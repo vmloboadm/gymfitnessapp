@@ -1,4 +1,5 @@
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
+import { demoTreinoData } from "~/lib/demo-bridge";
 import type { WorkoutLogs } from "~/lib/types/models";
 
 /**
@@ -34,9 +35,6 @@ let demoSingleton: TodayWorkout | null = null;
 /** Demo: sempre o MESMO objeto (logs idênticos nas duas telas). */
 export function getTodayWorkout(): TodayWorkout {
   if (!demoSingleton) {
-    // import tardio evita ciclo de módulo com demo-bridge
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { demoTreinoData } = require("~/lib/demo-bridge") as typeof import("~/lib/demo-bridge");
     demoSingleton = build(demoTreinoData().logs as WorkoutLogs[]);
   }
   return demoSingleton;
