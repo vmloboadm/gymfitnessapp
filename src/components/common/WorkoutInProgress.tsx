@@ -39,6 +39,12 @@ export default function WorkoutInProgress({
   const current = exercises[doneCount];
   const allDone = doneCount >= exercises.length;
 
+
+  useEffect(() => {
+    if (!allDone) return;
+    navigator.vibrate?.([60, 40, 60]);
+  }, [allDone]);
+
   // harden: lista vazia nunca quebra — oferece encerrar direto
   if (!exercises || exercises.length === 0) {
     return (
@@ -54,11 +60,6 @@ export default function WorkoutInProgress({
       </div>
     );
   }
-
-  useEffect(() => {
-    if (!allDone) return;
-    navigator.vibrate?.([60, 40, 60]);
-  }, [allDone]);
 
   const markCurrent = () => {
     navigator.vibrate?.(35);
