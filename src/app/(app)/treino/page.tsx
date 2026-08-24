@@ -145,7 +145,7 @@ export default function TreinoHomePage() {
       const programId = (workouts as StudentWorkouts).program_id;
       const programRes = await supabase.from("workout_programs").select("*").eq("id", programId).maybeSingle();
       const daysRes = await supabase.from("workout_days").select("*").eq("program_id", programId).order("day_order", { ascending: true });
-      const logsRes = await supabase.from("workout_logs").select("date, weight_kg, reps").eq("student_id", user.id).gte("date", new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10));
+      const logsRes = await supabase.from("workout_logs").select("date, weight_kg, reps").eq("student_id", user.id).gte("date", new Date(Date.now() - 13 * 86400000).toISOString().slice(0, 10));
 
       if (daysRes.error || logsRes.error) return errorResult(daysRes.error?.message ?? logsRes.error?.message ?? "Erro");
 
