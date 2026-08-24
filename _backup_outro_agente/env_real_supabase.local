@@ -1,0 +1,17 @@
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://jeixbpucnxrhizqpapyv.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_7XIQOGkCszn4daSJI6vU4g_fNCvV4RL
+SUPABASE_SERVICE_ROLE_KEY=***  # Ainda pendente
+
+# OpenRouter (IA) — OmniRoute
+OPENROUTER_API_KEY=***  # Ainda pendente
+OPENROUTER_MODEL=mistralai/mistral-large-latest
+
+# App
+NEXT_PUBLIC_APP_URL=https://app.gymfitness.com
+NEXT_PUBLIC_GYM_NAME=GymFitness
+NEXT_PUBLIC_GYM_SLUG=gymfitness
+
+# PWA
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=***  # Ainda pendente
+VAPID_PRIVATE_KEY=***  # Ainda pendente

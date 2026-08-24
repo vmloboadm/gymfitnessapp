@@ -1,0 +1,8 @@
+# Supabase CLI config — usada por `supabase db push` e edge functions.
+project_id = "gymfitness"
+
+[db]
+major_version = 15
+
+[auth]
+enabled = true

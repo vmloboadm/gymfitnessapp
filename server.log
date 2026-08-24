@@ -1,0 +1,16 @@
+ ⨯ Failed to start server
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at /root/.hermes/home/.hermes/gym-app/node_modules/next/dist/server/lib/start-server.js:280:16
+    at new Promise (<anonymous>)
+    at startServer (/root/.hermes/home/.hermes/gym-app/node_modules/next/dist/server/lib/start-server.js:191:11)
+    at Module.nextStart (/root/.hermes/home/.hermes/gym-app/node_modules/next/dist/cli/next-start.js:25:40)
+    at /root/.hermes/home/.hermes/gym-app/node_modules/next/dist/bin/next:105:856 {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}

@@ -1,0 +1,11 @@
+-- 005_add_day_pass.sql — (reservado) Ajustes futuros no fluxo day-pass.
+
+-- Ao ativar day-pass com QR via gestor, este trigger pode ser adicionado.
+-- create or replace function public.expire_day_pass()
+-- returns trigger as $$
+-- begin
+--   if now() > new.expires_at then
+--     new.status := 'expired';
+--   end if;
+--   return new;
+-- end; $$ language plpgsql;

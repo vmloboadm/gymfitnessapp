@@ -3,25 +3,584 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Identidade de marca GymFitness (plano de elevação §0):
+     #050507 near-black levemente azulado (fundo) / laranja #F4711E (destaque único).
+     Direção aprovada: Performance Telemetry x Premium Dark (Whoop/Tonal). */
+  --bg-base: #050507;
+  --bg-card: #0B1A33;
+  --bg-elevated: #16294C;
+  --accent: #F4711E;
+  --success: #33D17A;
+  --warning: #FF9F43;
+  --text-primary: #F3F6FC;
+  --text-secondary: #96A4BC;
+
+  --background: #050507;
+  --foreground: #F3F6FC;
+  --card: #0B1A33;
+  --card-foreground: #F3F6FC;
+  --muted: #12243F;
+  --muted-foreground: #96A4BC;
+  --border: rgba(147, 172, 207, 0.14);
+  --input: rgba(147, 172, 207, 0.22);
+  --ring: rgba(255, 111, 22, 0.55);
+  --brand: #FF6F16;
+  --brand-dark: #C84E04;
+  /* Texto escuro sobre laranja vibrante: contraste 6.8:1 (WCAG AA/AAA-large).
+     Branco sobre #FF6F16 dava 2.78:1 — reprovação no Lighthouse a11y. */
+  --brand-foreground: #1a0d04;
+  --brand-soft: rgba(255, 111, 22, 0.14);
+  --accent-foreground: #F3F6FC;
+  --secondary: #12243F;
+  --secondary-foreground: #C8D4EA;
+  --destructive: #FF4D4D;
+  --destructive-foreground: #ffffff;
+  --success-foreground: #04150c;
+  --warning-foreground: #1a1204;
+  --radius: 12px;
+
+  /* Fontes — 3 papéis (manual de marca) */
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg-base: #F5F7FC;
+    --bg-card: #FFFFFF;
+    --bg-elevated: #FFFFFF;
+    --accent: #E85D0E;
+    --success: #1FA25D;
+    --warning: #CF7213;
+    --text-primary: #0B1A33;
+    --text-secondary: #5C6B85;
+
+    --background: #F5F7FC;
+    --foreground: #0B1A33;
+    --card: #FFFFFF;
+    --card-foreground: #0B1A33;
+    --muted: #E9EEF7;
+    --muted-foreground: #5C6B85;
+    --border: rgba(11, 26, 51, 0.12);
+    --input: rgba(11, 26, 51, 0.16);
+    --ring: rgba(255, 111, 22, 0.4);
+    --brand: #FF6F16;
+    --brand-dark: #C84E04;
+    --brand-foreground: #1a0d04;
+    --brand-soft: rgba(255, 111, 22, 0.1);
+    --accent: rgba(11, 26, 51, 0.06);
+    --secondary: #E9EEF7;
+    --secondary-foreground: #2C3A57;
+    --destructive: #E03A2E;
+    --warning: #CF7213;
   }
+}
+
+* {
+  border-color: var(--border);
 }
 
 body {
   color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--background);
+  background-image:
+    radial-gradient(920px 540px at 88% -6%, rgba(244, 113, 30, 0.05), transparent 62%),
+    radial-gradient(820px 620px at -14% 32%, rgba(74, 222, 128, 0.05), transparent 62%),
+    radial-gradient(700px 520px at 55% 118%, rgba(244, 113, 30, 0.035), transparent 62%);
+  background-attachment: local;
+  font-family: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* grão de filme + hairline de brilho no topo (elementos next-gen) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+}
+
+@media (prefers-color-scheme: light) {
+  body::before {
+    opacity: 0.028;
+  }
+  body {
+    background-image:
+      radial-gradient(920px 540px at 88% -6%, rgba(232, 93, 14, 0.055), transparent 62%),
+      radial-gradient(820px 620px at -14% 32%, rgba(31, 162, 93, 0.05), transparent 62%),
+      radial-gradient(700px 520px at 55% 118%, transparent, transparent 62%);
+  }
+}
+
+/* Papéis tipográficos do manual de marca v1 */
+.font-display { font-family: var(--font-display), sans-serif; }
+.font-body { font-family: var(--font-body), sans-serif; }
+.font-mono { font-family: var(--font-mono), monospace; }
+
+h1, h2, h3, .gf-card-title, .gf-label, button { font-family: var(--font-display), sans-serif; }
+.gf-card-text { font-family: var(--font-body), sans-serif; }
+
+/* ---------- utilidades ---------- */
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+/* performance/accessibilidade (design-taste-frontend + accessibility skills):
+   respeita usuários que pedem menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-accordion-down,
+  .animate-accordion-up,
+  .skeleton-line,
+  .hero-live-dot,
+  .sheen,
+  .flame-flicker,
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .sheen {
+    display: none;
+  }
+}
+
+/* ---------- design tokens reutilizáveis (8.2) ---------- */
+/* SISTEMA DE PROFUNDIDADE — glassmorphism em camada (todo card segue a receita):
+   fundo translúcido + blur + border rgba(255,255,255,0.09) + sombra profunda. */
+.gf-card {
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.03) 100%);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  padding: 16px; /* múltiplo de 8 */
+}
+/* Elevação extra sobre o deep navy + brilho superior */
+.gf-glass {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(22, 41, 76, 0.42) 30%, rgba(11, 26, 51, 0.55) 100%);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 1px 0 0 rgba(255, 255, 255, 0.06) inset;
+}
+/* Edge-light: bordo aceso no hover (dispositivo com ponteiro) */
+@media (hover: hover) {
+  .gf-card {
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.22s ease, box-shadow 0.22s ease;
+  }
+  .gf-card:hover {
+    border-color: rgba(255, 255, 255, 0.17);
+    box-shadow: 0 26px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.03) inset, 0 4px 24px rgba(244, 113, 30, 0.06);
+    transform: translateY(-1px);
+  }
+}
+/* Varredura de brilho diagonal (hero) */
+@keyframes sheen-sweep {
+  0% { transform: translateX(-160%) skewX(-18deg); }
+  60%, 100% { transform: translateX(260%) skewX(-18deg); }
+}
+.sheen {
+  position: absolute;
+  top: -60%;
+  bottom: -60%;
+  width: 34%;
+  left: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+  transform: translateX(-160%) skewX(-18deg);
+  animation: sheen-sweep 5.5s cubic-bezier(0.2, 0.7, 0.3, 1) 0.8s both;
+  pointer-events: none;
+}
+
+/* chama de streak — cintilação sutil em streaks altos */
+@keyframes flame-flicker {
+  0%, 100% { transform: scaleY(1) scaleX(1); }
+  25% { transform: scaleY(1.06) scaleX(0.97); }
+  50% { transform: scaleY(0.96) scaleX(1.03); }
+  75% { transform: scaleY(1.04) scaleX(0.98); }
+}
+.flame-flicker {
+  animation: flame-flicker 0.9s ease-in-out infinite;
+}
+/* Glow ativo (hero, liga): sombra padrão + halo colorido da marca */
+.gf-glow {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 0 30px rgba(244, 113, 30, 0.18);
+}
+/* Glow pulsante para conteúdo novo/não visto (ex: insight) */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 0 0 rgba(244, 113, 30, 0); }
+  50% { box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 0 26px rgba(244, 113, 30, 0.32); }
+}
+.gf-glow-pulse {
+  animation: glow-pulse 2.6s ease-in-out infinite;
+}
+/* Cabeçalho de seção consistente */
+.gf-section {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted-foreground);
+}
+/* Número herói (mono, tabular) */
+.gf-hero-num {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--foreground);
+}
+/* Título de card: 15px semibold */
+.gf-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+  line-height: 1.4;
+}
+/* Texto de apoio: 13px regular, cor secundária */
+.gf-card-text {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+/* Etiqueta de seção (uppercase pequeno) */
+.gf-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+}
+/* Área de toque mínima 44px (8.3) */
+.gf-touch {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* acessibilidade (ui-ux-pro-max v3 + accessibility skills):
+   cursor pointer em elementos clicáveis e foco visível por teclado */
+button:not(:disabled),
+a[href],
+input[type="submit"] {
+  cursor: pointer;
+}
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* ---------- accordion (radix) ---------- */
+@keyframes accordion-down {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+.animate-accordion-down { animation: accordion-down 0.2s ease-out; }
+.animate-accordion-up { animation: accordion-up 0.2s ease-out; }
+
 @layer utilities {
+  .min-h-safe {
+    min-height: calc(100dvh - env(safe-area-inset-bottom));
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
   .text-balance {
     text-wrap: balance;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* skeleton shimmer */
+.skeleton-line {
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--muted) 25%, rgba(120, 145, 190, 0.18) 40%, var(--muted) 55%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s linear infinite;
+}
+
+/* dot de "ao vivo" (pulse verde) */
+.hero-live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--success);
+  animation: live-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* feedback tátil mobile */
+.tactile {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.15s ease;
+}
+.tactile:active {
+  transform: scale(0.975);
+}
+
+/* entrada em cascata das seções (leve: só transform/opacity) */
+@keyframes gf-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.gf-rise {
+  animation: gf-rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* progresso de faixa tocando (loop suave, só width) */
+@keyframes track-progress {
+  from { width: 4%; }
+  to { width: 96%; }
+}
+.track-progress {
+  animation: track-progress 12s linear infinite alternate;
+}
+
+/* scrollbar discreto */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* surfaces do navegador vestidas pelo tema (craft-floor) */
+::selection {
+  background: rgba(244, 113, 30, 0.35);
+  color: var(--foreground);
+}
+input,
+textarea {
+  caret-color: var(--brand);
+}
+
+/* ---------- mapa corporal (body-map.tsx) ---------- */
+.region-zone {
+  transition: filter 0.18s ease;
+}
+.region-zone:hover {
+  filter: brightness(1.24);
+}
+.region-zone:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 20px;
+}
+.rz-path {
+  transition: opacity 0.18s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bmap-scan-g {
+    display: none;
+  }
+}
+
+/* ---------- Performance Telemetry x Premium Dark (design system atual) ----------
+   Superfícies em camada: containers grandes, borda hairline rgba(255,255,255,.04),
+   padding generoso p-6/p-8. Dado é o herói. Zero emoji. */
+.pm-surface {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.008) 100%);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* hairline superior nas superfícies — luz incide no topo do objeto */
+.pm-surface::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+  pointer-events: none;
+}
+
+/* rótulo de telemetria: mono, caixa alta, tracking largo, discreto */
+.pm-mono {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+/* número-herói: display Sora, tabular, tracking negativo */
+.pm-num {
+  font-family: var(--font-display), sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* separador hairline entre células de dados */
+.pm-divider {
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* anel volumétrico: luz cônica girando lentamente sobre a face de vidro */
+@keyframes ring-shine {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.ring-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(
+    transparent 0deg,
+    transparent 300deg,
+    rgba(255, 255, 255, 0.055) 330deg,
+    rgba(255, 255, 255, 0.14) 350deg,
+    transparent 360deg
+  );
+  animation: ring-shine 7s linear infinite;
+  pointer-events: none;
+}
+
+/* celulares limitados: sem conic animado (custo alto de composição) */
+@media (max-width: 479px) {
+  .ring-shine {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+@keyframes ring-breathe {
+  0%, 100% { filter: drop-shadow(0 0 14px rgba(244, 113, 30, 0.35)); }
+  50% { filter: drop-shadow(0 0 30px rgba(244, 113, 30, 0.6)); }
+}
+.ring-glow {
+  animation: ring-breathe 3.4s ease-in-out infinite;
+}
+.ring-glow-done {
+  animation: ring-breathe 3.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 22px rgba(74, 222, 128, 0.45));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring-shine,
+  .ring-glow,
+  .ring-glow-done {
+    animation: none !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* CAMADA ATMOSFÉRICA — orbs volumétricos em profundidade              */
+/* ------------------------------------------------------------------ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42rem 36rem at 86% -8%, rgba(255, 111, 22, 0.13), transparent 62%),
+    radial-gradient(48rem 42rem at -16% 28%, rgba(74, 222, 128, 0.07), transparent 62%),
+    radial-gradient(44rem 38rem at 60% 124%, rgba(255, 111, 22, 0.08), transparent 60%),
+    radial-gradient(30rem 26rem at 30% 8%, rgba(255, 111, 22, 0.05), transparent 65%);
+  animation: aurora-drift 30s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes aurora-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(0, 18px, 0) scale(1.05); }
+}
+
+/* ------------------------------------------------------------------ */
+/* SUPERFÍCIES DE VIDRO — gloss superior + brilho de marca no hover    */
+/* ------------------------------------------------------------------ */
+.pm-surface {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (hover: hover) {
+  a.pm-surface,
+  button.pm-surface,
+  section.pm-surface a {
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  section.pm-surface:has(a:hover),
+  a.pm-surface:hover {
+    border-color: rgba(255, 111, 22, 0.18);
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.62), 0 0 0 1px rgba(255, 111, 22, 0.07),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* PÁGINAS TEMÁTICAS — scrollbar, seleção, caret e foco                */
+/* ------------------------------------------------------------------ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 111, 22, 0.4) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(255, 111, 22, 0.4), rgba(255, 111, 22, 0.16));
+  border-radius: 999px;
+  border: 2px solid var(--background);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 111, 22, 0.55);
+}
+::selection {
+  background: rgba(255, 111, 22, 0.38);
+  color: #ffffff;
+}
+:focus-visible {
+  outline: 2px solid rgba(255, 111, 22, 0.7);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ouro dos números-herói — queda de luz sutil */
+.pm-num {
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 36px rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    animation: none;
   }
 }

@@ -1,0 +1,565 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Award,
+  Flame,
+  Users,
+  Dumbbell,
+  Compass,
+  Shield,
+  Zap,
+  Crown,
+  Star,
+  Target,
+  Lock,
+  CheckCircle2,
+  ChevronDown,
+  HelpCircle,
+  RotateCcw,
+} from "lucide-react";
+import { useAuth } from "~/hooks/useAuth";
+import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { supabaseBrowser } from "~/lib/supabase/client";
+import { TopBar } from "~/components/layout/TopBar";
+import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
+import { Progress } from "~/components/ui/progress";
+import { formatDate } from "~/lib/utils/format";
+import { cn } from "~/lib/utils";
+import type { Achievements, StudentAchievements } from "~/lib/types/models";
+
+type Ach = {
+  id: string;
+  name: string;
+  description: string;
+  points: number;
+  category: "consistencia" | "social" | "carga" | "exploracao" | "especial";
+  requirement: {
+    type: "checkins" | "streak" | "aulao" | "volume" | "recordes" | "reacoes" | "recebidas" | "grupos" | "aparelhos";
+    value: number;
+  };
+  icon: "award" | "flame" | "users" | "dumbbell" | "compass" | "shield" | "zap" | "crown" | "star" | "target";
+  how: string;
+  rarity: "common" | "rare" | "epic" | "legendary";
+} & Achievements;
+
+const CATEGORY_CONFIG = {
+  consistencia: {
+    label: "Consistência",
+    color: "#FF6F16",
+    bg: "rgba(255, 111, 22, 0.1)",
+    icon: Flame,
+    description: "Treine com regularidade e construa hábitos sólidos",
+  },
+  social: {
+    label: "Social",
+    color: "#38BDF8",
+    bg: "rgba(56, 189, 248, 0.1)",
+    icon: Users,
+    description: "Interaja com a comunidade e motive colegas",
+  },
+  carga: {
+    label: "Força & Carga",
+    color: "#FBBF24",
+    bg: "rgba(251, 191, 36, 0.1)",
+    icon: Dumbbell,
+    description: "Supere seus limites e bata recordes pessoais",
+  },
+  exploracao: {
+    label: "Exploração",
+    color: "#4ADE80",
+    bg: "rgba(74, 222, 128, 0.1)",
+    icon: Compass,
+    description: "Descubra novos exercícios e treine o corpo todo",
+  },
+  especial: {
+    label: "Especiais",
+    color: "#A78BFA",
+    bg: "rgba(167, 139, 250, 0.1)",
+    icon: Crown,
+    description: "Conquistas únicas para momentos especiais",
+  },
+} as const;
+
+const ICON_COMPONENTS = {
+  award: Award,
+  flame: Flame,
+  users: Users,
+  dumbbell: Dumbbell,
+  compass: Compass,
+  shield: Shield,
+  zap: Zap,
+  crown: Crown,
+  star: Star,
+  target: Target,
+};
+
+type Ach = {
+  id: string;
+  name: string;
+  description: string;
+  points: number;
+  category: "consistencia" | "social" | "carga" | "exploracao" | "especial";
+  requirement: {
+    type: "checkins" | "streak" | "aulao" | "volume" | "recordes" | "reacoes" | "recebidas" | "grupos" | "aparelhos";
+    value: number;
+  };
+  icon: keyof typeof ICON_COMPONENTS;
+  how: string;
+  rarity: "common" | "rare" | "epic" | "legendary";
+} & Achievements;
+
+const REQUIREMENT_LABELS: Record<string, string> = {
+  checkins: "check-ins",
+  streak: "dias seguidos",
+  aulao: "aulões",
+  volume: "kg movidos",
+  recordes: "recordes pessoais",
+  reacoes: "reações dadas",
+  recebidas: "reações recebidas",
+  grupos: "grupos musculares",
+  aparelhos: "aparelhos diferentes",
+};
+
+const RARITY_STYLES = {
+  common: { border: "border-white/10", glow: "none", label: "Comum" },
+  rare: { border: "border-blue-500/40", glow: "0 0 12px rgba(59,130,246,0.3)", label: "Rara" },
+  epic: { border: "border-purple-500/40", glow: "0 0 12px rgba(168,85,247,0.4)", label: "Épica" },
+  legendary: { border: "border-amber-500/50", glow: "0 0 16px rgba(255,194,77,0.5)", label: "Lendária" },
+} as const;
+
+function AchievementIcon({ icon, color, size = 28, unlocked = true }: { icon: keyof typeof ICON_COMPONENTS; color: string; size?: number; unlocked?: boolean }) {
+  const Comp = ICON_COMPONENTS[icon];
+  return (
+    <span
+      className="flex items-center justify-center"
+      style={{ width: size, height: size }}
+    >
+      <Comp
+        className="transition-all duration-300"
+        style={{
+          color: unlocked ? color : "rgba(255,255,255,0.25)",
+          filter: unlocked ? "none" : "grayscale(1)",
+          transform: unlocked ? "scale(1)" : "scale(0.9)",
+        }}
+        size={size * 0.65}
+        strokeWidth={unlocked ? 2 : 1.5}
+      />
+    </span>
+  );
+}
+
+function ProgressRing({ progress, size = 48, strokeWidth = 4, color = "#FF6F16" }: { progress: number; size?: number; strokeWidth?: number; color?: string }) {
+  const circumference = 2 * Math.PI * (size / 2 - 2);
+  const offset = circumference * (1 - progress / 100);
+  return (
+    <svg width={size} height={size} className="transform -rotate-90" role="img" aria-label={`Progresso ${progress}%`}>
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={size / 2 - 2}
+        fill="none"
+        stroke="rgba(255,255,255,0.08)"
+        strokeWidth={strokeWidth}
+      />
+      <motion.circle
+        cx={size / 2}
+        cy={size / 2}
+        r={size / 2 - 2}
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        initial={{ strokeDashoffset: circumference }}
+        animate={{ strokeDashoffset: offset }}
+        transition={{ duration: 1.2, ease: [0.2, 0.8, 0.2, 1], delay: 0.3 }}
+        style={{ filter: "drop-shadow(0 0 6px currentColor)" }}
+      />
+    </svg>
+  );
+}
+
+function RequirementBadge({ type, current, target, color }: { type: string; current: number; target: number; color: string }) {
+  const progress = Math.min(100, Math.round((current / target) * 100));
+  return (
+    <div className="flex items-center gap-2">
+      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold text-white/80" style={{ background: `linear-gradient(135deg, ${color}22, ${color}0d)` }}>
+        <span className="font-mono text-[9px] text-white">{current}</span>
+        <span className="text-white/40">/</span>
+        <span className="font-mono text-[9px] text-white">{target}</span>
+        <span className="text-white/50">{REQUIREMENT_LABELS[type] ?? type}</span>
+      </span>
+      <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: `linear-gradient(90deg, ${color}80, ${color})`, boxShadow: `0 0 8px ${color}` }}
+          initial={{ width: 0 }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 1, ease: [0.2, 0.8, 0.2, 1], delay: 0.4 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function AchievementCard({
+  achievement,
+  unlocked,
+  earnedAt,
+  currentProgress,
+  onToggle,
+  isOpen,
+}: {
+  achievement: Ach;
+  unlocked: boolean;
+  earnedAt: string | null;
+  currentProgress: { current: number; target: number };
+  onToggle: () => void;
+  isOpen: boolean;
+}) {
+  const cat = CATEGORY_CONFIG[achievement.category];
+  const IconComp = ICON_COMPONENTS[achievement.icon];
+  const rarity = RARITY_STYLES[achievement.rarity];
+  const req = achievement.requirement;
+
+  return (
+    <motion.div
+      layout
+      key={achievement.id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.05 }}
+      className="group relative overflow-hidden"
+    >
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-2xl border p-5 transition-all duration-300",
+          unlocked
+            ? "border-brand/30 bg-gradient-to-br from-brand/5 via-card to-card shadow-[0_8px_32px_-8px_rgba(244,113,30,0.15)]"
+            : "border-white/8 bg-white/3 opacity-70 hover:border-white/15",
+          !unlocked && "opacity-60"
+        )}
+        style={{ boxShadow: rarity.glow }}
+      >
+        {/* Rarity indicator bar */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r" style={{ background: `linear-gradient(90deg, ${cat.color}00, ${cat.color}, ${cat.color}00)` }} />
+
+        {/* Header: icon + category + rarity */}
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="relative flex-shrink-0">
+              <div
+                className="flex items-center justify-center rounded-[14px]"
+                style={{
+                  width: 48,
+                  height: 48,
+                  background: unlocked
+                    ? `linear-gradient(135deg, ${cat.color}22, ${cat.color}08)`
+                    : "rgba(255,255,255,0.04)",
+                  border: unlocked ? `1px solid ${cat.color}40` : "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <AchievementIcon icon={achievement.icon} color={cat.color} size={36} unlocked={unlocked} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground">{achievement.name}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider text-white/80" style={{ background: `linear-gradient(135deg, ${cat.color}33, ${cat.color}11)` }}>
+                    <cat.icon className="h-2.5 w-2.5" style={{ color: cat.color }} />
+                    <span className="text-[9px] font-semibold">{cat.label}</span>
+                  </span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider text-white" style={{ background: `linear-gradient(135deg, ${rarity.border}33, ${rarity.border}11)` }}>
+                    <span style={{ color: rarity.border }}>{rarity.label}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            {unlocked && earnedAt && (
+              <div className="text-right">
+                <p className="pm-mono text-[10px] text-green-400">conquistada</p>
+                <p className="pm-mono text-[9px] text-muted-foreground">{formatDate(earnedAt)}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Description & How it works */}
+          <div className="mb-4">
+            <p className="text-sm leading-relaxed text-muted-foreground mb-3">{achievement.description}</p>
+            <div className="rounded-xl p-3 bg-white/3 border border-white/5">
+              <div className="flex items-center gap-1.5 mb-2">
+                <HelpCircle className="h-3.5 w-3.5 text-brand" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-brand">Como conquistar</span>
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground/90">{achievement.how}</p>
+            </div>
+          </div>
+
+          {/* Progress / Requirements */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="pm-mono text-[10px] uppercase tracking-wider text-muted-foreground">Requisito</span>
+              <span className="pm-mono text-[10px] font-semibold text-brand">{currentProgress.current} / {currentProgress.target}</span>
+            </div>
+            <RequirementBadge
+              type={req.type}
+              current={Math.min(currentProgress.current, currentProgress.target)}
+              target={currentProgress.target}
+              color={cat.color}
+            />
+            <p className="mt-2 text-[11px] text-muted-foreground/80">
+              {unlocked ? "Conquista liberada! 🎉" : `Faltam ${Math.max(0, currentProgress.target - currentProgress.current)} ${REQUIREMENT_LABELS[req.type] ?? req.type} para desbloquear`}
+            </p>
+          </div>
+
+          {/* Rewards */}
+          <div className="flex items-center justify-between pt-3 border-t border-white/5">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center rounded-full bg-brand/15 text-brand p-1.5">
+                <Star className="h-3.5 w-3.5" />
+              </span>
+              <span className="pm-num text-lg font-extrabold text-foreground">{achievement.points}</span>
+              <span className="pm-mono text-[10px] text-muted-foreground">pontos</span>
+            </div>
+            <motion.button
+              onClick={onToggle}
+              className="tactile flex items-center gap-1.5 rounded-full border border-white/10 bg-white/3 px-3 py-1.5 text-xs font-semibold transition-all"
+              style={{ background: "rgba(255,255,255,0.03)" }}
+              aria-expanded={isOpen}
+              aria-controls={`achievement-details-${achievement.id}`}
+            >
+              <span className="text-[11px] font-semibold">{isOpen ? "ver menos" : "ver detalhes"}</span>
+              <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200" style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+            </motion.button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function CategorySection({
+  category,
+  achievements,
+  unlockedCount,
+  totalCount,
+}: {
+  category: keyof typeof CATEGORY_CONFIG;
+  achievements: Ach[];
+  unlockedCount: number;
+  totalCount: number;
+}) {
+  const cat = CATEGORY_CONFIG[category];
+  return (
+    <motion.div role="section"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.1 }}
+    >
+      <div className="mb-4 flex items-center gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center rounded-[12px] p-2" style={{ background: cat.bg }}>
+              {(() => { const Icon = cat.icon; return <Icon className="h-5 w-5" style={{ color: cat.color }} /> })()}
+            </div>
+            <div>
+              <h3 className="font-display text-lg font-bold text-foreground">{cat.label}</h3>
+              <p className="text-xs text-muted-foreground">{cat.description}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+          <ProgressRing progress={totalCount > 0 ? Math.round((achievements.filter(a => a.earned_at).length / totalCount) * 100) : 0} size={36} strokeWidth={3} color={cat.color} />
+          <div className="text-right">
+            <p className="pm-num text-xl font-extrabold text-foreground">
+              {achievements.filter(a => a.earned_at).length} / {totalCount}
+            </p>
+            <p className="pm-mono text-[9px] text-muted- uppercase">{Math.round((achievements.filter(a => a.earned_at).length / totalCount) * 100)}% completo</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {achievements.map((a, i) => (
+          <AchievementCard
+            key={a.id}
+            achievement={a}
+            unlocked={!!a.earned_at}
+            earnedAt={a.earned_at}
+            currentProgress={{
+              current: 0, // será calculado no parent
+              target: a.requirement.value,
+            }}
+            onToggle={() => {}}
+            isOpen={false}
+          />
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+export default function ConquistasPage() {
+  const { user, profile } = useAuth();
+
+  const { data, loading, error, refetch } = useAsyncQuery<{ list: Ach[]; progress: number }>(
+    async () => {
+      const supabase = supabaseBrowser();
+      if (!user || !profile) return { data: null, error: { message: "Sessão indisponível" } };
+
+      const achRes = await supabase
+        .from("achievements")
+        .select("*")
+        .or(`gym_id.is.null,gym_id.eq.${profile.gym_id}`);
+      if (achRes.error) return { data: null, error: achRes.error };
+
+      const mineRes = await supabase
+        .from("student_achievements")
+        .select("achievement_id, earned_at")
+        .eq("student_id", user.id);
+      if (mineRes.error) return { data: null, error: mineRes.error };
+
+      const achievements = (achRes.data ?? []) as Achievements[];
+      const mine = (mineRes.data ?? []) as StudentAchievements[];
+      const earnedMap = new Map(mine.map((m) => [m.achievement_id, m.earned_at]));
+
+      const list = achievements.map((a) => ({
+        ...a,
+        sort: a.gym_id === null ? 0 : 1,
+        earned_at: earnedMap.get(a.id) ?? null,
+      })).sort((a, b) => (a.earned_at === null ? 1 : 0) - (b.earned_at === null ? 1 : 0) || a.sort - b.sort);
+
+      return {
+        data: { list, progress: achievements.length ? Math.round((mine.length / achievements.length) * 100) : 0 },
+        error: null,
+      };
+    },
+    [user?.id, profile?.id]
+  );
+
+  const earnedCount = useMemo(() => data?.list.filter((a) => a.earned_at).length ?? 0, [data?.list]);
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+  const [openAchievements, setOpenAchievements] = useState<Record<string, boolean>>({});
+
+  // Enriquecer conquistas com dados enriquecidos
+  const enrichedAchievements = useMemo(() => {
+    if (!data?.list) return [] as Ach[];
+    return data.list.map((a) => {
+      const cat = CATEGORY_CONFIG[a.category as keyof typeof CATEGORY_CONFIG] || CATEGORY_CONFIG.consistencia;
+      return {
+        ...a,
+        category: a.category as Ach["category"],
+        icon: (a.icon as Ach["icon"]) ?? "award",
+        requirement: {
+          type: (a.requirement?.type as Ach["requirement"]["type"]) ?? "checkins",
+          value: a.requirement?.value ?? 1,
+        },
+        icon: (a.icon as Ach["icon"]) ?? "award",
+        how: a.description || "Complete o requisito para desbloquear.",
+        rarity: (a.rarity as Ach["rarity"]) ?? "common",
+      } as Ach;
+    });
+  }, [data?.list]);
+
+  const categories = (["consistencia", "social", "carga", "exploracao", "especial"] as const).map(cat => {
+    const achievements = enrichedAchievements.filter(a => a.category === cat);
+    const unlocked = achievements.filter(a => a.earned_at).length;
+    return { cat, achievements, unlocked, total: achievements.length };
+  }).filter(c => c.achievements.length > 0);
+
+  const earnedCount = useMemo(() => data?.list.filter((a) => a.earned_at).length ?? 0, [data?.list]);
+
+  if (loading) {
+    return (
+      <>
+        <TopBar title="Conquistas" subtitle={`${earnedCount}/${data?.list.length ?? 0} liberadas`} />
+        <div className="space-y-6 p-4">
+          <SkeletonList rows={8} />
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <TopBar title="Conquistas" />
+        <div className="space-y-6 p-4">
+          <ErrorState message={error} onRetry={refetch} />
+        </div>
+      </>
+    );
+  }
+
+  if (!data?.list.length) {
+    return (
+      <>
+        <TopBar title="Conquistas" subtitle="Nenhuma conquista disponível" />
+        <div className="space-y-6 p-4">
+          <EmptyState title="Nenhuma conquista configurada" description="As conquistas globais ainda não foram liberadas nesta academia." icon={Award} />
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <TopBar title="Conquistas" subtitle={`${earnedCount}/${data?.list.length ?? 0} liberadas`} />
+      <div className="space-y-6 p-4">
+        {/* Progresso Geral */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="pm-surface overflow-hidden"
+        >
+          <div className="flex items-center justify-between px-6 py-5 border-b border-white/5">
+            <div>
+              <p className="pm-mono text-[#7E8AA0]">Progresso Geral</p>
+              <h2 className="mt-1 font-display text-2xl font-bold text-foreground">Sua jornada de conquistas</h2>
+            </div>
+            <ProgressRing progress={data?.progress ?? 0} size={72} strokeWidth={5} color="#FF6F16" />
+          </div>
+          <div className="px-6 pb-5">
+            <Progress value={data?.progress ?? 0} className="h-1.5" />
+            <div className="mt-3 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{data?.list.filter(a => a.earned_at).length} de {data?.list.length} conquistas desbloqueadas</span>
+              <span className="pm-mono text-brand">{data?.progress ?? 0}% completo</span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Legenda de siglas - sempre visível */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="rounded-[16px] border border-white/8 bg-white/3 p-4"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <HelpCircle className="h-4 w-4 text-brand" />
+            <span className="pm-mono text-[10px] uppercase tracking-wider text-brand">Como ler suas conquistas</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] leading-relaxed">
+            <div className="flex items-center gap-1.5 text-[#7E8AA0]"><span className="font-semibold text-[#BFC7D8]">CI</span><span>= Check-in (ir à academia)</span></div>
+            <div className="flex items-center gap-1.5 text-[#7E8AA0]"><span className="font-semibold text-[#BFC7D8]">STK</span><span>= Sequência de dias seguidos</span></div>
+            <div className="flex items-center gap-1.5 text-[#7E8AA0]"><span className="font-semibold text-[#BFC7D8]">AUL</span><span>= Aulão coletivo</span></div>
+            <div className="flex items-center gap-1.5 text-[#7E8AA0]"><span className="font-semibold text-[#BFC7D8]">REC</span><span>= Recorde pessoal</span></div>
+          </div>
+        </motion.div>
+
+        {/* Categorias */}
+        <div className="space-y-8">
+          {categories.map(({ cat, achievements, unlocked, total }) => (
+            <CategorySection
+              key={cat}
+              category={cat}
+              achievements={achievements}
+              unlockedCount={unlocked}
+              totalCount={total}
+            />
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
