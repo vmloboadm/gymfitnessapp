@@ -1,6 +1,6 @@
 /**
  * Camada de dados compartilhada para dashboard/tickers (pro-frontend-standards §7).
- * Centraliza constantes e fetches normalizados — rotas de API e páginas
+ * Centraliza constantes e fetches normalizados, rotas de API e páginas
  * consomem este módulo, sem fetch duplicado.
  */
 
@@ -66,7 +66,7 @@ export function buildFrequencySeries(
 }
 
 /**
- * Fonte única do "Treino de Hoje" — Dashboard e aba Treino leem daqui,
+ * Fonte única do "Treino de Hoje", Dashboard e aba Treino leem daqui,
  * garantindo que o nome exibido seja sempre o mesmo nos dois lugares.
  */
 export function todayWorkoutTitle(programName: string | null | undefined): string {

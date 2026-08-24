@@ -38,7 +38,7 @@ export function OfflineSyncListener() {
           window.localStorage.removeItem(STORAGE_KEY);
         }
       } catch {
-        // offline de novo — mantém a fila para a próxima tentativa
+        // offline de novo, mantém a fila para a próxima tentativa
       }
     };
 

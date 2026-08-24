@@ -3,7 +3,7 @@
 import { Sparkles } from "lucide-react";
 
 /**
- * Dica GymFitness — em produção, o `text` vem da rota /api/ai-tip
+ * Dica GymFitness, em produção, o `text` vem da rota /api/ai-tip
  * (LLM gera dica personalizada por sessões/estatísticas do aluno).
  * Hoje é uma rotação de frases educativas locais (TIPS) como fallback.
  */

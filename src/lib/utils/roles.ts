@@ -17,7 +17,7 @@ export const ROLE_GROUP: Record<Role, string> = {
   admin: "(admin)",
 };
 
-/** Home path por role — usado no middleware p/ redirect pós-login. */
+/** Home path por role, usado no middleware p/ redirect pós-login. */
 export const ROLE_HOME: Record<Role, string> = {
   student: "/treino",
   trainer: "/alunos",

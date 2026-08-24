@@ -7,7 +7,7 @@ import { cn } from "~/lib/utils";
 import { recoveryState } from "~/lib/today-workout";
 
 /**
- * Mapa corporal GymFitness — SVG anatômico REAL (react-body-highlighter).
+ * Mapa corporal GymFitness, SVG anatômico REAL (react-body-highlighter).
  *
  * Estados visíveis SEM tocar (cor com função):
  *   verde  = grupo recuperado/liberado

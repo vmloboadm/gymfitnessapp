@@ -9,7 +9,7 @@ let cache: Cached | null = null;
 const TTL_MS = 10 * 60 * 1000;
 
 /**
- * GET /api/frequencia/resumo-semana — comparativo de frequência (pro-frontend
+ * GET /api/frequencia/resumo-semana, comparativo de frequência (pro-frontend
  * standards §3/§7). Cache TTL 10min; sem sessão → 401. Fallback: mesmos dados
  * estadísticos construídos no módulo (sem chamada externa, não há o que falhar).
  */

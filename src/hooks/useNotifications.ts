@@ -11,12 +11,12 @@ export function registerServiceWorker() {
   if (typeof window === "undefined") return;
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {
-      // SW indisponível (dev/sem https) — não quebra o app
+      // SW indisponível (dev/sem https), não quebra o app
     });
   }
 }
 
-/** Central de notificações in-app (blueprint §5.4 — canal por usuário). */
+/** Central de notificações in-app (blueprint §5.4, canal por usuário). */
 export function useNotifications(userId?: string) {
   const [items, setItems] = useState<Notifications[]>([]);
   const [unread, setUnread] = useState(0);

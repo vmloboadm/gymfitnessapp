@@ -38,7 +38,7 @@ import type {
  *
  * ATENÇÃO: para gerar tipos exatos do banco, rode `supabase gen types typescript`
  * apontando para o projeto. Este arquivo manual é o contrato de domínio usado
- * enquanto o banco não está conectado — a estrutura espelha o schema SQL.
+ * enquanto o banco não está conectado, a estrutura espelha o schema SQL.
  */
 export interface Database {
   public: {

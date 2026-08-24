@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bot, Send, X, Sparkles } from "lucide-react";
 
 /**
- * Personal Digital — bolha de chat flutuante presente nas telas principais do
+ * Personal Digital, bolha de chat flutuante presente nas telas principais do
  * aluno (plano §IA). Conversa livre em texto com streaming simulado
  * (resposta aparece progressivamente). Escuta o evento `gf-ask-ai`
  * para abrir com contexto pré-preenchido ("Perguntar à IA" por exercício).
@@ -22,21 +22,21 @@ const QUICK = [
 function answerFor(q: string): string {
   const s = q.toLowerCase();
   if (s.includes("perna") || s.includes("quadri") || s.includes("joelho")) {
-    return "Dá sim! Treinar perna em dias seguidos só atrapalha se bater 100% de intensidade nas duas sessões. Regra prática: alterna intensidade — se ontem foi pesado e hoje ainda está dolorido, faça o treino em 70–80% da carga e reduza o volume. Articulações gostam de movimento, músculo precisa de descanso para crescer.";
+    return "Dá sim! Treinar perna em dias seguidos só atrapalha se bater 100% de intensidade nas duas sessões. Regra prática: alterna intensidade, se ontem foi pesado e hoje ainda está dolorido, faça o treino em 70–80% da carga e reduza o volume. Articulações gostam de movimento, músculo precisa de descanso para crescer.";
   }
   if (s.includes("supino") || s.includes("peito") || s.includes("ombro") || s.includes("dor no ombro")) {
-    return "Dor de ombro no supino quase sempre é amplitude + retração. 1) Retraia as escápulas antes de deitar (empurre o peito pra cima). 2) Não afunde a barra na altura dos ombros — desça até a linha do mamilo. 3) Se doer mesmo assim, reduza a carga e feche a pegada 2 dedos. Quer que eu sugira um aquecimento de 2 minutos para o ombro?";
+    return "Dor de ombro no supino quase sempre é amplitude + retração. 1) Retraia as escápulas antes de deitar (empurre o peito pra cima). 2) Não afunde a barra na altura dos ombros, desça até a linha do mamilo. 3) Se doer mesmo assim, reduza a carga e feche a pegada 2 dedos. Quer que eu sugira um aquecimento de 2 minutos para o ombro?";
   }
   if (s.includes("cansad") || s.includes("foga") || s.includes("fadiga") || s.includes("dificil") || s.includes("desist")) {
-    return "Sentir queda na última série é normal (é a falência chegando). Se isso virou rotina, não é preguiça — pode ser volume alto demais. Duas correções: (1) deixa 1–2 repetições sempre em reserva nas primeiras séries e (2) revisa o descanso — 90s a 120s aumenta bastante a sua recuperação entre séries.";
+    return "Sentir queda na última série é normal (é a falência chegando). Se isso virou rotina, não é preguiça, pode ser volume alto demais. Duas correções: (1) deixa 1–2 repetições sempre em reserva nas primeiras séries e (2) revisa o descanso, 90s a 120s aumenta bastante a sua recuperação entre séries.";
   }
   if (s.includes("peso") || s.includes("carga") || s.includes("aumentar") || s.includes("progress") || s.includes("evolu")) {
     return "Regra de progressão simples e segura: quando você concluir todas as séries com 2 repetições de sobra na última, suba a carga. Ex.: 4×12 com folga → 4×8 com o peso novo, subindo 1–2 reps por semana até voltar a 12. Carga sobe de pouco em pouco; o real segredo é a consistência."
   }
   if (s.includes("crucifixo") || s.includes("aparelho ocupado") || s.includes("substitu") || s.includes("trocar")) {
-    return "Ótima escolha. Trocar o aparelho ocupado por um exercício de músculo igual mantém o estímulo do dia. Ex.: supino reto → crucifixo com halteres (mesma dorsoflexão), agachamento → leg press (mesma cadeia). Só não troque puxado por empurrado — o estímulo muda de grupo.";
+    return "Ótima escolha. Trocar o aparelho ocupado por um exercício de músculo igual mantém o estímulo do dia. Ex.: supino reto → crucifixo com halteres (mesma dorsoflexão), agachamento → leg press (mesma cadeia). Só não troque puxado por empurrado, o estímulo muda de grupo.";
   }
-  return "Boa pergunta! Sou seu coach de treino. Sobre isso: o ideal é respeitar a sua recuperação e manter consistência — aliás, esse ponto já é coberto pelo seu plano. Me conte mais do contexto (qual exercício, qual dor, qual intensidade) que eu trago uma resposta mais específica. E lembre: qualquer ponto de dúvida vale você anotar aqui que a gente conversa em tempo real.";
+  return "Boa pergunta! Sou seu coach de treino. Sobre isso: o ideal é respeitar a sua recuperação e manter consistência, aliás, esse ponto já é coberto pelo seu plano. Me conte mais do contexto (qual exercício, qual dor, qual intensidade) que eu trago uma resposta mais específica. E lembre: qualquer ponto de dúvida vale você anotar aqui que a gente conversa em tempo real.";
 }
 
 export function openAiCoach(query: string) {
@@ -134,7 +134,7 @@ export default function AiCoach() {
               {bubbles.length === 0 && !thinking && (
                 <div className="space-y-2">
                   <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[13px] leading-relaxed text-foreground">
-                    Oi! Eu sou seu coach de treino. Pergunta qualquer coisa sobre o seu dia, exercício, carga ou dor — respostas pensadas a partir dos seus dados.
+                    Oi! Eu sou seu coach de treino. Pergunta qualquer coisa sobre o seu dia, exercício, carga ou dor, respostas pensadas a partir dos seus dados.
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {QUICK.map((q) => (

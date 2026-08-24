@@ -10,7 +10,7 @@
 
 export type Gender = "masculino" | "feminino";
 
-/** Títulos mensais por gênero — desbloqueados por check-ins + streak no mês. */
+/** Títulos mensais por gênero, desbloqueados por check-ins + streak no mês. */
 export interface TitleDef {
   id: string;
   label: string;
@@ -47,7 +47,7 @@ export interface MonthlyScore {
 export interface MuscleState {
   id: "superiores" | "core" | "inferiores";
   label: string;
-  /** 0-100 — prontidão para treinar. */
+  /** 0-100, prontidão para treinar. */
   readiness: number;
   state: "pronto" | "recuperacao" | "fadiga";
 }
@@ -63,7 +63,7 @@ export interface CommunityFeat {
   author: string;
   role: string;
   text: string;
-  /** Foto de perfil (obrigatória — pra já, mock com pravatar). */
+  /** Foto de perfil (obrigatória, pra já, mock com pravatar). */
   avatar: string;
   /** Dono da conquista (para notificar em reação 🔥). */
   ownerId?: string;
@@ -82,7 +82,7 @@ export function inferGender(name?: string | null): Gender {
   return /a$/.test(first) ? "feminino" : "masculino";
 }
 
-/** Situação da academia no momento — frases por horário (mock de ocupação). */
+/** Situação da academia no momento, frases por horário (mock de ocupação). */
 export function livePulse(hour: number, online: number): { phrase: string; occupancy: number } {
   const occ = Math.min(1, online / 30);
   if (hour >= 18 && hour < 21) {
@@ -104,7 +104,7 @@ export function livePulse(hour: number, online: number): { phrase: string; occup
 export const monthlyScore: MonthlyScore = { total: 450, checkins: 27, auloes: 1, metasBatidas: 3 };
 export const monthlyKg = 5800;
 
-/** Prontidão muscular mock — inferiores prontos, superiores em recuperação. */
+/** Prontidão muscular mock, inferiores prontos, superiores em recuperação. */
 export const muscleSnapshot: MuscleState[] = [
   { id: "superiores", label: "Superiores", readiness: 10, state: "fadiga" },
   { id: "core", label: "Core", readiness: 68, state: "recuperacao" },
@@ -117,7 +117,7 @@ export const focusToday: FocusRecommendation = {
   reason: "Pernas estão prontas (95%) e superiores ainda se recuperam.",
 };
 
-/** Sequência padrão da ficha do aluno (ABC) — define o próximo treino sugerido. */
+/** Sequência padrão da ficha do aluno (ABC), define o próximo treino sugerido. */
 export const WORKOUT_SEQUENCE: FocusRecommendation[] = [
   { bodyCat: "peito", label: "Peito & Tríceps", reason: "Sequência da ficha" },
   { bodyCat: "costas", label: "Costas & Bíceps", reason: "Sequência da ficha" },
@@ -128,7 +128,7 @@ export const WORKOUT_SEQUENCE: FocusRecommendation[] = [
 ];
 
 /**
- * Próximo treino da SEQUÊNCIA da ficha — baseado no último treino realizado.
+ * Próximo treino da SEQUÊNCIA da ficha, baseado no último treino realizado.
  * Se o aluno faltou um dia, o treino perdido NÃO é pulado: o índice avança só
  * quando o dia com treino é registrado (continua de onde parou).
  */
@@ -183,5 +183,5 @@ export const TIPS_STRUCTURED: TipOfTheDay[] = [
 export const GYM_HIGHLIGHTS = [
   { icon: "👑", tag: "Aluno do mês", title: "Marina Costa", body: "12 treinos no mês e liga Ouro conquistada." },
   { icon: "🏆", tag: "Recorde recente", title: "Leg press · 320kg", body: "Lucas Andrade cravou novo recorde da casa." },
-  { icon: "📅", tag: "Evento", title: "Aula aberta sábado 9h", body: "Funcional em grupo — traga um amigo." },
+  { icon: "📅", tag: "Evento", title: "Aula aberta sábado 9h", body: "Funcional em grupo, traga um amigo." },
 ];

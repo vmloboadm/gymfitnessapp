@@ -1,5 +1,5 @@
 /**
- * Camada de dados DEMO — injeta conteúdo rico e realista quando
+ * Camada de dados DEMO, injeta conteúdo rico e realista quando
  * NEXT_PUBLIC_DEMO_MODE=1, para que todas as telas pareçam vivas
  * mesmo sem login/banco. Nunca é usado em produção.
  */
@@ -235,10 +235,27 @@ export const demoStudentWorkout = {
   completed_at: null,
 } as any;
 
+const we = (n: number, exId: string, sets: number, reps: string, rest: number) =>
+  ({ id: `we-demo-${String(n).padStart(3, "0")}`, gym_id: "00000000-0000-0000-0000-000000000001", day_id: "day-demo-001", exercise_id: exId, variation_id: null, sets, reps, rest_seconds: rest, rpe: 7 + (n % 3), notes: null, technique: "standard", order: n });
+
 export const demoWorkoutExercises = [
-  { id: "we-demo-001", gym_id: "00000000-0000-0000-0000-000000000001", day_id: "day-demo-001", exercise_id: "ex-demo-001", variation_id: null, sets: 4, reps: "10", rest_seconds: 90, rpe: 8, notes: "Progressão 5%", technique: "standard", order: 1 },
-  { id: "we-demo-002", gym_id: "00000000-0000-0000-0000-000000000001", day_id: "day-demo-001", exercise_id: "ex-demo-006", variation_id: null, sets: 3, reps: "12", rest_seconds: 60, rpe: 7, notes: null, technique: "standard", order: 2 },
+  we(1, "ex-demo-001", 4, "10", 90), // Supino Reto
+  we(2, "ex-demo-007", 3, "12", 60), // Desenvolvimento Militar
+  we(3, "ex-demo-005", 4, "10", 75), // Puxada Alta
+  we(4, "ex-demo-008", 3, "12", 45), // Rosca Direta
+  we(5, "ex-demo-002", 4, "8", 90),  // Agachamento
+  we(6, "ex-demo-006", 1, "15min", 0), // Esteira (finalizador)
 ] as any[];
+
+// novos exercícios do catálogo usado acima
+for (const extra of [
+  { id: "ex-demo-007", name: "Desenvolvimento Militar", category: "strength", muscles: ["shoulders"], tips: ["Core firme, sem arco lombar"], technique_default: "standard", high_impact: false },
+  { id: "ex-demo-008", name: "Rosca Direta", category: "strength", muscles: ["biceps"], tips: ["Sem balançar o tronco"], technique_default: "standard", high_impact: false },
+]) {
+  if (!demoExercises.some((e: any) => e.id === extra.id)) {
+    (demoExercises as any[]).push({ ...extra, gym_id: "00000000-0000-0000-0000-000000000001", equipment_id: null, photo_url: null, video_url: null, created_at: new Date().toISOString() } as any);
+  }
+}
 
 export const demoWorkoutLogs = () => {
   const logs = [] as any[];
@@ -250,7 +267,7 @@ export const demoWorkoutLogs = () => {
     const date = new Date(Date.now() - d * 86400000);
     const dow = date.getDay();
     let train = PATTERN.includes(dow);
-    if (d === 0) train = true; // hoje SEMPRE em progresso (nunca concluído — senão a aba Treino morre)
+    if (d === 0) train = true; // hoje SEMPRE em progresso (nunca concluído, senão a aba Treino morre)
     if (d === 1) train = false; // ontem ainda não
     if (!train) continue;
     const count = d === 0 ? 1 : 1 + Math.round(Math.random()); // hoje: 1 série fixa (progresso parcial)

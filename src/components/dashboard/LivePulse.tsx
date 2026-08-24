@@ -6,7 +6,7 @@ import { MiniEcg } from "./ECGLine";
 import { livePulse } from "./mocks";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 
-/** Pulso da academia — termômetro vivo de ocupação (FOMO & social proof).
+/** Pulso da academia, termômetro vivo de ocupação (FOMO & social proof).
     O ícone de batimento é um ECG contínuo (trilha em loop), nunca imagem parada. */
 export function LivePulse({ online }: { online: number }) {
   const hour = new Date().getHours();
@@ -26,7 +26,7 @@ export function LivePulse({ online }: { online: number }) {
         <p className="flex-1 text-[12px] leading-snug text-[#BFC7D8]">{phrase}</p>
         <Activity className="h-4 w-4 shrink-0 text-[#4ADE80]/70" />
       </div>
-      {/* arco de ocupação — traço fino, gradiente suave */}
+      {/* arco de ocupação, traço fino, gradiente suave */}
       <div className="flex items-center gap-4 px-5 pb-5 pt-1">
         <svg viewBox="0 0 44 44" className="h-11 w-11 shrink-0">
           <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
@@ -56,7 +56,7 @@ export function LivePulse({ online }: { online: number }) {
           </text>
         </svg>
         <p className="text-[12px] leading-snug text-[#BFC7D8]">
-          Ocupação da academia agora — planeje horários menos cheios.
+          Ocupação da academia agora, planeje horários menos cheios.
         </p>
       </div>
     </section>

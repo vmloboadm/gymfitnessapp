@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -200,9 +200,19 @@ export default function TreinoHomePage() {
     },
     [user?.id, profile?.id, demo]
   );
+  const programRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (loading) return;
+    if (typeof window === "undefined") return;
+    const ir = new URLSearchParams(window.location.search).get("ir");
+    if (ir === "hoje" && programRef.current) {
+      const to = setTimeout(() => programRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+      return () => clearTimeout(to);
+    }
+  }, [loading]);
 
   const todayKey = new Date().toISOString().slice(0, 10);
-  // MESMA FONTE da home — nunca diverge
+  // MESMA FONTE da home, nunca diverge
   const tw = useMemo(() => (demo ? getTodayWorkout() : resolveFromLogs(data?.logs ?? [])), [demo, data?.logs]);
   const focus = { label: tw.focusLabel, resume: tw.resume, bodyCat: tw.bodyCat };
   function resolveFromLogs(logs: NonNullable<TreinoData["logs"]>) {
@@ -269,7 +279,7 @@ export default function TreinoHomePage() {
     );
   }
 
-  // Treino em andamento (demo) — substitui a navegação normal.
+  // Treino em andamento (demo), substitui a navegação normal.
   if (phase === "active" && demo) {
     const demoExercises = session ?? DEFAULT_DEMO_EX;
     return <WorkoutInProgress exercises={demoExercises} onFinish={conclude} />;
@@ -280,14 +290,14 @@ export default function TreinoHomePage() {
       <>
         <TopBar title="Hoje" subtitle={cap(weekdayName())} />
         <div className="space-y-6 p-4">
-          <EmptyState title="Sem treino prescrito para hoje" description="Quando seu personal atribuir um programa, ele aparece aqui — e os planos disponíveis já dão um gostinho do que vem por aí." icon={Dumbbell} />
+          <EmptyState title="Sem treino prescrito para hoje" description="Quando seu personal atribuir um programa, ele aparece aqui, e os planos disponíveis já dão um gostinho do que vem por aí." icon={Dumbbell} />
         </div>
         <AiCoach />
       </>
     );
   }
 
-  // Tela de encerramento — pós-treino (RPE não fica preso no topo)
+  // Tela de encerramento, pós-treino (RPE não fica preso no topo)
   if (phase === "done") {
     return (
       <>
@@ -298,12 +308,12 @@ export default function TreinoHomePage() {
               <CheckCircle2 className="h-7 w-7 text-success" />
             </span>
             <h2 className="mt-3 font-display text-xl font-bold text-foreground">Treino concluído!</h2>
-            <p className="mt-1 gf-card-text">Bora anotar como foi — esse dado treina o seu plano.</p>
+            <p className="mt-1 gf-card-text">Bora anotar como foi, esse dado treina o seu plano.</p>
           </div>
 
           <div className="gf-card gf-glass !py-4">
             <p className="gf-section mb-2">Como foi o treino?</p>
-            <p className="gf-card-text mb-3">Toque em como o treino pesou — sem número, sem grilo.</p>
+            <p className="gf-card-text mb-3">Toque em como o treino pesou, sem número, sem grilo.</p>
             <div className="grid grid-cols-3 gap-2">
               {[
                 { key: "tranquilo", label: "Tranquilo", icon: Meh, tone: "text-sky-400" },
@@ -331,7 +341,7 @@ export default function TreinoHomePage() {
               })}
             </div>
             {rpe ? (
-              <p className="mt-2 text-[11px] text-brand">RPE {rpe} salvo — entra no cálculo de progresso do seu plano.</p>
+              <p className="mt-2 text-[11px] text-brand">RPE {rpe} salvo, entra no cálculo de progresso do seu plano.</p>
             ) : (
               <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
                 RPE é a nota de 0 a 10 de como o treino pesou pra você. Ajuda o Personal Digital a calibrar a carga de amanhã.
@@ -392,7 +402,7 @@ export default function TreinoHomePage() {
     <>
       <TopBar title="Treino" subtitle={cap(weekdayName())} />
       <div className="space-y-8 p-4">
-        {/* 1. STATUS ATUAL — como você chegou hoje */}
+        {/* 1. STATUS ATUAL, como você chegou hoje */}
         <div className="rounded-2xl border border-border bg-card/50 p-4">
           <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">Como você está hoje?</p>
           <div className="grid grid-cols-3 gap-2">
@@ -426,7 +436,7 @@ export default function TreinoHomePage() {
           ) : null}
         </div>
 
-        {/* 2. MAPA CORPORAL — toque na região para ver os aparelhos */}
+        {/* 2. MAPA CORPORAL, toque na região para ver os aparelhos */}
         <BodyMap
           counts={BODY_COUNTS}
           onSelect={(catId) => setBodyCat((prev) => (prev === catId ? null : catId))}
@@ -503,7 +513,7 @@ export default function TreinoHomePage() {
           </div>
         ) : null}
 
-        {/* 3. TREINO DE HOJE — programa ativo + exercícios */}
+        {/* 3. TREINO DE HOJE, programa ativo + exercícios */}
         <div>
           <div className="mb-2 flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-foreground">Treino de hoje</h2>
@@ -581,7 +591,7 @@ export default function TreinoHomePage() {
                       const id = d.exercise_id ?? d.id;
                       navigator.vibrate?.(40);
                       setEqSessions((prev) => ({ ...prev, [id]: Date.now() }));
-                      toast.success("Sessão iniciada — cronômetro rodando");
+                      toast.success("Sessão iniciada, cronômetro rodando");
                     }}
                     onFinish={() => {
                       const id = d.exercise_id ?? d.id;
@@ -600,7 +610,7 @@ export default function TreinoHomePage() {
           )}
         </div>
 
-        {/* 4. PLANOS DISPONÍVEIS — preview bloqueado, liberação pelo personal */}
+        {/* 4. PLANOS DISPONÍVEIS, preview bloqueado, liberação pelo personal */}
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-foreground">Planos disponíveis</h2>
@@ -635,7 +645,7 @@ export default function TreinoHomePage() {
                 <p className="mt-2 truncate text-[13px] font-bold text-foreground">{p.name}</p>
                 <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{p.focus} · {p.weeks}</p>
 
-                {/* lista fantasma — dá vontade de desbloquear */}
+                {/* lista fantasma, dá vontade de desbloquear */}
                 <ul className="mt-2.5 space-y-1 select-none" aria-hidden>
                   {p.ghost.map((g) => (
                     <li key={g} className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 blur-[1.5px]">
@@ -653,7 +663,7 @@ export default function TreinoHomePage() {
           </div>
         </div>
 
-        {/* 5. HISTÓRICO RECENTE — accordion fechado por padrão */}
+        {/* 5. HISTÓRICO RECENTE, accordion fechado por padrão */}
         <HistoryList logs={data.logs} />
       </div>
       <AiCoach />
@@ -682,11 +692,11 @@ function ExerciseRow({
   const ss = String(elapsed % 60).padStart(2, "0");
   const suggestion =
     item.exercise?.name === "Supino Reto"
-      ? "Aparelho ocupado? Crucifixo com halteres no banco livre — mesmo estímulo, sem espera."
+      ? "Aparelho ocupado? Crucifixo com halteres no banco livre, mesmo estímulo, sem espera."
       : item.exercise?.name === "Agachamento"
         ? "Smith ocupado? Leg press 45° é um bom substituto de hoje."
         : null;
-  const catLabel = item.exercise?.category ? CAT_LABEL[item.exercise.category] ?? item.exercise.category : "—";
+  const catLabel = item.exercise?.category ? CAT_LABEL[item.exercise.category] ?? item.exercise.category : "-";
   const ex = item.exercise as (Exercises & { imageUrl?: string; videoUrl?: string }) | null;
   const photo = ex?.photo_url ?? ex?.imageUrl ?? null;
   const video = ex?.video_url ?? ex?.videoUrl ?? null;
@@ -729,7 +739,7 @@ function ExerciseRow({
         </button>
       </div>
 
-      {/* Sugestão GymFitness — destaque secundário discreto */}
+      {/* Sugestão GymFitness, destaque secundário discreto */}
       {suggestion ? (
         <p className="mt-2.5 border-l-2 border-brand/50 bg-brand/[0.06] py-1.5 pl-2.5 pr-2 text-[11px] leading-snug text-muted-foreground">
           <Sparkles className="mr-1 inline h-3 w-3 align-[-2px] text-brand" />

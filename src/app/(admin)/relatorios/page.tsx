@@ -12,7 +12,7 @@ import type { Checkins } from "~/lib/types/models";
 
 /**
  * Relatórios do gym: presença (check-ins de entrada) e volume total movido
- * em 7 dias — números para orientar treinos e horários.
+ * em 7 dias, números para orientar treinos e horários.
  */
 export default function RelatoriosPage() {
   const { profile } = useAuth();

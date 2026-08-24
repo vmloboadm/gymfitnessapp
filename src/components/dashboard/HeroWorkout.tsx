@@ -18,7 +18,7 @@ interface HeroWorkoutProps {
   notice?: string;
 }
 
-/** Hero do treino de hoje — imagem de fundo + overlay de leitura forte + CTA glow.
+/** Hero do treino de hoje, imagem de fundo + overlay de leitura forte + CTA glow.
     Visual premium e respirado: padding interno generoso, título grande e botão imponente. */
 export function HeroWorkout({
   image,
@@ -33,7 +33,7 @@ export function HeroWorkout({
   return (
     <motion.div variants={item} whileTap={{ scale: 0.985 }}>
       <Link
-        href="/treino"
+        href="/treino?ir=hoje"
         aria-label={`Treino de hoje: ${title}`}
         className="pm-surface tactile block"
       >

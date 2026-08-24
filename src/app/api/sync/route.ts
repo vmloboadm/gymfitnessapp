@@ -24,7 +24,7 @@ const ALLOWED_TABLES = [
 ];
 
 /**
- * POST /api/sync — flush da fila offline (blueprint §5.5).
+ * POST /api/sync, flush da fila offline (blueprint §5.5).
  * Recebe a lista de ações e aplica sobre o banco em ordem, com checagem de
  * tabela permitida (nunca confia no cliente). Sem service role configurado,
  * retorna erro estrutural (fallback honesto, sem falsa sensação de sucesso).
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         error:
-          "SUPABASE_SERVICE_ROLE_KEY não configurada — sincronização offline indisponível.",
+          "SUPABASE_SERVICE_ROLE_KEY não configurada, sincronização offline indisponível.",
         synced: 0,
       },
       { status: 503 }

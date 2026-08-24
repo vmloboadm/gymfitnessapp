@@ -99,7 +99,7 @@ export default function BibliotecaPage() {
                   <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{e.tips[0]}</p>
                 ) : null}
                 {e.high_impact ? (
-                  <p className="mt-2 text-[11px] font-medium text-warning">Alto impacto — atenção a restrições.</p>
+                  <p className="mt-2 text-[11px] font-medium text-warning">Alto impacto, atenção a restrições.</p>
                 ) : null}
               </div>
             ))}

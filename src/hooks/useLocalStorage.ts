@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 /**
- * Cache offline simples (localStorage) — padrão PWA-first.
+ * Cache offline simples (localStorage), padrão PWA-first.
  * Treino do dia + dados recentes ficam visíveis sem conexão.
  */
 export function useLocalStorage<T>(key: string, initialValue: T) {
@@ -25,7 +25,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
         try {
           window.localStorage.setItem(key, JSON.stringify(next));
         } catch {
-          // storage cheia — ignora
+          // storage cheia, ignora
         }
         return next;
       });

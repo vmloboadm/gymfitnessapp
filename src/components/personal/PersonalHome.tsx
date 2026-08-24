@@ -17,7 +17,7 @@ import { cn } from "~/lib/utils";
 import { demoAlunosPersonal } from "~/lib/demo-bridge";
 
 /**
- * Dashboard MOBILE-FIRST do Personal — nada de anel/streak de aluno.
+ * Dashboard MOBILE-FIRST do Personal, nada de anel/streak de aluno.
  * Radar de Retenção + lista gerenciada + ações rápidas. Tudo empilhado,
  * 100% largura, pensado pra ser usado em pé na sala da academia.
  */
@@ -39,8 +39,8 @@ export default function PersonalHomePage() {
     for (const s of students) {
       const d = daysSince(s.last_workout);
       if (d >= 3) alerts.push({ level: "critico", name: s.name, msg: `sem check-in há ${d} dias · streak ${s.streak}d` });
-      else if (s.streak >= 8) alerts.push({ level: "elogio", name: s.name, msg: `streak de ${s.streak} dias — recorde pessoal` });
-      else if (d === 2) alerts.push({ level: "atencao", name: s.name, msg: "2 dias sem treinar — risco de pausa" });
+      else if (s.streak >= 8) alerts.push({ level: "elogio", name: s.name, msg: `streak de ${s.streak} dias, recorde pessoal` });
+      else if (d === 2) alerts.push({ level: "atencao", name: s.name, msg: "2 dias sem treinar, risco de pausa" });
     }
     const order = { critico: 0, atencao: 1, elogio: 2 } as const;
     return alerts.sort((a, b) => order[a.level] - order[b.level]);
@@ -54,7 +54,7 @@ export default function PersonalHomePage() {
   };
 
   const waLink = (name: string, msg: string) =>
-    `${WA_BASE}${encodeURIComponent(`Oi ${name.split(" ")[0]}! Passando pra ${msg}. Bora manter o ritmo? — ${profile?.name ?? "Personal"} | GymFitness`)}`;
+    `${WA_BASE}${encodeURIComponent(`Oi ${name.split(" ")[0]}! Passando pra ${msg}. Bora manter o ritmo?, ${profile?.name ?? "Personal"} | GymFitness`)}`;
 
   const container = {
     hidden: {},
@@ -89,7 +89,7 @@ export default function PersonalHomePage() {
           <div className="space-y-2">
             {radar.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-card/30 px-4 py-6 text-center text-sm text-muted-foreground">
-                Nenhum alerta — todo mundo no ritmo. 🎯
+                Nenhum alerta, todo mundo no ritmo. 🎯
               </div>
             ) : (
               radar.map((a, i) => {
@@ -173,7 +173,7 @@ export default function PersonalHomePage() {
           </p>
           <p className="gf-card-text">
             Descreva o objetivo do aluno e receba um rascunho de treino para revisar. Nada vai pro aluno
-            sem sua aprovação — e toda alteração chega a ele identificada com o SEU nome.
+            sem sua aprovação, e toda alteração chega a ele identificada com o SEU nome.
           </p>
           <Link href="/ia" className="gf-touch mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-bold text-brand-foreground shadow-lg shadow-brand/25">
             Abrir assistente de prescrição

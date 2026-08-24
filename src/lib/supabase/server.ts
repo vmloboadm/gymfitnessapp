@@ -7,7 +7,7 @@ type ServerClient = SupabaseClient<Database>;
 
 /**
  * Cliente Supabase para Server Components / actions.
- * Cria um cliente novo por request (não cacheadável — usa cookies()).
+ * Cria um cliente novo por request (não cacheadável, usa cookies()).
  */
 export function supabaseServer(): ServerClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -30,7 +30,7 @@ export function supabaseServer(): ServerClient {
         try {
           cookieStore.set({ name, value, ...options });
         } catch {
-          // Server Component que não pode setar cookie — ignorar.
+          // Server Component que não pode setar cookie, ignorar.
         }
       },
       remove(name: string, options: CookieOptions) {

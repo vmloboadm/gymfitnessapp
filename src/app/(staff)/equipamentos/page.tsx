@@ -12,7 +12,7 @@ import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
 import type { Equipment, EquipmentMaintenanceLogs } from "~/lib/types/models";
 
 /**
- * Gestão de equipamentos (staff shared — personal e gestor).
+ * Gestão de equipamentos (staff shared, personal e gestor).
  * Lista com status e pedidos de manutenção ativos.
  */
 export default function EquipamentosPage() {

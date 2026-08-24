@@ -1,6 +1,6 @@
 import { Skeleton } from "~/components/ui/skeleton";
 
-/** Skeleton global (blueprint §4.4) — nunca spinner genérico. */
+/** Skeleton global (blueprint §4.4), nunca spinner genérico. */
 export default function Loading() {
   return (
     <div className="mx-auto max-w-6xl space-y-4 px-4 py-6">

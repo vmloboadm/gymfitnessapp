@@ -134,7 +134,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Check-in por tipo de matrícula — destaque Gympass/TotalPass */}
+      {/* Check-in por tipo de matrícula, destaque Gympass/TotalPass */}
       <div className="rounded-2xl border border-border bg-card/50 p-4">
         <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           <TrendingUp className="h-3.5 w-3.5 text-brand" /> Check-in por tipo de matrícula
@@ -165,7 +165,7 @@ export default function DashboardPage() {
           })}
         </div>
         <p className="mt-3 rounded-lg bg-warning/10 px-3 py-2 text-[11px] text-warning">
-          Aluno de plataforma tem o menor vínculo com a unidade — use streaks e comunidade para fidelizar.
+          Aluno de plataforma tem o menor vínculo com a unidade, use streaks e comunidade para fidelizar.
         </p>
       </div>
 

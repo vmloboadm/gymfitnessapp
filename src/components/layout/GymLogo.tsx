@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cn } from "~/lib/utils";
 
 /**
- * Logo GymFitness — asset oficial (logo GF) com fundo transparente (PNG).
+ * Logo GymFitness, asset oficial (logo GF) com fundo transparente (PNG).
  * Usa o quadrado original quando `variant="square"` (favicon/emblema).
  */
 export function GymLogo({
@@ -46,7 +46,7 @@ export function GymLogo({
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       {href ? (
-        <Link href={href} aria-label="GymFitness — início">
+        <Link href={href} aria-label="GymFitness, início">
           {mark}
         </Link>
       ) : (

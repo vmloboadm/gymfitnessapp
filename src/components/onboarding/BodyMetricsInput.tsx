@@ -10,7 +10,7 @@ import { calcBmi } from "~/lib/utils/calculations";
 import type { Profiles } from "~/lib/types/models";
 
 /**
- * STEP 3 — Métricas corporais iniciais (blueprint §3.1).
+ * STEP 3, Métricas corporais iniciais (blueprint §3.1).
  * Calcula IMC ao vivo e salva em body_metrics + profile.daily_intake
  * com frequência meta.
  */
@@ -120,7 +120,7 @@ export function IntentInput({
 
       <Button type="submit" className="w-full" size="lg" disabled={saving || !valid}>
         {saving ? <Loader2 className="animate-spin" /> : null}
-        Continuar — Saúde e restrições
+        Continuar, Saúde e restrições
       </Button>
     </form>
   );

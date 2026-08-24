@@ -4,7 +4,7 @@ import type { WorkoutLogs } from "~/lib/types/models";
 
 /**
  * FONTE ÚNICA do "Treino de Hoje".
- * Dashboard e aba Treino leem O MESMO objeto daqui — nunca dois mocks
+ * Dashboard e aba Treino leem O MESMO objeto daqui, nunca dois mocks
  * separados. Em demo é um singleton em memória; com dados reais, ambas as
  * telas passam os MESMOS logs (mesma query do aluno) por resolve().
  */

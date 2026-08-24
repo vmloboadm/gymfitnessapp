@@ -1,5 +1,5 @@
 /**
- * OmniRoute — gateway próprio de IA (REGRA 0.2 do projeto).
+ * OmniRoute, gateway próprio de IA (REGRA 0.2 do projeto).
  *
  * TODA integração de IA passa por este arquivo. Nunca chamar
  * providers externos (OpenAI, Anthropic, Mistral...) direto no app.
@@ -35,14 +35,14 @@ const AI_ENDPOINT =
     : null;
 
 /**
- * Chama o gateway OmniRoute. Lança/retorna erro se não configurado —
+ * Chama o gateway OmniRoute. Lança/retorna erro se não configurado -
  * nunca cai em provider externo.
  */
 export async function generate(payload: AiRequest): Promise<AiResult> {
   if (!AI_ENDPOINT) {
     return {
       ok: false,
-      error: "OMNIRoute_API_KEY não configurada — IA indisponível nesta fase.",
+      error: "OMNIRoute_API_KEY não configurada, IA indisponível nesta fase.",
     };
   }
 

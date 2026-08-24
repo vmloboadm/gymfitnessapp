@@ -15,7 +15,7 @@ import type { DayPasses } from "~/lib/types/models";
 
 /**
  * Day-pass público (blueprint day-pass): compra avulsa de acesso diário.
- * Público por design — o middleware já libera /day-pass sem login.
+ * Público por design, o middleware já libera /day-pass sem login.
  */
 export default function DayPassPage() {
   const [name, setName] = useState("");

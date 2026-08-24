@@ -5,7 +5,7 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Label } from "~/components/ui/label";
 
 /**
- * LGPD consent — checkbox explícito + texto lero (blueprint §3.1/9).
+ * LGPD consent, checkbox explícito + texto lero (blueprint §3.1/9).
  * O consentimento (data/hora) é gravado em profiles.lgpd_consent_at
  * pelo fluxo de cadastro.
  */

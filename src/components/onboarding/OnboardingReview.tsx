@@ -8,20 +8,20 @@ import type { Profiles } from "~/lib/types/models";
 
 const SUMMARY: Array<{ label: string; get: (p: Profiles) => string }> = [
   { label: "Nome", get: (p) => p.name },
-  { label: "Data de nascimento", get: (p) => p.birth_date ?? "—" },
-  { label: "Objetivo", get: (p) => p.goal ?? "—" },
+  { label: "Data de nascimento", get: (p) => p.birth_date ?? "-" },
+  { label: "Objetivo", get: (p) => p.goal ?? "-" },
   {
     label: "Frequência semanal",
-    get: (p) => (p.daily_intake ? `${p.daily_intake}×` : "—"),
+    get: (p) => (p.daily_intake ? `${p.daily_intake}×` : "-"),
   },
   {
     label: "Restrição clínica",
-    get: (p) => (p.medical_risk ? "Sim — laudo requisitado" : "Nenhuma"),
+    get: (p) => (p.medical_risk ? "Sim, laudo requisitado" : "Nenhuma"),
   },
 ];
 
 /**
- * STEP 5 — Revisão + confirmação (blueprint §3.1).
+ * STEP 5, Revisão + confirmação (blueprint §3.1).
  */
 export function OnboardingReview({
   profile,

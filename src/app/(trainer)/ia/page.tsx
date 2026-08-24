@@ -12,7 +12,7 @@ import { generate, isAiConfigured } from "~/lib/ai/omniroute";
 
 /**
  * Assistente com IA do personal (blueprint IA). Sempre passa pelo
- * gateway OmniRoute (REGRA 0.2) — nunca por provider direto.
+ * gateway OmniRoute (REGRA 0.2), nunca por provider direto.
  */
 export default function IaPage() {
   const { user, profile } = useAuth();

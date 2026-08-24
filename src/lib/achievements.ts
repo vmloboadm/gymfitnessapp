@@ -1,7 +1,7 @@
 import type { Achievements } from "~/lib/types/models";
 
 /**
- * Fonte única de conquistas do aluno — usada por /conquistas (completa),
+ * Fonte única de conquistas do aluno, usada por /conquistas (completa),
  * Ranking (top recentes) e Perfil (todas). Uma verdade, três exibições.
  */
 export type StudentAchievement = Pick<
@@ -32,7 +32,7 @@ export function sortedAchievements(): StudentAchievement[] {
   });
 }
 
-/** Últimas N conquistadas — para o card resumido do Ranking. */
+/** Últimas N conquistadas, para o card resumido do Ranking. */
 export function recentAchievements(n = 3): StudentAchievement[] {
   return sortedAchievements()
     .filter((a) => a.earned_at)

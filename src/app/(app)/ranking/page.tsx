@@ -22,7 +22,7 @@ import type { Leaderboard, Profiles } from "~/lib/types/models";
 
 const ME = "00000000-0000-0000-0000-000000000099";
 
-/** Avatar mock determinístico — campo avatar_url do perfil assume em produção. */
+/** Avatar mock determinístico, campo avatar_url do perfil assume em produção. */
 function avatarFor(id: string | undefined): string {
   let n = 0;
   for (const ch of id ?? "") n = (n * 31 + ch.charCodeAt(0)) % 70;
@@ -160,7 +160,7 @@ export default function RankingPage() {
           </div>
         </div>
 
-        {/* Trilha de ligas — onde você está e o que vem depois */}
+        {/* Trilha de ligas, onde você está e o que vem depois */}
         <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "60ms" }}>
           <p className="gf-section mb-3">Trilha de ligas</p>
           <div className="flex items-center justify-between gap-1">
@@ -187,7 +187,7 @@ export default function RankingPage() {
           </div>
         </div>
 
-        {/* Pódio — top 3 da semana em destaque */}
+        {/* Pódio, top 3 da semana em destaque */}
         {!loading && !error && data && data.rows.length >= 3 ? (
           <div className="gf-rise rounded-[20px] border border-border bg-card/40 p-4" style={{ animationDelay: "120ms" }}>
             <p className="gf-section mb-3">Pódio da semana</p>
@@ -361,7 +361,7 @@ export default function RankingPage() {
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-brand-soft">
                 <TrendingUp className="h-3.5 w-3.5 text-brand" />
               </span>
-              <span>Reset toda segunda-feira — todo mundo recomeça, mantendo iniciante competitivo.</span>
+              <span>Reset toda segunda-feira, todo mundo recomeça, mantendo iniciante competitivo.</span>
             </div>
           </div>
         </div>

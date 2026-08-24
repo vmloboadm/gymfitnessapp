@@ -1,6 +1,6 @@
 import { Progress } from "~/components/ui/progress";
 
-/** Barra de progresso do onboarding — animada via scaleX (standards §2). */
+/** Barra de progresso do onboarding, animada via scaleX (standards §2). */
 export function OnboardingProgress({
   current,
   total,

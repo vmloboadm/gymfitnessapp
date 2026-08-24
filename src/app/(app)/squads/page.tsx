@@ -81,7 +81,7 @@ function challengePct(start?: string | null, end?: string | null): number | null
 
 /**
  * Squads do aluno: grupos e desafios da academia + membros contados.
- * (Chat completo dos times fica em /squads/[id] — futura iteração.)
+ * (Chat completo dos times fica em /squads/[id], futura iteração.)
  */
 export default function SquadsPage() {
   const { user, profile } = useAuth();

@@ -8,7 +8,7 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 type DayVolume = { key: string; level: number; today: boolean };
 
 const PEAKS = [
-  // formas QRS (oito padrões de batimento) — varrem de -x a x alinhadas
+  // formas QRS (oito padrões de batimento), varrem de -x a x alinhadas
   { pos: 0.08, w: 0.16, a: 0.42 },
   { pos: 0.24, w: 0.13, a: 0.3 },
   { pos: 0.41, w: 0.15, a: 0.38 },
@@ -46,7 +46,7 @@ function seedRe(n: number) {
 }
 
 /**
- * Linha de ECG — trilha desenhada em loop (stroke-dashoffset), estilo monitor.
+ * Linha de ECG, trilha desenhada em loop (stroke-dashoffset), estilo monitor.
  * Sem números crus: dias são células de cor de intensidade com bout de hoje.
  */
 export function ECGLine({
@@ -120,7 +120,7 @@ export function ECGLine({
         )}
       </svg>
 
-      {/* células de intensidade da semana — só cor, sem números */}
+      {/* células de intensidade da semana, só cor, sem números */}
       <div className="mt-1.5 grid grid-cols-7 gap-1.5" role="img" aria-label="Intensidade dos treinos da semana">
         {days.map((d) => {
           return (
@@ -146,7 +146,7 @@ export function ECGLine({
   );
 }
 
-/** Mini ECG — pulso contínuo para o card de batimento (LivePulse/hero). */
+/** Mini ECG, pulso contínuo para o card de batimento (LivePulse/hero). */
 export function MiniEcg({ className, height = 20 }: { className?: string; height?: number }) {
   const path = useMemo(() => ecgPath(3), []);
   const reduced = useReducedMotion();

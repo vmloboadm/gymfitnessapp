@@ -30,7 +30,7 @@ function useCountUp(target: number, duration = 900) {
 
 const STROKE = 9;
 
-/** Anel da meta semanal — traço fino estilo Apple Fitness.
+/** Anel da meta semanal, traço fino estilo Apple Fitness.
     Inicia no topo (12h) e preenche no sentido ANTI-HORÁRIO (sweep-flag=0).
     Gradiente sutil ao longo do arco + glow suave (cópia desfocada sob o traço). */
 export function PerformanceRing({ done, goal }: { done: number; goal: number }) {

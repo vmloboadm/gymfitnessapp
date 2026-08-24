@@ -58,7 +58,7 @@ export function TopBar({
 }
 
 /**
- * Badge offline — "X ações pendentes de sincronizar" (blueprint §5.5).
+ * Badge offline, "X ações pendentes de sincronizar" (blueprint §5.5).
  */
 export function OfflineBadge({
   count,

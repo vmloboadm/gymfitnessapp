@@ -26,7 +26,7 @@ const RISK_FLAGS: RiskFlag[] = [
 ];
 
 /**
- * STEP 2 — Anamnese completíssima (blueprint §3.1/§6.3d).
+ * STEP 2, Anamnese completíssima (blueprint §3.1/§6.3d).
  * Se marcar condição grave → medical_risk = true → TRAVA CLÍNICA ativa
  * (status = pending_clearance) no step 4.
  */
@@ -140,7 +140,7 @@ export function AnamneseForm({
 
       <Button type="submit" className="w-full" size="lg" disabled={saving}>
         {saving ? <Loader2 className="animate-spin" /> : null}
-        Continuar — Métricas
+        Continuar, Métricas
       </Button>
     </form>
   );

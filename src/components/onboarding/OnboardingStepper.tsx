@@ -11,7 +11,7 @@ const STEPS = [
   { id: 5, label: "Revisar" },
 ] as const;
 
-/** Stepper visual do onboarding (não navega sozinho — só exibe o progresso). */
+/** Stepper visual do onboarding (não navega sozinho, só exibe o progresso). */
 export function OnboardingStepper({ current, maxReached }: { current: number; maxReached: number }) {
   return (
     <ol className="flex items-center gap-1.5" aria-label="Progresso do cadastro">

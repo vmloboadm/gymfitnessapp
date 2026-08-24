@@ -13,7 +13,7 @@ const ROLE_OPTIONS = [
 ];
 
 /**
- * Seletor de papel (somente modo demo) — navega entre os 3 painéis
+ * Seletor de papel (somente modo demo), navega entre os 3 painéis
  * sem precisar fazer login real.
  */
 export function DemoRoleSwitcher({ className }: { className?: string }) {

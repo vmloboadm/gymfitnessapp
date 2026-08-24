@@ -185,7 +185,7 @@ export function demoOnlineAgora(): number {
 }
 
 // ---------------------------------------------------------------------------
-// Home/Dashboard — cards de mundo fit, patrocinadores e destaques
+// Home/Dashboard, cards de mundo fit, patrocinadores e destaques
 // ---------------------------------------------------------------------------
 
 export function demoMundoFit() {
@@ -304,7 +304,7 @@ export function demoDestaquesAcademia() {
 }
 
 // ---------------------------------------------------------------------------
-// Gestor — KPIs e financeiro
+// Gestor, KPIs e financeiro
 // ---------------------------------------------------------------------------
 
 export function demoKpis() {
@@ -319,7 +319,7 @@ export function demoKpis() {
 }
 
 // ---------------------------------------------------------------------------
-// Gestor — dashboard de decisão (ocupação por horário, check-in por plano,
+// Gestor, dashboard de decisão (ocupação por horário, check-in por plano,
 // manutenção recorrente, tendência de receita)
 // ---------------------------------------------------------------------------
 
@@ -399,7 +399,7 @@ export function demoRelatorios() {
 }
 
 // ---------------------------------------------------------------------------
-// Personal — biblioteca/alunos/treinos
+// Personal, biblioteca/alunos/treinos
 // ---------------------------------------------------------------------------
 
 export function demoBiblioteca() {

@@ -12,7 +12,7 @@ import { cn } from "~/lib/utils";
 import type { CommunityFeat } from "./mocks";
 import type { Notifications } from "~/lib/types/models";
 
-/** Conquistas da Galera — feitos de colegas com foto de perfil e reação "Dar Fogo".
+/** Conquistas da Galera, feitos de colegas com foto de perfil e reação "Dar Fogo".
     A primeira reação 🔥 gera notificação real para o dono da conquista. */
 export function CommunityHighlight({ feat }: { feat: CommunityFeat }) {
   const { user, profile } = useAuth();
@@ -22,7 +22,7 @@ export function CommunityHighlight({ feat }: { feat: CommunityFeat }) {
   const sendNotification = async () => {
     const supabase = supabaseBrowser();
     if (!user || !profile || !feat.ownerId) {
-      // Demo / sem sessão — simula a notificação ao dono
+      // Demo / sem sessão, simula a notificação ao dono
       return;
     }
     const payload: Partial<Notifications> = {

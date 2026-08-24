@@ -15,7 +15,7 @@ import type { Profiles } from "~/lib/types/models";
 
 /**
  * Onboarding multi-step (blueprint §3.1): cada step salva incrementalmente
- * em profiles — o aluno pode sair e retomar onde parou (onboarding_step).
+ * em profiles, o aluno pode sair e retomar onde parou (onboarding_step).
  */
 const STEP_COMPONENTS = [
   null, // 0 index base

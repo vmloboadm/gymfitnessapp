@@ -79,7 +79,7 @@ interface MedalDef {
   category: MedalCategory;
   req: MedalReq;
   rarity: "common" | "rare" | "epic" | "legendary";
-  /** O que a pessoa precisa fazer — sem siglas, em português simples. */
+  /** O que a pessoa precisa fazer, sem siglas, em português simples. */
   how: string;
 }
 
@@ -145,7 +145,7 @@ function getRarityGlow(rarity: MedalDef["rarity"]) {
   }
 }
 
-/** Título mensal (identidade) — desbloqueado por check-ins + streak. */
+/** Título mensal (identidade), desbloqueado por check-ins + streak. */
 export function TitleCard({ gender, checkins, streak }: { gender: Gender; checkins: number; streak: number }) {
   const titles: TitleDef[] = gender === "feminino" ? FEM_TITLES : MASC_TITLES;
   const current = [...titles].reverse().find((t) => checkins >= t.req[0] && streak >= t.req[1]) ?? titles[0];
@@ -207,7 +207,7 @@ export function TitleCard({ gender, checkins, streak }: { gender: Gender; checki
   );
 }
 
-/** Medalhas estilo Duolingo — retrátil. Ao abrir, explica cada conquista em linguagem simples. */
+/** Medalhas estilo Duolingo, retrátil. Ao abrir, explica cada conquista em linguagem simples. */
 export function MedalsCard({
   score,
   streak,
@@ -266,7 +266,7 @@ export function MedalsCard({
                           isOk ? "border-brand/40" : "border-white/[0.06] opacity-60"
                         )}
                         style={{ boxShadow: isOk ? getRarityGlow(m.rarity) : "none" }}
-                        aria-label={isOk ? `${m.label} desbloqueada` : `${m.label} — bloqueada`}
+                        aria-label={isOk ? `${m.label} desbloqueada` : `${m.label}, bloqueada`}
                         title={`${m.how}${isOk ? "" : " (ainda não conquistada)"}`}
                       >
                         <div
@@ -294,7 +294,7 @@ export function MedalsCard({
             );
           })}
 
-          {/* legenda leiga — explica as siglas */}
+          {/* legenda leiga, explica as siglas */}
           <div className="rounded-[14px] border border-white/[0.06] bg-white/[0.02] px-4 py-3.5 text-[11px] leading-relaxed text-[#8B95A9]">
             <p className="pm-mono mb-1.5 text-[9px] text-[#7E8AA0]">como ler as conquistas</p>
             <p><span className="font-semibold text-[#BFC7D8]">CI</span> = ida à academia (check-in)</p>
@@ -353,12 +353,12 @@ export function PointsCard({ score }: { score: MonthlyScore }) {
       </div>
 
       <p className={cn("pm-mono mt-4 text-[9px] text-[#6E7A90]")}>
-        check-in 10 · aulão 30 · meta semanal 50 — o ranking zera todo dia 1º
+        check-in 10 · aulão 30 · meta semanal 50, o ranking zera todo dia 1º
       </p>
     </section>
   );
 }
-/** Título do mês em formato compacto — para exibição como linha secundária
+/** Título do mês em formato compacto, para exibição como linha secundária
     dentro do card de liga/ranking (consolidação de gamificação). */
 export function titleFor(gender: Gender, checkins: number, streak: number): { label: string; nextLabel: string | null } {
   const titles: TitleDef[] = gender === "feminino" ? FEM_TITLES : MASC_TITLES;

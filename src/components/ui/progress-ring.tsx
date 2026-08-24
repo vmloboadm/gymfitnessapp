@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 
 /**
  * Elemento de assinatura GymFitness (manual de marca v1):
- * anel de progresso circular + núcleo laranja — como um disco de anilha.
+ * anel de progresso circular + núcleo laranja, como um disco de anilha.
  * Preenche conforme progresso real por trás (streak, descanso, meta).
  */
 export function ProgressRing({
@@ -30,7 +30,7 @@ export function ProgressRing({
 
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }} aria-label={label ? `${clamped}%` : undefined}>
-      {/* núcleo laranja — centro de energia */}
+      {/* núcleo laranja, centro de energia */}
       <span
         className="pointer-events-none absolute rounded-full"
         style={{

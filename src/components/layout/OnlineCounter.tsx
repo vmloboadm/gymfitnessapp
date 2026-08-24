@@ -5,7 +5,7 @@ import { useOnlineCount } from "~/hooks/useOnlineCount";
 import { cn } from "~/lib/utils";
 
 /**
- * "X pessoas treinando agora" — dot "ao vivo" pulsante + contador mono.
+ * "X pessoas treinando agora", dot "ao vivo" pulsante + contador mono.
  * Flame é ícone SVG lucide, não emoji (anti-slop).
  */
 export function OnlineCounter({

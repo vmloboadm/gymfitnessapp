@@ -113,7 +113,7 @@ export default function ProgressoPage() {
     }));
   }, [freq]);
 
-  // Métricas passivas — calculadas dos dados existentes, sem esforço do aluno.
+  // Métricas passivas, calculadas dos dados existentes, sem esforço do aluno.
   const freqMonthly = useMemo(() => {
     const monthStart = new Date().toISOString().slice(0, 7);
     return new Set((data?.checkins ?? []).map((c) => c.checked_at.slice(0, 7)).filter((m) => m === monthStart)).size
@@ -151,7 +151,7 @@ export default function ProgressoPage() {
     return prev.toLocaleDateString("pt-BR", { month: "short" });
   }, []);
 
-  // Evolução corporal (peso/bioimpedância) — serviço pago (plano Pro)
+  // Evolução corporal (peso/bioimpedância), serviço pago (plano Pro)
   const evolution = useMemo(() => {
     if (!demo) return null;
     const m = (demoMetricsData().metrics ?? []) as Array<{
@@ -214,7 +214,7 @@ export default function ProgressoPage() {
           />
         </div>
 
-        {/* Métricas passivas — sem esforço de registro */}
+        {/* Métricas passivas, sem esforço de registro */}
         <div className="gf-rise grid grid-cols-3 gap-2" style={{ animationDelay: "60ms" }}>
           <PassiveMetric label="Frequência/mês" value={`${freqMonthly}`} icon={CalendarDays} />
           <PassiveMetric label="Dias ativos semana" value={`${freqDays}`} icon={Target} />
@@ -263,7 +263,7 @@ export default function ProgressoPage() {
 
         <p className="text-xs text-muted-foreground">{sessionsThisWeek} {sessionsThisWeek === 1 ? "sessão" : "sessões"} na semana</p>
 
-        {/* Evolução corporal (peso/bioimpedância) — plano Pro */}
+        {/* Evolução corporal (peso/bioimpedância), plano Pro */}
         <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "240ms" }}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
@@ -281,7 +281,7 @@ export default function ProgressoPage() {
                 <PesoLineChart data={evolution} left={-14} />
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">
-                Última bioimpedância: {evolution[evolution.length - 1]?.peso} kg · BF {evolution[evolution.length - 1]?.bf}% — acompanhamento do plano Pro.
+                Última bioimpedância: {evolution[evolution.length - 1]?.peso} kg · BF {evolution[evolution.length - 1]?.bf}%, acompanhamento do plano Pro.
               </p>
             </>
           ) : (
@@ -294,16 +294,16 @@ export default function ProgressoPage() {
           )}
         </div>
 
-        {/* Programa de evolução de carga — opt-in, fora do topo */}
+        {/* Programa de evolução de carga, opt-in, fora do topo */}
         <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "300ms" }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
               <p className="gf-section">Programa de evolução de carga</p>
               <p className="text-[13px] font-semibold text-foreground">
-                {loadProgram ? "Ativo — registro rápido pré-preenchido" : "Acompanhe o aumento de carga nos exercícios"}
+                {loadProgram ? "Ativo, registro rápido pré-preenchido" : "Acompanhe o aumento de carga nos exercícios"}
               </p>
               <p className="gf-card-text">
-                Quando ativo, todo registro de série usa o valor anterior como base — só ajuste toque a toque, sem digitar do zero.
+                Quando ativo, todo registro de série usa o valor anterior como base, só ajuste toque a toque, sem digitar do zero.
               </p>
             </div>
             <button
@@ -331,7 +331,7 @@ export default function ProgressoPage() {
           ) : null}
         </div>
 
-        {/* Dicionário leigo — siglas e jargões explicados sem sair da tela */}
+        {/* Dicionário leigo, siglas e jargões explicados sem sair da tela */}
         <GlossaryCard
           className="gf-rise"
           items={[
@@ -345,7 +345,7 @@ export default function ProgressoPage() {
             },
             {
               term: "Sequência (streak)",
-              text: "Dias seguidos cumprindo seu plano. Não precisa ser todo dia — o que importa é não quebrar a corrente do seu ritmo.",
+              text: "Dias seguidos cumprindo seu plano. Não precisa ser todo dia, o que importa é não quebrar a corrente do seu ritmo.",
             },
             {
               term: "BF (% de gordura)",

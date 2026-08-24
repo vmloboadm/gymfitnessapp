@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import type { Profiles } from "~/lib/types/models";
 
 /**
- * STEP 4 — Restrições médicas + upload de laudo.
+ * STEP 4, Restrições médicas + upload de laudo.
  * Se medical_risk e laudo aprovado → o trigger do Postgres libera o profile
  * (status sai de pending_clearance). O upload grava em supabase.storage.
  */
@@ -53,7 +53,7 @@ export function MedicalRestrictionForm({
     }
 
     setUploaded(true);
-    toast.success("Laudo enviado — em análise");
+    toast.success("Laudo enviado, em análise");
   };
 
   const handleNext = async () => {
@@ -65,7 +65,7 @@ export function MedicalRestrictionForm({
       <div className="flex items-center gap-2">
         <ShieldCheck className="h-4 w-4 text-brand" />
         <h2 className="text-sm font-semibold text-foreground">
-          {profile.medical_risk ? "Restrição identificada — envie laudo" : "Saúde confirmada"}
+          {profile.medical_risk ? "Restrição identificada, envie laudo" : "Saúde confirmada"}
         </h2>
       </div>
 
@@ -83,7 +83,7 @@ export function MedicalRestrictionForm({
           >
             <FileUp className="h-8 w-8 text-brand" />
             <span className="text-sm font-semibold text-foreground">
-              {uploaded ? "Laudo enviado — reenviar" : file ? file.name : "Enviar laudo médico"}
+              {uploaded ? "Laudo enviado, reenviar" : file ? file.name : "Enviar laudo médico"}
             </span>
             <span className="text-xs text-muted-foreground">
               PDF ou imagem · máx 5 MB
@@ -108,7 +108,7 @@ export function MedicalRestrictionForm({
             className="w-full"
             size="lg"
           >
-            Continuar — Revisar
+            Continuar, Revisar
           </Button>
         </>
       ) : (
@@ -117,7 +117,7 @@ export function MedicalRestrictionForm({
             Maravilha! Você não sinalizou restrições. Pode seguir.
           </p>
           <Button onClick={handleNext} className="w-full" size="lg">
-            Continuar — Revisar
+            Continuar, Revisar
           </Button>
         </>
       )}

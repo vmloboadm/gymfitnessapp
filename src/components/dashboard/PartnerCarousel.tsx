@@ -7,7 +7,7 @@ import { ExternalLink, BadgePercent } from "lucide-react";
 import { toast } from "sonner";
 import { isDemoMode, demoPatrocinadores, codeResgate, type Patrocinador } from "~/lib/demo-bridge";
 
-/** Monograma premium — primeira letra em display pesado sobre a cor da marca.
+/** Monograma premium, primeira letra em display pesado sobre a cor da marca.
     Quando o parceiro cadastra a logo (upload), ela substitui o monograma. */
 function PartnerMark({ p, size = 44 }: { p: Patrocinador; size?: number }) {
   const radius = Math.round(size * 0.28);
@@ -46,7 +46,7 @@ function PartnerMark({ p, size = 44 }: { p: Patrocinador; size?: number }) {
   );
 }
 
-/** Carrossel universal de parceiros — snap central sedoso, autoplay lento, peek do próximo card.
+/** Carrossel universal de parceiros, snap central sedoso, autoplay lento, peek do próximo card.
     Sem corte abrupto na borda: o contéudo do card nunca é cortado feio. */
 export default function PartnerCarousel() {
   const partners = isDemoMode() ? demoPatrocinadores() : [];
@@ -84,7 +84,7 @@ export default function PartnerCarousel() {
         </span>
       </div>
 
-      {/* máscara lateral suave — o card vizinho desvanece, nunca corta feio */}
+      {/* máscara lateral suave, o card vizinho desvanece, nunca corta feio */}
       <div
         className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6"
         style={{ background: "linear-gradient(90deg, #050507 0%, transparent 100%)" }}

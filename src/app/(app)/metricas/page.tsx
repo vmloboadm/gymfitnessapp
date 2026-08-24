@@ -166,24 +166,24 @@ export default function MetricasPage() {
         <div className="gf-rise grid grid-cols-3 gap-2">
           <StatCard
             label="Peso"
-            value={latest.weight_kg != null ? `${formatNumber(latest.weight_kg)} kg` : "—"}
+            value={latest.weight_kg != null ? `${formatNumber(latest.weight_kg)} kg` : "-"}
             delta={weightDelta}
             icon={Scale}
           />
           <StatCard
             label="Altura"
-            value={latest.height_m ? `${formatNumber(latest.height_m * 100)} cm` : "—"}
+            value={latest.height_m ? `${formatNumber(latest.height_m * 100)} cm` : "-"}
             icon={Ruler}
           />
           <StatCard
             label="Gordura"
-            value={latest.body_fat_pct != null ? `${formatNumber(latest.body_fat_pct)}%` : "—"}
+            value={latest.body_fat_pct != null ? `${formatNumber(latest.body_fat_pct)}%` : "-"}
             delta={bfDelta}
             icon={Percent}
           />
         </div>
 
-        {/* Evolução do peso — tendência real das medições */}
+        {/* Evolução do peso, tendência real das medições */}
         {weightSeries.length >= 2 ? (
           <div className="gf-rise rounded-xl border border-border bg-card/50 p-4" style={{ animationDelay: "60ms" }}>
             <p className="mb-2 gf-section">Evolução do peso</p>
@@ -233,13 +233,13 @@ export default function MetricasPage() {
             </div>
 
             <GlossaryTip term="IMC?" className="mt-3">
-              IMC compara seu peso com sua altura pra dar uma noção geral da saúde do corpo. Ele não enxerga músculo —
+              IMC compara seu peso com sua altura pra dar uma noção geral da saúde do corpo. Ele não enxerga músculo -
               quem treina pesado pode ter IMC alto e estar ótimo. Use como referência junto com o % de gordura.
             </GlossaryTip>
           </div>
         ) : null}
 
-        {/* Composição corporal — massa magra e cintura com variação */}
+        {/* Composição corporal, massa magra e cintura com variação */}
         <div className="gf-rise space-y-2" style={{ animationDelay: "180ms" }}>
           {latest.muscle_kg != null ? (
             <div className="flex items-center gap-3 rounded-xl border border-border bg-card/40 p-4">
@@ -266,7 +266,7 @@ export default function MetricasPage() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-foreground">Cintura</p>
-                <p className="text-xs text-muted-foreground">{formatNumber(latest.waist_cm)} cm — cintura descendo é um ótimo sinal</p>
+                <p className="text-xs text-muted-foreground">{formatNumber(latest.waist_cm)} cm, cintura descendo é um ótimo sinal</p>
               </div>
             </div>
           ) : null}
@@ -280,7 +280,7 @@ export default function MetricasPage() {
                 <p className="text-sm font-semibold text-foreground">Gordura corporal</p>
                 <p className="text-xs text-muted-foreground">
                   {formatNumber(latest.body_fat_pct)}% ·{" "}
-                  {bfDelta < 0 ? "caindo — evolução!" : bfDelta > 0 ? "subiu desde a última medição" : "estável"}
+                  {bfDelta < 0 ? "caindo, evolução!" : bfDelta > 0 ? "subiu desde a última medição" : "estável"}
                 </p>
               </div>
             </div>
@@ -296,7 +296,7 @@ export default function MetricasPage() {
                 <div key={m.id} className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3.5 py-2.5">
                   <span className="text-sm font-medium text-foreground">{formatDate(m.recorded_at)}</span>
                   <span className="gf-hero-num text-xs text-muted-foreground">
-                    {m.weight_kg != null ? `${formatNumber(m.weight_kg)} kg` : "—"}
+                    {m.weight_kg != null ? `${formatNumber(m.weight_kg)} kg` : "-"}
                     {m.body_fat_pct != null ? ` · ${formatNumber(m.body_fat_pct)}% BF` : ""}
                   </span>
                 </div>

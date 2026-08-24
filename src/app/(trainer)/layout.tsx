@@ -16,7 +16,7 @@ const NAV = [
 ];
 
 /**
- * Área do personal — sidebar desktop (blueprint §3.3).
+ * Área do personal, sidebar desktop (blueprint §3.3).
  */
 export default function TrainerLayout({
   children,

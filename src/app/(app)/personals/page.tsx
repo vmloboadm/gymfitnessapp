@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { demoPersonais } from "~/lib/demo-bridge";
 
 /**
- * Personals da Casa — vitrine de monetização (piloto via WhatsApp).
+ * Personals da Casa, vitrine de monetização (piloto via WhatsApp).
  * Card vertical grande: foto, nome, especialidade, pitch e CTA laranja
  * que abre o WhatsApp com mensagem pré-preenchida.
  */
@@ -87,7 +87,7 @@ export default function PersonaisMarketplacePage() {
         })}
 
         <p className="pb-2 text-center text-[11px] text-muted-foreground">
-          O contato é direto pelo WhatsApp do personal — sem intermediários.
+          O contato é direto pelo WhatsApp do personal, sem intermediários.
         </p>
       </div>
     </>

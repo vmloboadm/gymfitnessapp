@@ -32,7 +32,7 @@ const STAGE_LOOK = [
   { scale: 1.22, color: "#F4711E", glow: 14 },
 ];
 
-/** Chama do streak — ícone Lucide com variação de intensidade por estágio.
+/** Chama do streak, ícone Lucide com variação de intensidade por estágio.
     Streak baixo = apagada/cinza; streak alto = viva e maior. */
 export function StreakFlame({ streak, size = 42 }: { streak: number; size?: number }) {
   const stage = streakStage(streak);

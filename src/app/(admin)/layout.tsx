@@ -26,7 +26,7 @@ const NAV = [
 ];
 
 /**
- * Área do gestor — MOBILE-FIRST: bottom nav no celular (igual ao app do
+ * Área do gestor, MOBILE-FIRST: bottom nav no celular (igual ao app do
  * aluno), sidebar só aparece a partir de lg. Nada de sidebar fixa no mobile.
  */
 export default function AdminLayout({

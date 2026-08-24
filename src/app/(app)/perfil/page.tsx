@@ -72,7 +72,7 @@ export default function PerfilPage() {
     return ((parts[0]?.[0] ?? "?") + (parts[1]?.[0] ?? "")).toUpperCase();
   }, [profile?.name]);
 
-  // Foto de perfil: obrigatória — mock usa pravatar; produção usa avatar_url real.
+  // Foto de perfil: obrigatória, mock usa pravatar; produção usa avatar_url real.
   const avatarUrl = demo
     ? "https://i.pravatar.cc/160?img=12"
     : profile?.avatar_url || null;
@@ -87,7 +87,7 @@ export default function PerfilPage() {
     [data?.metrics]
   );
 
-  // Evolução de carga (demo) — mesma lógica visual do Progresso
+  // Evolução de carga (demo), mesma lógica visual do Progresso
   const loadChart = useMemo(
     () =>
       demo
@@ -209,7 +209,7 @@ export default function PerfilPage() {
                 </Badge>
               ) : (
                 <Badge variant="success" className="gap-1">
-                  <CalendarClock className="h-3 w-3" /> até {sub.ends_at ? formatDate(sub.ends_at) : "—"}
+                  <CalendarClock className="h-3 w-3" /> até {sub.ends_at ? formatDate(sub.ends_at) : "-"}
                 </Badge>
               )
             ) : (
@@ -218,7 +218,7 @@ export default function PerfilPage() {
           </div>
           {sub && (sub.type === "gympass" || sub.type === "totalpass") && (
             <p className="mt-2 rounded-lg bg-muted/70 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-              Matrícula via plataforma — compareça nesta unidade para acumular streak, ranking e benefícios da comunidade.
+              Matrícula via plataforma, compareça nesta unidade para acumular streak, ranking e benefícios da comunidade.
             </p>
           )}
         </div>
@@ -242,7 +242,7 @@ export default function PerfilPage() {
           )}
         </div>
 
-        {/* Evolução de carga (demo) — mesmo estilo recharts do Progresso */}
+        {/* Evolução de carga (demo), mesmo estilo recharts do Progresso */}
         <div className="gf-card gf-glass !py-4">
           <div className="mb-3 flex items-center justify-between">
             <p className="gf-section">Evolução de carga (supino)</p>
@@ -275,7 +275,7 @@ export default function PerfilPage() {
           </div>
         )}
 
-        {/* Conquistas — timeline */}
+        {/* Conquistas, timeline */}
         <div className="gf-card gf-glass !py-4">
           <div className="mb-3 flex items-center justify-between">
             <p className="gf-section">Conquistas</p>

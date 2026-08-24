@@ -3,7 +3,7 @@
 import { BottomNav } from "~/components/layout/BottomNav";
 
 /**
- * Área do aluno — mobile-first PWA (BottomNav + TopBar por página).
+ * Área do aluno, mobile-first PWA (BottomNav + TopBar por página).
  * Parceiros saíram do layout universal: agora vivem no "Ver mais" da home,
  * reduzindo densidade e JS montado em todas as telas.
  */

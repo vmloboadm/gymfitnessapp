@@ -5,7 +5,7 @@ import type { Database } from "~/lib/types/database";
 /**
  * Middleware autenticação + role check (blueprint §2).
  * Nota: rotas de grupo ((app), (trainer), (admin)) são organizacionais no
- * Next.js App Router — não aparecem na URL. Por isso mapeamos os paths reais.
+ * Next.js App Router, não aparecem na URL. Por isso mapeamos os paths reais.
  */
 
 const PUBLIC_PATHS = [
@@ -86,7 +86,7 @@ function pathAllowed(role: string | undefined, pathname: string): string | null 
     return HOME_BY_ROLE[role ?? "student"] ?? "/login";
   }
 
-  // fallback: rotas sem área definida (dashboard raiz) — libera logado
+  // fallback: rotas sem área definida (dashboard raiz), libera logado
   return null;
 }
 

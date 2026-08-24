@@ -9,7 +9,7 @@ import { GoalSelector } from "~/components/onboarding/GoalSelector";
 import type { Profiles } from "~/lib/types/models";
 
 /**
- * STEP 1 — Dados pessoais + objetivo (blueprint §3.1).
+ * STEP 1, Dados pessoais + objetivo (blueprint §3.1).
  */
 export function ProfileBasicForm({
   profile,
@@ -85,7 +85,7 @@ export function ProfileBasicForm({
 
       <Button type="submit" className="w-full" size="lg" disabled={saving}>
         {saving ? <Loader2 className="animate-spin" /> : <Target />}
-        Continuar — Anamnese
+        Continuar, Anamnese
       </Button>
     </form>
   );

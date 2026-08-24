@@ -234,7 +234,7 @@ export default function CheckinPage() {
   const stopScanning = () => setScannerActive(false);
 
   // ---------------------------------------------------------------------------
-  // NFC real (Web NFC / NDEFReader — Chrome no Android). A tag guarda a mesma
+  // NFC real (Web NFC / NDEFReader, Chrome no Android). A tag guarda a mesma
   // URL/código do campo nfc_tag_url do aparelho; a leitura cai no mesmo
   // scanSuccess do QR. Sem suporte → fallback explícito para QR.
   // ---------------------------------------------------------------------------
@@ -325,7 +325,10 @@ useEffect(() => {
   const doEntry = async (source: "nfc" | "qrcode" | "app" = "app") => {
     if (demo) {
       setGymEntry({ id: "ck-demo-" + Date.now(), checked_at: new Date().toISOString(), source });
-      try { localStorage.setItem("gymfit_last_checkin", todayLocalKey()); } catch {}
+      try {
+        localStorage.setItem("gymfit_last_checkin", todayLocalKey());
+        localStorage.setItem("gymfit_checkin_started_at", String(Date.now()));
+      } catch {}
       toast.success("Check-in de entrada realizado!");
       return;
     }
@@ -341,7 +344,10 @@ useEffect(() => {
       return;
     }
     setGymEntry(inserted as any);
-    try { localStorage.setItem("gymfit_last_checkin", todayLocalKey()); } catch {}
+    try {
+      localStorage.setItem("gymfit_last_checkin", todayLocalKey());
+      localStorage.setItem("gymfit_checkin_started_at", String(Date.now()));
+    } catch {}
     toast.success("Check-in de entrada realizado!");
   };
 
@@ -436,7 +442,7 @@ useEffect(() => {
           {gymEntry && (
             <div className="flex items-center gap-2 rounded-xl bg-card/50 px-3 py-2 text-xs text-success">
               <span className="hero-live-dot" />
-              Treino em andamento — ao sair, o treino inteiro é finalizado.
+              Treino em andamento, ao sair, o treino inteiro é finalizado.
             </div>
           )}
         </div>
@@ -474,7 +480,7 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Tag NFC detectada pelo link — pede confirmação antes de abrir sessão */}
+      {/* Tag NFC detectada pelo link, pede confirmação antes de abrir sessão */}
       {pendingEq && !session ? (
         <div className="animate-fade-in rounded-[20px] border border-success/40 bg-gradient-to-br from-success/15 via-card to-card p-5">
           <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-success">
@@ -500,7 +506,7 @@ useEffect(() => {
         </div>
       ) : null}
 
-      {/* NFC — o diferencial GymFitness, explicado sem jargão */}
+      {/* NFC, o diferencial GymFitness, explicado sem jargão */}
       <div className="relative overflow-hidden rounded-[20px] border border-brand/35 bg-gradient-to-br from-brand/15 via-card to-card p-5">
         <div className="flex items-start gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-brand text-brand-foreground shadow-lg shadow-brand/30">
@@ -511,7 +517,7 @@ useEffect(() => {
             <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
               Os aparelhos da academia têm tag NFC.{" "}
               <span className="font-semibold text-foreground">Encoste o celular nela</span> e a
-              sessão abre sozinha — seu uso já fica registrado, sem procurar nada na lista.
+              sessão abre sozinha, seu uso já fica registrado, sem procurar nada na lista.
             </p>
           </div>
         </div>
@@ -520,7 +526,7 @@ useEffect(() => {
           {[
             { n: "1", label: "Encoste no aparelho" },
             { n: "2", label: "Confirme na tela" },
-            { n: "3", label: "Treine — fecha ao trocar" },
+            { n: "3", label: "Treine, fecha ao trocar" },
           ].map((s) => (
             <div key={s.n} className="rounded-xl border border-border bg-card/50 px-2 py-2.5">
               <span className="mx-auto flex h-5 w-5 items-center justify-center rounded-full bg-brand/15 text-[10px] font-bold text-brand">
@@ -532,7 +538,7 @@ useEffect(() => {
         </div>
 
         <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
-          <span className="font-semibold text-foreground">iPhone:</span> encoste o topo do aparelho na tag —
+          <span className="font-semibold text-foreground">iPhone:</span> encoste o topo do aparelho na tag -
           aparece uma notificação da Apple; toque nela e a sessão abre aqui.
           <br />
           <span className="font-semibold text-foreground">Android:</span> use o botão abaixo (ou deixe a

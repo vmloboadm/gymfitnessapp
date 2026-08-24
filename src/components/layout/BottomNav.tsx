@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 
-/* Navegação completa (7 destinos) em barra com scroll horizontal —
+/* Navegação completa (7 destinos) em barra com scroll horizontal -
    padrão consagrado de tabs com overflow (mesmo comportamento de apps
    com muitas seções). Equipamentos fica dentro de Check-in/Treino. */
 const NAV_ITEMS = [

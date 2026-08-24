@@ -16,7 +16,7 @@ type PostRow = FeedPosts & { author: Profiles | null; likes: number; comments: n
 
 /**
  * Moderação do feed (gestor): visualiza posts recentes, pode remover.
- * Report/flag automático é futuro — aqui o gestor decide por análise.
+ * Report/flag automático é futuro, aqui o gestor decide por análise.
  */
 export default function ModerationPage() {
   const { profile } = useAuth();
