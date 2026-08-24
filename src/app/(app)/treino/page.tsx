@@ -22,6 +22,7 @@ import {
   ScanLine,
   Info,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -34,6 +35,7 @@ import AiCoach, { openAiCoach } from "~/components/ai/coach-chat";
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
 import { ExerciseInfoSheet, iconForExercise, type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
+import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
 import { todayWorkoutTitle } from "~/lib/academia";
 import { useWorkoutSession, elapsedSeconds, formatMMSS } from "~/lib/workout-session";
@@ -126,6 +128,7 @@ export default function TreinoHomePage() {
   const demo = isDemoMode();
   const [feeling, setFeeling] = useState<string | null>(null);
   const [detailEx, setDetailEx] = useState<ExerciseDetail | null>(null);
+  const [summarySeconds, setSummarySeconds] = useState<number | null>(null);
   /* Sessão POR APARELHO (fluxo NFC contextual): exercícioId → início.
      No demo, tocar na instrução simula a leitura da tag. */
   const [eqSessions, setEqSessions] = useState<Record<string, number>>({});
@@ -207,6 +210,7 @@ export default function TreinoHomePage() {
     },
     [user?.id, profile?.id, demo]
   );
+  const router = useRouter();
   const { session: daySession, end: endDaySession } = useWorkoutSession();
   const [nowTick2, setNowTick2] = useState(Date.now());
   useEffect(() => {
@@ -252,6 +256,9 @@ export default function TreinoHomePage() {
   }, [demo]);
 
   const conclude = () => {
+    setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
+    endDaySession();
+    navigator.vibrate?.([60, 40, 90]);
     setPhase("done");
     toast.success("Treino concluído! 💪");
   };
@@ -338,6 +345,7 @@ export default function TreinoHomePage() {
         <button
           onClick={() => {
             navigator.vibrate?.([60, 40, 60]);
+            setSummarySeconds(elapsedSeconds(daySession.startedAt, Date.now()));
             endDaySession();
             toast.success("Sessão finalizada. Registre como foi!");
             setPhase("done");
@@ -369,7 +377,21 @@ export default function TreinoHomePage() {
   }
 
   // Tela de encerramento, pós-treino (RPE não fica preso no topo)
-  if (phase === "done") {
+    if (phase === "done") {
+    return (
+      <WorkoutSummary
+        seconds={summarySeconds ?? 0}
+        done={Math.min(todayLogs || 1, totalToday || 1)}
+        total={totalToday || 1}
+        onDone={() => {
+          router.replace("/");
+        }}
+      />
+    );
+  }
+
+  // legado RPE desativado
+  if (false) {
     return (
       <>
         <TopBar title="Treino" subtitle="Encerrado" />

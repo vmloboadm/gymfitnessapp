@@ -38,3 +38,37 @@ export function recentAchievements(n = 3): StudentAchievement[] {
     .filter((a) => a.earned_at)
     .slice(0, n);
 }
+
+
+/* ---------- Overrides em execução (conquistas desbloqueadas no app) ---------- */
+const OVERRIDE_KEY = "gymfit_ach_overrides";
+
+function readOverrides(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(OVERRIDE_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+/** Marca como conquistada AGORA (persistente no dispositivo). */
+export function unlockAchievement(id: string): void {
+  const o = readOverrides();
+  o[id] = new Date().toISOString();
+  try {
+    localStorage.setItem(OVERRIDE_KEY, JSON.stringify(o));
+  } catch {}
+}
+
+/** Lista ordenada aplicando overrides locais (ganha sobre o mock estático). */
+export function sortedWithOverrides(): StudentAchievement[] {
+  const ov = typeof window !== "undefined" ? readOverrides() : {};
+  return sortedAchievements().map((a) =>
+    !a.earned_at && ov[a.id] ? { ...a, earned_at: ov[a.id] } : a
+  );
+}
+
+/** Próxima não-conquistada (para o card de comemoração pós-treino). */
+export function nextToUnlock(): StudentAchievement | null {
+  return sortedWithOverrides().find((a) => !a.earned_at) ?? null;
+}
