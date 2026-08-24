@@ -20,6 +20,7 @@ import {
   Lock,
   X,
   ScanLine,
+  Info,
 } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -32,6 +33,7 @@ import WorkoutInProgress from "~/components/common/WorkoutInProgress";
 import AiCoach, { openAiCoach } from "~/components/ai/coach-chat";
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
+import { ExerciseInfoSheet, iconForExercise, type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
 import { weekdayName } from "~/lib/utils/calculations";
 import { todayWorkoutTitle } from "~/lib/academia";
 import { useWorkoutSession, elapsedSeconds, formatMMSS } from "~/lib/workout-session";
@@ -110,17 +112,20 @@ const BODY_COUNTS = (() => {
   };
 })();
 
-const DEFAULT_DEMO_EX = [
-  { id: "d1", name: "Supino Reto", picto: "🏋️", sets: 4, reps: "10", rest: 90 },
-  { id: "d2", name: "Crucifixo com Halteres", picto: "🦾", sets: 3, reps: "12", rest: 60 },
-  { id: "d3", name: "Desenvolvimento Militar", picto: "🏋️", sets: 3, reps: "10", rest: 75 },
-  { id: "d4", name: "Elevação Lateral", picto: "🪶", sets: 4, reps: "15", rest: 45 },
+const IMG: string | null = "/workout/workout-strength.jpg";
+const YT = (q: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q + " execução")}`;
+const DEFAULT_DEMO_EX: Array<{ id: string; name: string; picto: string; sets: number; reps: string; rest: number; info: string; tips?: string[] | null; imageUrl: string | null; videoUrl: string | null }> = [
+  { id: "d1", name: "Supino Reto", picto: "🏋️", sets: 4, reps: "10", rest: 90, imageUrl: IMG as string | null, videoUrl: YT("Supino Reto"), info: "Empurre sem travar o cotovelo." },
+  { id: "d2", name: "Crucifixo com Halteres", picto: "🦾", sets: 3, reps: "12", rest: 60, imageUrl: IMG as string | null, videoUrl: YT("Crucifixo Halteres"), info: "Abra até a linha do peito e volte controlando." },
+  { id: "d3", name: "Desenvolvimento Militar", picto: "🏋️", sets: 3, reps: "10", rest: 75, imageUrl: IMG as string | null, videoUrl: YT("Desenvolvimento Militar"), info: "Core firme, sem arco lombar." },
+  { id: "d4", name: "Elevação Lateral", picto: "🪶", sets: 4, reps: "15", rest: 45, imageUrl: IMG as string | null, videoUrl: YT("Elevação Lateral"), info: "Cotovelos levemente flexionados." },
 ];
 
 export default function TreinoHomePage() {
   const { user, profile } = useAuth();
   const demo = isDemoMode();
   const [feeling, setFeeling] = useState<string | null>(null);
+  const [detailEx, setDetailEx] = useState<ExerciseDetail | null>(null);
   /* Sessão POR APARELHO (fluxo NFC contextual): exercícioId → início.
      No demo, tocar na instrução simula a leitura da tag. */
   const [eqSessions, setEqSessions] = useState<Record<string, number>>({});
@@ -542,16 +547,32 @@ export default function TreinoHomePage() {
                         sets: 3,
                         reps: "10",
                         rest: 75,
+                        info: x.info,
+                        tips: x.tags ?? null,
+                        imageUrl: x.imageUrl ?? null,
+                        videoUrl: x.videoUrl ?? null,
                       }))
                     )
                   }
                   className="gf-touch flex w-full items-center gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left transition-colors hover:border-brand/40"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-lg">{e.picto}</span>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-brand">
+                    {(() => { const I = iconForExercise(e.name); return <I className="h-5 w-5" />; })()}
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold text-foreground">{e.name}</span>
                     <span className="block truncate text-[11px] text-muted-foreground">{e.equipment ?? "Exercício livre"}</span>
                   </span>
+                  <button
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      setDetailEx({ name: e.name, info: e.info, tips: e.tags ?? null, imageUrl: e.imageUrl ?? null, videoUrl: e.videoUrl ?? null });
+                    }}
+                    aria-label={`Ver ficha de ${e.name}`}
+                    className="gf-touch tactile flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
+                  >
+                    <Info className="h-4 w-4" />
+                  </button>
                   {e.machineId ? (
                     <Badge variant="outline" className="shrink-0 !px-2 !text-[9px]">
                       <Nfc className="mr-1 h-3 w-3 text-brand" /> NFC
@@ -570,6 +591,10 @@ export default function TreinoHomePage() {
                     sets: 3,
                     reps: "10",
                     rest: 75,
+                    info: x.info,
+                    tips: x.tags ?? null,
+                    imageUrl: x.imageUrl ?? null,
+                    videoUrl: x.videoUrl ?? null,
                   }))
                 )
               }
@@ -670,6 +695,15 @@ export default function TreinoHomePage() {
                       });
                       toast.success("Exercício finalizado. Bom trabalho! 💪");
                     }}
+                    onInfo={() =>
+                      setDetailEx({
+                        name: d.exercise?.name ?? "Exercício",
+                        info: d.exercise?.tips?.[0] ?? null,
+                        tips: d.exercise?.tips ?? null,
+                        imageUrl: (d.exercise as any)?.imageUrl ?? d.exercise?.photo_url ?? null,
+                        videoUrl: (d.exercise as any)?.videoUrl ?? (d.exercise as any)?.video_url ?? null,
+                      })
+                    }
                   />
                 ))}
               </div>
@@ -732,6 +766,7 @@ export default function TreinoHomePage() {
 
         {/* 5. HISTÓRICO RECENTE, accordion fechado por padrão */}
         <HistoryList logs={data.logs} />
+        <ExerciseInfoSheet ex={detailEx} onClose={() => setDetailEx(null)} />
       </div>
       <AiCoach />
     </>
@@ -745,6 +780,7 @@ function ExerciseRow({
   now,
   onStart,
   onFinish,
+  onInfo,
 }: {
   item: TreinoDay;
   machineFor: string;
@@ -752,6 +788,7 @@ function ExerciseRow({
   now?: number;
   onStart?: () => void;
   onFinish?: () => void;
+  onInfo: () => void;
 }) {
   const elapsed = sessionStart && now ? Math.max(0, Math.floor((now - sessionStart) / 1000)) : 0;
   const demoModeHint = isDemoMode();
@@ -796,6 +833,14 @@ function ExerciseRow({
             <Badge variant="outline">{catLabel}</Badge>
           </div>
         </div>
+        <button
+          onClick={onInfo}
+          aria-label={`Ficha técnica de ${item.exercise?.name}`}
+          title="Como fazer"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
+        >
+          <Info className="h-3.5 w-3.5" />
+        </button>
         <button
           onClick={() => openAiCoach(`Sobre o exercício ${item.exercise?.name ?? "desse"}: como executar com segurança e ajustar a carga?`)}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, CheckCircle2, ChevronRight } from "lucide-react";
+import { Check, CheckCircle2, ChevronRight, Info } from "lucide-react";
+import { iconForExercise, type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
+import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { cn } from "~/lib/utils";
 
 type WExercise = {
@@ -13,6 +15,10 @@ type WExercise = {
   reps: string;
   rest: number;
   done?: boolean;
+  info?: string | null;
+  tips?: string[] | null;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
 };
 
 /**
@@ -29,6 +35,7 @@ export default function WorkoutInProgress({
   onFinish: () => void;
 }) {
   const [doneCount, setDoneCount] = useState(0);
+  const [detailEx, setDetailEx] = useState<ExerciseDetail | null>(null);
   const current = exercises[doneCount];
   const allDone = doneCount >= exercises.length;
 
@@ -79,13 +86,18 @@ export default function WorkoutInProgress({
                   done ? "border-success/40 bg-success/[0.08]" : isNow ? "border-brand/50 bg-brand/[0.07]" : "border-border bg-card/40 opacity-70"
                 )}
               >
-                <span
-                  className={cn(
-                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-lg",
-                    done ? "bg-success/20" : "bg-card"
-                  )}
+                <button
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    setDetailEx({ name: e.name, info: e.info ?? null, tips: e.tips ?? null, imageUrl: e.imageUrl ?? null, videoUrl: e.videoUrl ?? null });
+                  }}
+                  aria-label={`Ficha de ${e.name}`}
+                  className="gf-touch tactile flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
                 >
-                  {done ? <CheckCircle2 className="h-5 w-5 text-success" /> : e.picto}
+                  <Info className="h-4 w-4" />
+                </button>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card text-brand">
+                  {(() => { const I = iconForExercise(e.name); return <I className="h-5 w-5" />; })()}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className={cn("truncate text-[13px] font-semibold", done ? "text-muted-foreground line-through" : "text-foreground")}>
@@ -115,8 +127,8 @@ export default function WorkoutInProgress({
               animate={{ opacity: 1, scale: 1 }}
               className="overflow-hidden rounded-[22px] border border-brand/40 bg-gradient-to-b from-brand/20 via-card to-card p-6 text-center"
             >
-              <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-card/70 text-5xl shadow-inner">
-                {current.picto}
+              <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-card/70 text-brand shadow-inner">
+                {(() => { const I = iconForExercise(current.name); return <I className="h-11 w-11" />; })()}
               </span>
               <h1 className="mt-3 text-xl font-black leading-tight text-foreground">{current.name}</h1>
               <p className="mt-1 gf-card-text">{current.sets} × {current.reps} no seu ritmo</p>
@@ -159,6 +171,25 @@ export default function WorkoutInProgress({
             Próximo: <span className="font-semibold text-foreground">{exercises[doneCount + 1].name}</span>
           </p>
         ) : null}
+
+        <BottomSheet open={!!detailEx} onClose={() => setDetailEx(null)}>
+          {detailEx ? (
+            <>
+              <h3 className="mb-3 text-base font-black text-foreground">{detailEx.name}</h3>
+              <p className="gf-card-text">{detailEx.info ?? "Execução padrão, cadência controlada."}</p>
+              {detailEx.videoUrl ? (
+                <a
+                  href={detailEx.videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="gf-touch mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-bold text-brand"
+                >
+                  Ver vídeo no YouTube
+                </a>
+              ) : null}
+            </>
+          ) : null}
+        </BottomSheet>
       </div>
     </div>
   );
