@@ -80,7 +80,7 @@ export default function FinanceiroPage() {
           <ErrorState message={error} onRetry={refetch} />
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <StatCard label="MRR" value={formatBRL(mrr)} icon={Wallet} context="Receita mensal recorrente" />
               <StatCard
                 label="Vencidas"

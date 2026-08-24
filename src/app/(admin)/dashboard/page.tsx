@@ -101,7 +101,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <StatCard label="Alunos" value={formatNumber(kpis?.students ?? 0)} delta={3.2} icon={Users} context="vs mês anterior" />
         <StatCard label="Personais" value={formatNumber(kpis?.trainers ?? 0)} icon={Dumbbell} context="equipe ativa" />
         <StatCard label="Aparelhos" value={`${formatNumber(kpis?.equipment ?? 0)}`} icon={BarChart3} context="cadastrados" />
@@ -198,7 +198,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Ações rápidas */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {[
           { href: "/matriculas", label: "Nova matrícula", emoji: "📋" },
           { href: "/personais", label: "Adicionar personal", emoji: "🧑‍🏫" },

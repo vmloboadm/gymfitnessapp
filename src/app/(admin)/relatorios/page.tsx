@@ -96,7 +96,7 @@ export default function RelatoriosPage() {
           />
         ) : (
           <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <StatCard label="Check-ins" value={formatNumber(data?.sessions ?? 0)} icon={Activity} context="Entradas (7d)" />
               <StatCard label="Volume" value={formatVolumeKg(data?.volume ?? 0)} icon={BarChart3} context="Carga total" />
               <StatCard label="Dias ativos" value={formatNumber(new Set(data?.checkins.map((c) => c.checked_at.slice(0, 10))).size)} icon={Users} context="Dias c/ atividade" />

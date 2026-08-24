@@ -16,6 +16,7 @@ import { calcStreak, weekdayName, startOfWeek } from "~/lib/utils/calculations";
 import { cap } from "~/lib/utils/format";
 import { leagueFor } from "~/lib/utils/leagues";
 import AiCoach from "~/components/ai/coach-chat";
+import PersonalHome from "~/components/personal/PersonalHome";
 import { LivePulse } from "~/components/dashboard/LivePulse";
 import { StreakFlame, FlameStageHint } from "~/components/dashboard/StreakFlame";
 import { PerformanceRing } from "~/components/dashboard/PerformanceRing";
@@ -173,13 +174,11 @@ export default function HomePage() {
 
   useEffect(() => {
     if (loading) return;
-    // No modo demo a home do aluno nunca expulsa: o papel trocado no
-    // seletor "Painel demo" fica salvo no navegador e travava todos os
-    // acessos diretos na home. Troca de painel é feita pelo seletor.
-    if (demo) return;
-    if (profile?.role === "trainer") router.replace("/alunos");
-    else if (profile?.role === "manager" || profile?.role === "admin") router.replace("/dashboard");
-  }, [demo, profile?.role, loading, router]);
+    // Gestor vai para o painel de gestão; Personal tem dashboard próprio abaixo.
+    if (profile?.role === "manager" || profile?.role === "admin") router.replace("/dashboard");
+  }, [profile?.role, loading, router]);
+
+
 
   const { data, loading: dataLoading } = useAsyncQuery<{
     logs: WorkoutLogs[];
@@ -301,6 +300,7 @@ export default function HomePage() {
   // Treino de hoje = próximo da SEQUÊNCIA da ficha (não decide por fadiga).
   // Se faltou um dia, retoma o treino perdido — é o que aparece no hero.
   const focus = useMemo(() => nextWorkoutFromLogs(logs), [logs]);
+  const todayLabel = `Treino do dia · ${focus.label}`;
   const activeDays = monthDays.days.filter((d) => d.level > 0).length;
   const remaining = Math.max(0, META_SEMANAL - sessionsWeek);
 
@@ -336,6 +336,11 @@ export default function HomePage() {
         <SkeletonList rows={6} />
       </div>
     );
+  }
+
+  // Dashboard específico do Personal (mobile-first, sem anel/streak de aluno)
+  if (profile?.role === "trainer") {
+    return <PersonalHome />;
   }
 
   return (
@@ -472,7 +477,7 @@ export default function HomePage() {
         <motion.div variants={item}>
           <HeroWorkout
             image={FOCUS_IMAGE[focus.bodyCat] ?? "/workout/workout-hero.jpg"}
-            title={`Treino do dia · ${focus.label}`}
+            title={todayLabel}
             exerciseCount={exCount}
             estMin={45}
             sessionsWeek={sessionsWeek}
@@ -652,6 +657,11 @@ export default function HomePage() {
               <p className="text-[10px] font-bold uppercase tracking-widest text-warning">Dica do dia</p>
               <p className="mt-1.5 line-clamp-3 text-[13px] font-medium leading-snug text-[#D6DCEC]">{tip}</p>
             </div>
+            <Link href="/personals" className="w-[80%] shrink-0 snap-start rounded-[18px] border border-brand/35 bg-gradient-to-br from-brand/15 via-card to-card p-4 transition-colors hover:border-brand/60">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-brand">Personals da casa</p>
+              <p className="mt-1.5 line-clamp-2 text-[13px] font-semibold leading-snug text-[#F4F6FB]">Acelere com acompanhamento premium</p>
+              <p className="mt-2 text-[11px] font-semibold text-brand">Ver personais →</p>
+            </Link>
           </div>
         </motion.section>
 
@@ -660,7 +670,7 @@ export default function HomePage() {
 
         {/* Marcador de build — confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 24/08 v3 ✓
+          GymFitness · build 24/08 v4 ✓
         </p>
           </>
         ) : null}
