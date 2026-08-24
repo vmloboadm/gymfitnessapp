@@ -343,6 +343,9 @@ export type DemoExercise = {
   machineId?: string;
   imageUrl?: string;
   videoUrl?: string;
+  thumbUrl?: string;
+  videoUrlMale?: string;
+  videoUrlFemale?: string;
 };
 
 export type DemoSubCategory = {
@@ -360,8 +363,12 @@ export type DemoCategory = {
 
 const YT = (q: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q + " execução")}`;
 
-const ex = (id: string, name: string, picto: string, info: string, equipment: string | null = null, tags: string[] = [], machineId?: string): DemoExercise =>
-  ({ id, name, picto, info, equipment, tags, machineId, imageUrl: "/workout/workout-strength.jpg", videoUrl: YT(name) });
+const UNSPLASH = (id: string) => `https://images.unsplash.com/${id}?w=300&h=300&fit=crop&q=70`;
+const VID_M = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
+const VID_F = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4";
+
+const ex = (id: string, name: string, picto: string, info: string, equipment: string | null = null, tags: string[] = [], machineId?: string, thumbId = "photo-1517836357463-d25dfeac3438"): DemoExercise =>
+  ({ id, name, picto, info, equipment, tags, machineId, imageUrl: UNSPLASH(thumbId), thumbUrl: UNSPLASH(thumbId), videoUrl: YT(name), videoUrlMale: VID_M, videoUrlFemale: VID_F });
 
 export const demoLib: DemoCategory[] = [
   {

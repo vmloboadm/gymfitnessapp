@@ -2,7 +2,7 @@
  * Offline shell + cache runtime com estrategia network-first p/ páginas,
  * stale-while-revalidate p/ assets, background sync e escuta de push.
  */
-const CACHE_VERSION = "gymfitness-v19";
+const CACHE_VERSION = "gymfitness-v20";
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
@@ -51,6 +51,28 @@ self.addEventListener("fetch", (event) => {
   // API routes: network-only
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(fetch(request).catch(() => new Response(null, { status: 503 })));
+    return;
+  }
+
+  // Estáticos imutáveis (chunks JS/CSS/ícones/imagens locais): CACHE-FIRST abre instantâneo
+  if (
+    url.pathname.startsWith("/_next/static") ||
+    url.pathname.startsWith("/icons") ||
+    url.pathname.startsWith("/workout") ||
+    url.pathname.startsWith("/images") ||
+    url.pathname === "/manifest.json"
+  ) {
+    event.respondWith(
+      caches.match(request).then(
+        (hit) =>
+          hit ||
+          fetch(request).then((res) => {
+            const copy = res.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+            return res;
+          })
+      )
+    );
     return;
   }
 

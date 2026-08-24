@@ -142,6 +142,12 @@ export type Exercises = {
   photo_url: string | null;
   /** Link de vídeo de execução (YouTube embed/watch). */
   video_url: string | null;
+  /** Miniatura da execução (usada nas listas do treino). */
+  thumbUrl?: string | null;
+  /** Vídeo de execução com atleta masculino (MP4 direto, carrega sob demanda). */
+  videoUrlMale?: string | null;
+  /** Vídeo de execução com atleta feminina (MP4 direto, carrega sob demanda). */
+  videoUrlFemale?: string | null;
   tips: string[] | null;
   technique_default: TECHNIQUE_TYPE;
   high_impact: boolean;

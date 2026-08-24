@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, CheckCircle2, ChevronRight, Info } from "lucide-react";
+import { Check, CheckCircle2, ChevronRight, Info, PlayCircle } from "lucide-react";
 import { iconForExercise, type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
+import { ExerciseVideoModal } from "~/components/common/ExerciseVideoModal";
+import Image from "next/image";
 import { cn } from "~/lib/utils";
 
 type WExercise = {
@@ -19,6 +21,9 @@ type WExercise = {
   tips?: string[] | null;
   imageUrl?: string | null;
   videoUrl?: string | null;
+  thumbUrl?: string | null;
+  videoUrlMale?: string | null;
+  videoUrlFemale?: string | null;
 };
 
 /**
@@ -36,6 +41,7 @@ export default function WorkoutInProgress({
 }) {
   const [doneCount, setDoneCount] = useState(0);
   const [detailEx, setDetailEx] = useState<ExerciseDetail | null>(null);
+  const [videoEx, setVideoEx] = useState<{ name: string; poster?: string | null; url: string } | null>(null);
   const current = exercises[doneCount];
   const allDone = doneCount >= exercises.length;
 
@@ -113,9 +119,26 @@ export default function WorkoutInProgress({
                 >
                   <Info className="h-4 w-4" />
                 </button>
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card text-brand">
-                  {(() => { const I = iconForExercise(e.name); return <I className="h-5 w-5" />; })()}
-                </span>
+                <button
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    const url = e.videoUrlMale ?? e.videoUrl ?? e.videoUrlFemale;
+                    if (url) setVideoEx({ name: e.name, poster: e.thumbUrl ?? e.imageUrl ?? null, url });
+                  }}
+                  aria-label={`Ver vídeo de ${e.name}`}
+                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-white/[0.08]"
+                >
+                  <Image
+                    src={e.thumbUrl ?? "/workout/workout-strength.jpg"}
+                    alt=""
+                    fill
+                    sizes="64px"
+                    className="object-cover"
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/35">
+                    <PlayCircle className="h-6 w-6 text-white drop-shadow" />
+                  </span>
+                </button>
                 <div className="min-w-0 flex-1">
                   <p className={cn("truncate text-[13px] font-semibold", done ? "text-muted-foreground line-through" : "text-foreground")}>
                     {e.name}
@@ -189,6 +212,13 @@ export default function WorkoutInProgress({
           </p>
         ) : null}
 
+        <ExerciseVideoModal
+          open={!!videoEx}
+          onClose={() => setVideoEx(null)}
+          name={videoEx?.name ?? ""}
+          poster={videoEx?.poster ?? null}
+          videoUrl={videoEx?.url ?? null}
+        />
         <BottomSheet open={!!detailEx} onClose={() => setDetailEx(null)}>
           {detailEx ? (
             <>
