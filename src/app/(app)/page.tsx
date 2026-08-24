@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { motion, type Variants } from "framer-motion";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { ChevronRight, ChevronDown, Activity, Award, Trophy, CheckCircle2, Gem, Crown, ArrowUpRight, ScanLine } from "lucide-react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useAuth } from "~/hooks/useAuth";
@@ -175,6 +175,12 @@ export default function HomePage() {
   const demo = isDemoMode();
   const [showMore, setShowMore] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [showTopBtn, setShowTopBtn] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShowTopBtn(window.scrollY > 600);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   // Check-in contextual: lido da MESMA fonte que a aba Check-in grava (localStorage por dia)
   // SESSÃO ÚNICA (gate por scan) — mesma fonte do Treino e Checkin
   const { session, end: endSession } = useWorkoutSession();
@@ -722,12 +728,31 @@ export default function HomePage() {
 
         {/* Marcador de build, confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 24/08 v21 ✓
+          GymFitness · build 24/08 v22 ✓
         </p>
           </>
         ) : null}
       </motion.div>
 
+      {/* Voltar ao topo (nav:back-to-top) */}
+      <AnimatePresence>
+        {showTopBtn ? (
+          <motion.button
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => {
+              navigator.vibrate?.(15);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            aria-label="Voltar ao topo"
+            className="fixed bottom-24 right-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-brand/40 bg-[#0B1A33]/90 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur"
+          >
+            <ChevronDown className="h-5 w-5 rotate-180 text-brand" />
+          </motion.button>
+        ) : null}
+      </AnimatePresence>
       <AiCoach />
     </div>
   );
