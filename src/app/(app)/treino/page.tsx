@@ -315,7 +315,14 @@ export default function TreinoHomePage() {
             Escaneie o QR da portaria ou encoste o celular no leitor NFC. Validou, treino liberado.
           </p>
           <Link
-            href="/checkin?scan=1&from=/treino"
+            href="/checkin?scan=1"
+            onClick={(e) => {
+              e.preventDefault();
+              // engenharia reversa do fluxo: lembra EXATAMENTE onde o usuário estava,
+              // incluindo ?ir=hoje quando ele veio do card "Treino do dia" do dashboard
+              const cur = window.location.pathname + window.location.search;
+              router.push(`/checkin?scan=1&from=${encodeURIComponent(cur)}`);
+            }}
             className="gf-touch tactile mx-auto flex w-full max-w-[320px] items-center justify-center gap-2 rounded-2xl bg-[#F4711E] py-4 text-[15px] font-black text-black shadow-[0_0_30px_rgba(244,113,30,0.5)] transition-transform active:scale-[0.98]"
           >
             <ScanLine className="h-5 w-5" /> Escanear e liberar treino
