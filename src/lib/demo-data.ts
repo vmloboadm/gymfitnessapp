@@ -250,10 +250,10 @@ export const demoWorkoutLogs = () => {
     const date = new Date(Date.now() - d * 86400000);
     const dow = date.getDay();
     let train = PATTERN.includes(dow);
-    if (d === 0) train = true; // hoje treinado
+    if (d === 0) train = true; // hoje SEMPRE em progresso (nunca concluído — senão a aba Treino morre)
     if (d === 1) train = false; // ontem ainda não
     if (!train) continue;
-    const count = 1 + Math.round(Math.random());
+    const count = d === 0 ? 1 : 1 + Math.round(Math.random()); // hoje: 1 série fixa (progresso parcial)
     for (let i = 0; i < count; i++) {
       logs.push({
         id: `log-demo-${d}-${i}`,
