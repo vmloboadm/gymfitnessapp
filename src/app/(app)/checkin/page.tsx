@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ScanLine, Check, X, LogIn, LogOut, Dumbbell, HeartPulse, Zap, Wrench } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
@@ -12,6 +13,7 @@ import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { toast } from "sonner";
 import type { Equipment, EquipmentSessions } from "~/lib/types/models";
 import { useSessionTimeout } from "~/hooks/useSessionTimeout";
+import { useWorkoutSession, endWorkoutSession } from "~/lib/workout-session";
 import { WorkoutLogModal } from "~/components/workout-log-modal";
 import {
   isDemoMode,
@@ -38,6 +40,13 @@ export default function CheckinPage() {
   const [variationPicker, setVariationPicker] = useState<string | null>(null);
   /** Aparelho detectado por deep link de tag NFC (iPhone/Android) aguardando confirmação. */
   const [pendingEq, setPendingEq] = useState<Equipment | null>(null);
+  const { session: daySession, start: startDaySession } = useWorkoutSession();
+  const router = useRouter();
+  /** Chegou via gate (?scan=1&from=...): scanner abre sozinho e qualquer leitura valida a entrada. */
+  const [doorMode, setDoorMode] = useState(false);
+  const [cameFrom, setCameFrom] = useState<string | null>(null);
+  const [autoOpened, setAutoOpened] = useState(false);
+  const [mockValidating, setMockValidating] = useState(false);
   const demo = isDemoMode();
 
   const { data, loading, error, refetch } = useAsyncQuery<{
@@ -108,6 +117,7 @@ export default function CheckinPage() {
 
     if (eq) {
       setPendingEq(eq);
+      startDaySession();
       navigator.vibrate?.(60);
       // limpa a query da barra de endereço para não reabrir no refresh
       window.history.replaceState({}, "", window.location.pathname);
@@ -227,6 +237,15 @@ export default function CheckinPage() {
       setScannerActive(false);
       return;
     }
+    if (doorMode) {
+      // tag da PORTARIA: qualquer leitura valida a entrada do dia
+      navigator.vibrate?.([60, 40, 60]);
+      startDaySession();
+      toast.success("Entrada validada! Treino liberado 💪");
+      stopScanning();
+      backToOrigin();
+      return;
+    }
     toast.error("Código não corresponde a nenhum equipamento");
   };
 
@@ -245,6 +264,9 @@ export default function CheckinPage() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
+
+
+  const backToOrigin = () => router.replace(cameFrom ?? "/");
 
   const startNfcScan = async () => {
     if (!("NDEFReader" in window)) {
@@ -290,6 +312,29 @@ export default function CheckinPage() {
   // encerra leitor NFC ao desmontar
   useEffect(() => () => nfcAbortRef.current?.abort(), []);
 
+  // Contexto do gate (?scan=1&from=/treino): abre câmera automaticamente
+  useEffect(() => {
+    if (autoOpened) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const scan = params.get("scan") === "1";
+    const from = params.get("from");
+    if (!scan && !from) return;
+    setAutoOpened(true);
+    setDoorMode(scan);
+    if (from) setCameFrom(from);
+    if (daySession) {
+      // já liberado: devolve pra origem
+      router.replace(from ?? "/");
+      return;
+    }
+    if (scan) {
+      const to = setTimeout(() => startScanning(), 350);
+      return () => clearTimeout(to);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpened]);
+
   // QR scanning handler
 useEffect(() => {
     if (!scannerActive) return;
@@ -325,10 +370,7 @@ useEffect(() => {
   const doEntry = async (source: "nfc" | "qrcode" | "app" = "app") => {
     if (demo) {
       setGymEntry({ id: "ck-demo-" + Date.now(), checked_at: new Date().toISOString(), source });
-      try {
-        localStorage.setItem("gymfit_last_checkin", todayLocalKey());
-        localStorage.setItem("gymfit_checkin_started_at", String(Date.now()));
-      } catch {}
+      startDaySession();
       toast.success("Check-in de entrada realizado!");
       return;
     }
@@ -344,10 +386,7 @@ useEffect(() => {
       return;
     }
     setGymEntry(inserted as any);
-    try {
-      localStorage.setItem("gymfit_last_checkin", todayLocalKey());
-      localStorage.setItem("gymfit_checkin_started_at", String(Date.now()));
-    } catch {}
+    startDaySession();
     toast.success("Check-in de entrada realizado!");
   };
 
@@ -356,7 +395,7 @@ useEffect(() => {
     if (session) await endSession();
     if (demo) {
       setGymEntry(null);
-      try { localStorage.removeItem("gymfit_last_checkin"); } catch {}
+endWorkoutSession();
       toast.success("Check-out realizado. Treino concluído!");
       return;
     }
@@ -370,7 +409,7 @@ useEffect(() => {
       return;
     }
     setGymEntry(null);
-    try { localStorage.removeItem("gymfit_last_checkin"); } catch {}
+    endWorkoutSession();
     toast.success("Check-out realizado. Treino concluído!");
   };
 
@@ -422,21 +461,47 @@ useEffect(() => {
                 {gymEntry ? "Você está na academia" : "Entrada na academia"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {gymEntry
-                  ? `Check-in ${gymEntry.source === "nfc" ? "via NFC" : gymEntry.source === "qrcode" ? "via QR" : "via app"}`
-                  : "Escaneie o QR/NFC da entrada para iniciar seu treino"}
+                {gymEntry || session
+                  ? `Check-in ${gymEntry?.source === "nfc" ? "via NFC" : gymEntry?.source === "qrcode" ? "via QR" : "validado"} · treino liberado`
+                  : doorMode
+                    ? "Aponte a câmera para o QR da portaria ou use o NFC"
+                    : "Escaneie o QR/NFC da entrada para iniciar seu treino"}
               </p>
             </div>
-            {gymEntry ? (
+            {gymEntry || daySession || session ? (
               <Button size="sm" variant="outline" onClick={doExit}>
                 <LogOut className="mr-1 h-3.5 w-3.5" />
                 Fazer check-out
               </Button>
+            ) : mockValidating ? (
+              <span className="flex shrink-0 items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-4 py-2 text-[12px] font-bold text-brand">
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-brand/30 border-t-brand" />
+                Validando…
+              </span>
             ) : (
-              <Button size="sm" onClick={() => doEntry("app")}>
-                <LogIn className="mr-1 h-3.5 w-3.5" />
-                Check-in agora
-              </Button>
+              <div className="flex shrink-0 flex-col gap-1.5">
+                <Button size="sm" onClick={() => doEntry("app")}>
+                  <LogIn className="mr-1 h-3.5 w-3.5" />
+                  Check-in agora
+                </Button>
+                {doorMode && demo ? (
+                  <button
+                    onClick={() => {
+                      setMockValidating(true);
+                      setTimeout(() => {
+                        setMockValidating(false);
+                        navigator.vibrate?.([60, 40, 60]);
+                        startDaySession();
+                        toast.success("Entrada validada! Treino liberado 💪");
+                        backToOrigin();
+                      }, 1000);
+                    }}
+                    className="rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-warning"
+                  >
+                    Simular leitura da portaria (demo)
+                  </button>
+                ) : null}
+              </div>
             )}
           </div>
           {gymEntry && (

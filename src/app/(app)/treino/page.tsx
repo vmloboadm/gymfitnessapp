@@ -19,6 +19,7 @@ import {
   RotateCcw,
   Lock,
   X,
+  ScanLine,
 } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -33,6 +34,7 @@ import { cn } from "~/lib/utils";
 import { toast } from "sonner";
 import { weekdayName } from "~/lib/utils/calculations";
 import { todayWorkoutTitle } from "~/lib/academia";
+import { useWorkoutSession, elapsedSeconds, formatMMSS } from "~/lib/workout-session";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
 
 /* mapa exercício→grupo para dados reais (categories canônicas) */
@@ -200,6 +202,14 @@ export default function TreinoHomePage() {
     },
     [user?.id, profile?.id, demo]
   );
+  const { session: daySession, end: endDaySession } = useWorkoutSession();
+  const [nowTick2, setNowTick2] = useState(Date.now());
+  useEffect(() => {
+    if (!daySession) return;
+    const i = setInterval(() => setNowTick2(Date.now()), 1000);
+    return () => clearInterval(i);
+  }, [daySession]);
+
   const programRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (loading) return;
@@ -278,6 +288,62 @@ export default function TreinoHomePage() {
       </>
     );
   }
+
+  // GATE: sem sessão validada por scan, o treino não abre
+  if (!daySession) {
+    return (
+      <>
+        <TopBar title="Treino" subtitle="Bloqueado" />
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mx-auto max-w-md space-y-4 p-4 pt-10 text-center">
+          <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-[24px] border border-brand/30 bg-brand/10">
+            <Lock className="h-9 w-9 text-brand" />
+          </span>
+          <h2 className="text-lg font-black text-foreground">Faça o check-in para liberar</h2>
+          <p className="gf-card-text mx-auto max-w-[300px]">
+            Escaneie o QR da portaria ou encoste o celular no leitor NFC. Validou, treino liberado.
+          </p>
+          <Link
+            href="/checkin?scan=1&from=/treino"
+            className="gf-touch tactile mx-auto flex w-full max-w-[320px] items-center justify-center gap-2 rounded-2xl bg-[#F4711E] py-4 text-[15px] font-black text-black shadow-[0_0_30px_rgba(244,113,30,0.5)] transition-transform active:scale-[0.98]"
+          >
+            <ScanLine className="h-5 w-5" /> Escanear e liberar treino
+          </Link>
+          <Link href="/" className="block text-xs font-semibold text-muted-underline hover:underline text-muted-foreground">
+            voltar ao início
+          </Link>
+        </motion.div>
+      </>
+    );
+  }
+
+  // BARRA FIXA DE SESSÃO
+  const sessionBar = (
+    <div className="sticky top-[56px] z-20 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+      <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-4 py-2">
+        <div className="flex items-center gap-2.5">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+          </span>
+          <span className="pm-num text-[18px] leading-none text-foreground">
+            {formatMMSS(elapsedSeconds(daySession.startedAt, nowTick2))}
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">treinando</span>
+        </div>
+        <button
+          onClick={() => {
+            navigator.vibrate?.([60, 40, 60]);
+            endDaySession();
+            toast.success("Sessão finalizada. Registre como foi!");
+            setPhase("done");
+          }}
+          className="tactile rounded-full bg-success px-4 py-1.5 text-[11px] font-black text-black transition-transform active:scale-95"
+        >
+          Finalizar Treino
+        </button>
+      </div>
+    </div>
+  );
 
   // Treino em andamento (demo), substitui a navegação normal.
   if (phase === "active" && demo) {
@@ -397,10 +463,11 @@ export default function TreinoHomePage() {
     );
   }
 
-  // Idle normal: pré-treino (check-in antes, some ao começar).
+  // Idle normal: pré-treino com sessão ativa.
   return (
     <>
       <TopBar title="Treino" subtitle={cap(weekdayName())} />
+      {sessionBar}
       <div className="space-y-8 p-4">
         {/* 1. STATUS ATUAL, como você chegou hoje */}
         <div className="rounded-2xl border border-border bg-card/50 p-4">

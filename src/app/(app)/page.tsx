@@ -17,6 +17,7 @@ import { calcStreak, weekdayName, startOfWeek } from "~/lib/utils/calculations";
 import { cap } from "~/lib/utils/format";
 import { leagueFor } from "~/lib/utils/leagues";
 import { getTodayWorkout, type TodayWorkout } from "~/lib/today-workout";
+import { useWorkoutSession, elapsedSeconds } from "~/lib/workout-session";
 import { GYM_HIGHLIGHTS, TIPS_STRUCTURED } from "~/components/dashboard/mocks";
 import AiCoach from "~/components/ai/coach-chat";
 import PersonalHome from "~/components/personal/PersonalHome";
@@ -175,30 +176,23 @@ export default function HomePage() {
   const [showMore, setShowMore] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   // Check-in contextual: lido da MESMA fonte que a aba Check-in grava (localStorage por dia)
-  const [checkin, setCheckin] = useState<{ done: boolean; startedAt: number | null }>(() => {
-    if (typeof window === "undefined") return { done: false, startedAt: null };
-    const d = new Date();
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    try {
-      const done = window.localStorage.getItem("gymfit_last_checkin") === key;
-      const started = Number(window.localStorage.getItem("gymfit_checkin_started_at") ?? 0) || null;
-      return { done, startedAt: done ? started : null };
-    } catch { return { done: false, startedAt: null }; }
-  });
-  const isCheckedInToday = checkin.done;
+  // SESSÃO ÚNICA (gate por scan) — mesma fonte do Treino e Checkin
+  const { session, end: endSession } = useWorkoutSession();
+  const isCheckedInToday = !!session;
+  const startedAt = session?.startedAt ?? null;
   const [nowTickHome, setNowTickHome] = useState(Date.now());
   useEffect(() => {
-    if (!isCheckedInToday) return;
+    if (!session) return;
     const i = setInterval(() => setNowTickHome(Date.now()), 1000);
     return () => clearInterval(i);
-  }, [isCheckedInToday]);
+  }, [session]);
   const heroRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (isCheckedInToday && heroRef.current) {
       const t = setTimeout(() => heroRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 350);
       return () => clearTimeout(t);
     }
-  }, [isCheckedInToday]);
+  }, [session]);
 
   useEffect(() => {
     if (loading) return;
@@ -391,7 +385,7 @@ export default function HomePage() {
                   <p className="text-[11px] font-bold uppercase tracking-wider text-success">Check-in feito</p>
                   <p className="pm-num text-[18px] leading-tight text-foreground">
                     {(() => {
-                      const s = checkin.startedAt ? Math.max(0, Math.floor((nowTickHome - checkin.startedAt) / 1000)) : 0;
+                      const s = startedAt ? elapsedSeconds(startedAt, nowTickHome) : 0;
                       return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
                     })()}
                     <span className="ml-1 text-[10px] font-semibold text-muted-foreground">de treino</span>
@@ -400,11 +394,7 @@ export default function HomePage() {
               </div>
               <button
                 onClick={() => {
-                  try {
-                    localStorage.removeItem("gymfit_last_checkin");
-                    localStorage.removeItem("gymfit_checkin_started_at");
-                  } catch {}
-                  setCheckin({ done: false, startedAt: null });
+                  endSession();
                   toast.success("Treino finalizado. Descanse bem! 🌙");
                 }}
                 className="gf-touch tactile shrink-0 rounded-full bg-success px-4 py-2 text-[12px] font-black text-black transition-transform active:scale-95"
@@ -745,7 +735,7 @@ export default function HomePage() {
 
         {/* Marcador de build, confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 24/08 v10 ✓
+          GymFitness · build 24/08 v11 ✓
         </p>
           </>
         ) : null}
