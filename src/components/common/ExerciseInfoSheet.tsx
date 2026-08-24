@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
+import { curatedSearch, findInDatabase } from "~/lib/exercises-database";
 
 /** Ícone do grupo pelo nome do exercício (sem emoji, identidade Lucide). */
 export function iconForExercise(name: string): LucideIcon {
@@ -49,6 +50,8 @@ export function ExerciseInfoSheet({
   onClose: () => void;
 }) {
   const Icon = ex ? iconForExercise(ex.name) : Dumbbell;
+  // YouTube CURADO: banco próprio primeiro, busca Jeff Nippard como garantia
+  const ytUrl = ex.videoUrl ?? findInDatabase(ex.name)?.youtubeUrl ?? curatedSearch(ex.name);
   const steps = ex
     ? [
         ex.tips?.[0] ?? "Posição inicial estável, coluna neutra.",
@@ -97,7 +100,7 @@ export function ExerciseInfoSheet({
 
           {ex.videoUrl ? (
             <a
-              href={ex.videoUrl}
+              href={ytUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="gf-touch tactile mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FF0000] py-3.5 text-sm font-black text-white shadow-lg transition-transform active:scale-[0.98]"
