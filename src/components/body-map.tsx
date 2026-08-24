@@ -82,9 +82,10 @@ export default function BodyMap({
   for (const g of groups) {
     const isActive = activeCat === g.catId;
     const st = isActive ? "ativo" : recoveryState(g.catId, lastTrained?.[g.catId]);
-    if (st === "nunca") continue;
-    anyState = true;
-    const freq = st === "ativo" ? 1 : st === "recuperado" ? 2 : 3;
+    if (st !== "nunca") anyState = true;
+    // ativo pinta SEMPRE (mesmo sem histórico); demais só quando têm estado
+    if (!isActive && st === "nunca") continue;
+    const freq = isActive ? 1 : st === "recuperado" ? 2 : 3;
     for (const m of g.muscles) data.push({ name: m, muscles: [m], frequency: freq });
   }
 

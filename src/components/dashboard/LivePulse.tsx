@@ -23,27 +23,41 @@ export function LivePulse({ online }: { online: number }) {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#4ADE80] opacity-70" />
           </span>
         </span>
-        <p className="flex-1 text-[12px] leading-snug text-[#BFC7D8]">
-          {phrase}
-          <span className="pm-mono ml-2 !text-[9px] text-[#7E8AA0]">ocupação {pct}%</span>
-        </p>
+        <p className="flex-1 text-[12px] leading-snug text-[#BFC7D8]">{phrase}</p>
         <Activity className="h-4 w-4 shrink-0 text-[#4ADE80]/70" />
       </div>
-      <div className="relative h-[3px] w-full bg-white/[0.04]">
-        <motion.span
-          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#22c55e]/60 to-[#4ADE80]"
-          initial={{ width: "8%" }}
-          animate={
-            reduced
-              ? { width: `${pct}%` }
-              : { width: `${pct}%`, boxShadow: ["0 0 4px rgba(74,222,128,0.4)", "0 0 9px rgba(74,222,128,0.8)", "0 0 4px rgba(74,222,128,0.4)"] }
-          }
-          transition={
-            reduced
-              ? { duration: 0.5, ease: "easeOut" }
-              : { width: { duration: 1, ease: "easeOut" }, boxShadow: { duration: 2.4, repeat: Infinity, ease: "easeInOut" } }
-          }
-        />
+      {/* arco de ocupação — traço fino, gradiente suave */}
+      <div className="flex items-center gap-4 px-5 pb-5 pt-1">
+        <svg viewBox="0 0 44 44" className="h-11 w-11 shrink-0">
+          <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
+          <motion.circle
+            cx="22"
+            cy="22"
+            r="18"
+            fill="none"
+            stroke="url(#occ-grad)"
+            strokeWidth="4"
+            strokeLinecap="round"
+            pathLength={1}
+            strokeDasharray="1 1"
+            initial={{ strokeDashoffset: 1 }}
+            animate={{ strokeDashoffset: 1 - pct / 100 }}
+            transition={{ duration: 1.1, ease: [0.2, 0.8, 0.2, 1] }}
+            transform="rotate(-90 22 22)"
+          />
+          <defs>
+            <linearGradient id="occ-grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#4ADE80" />
+              <stop offset="100%" stopColor="#22c55e" />
+            </linearGradient>
+          </defs>
+          <text x="22" y="25" textAnchor="middle" fontSize="10" fontWeight="800" fill="#E6F9EE">
+            {pct}%
+          </text>
+        </svg>
+        <p className="text-[12px] leading-snug text-[#BFC7D8]">
+          Ocupação da academia agora — planeje horários menos cheios.
+        </p>
       </div>
     </section>
   );

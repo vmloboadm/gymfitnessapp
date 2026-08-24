@@ -165,3 +165,23 @@ export const spotlightSponsor: Sponsor = {
   msg: "Desconto de R$ 15 em compras acima de R$ 80 para alunos GymFitness.",
   url: "https://www.google.com/",
 };
+
+/* ---------- Dica do dia (estrutura pronta p/ posts do Instagram) ---------- */
+export type TipOfTheDay = {
+  text: string;
+  /** Origem futura: post educativo no IG da academia. */
+  source?: { kind: "instagram"; url?: string; image?: string; handle?: string };
+};
+
+export const TIPS_STRUCTURED: TipOfTheDay[] = [
+  { text: "Descanso é treino: durma 7–8h pra hipertrofia acontecer.", source: { kind: "instagram", handle: "@gymfitness" } },
+  { text: "Cadência controlada na descida vale mais que carga jogada.", source: { kind: "instagram", handle: "@gymfitness" } },
+  { text: "Água antes do café: desempenho cai com desidratação leve.", source: { kind: "instagram", handle: "@gymfitness" } },
+];
+
+/* ---------- Destaques da academia (mock carrossel) ---------- */
+export const GYM_HIGHLIGHTS = [
+  { icon: "👑", tag: "Aluno do mês", title: "Marina Costa", body: "12 treinos no mês e liga Ouro conquistada." },
+  { icon: "🏆", tag: "Recorde recente", title: "Leg press · 320kg", body: "Lucas Andrade cravou novo recorde da casa." },
+  { icon: "📅", tag: "Evento", title: "Aula aberta sábado 9h", body: "Funcional em grupo — traga um amigo." },
+];

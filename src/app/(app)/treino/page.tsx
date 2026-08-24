@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -119,6 +119,15 @@ export default function TreinoHomePage() {
   const { user, profile } = useAuth();
   const demo = isDemoMode();
   const [feeling, setFeeling] = useState<string | null>(null);
+  /* Sessão POR APARELHO (fluxo NFC contextual): exercícioId → início.
+     No demo, tocar na instrução simula a leitura da tag. */
+  const [eqSessions, setEqSessions] = useState<Record<string, number>>({});
+  const [nowTick, setNowTick] = useState(Date.now());
+  useEffect(() => {
+    if (Object.keys(eqSessions).length === 0) return;
+    const i = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(i);
+  }, [Object.keys(eqSessions).length]);
   const [rpe, setRpe] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "active" | "done">("idle");
   const [bodyCat, setBodyCat] = useState<string | null>(() => {
@@ -562,7 +571,29 @@ export default function TreinoHomePage() {
 
               <div className="space-y-2">
                 {data.details.map((d) => (
-                  <ExerciseRow key={d.id} item={d} machineFor={machineByExercise.get(d.exercise?.name ?? "") ?? ""} />
+                  <ExerciseRow
+                    key={d.id}
+                    item={d}
+                    machineFor={machineByExercise.get(d.exercise?.name ?? "") ?? ""}
+                    sessionStart={eqSessions[d.exercise_id ?? d.id] ?? null}
+                    now={nowTick}
+                    onStart={() => {
+                      const id = d.exercise_id ?? d.id;
+                      navigator.vibrate?.(40);
+                      setEqSessions((prev) => ({ ...prev, [id]: Date.now() }));
+                      toast.success("Sessão iniciada — cronômetro rodando");
+                    }}
+                    onFinish={() => {
+                      const id = d.exercise_id ?? d.id;
+                      navigator.vibrate?.(60);
+                      setEqSessions((prev) => {
+                        const next = { ...prev };
+                        delete next[id];
+                        return next;
+                      });
+                      toast.success("Exercício finalizado. Bom trabalho! 💪");
+                    }}
+                  />
                 ))}
               </div>
             </div>
@@ -630,7 +661,25 @@ export default function TreinoHomePage() {
   );
 }
 
-function ExerciseRow({ item, machineFor }: { item: TreinoDay; machineFor: string }) {
+function ExerciseRow({
+  item,
+  machineFor,
+  sessionStart,
+  now,
+  onStart,
+  onFinish,
+}: {
+  item: TreinoDay;
+  machineFor: string;
+  sessionStart?: number | null;
+  now?: number;
+  onStart?: () => void;
+  onFinish?: () => void;
+}) {
+  const elapsed = sessionStart && now ? Math.max(0, Math.floor((now - sessionStart) / 1000)) : 0;
+  const demoModeHint = isDemoMode();
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
+  const ss = String(elapsed % 60).padStart(2, "0");
   const suggestion =
     item.exercise?.name === "Supino Reto"
       ? "Aparelho ocupado? Crucifixo com halteres no banco livre — mesmo estímulo, sem espera."
@@ -688,11 +737,36 @@ function ExerciseRow({ item, machineFor }: { item: TreinoDay; machineFor: string
         </p>
       ) : null}
 
-      {/* NFC: ensina a marcar o aparelho, sem depender de aviso físico */}
-      {machineFor ? (
-        <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-brand">
-          <Nfc className="h-3.5 w-3.5" /> Encoste o celular no aparelho para começar a contar
-        </p>
+      {/* Fluxo NFC contextual por exercício */}
+      {sessionStart ? (
+        <div className="mt-2.5 flex items-center justify-between rounded-xl border border-success/40 bg-success/10 px-3 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+            </span>
+            <span className="pm-num text-[20px] leading-none text-foreground">{mm}:{ss}</span>
+            <span className="text-[11px] font-semibold text-success">em andamento</span>
+          </div>
+          <button
+            onClick={onFinish}
+            className="gf-touch tactile rounded-full bg-success px-4 py-1.5 text-[11px] font-bold text-black transition-transform active:scale-95"
+          >
+            Finalizar
+          </button>
+        </div>
+      ) : machineFor ? (
+        <button
+          onClick={onStart}
+          className="tactile mt-2.5 flex w-full items-center justify-between rounded-xl border border-brand/30 bg-brand/[0.07] px-3 py-2.5 text-left transition-colors hover:border-brand/50"
+        >
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-brand">
+            <Nfc className="h-3.5 w-3.5" /> Encoste o celular no aparelho para começar a contar
+          </span>
+          {demoModeHint ? (
+            <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand">simular</span>
+          ) : null}
+        </button>
       ) : null}
 
       {item.exercise?.tips?.length ? <p className="mt-2 text-xs text-muted-foreground">{item.exercise.tips[0]}</p> : null}

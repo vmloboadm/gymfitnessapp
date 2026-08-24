@@ -16,6 +16,7 @@ import { calcStreak, weekdayName, startOfWeek } from "~/lib/utils/calculations";
 import { cap } from "~/lib/utils/format";
 import { leagueFor } from "~/lib/utils/leagues";
 import { getTodayWorkout, type TodayWorkout } from "~/lib/today-workout";
+import { GYM_HIGHLIGHTS, TIPS_STRUCTURED } from "~/components/dashboard/mocks";
 import AiCoach from "~/components/ai/coach-chat";
 import PersonalHome from "~/components/personal/PersonalHome";
 import { LivePulse } from "~/components/dashboard/LivePulse";
@@ -301,6 +302,7 @@ export default function HomePage() {
   const mundo = (demo ? demoMundoFit() : [])[0];
   const online = demo ? demoOnlineAgora() : 0;
   const tip = TIPS[new Date().getDate() % TIPS.length];
+  const structuredTip = TIPS_STRUCTURED[new Date().getDate() % TIPS_STRUCTURED.length];
 
   const hour = today.getHours();
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
@@ -647,6 +649,22 @@ export default function HomePage() {
           </div>
         </motion.section>
 
+        {/* 5A. DESTAQUES DA ACADEMIA */}
+        <motion.section variants={item}>
+          <p className="gf-section mb-2 px-1">Destaques da academia</p>
+          <div className="scrollbar-hide -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+            {GYM_HIGHLIGHTS.map((h) => (
+              <div key={h.title} className="w-[78%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4">
+                <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-brand">
+                  <span aria-hidden>{h.icon}</span> {h.tag}
+                </p>
+                <p className="mt-1.5 text-[14px] font-bold text-[#F4F6FB]">{h.title}</p>
+                <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{h.body}</p>
+              </div>
+            ))}
+          </div>
+        </motion.section>
+
         {/* 5. MAIS PRA VOCÊ — carrossel horizontal (menos scroll vertical) */}
         <motion.section variants={item}>
           <p className="gf-section mb-2 px-1">Mais pra você</p>
@@ -666,8 +684,13 @@ export default function HomePage() {
               </div>
             ) : null}
             <div className="w-[80%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-warning">Dica do dia</p>
-              <p className="mt-1.5 line-clamp-3 text-[13px] font-medium leading-snug text-[#D6DCEC]">{tip}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-warning">Dica GymFitness</p>
+              <p className="mt-1.5 line-clamp-3 text-[13px] font-medium leading-snug text-[#D6DCEC]">{structuredTip.text}</p>
+              {structuredTip.source ? (
+                <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-brand">
+                  📷 {structuredTip.source.handle ?? "@gymfitness"} · post completo em breve
+                </p>
+              ) : null}
             </div>
             <Link href="/personals" className="w-[80%] shrink-0 snap-start rounded-[18px] border border-brand/35 bg-gradient-to-br from-brand/15 via-card to-card p-4 transition-colors hover:border-brand/60">
               <p className="text-[10px] font-bold uppercase tracking-widest text-brand">Personals da casa</p>
@@ -682,7 +705,7 @@ export default function HomePage() {
 
         {/* Marcador de build — confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 24/08 v8 ✓
+          GymFitness · build 24/08 v9 ✓
         </p>
           </>
         ) : null}

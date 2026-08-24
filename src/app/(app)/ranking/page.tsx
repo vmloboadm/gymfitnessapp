@@ -8,7 +8,7 @@ import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
-import { Avatar, AvatarFallback } from "~/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import { startOfWeek } from "~/lib/utils/calculations";
 import { formatNumber, formatDate } from "~/lib/utils/format";
@@ -21,6 +21,13 @@ import type { Leaderboard, Profiles } from "~/lib/types/models";
 // Ligas por faixa (gamificação estilo Duolingo)
 
 const ME = "00000000-0000-0000-0000-000000000099";
+
+/** Avatar mock determinístico — campo avatar_url do perfil assume em produção. */
+function avatarFor(id: string | undefined): string {
+  let n = 0;
+  for (const ch of id ?? "") n = (n * 31 + ch.charCodeAt(0)) % 70;
+  return `https://i.pravatar.cc/96?img=${n + 1}`;
+}
 
 /* Ícones de liga em traço consistente (nada de emoji): mesmo padrão da home */
 const LEAGUE_GLYPHS: Record<string, { Icon: typeof Trophy; color: string }> = {
@@ -212,6 +219,7 @@ export default function RankingPage() {
                       )}
                       style={{ boxShadow: `0 0 22px ${glowColor}66` }}
                     >
+                      <AvatarImage src={row.student?.avatar_url ?? avatarFor(row.student_id)} alt={row.student?.name ?? "Atleta"} />
                       <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
                         {(row.student?.name?.[0] ?? "?").toUpperCase()}
                       </AvatarFallback>
@@ -275,16 +283,17 @@ export default function RankingPage() {
             />
           ) : (
             <div className="space-y-2">
-              {data?.rows.map((row, i) => {
+              {data?.rows.slice(3).map((row, i) => {
                 const league = leagueFor(row.points);
+                const glyphC = LEAGUE_GLYPHS[league.id]?.color ?? "#B8C4D8";
                 return (
                   <div
                     key={row.id}
                     className={cn(
-                      "gf-rise relative flex items-center gap-3 overflow-hidden rounded-xl border bg-card/40 p-3",
+                      "gf-rise relative flex items-center gap-3 overflow-hidden rounded-xl border border-border bg-card/40 p-3",
                       row.student_id === (user?.id ?? ME) ? "border-brand/50 bg-brand/5" : "border-border"
                     )}
-                    style={{ animationDelay: `${Math.min(i * 40, 320)}ms` }}
+                    style={{ borderLeft: `3px solid ${glyphC}`, animationDelay: `${Math.min(i * 40, 320)}ms` }}
                   >
                     <div className="w-7 shrink-0 text-center">
                       {i === 0 ? (
@@ -300,10 +309,11 @@ export default function RankingPage() {
                           <Medal className="h-4 w-4 text-brand" />
                         </span>
                       ) : (
-                        <span className="gf-hero-num text-sm text-muted-foreground">{i + 1}</span>
+                        <span className="gf-hero-num text-sm text-muted-foreground">{i + 4}</span>
                       )}
                     </div>
                     <Avatar className="h-9 w-9">
+                      <AvatarImage src={row.student?.avatar_url ?? avatarFor(row.student_id)} alt={row.student?.name ?? "Atleta"} />
                       <AvatarFallback className="bg-secondary text-[11px] text-secondary-foreground">
                         {(row.student?.name?.[0] ?? "?").toUpperCase()}
                       </AvatarFallback>

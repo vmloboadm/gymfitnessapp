@@ -28,12 +28,13 @@ export function TopBar({
         <div className="flex min-w-0 items-center gap-2.5">
           <GymLogo showName={false} size={34} href="/" />
           <div className="min-w-0 flex-1">
-            {/* Título nunca corta no meio: quebra por palavra inteira se faltar espaço */}
-            <h1 className="break-words text-[15px] font-bold leading-snug text-foreground">
+            {/* NADA corta aqui: título e subtítulo quebram por palavra inteira;
+                o cabeçalho cresce naturalmente quando precisar */}
+            <h1 className="break-words text-[15px] font-bold leading-snug text-foreground sm:text-base">
               {title}
             </h1>
             {subtitle ? (
-              <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+              <p className="break-words text-[11px] leading-snug text-muted-foreground">{subtitle}</p>
             ) : null}
           </div>
         </div>
@@ -44,7 +45,7 @@ export function TopBar({
           <Link
             href="/notificacoes"
             className={cn(
-              "relative flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card/60 text-muted-foreground transition-colors hover:text-foreground"
+              "relative flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/60 text-muted-foreground transition-colors hover:text-foreground"
             )}
             aria-label="Notificações"
           >
