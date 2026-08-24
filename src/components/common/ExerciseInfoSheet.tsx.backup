@@ -51,7 +51,7 @@ export function ExerciseInfoSheet({
 }) {
   const Icon = ex ? iconForExercise(ex.name) : Dumbbell;
   // YouTube CURADO: banco próprio primeiro, busca Jeff Nippard como garantia
-  const ytUrl = ex ? (ex.videoUrl ?? findInDatabase(ex.name)?.youtubeUrl ?? curatedSearch(ex.name)) : curatedSearch('');
+  const ytUrl = ex.videoUrl ?? findInDatabase(ex.name)?.youtubeUrl ?? curatedSearch(ex.name);
   const steps = ex
     ? [
         ex.tips?.[0] ?? "Posição inicial estável, coluna neutra.",
@@ -100,7 +100,7 @@ export function ExerciseInfoSheet({
 
           {ex.videoUrl ? (
             <a
-              href={ytUrl ?? "#"}
+              href={ytUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="gf-touch tactile mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FF0000] py-3.5 text-sm font-black text-white shadow-lg transition-transform active:scale-[0.98]"
