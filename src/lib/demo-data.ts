@@ -254,13 +254,17 @@ export const demoWorkoutLogs = () => {
     if (d === 1) train = false; // ontem ainda não
     if (!train) continue;
     const count = d === 0 ? 1 : 1 + Math.round(Math.random()); // hoje: 1 série fixa (progresso parcial)
+    /* divisão semanal: dom/qua = pernas · seg/sex = peito · qui = costas
+       → alimenta o estado REAL de recuperação do mapa corporal */
+    const SPLIT: Record<number, string> = { 0: "ex-demo-002", 3: "ex-demo-002", 4: "ex-demo-005", 1: "ex-demo-001", 5: "ex-demo-001" };
+    const exId = SPLIT[dow] ?? "ex-demo-001";
     for (let i = 0; i < count; i++) {
       logs.push({
         id: `log-demo-${d}-${i}`,
         gym_id: "00000000-0000-0000-0000-000000000001",
         student_id: "00000000-0000-0000-0000-000000000099",
         workout_id: "sw-demo-001",
-        exercise_id: "ex-demo-001",
+        exercise_id: exId,
         session_id: null,
         date: iso(d, 9 + i),
         weight_kg: base + d * 2 + i * 5 + Math.round(Math.random() * 4),

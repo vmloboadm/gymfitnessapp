@@ -33,6 +33,14 @@ import { toast } from "sonner";
 import { weekdayName } from "~/lib/utils/calculations";
 import { todayWorkoutTitle } from "~/lib/academia";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
+
+/* mapa exercício→grupo para dados reais (categories canônicas) */
+const DEMO_EX_GROUP_REAL: Record<string, string> = {
+  "ex-demo-001": "peito",
+  "ex-demo-002": "perna",
+  "ex-demo-005": "costas",
+  "ex-demo-006": "perna",
+};
 import { getTodayWorkout } from "~/lib/today-workout";
 import { cap, formatDate } from "~/lib/utils/format";
 import { isDemoMode, demoTreinoData, demoLib } from "~/lib/demo-bridge";
@@ -189,7 +197,13 @@ export default function TreinoHomePage() {
   const focus = { label: tw.focusLabel, resume: tw.resume, bodyCat: tw.bodyCat };
   function resolveFromLogs(logs: NonNullable<TreinoData["logs"]>) {
     const f = nextWorkoutFromLogs(logs);
-    return { focusLabel: String(f.label), resume: !!f.resume, bodyCat: String(f.bodyCat), label: `Treino do dia · ${String(f.label)}` };
+    const lastTrained: Record<string, string | null> = {};
+    for (const l of logs as Array<NonNullable<TreinoData["logs"]>[number] & { exercise_id?: string }>) {
+      const cat = DEMO_EX_GROUP_REAL[l.exercise_id ?? ""] ?? null;
+      if (!cat) continue;
+      if (!lastTrained[cat] || l.date > (lastTrained[cat] ?? "")) lastTrained[cat] = l.date;
+    }
+    return { focusLabel: String(f.label), resume: !!f.resume, bodyCat: String(f.bodyCat), label: `Treino do dia · ${String(f.label)}`, lastTrained };
   }
   const todayLogs = useMemo(() => (data?.logs ?? []).filter((l) => l.date.slice(0, 10) === todayKey).length, [data, todayKey]);
   const totalToday = data?.details.length ?? 0;
@@ -407,6 +421,7 @@ export default function TreinoHomePage() {
           counts={BODY_COUNTS}
           onSelect={(catId) => setBodyCat((prev) => (prev === catId ? null : catId))}
           activeCat={bodyCat ?? ""}
+          lastTrained={tw.lastTrained}
         />
 
         {/* Grupo selecionado: lista de exercícios/aparelhos p/ começar */}

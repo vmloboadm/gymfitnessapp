@@ -15,18 +15,56 @@ export type TodayWorkout = {
   resume: boolean;
   bodyCat: string;
   logs: WorkoutLogs[];
+  /** Última vez que cada grupo foi treinado (catId → ISO). Fonte: mesmos logs do NFC/treinos. */
+  lastTrained: Record<string, string | null>;
 };
+
+/* exercício demo → grupo muscular do mapa corporal */
+const DEMO_EX_GROUP: Record<string, string> = {
+  "ex-demo-001": "peito",
+  "ex-demo-002": "perna",
+  "ex-demo-005": "costas",
+  "ex-demo-006": "perna",
+};
+
+/** Grupos grandes descansam 48h; pequenos, 24h. Regra simples e útil pro dia 1. */
+export const RECOVERY_HOURS: Record<string, number> = {
+  peito: 48,
+  costas: 48,
+  perna: 48,
+  ombro: 24,
+  braco: 24,
+  abdomen: 24,
+  panturrilha: 24,
+};
+
+export function recoveryState(catId: string, lastISO: string | null | undefined): "recuperado" | "recuperando" | "nunca" {
+  if (!lastISO) return "nunca";
+  const h = (Date.now() - new Date(lastISO).getTime()) / 3600000;
+  return h >= (RECOVERY_HOURS[catId] ?? 24) ? "recuperado" : "recuperando";
+}
 
 const DAY_LABELS: Record<string, string> = {};
 
-function build(logs: WorkoutLogs[]): TodayWorkout {
+function build(logs: WorkoutLogs[], categoryOf?: (exerciseId: string) => string | null): TodayWorkout {
   const focus = nextWorkoutFromLogs(logs);
+
+  // última vez que cada grupo foi treinado (fonte: os próprios logs)
+  const lastTrained: Record<string, string | null> = {};
+  const catOf = categoryOf ?? ((exId: string) => DEMO_EX_GROUP[exId] ?? null);
+  for (const l of logs as Array<WorkoutLogs & { exercise_id?: string }>) {
+    const cat = catOf(l.exercise_id ?? "");
+    if (!cat) continue;
+    if (!lastTrained[cat] || l.date > lastTrained[cat]) lastTrained[cat] = l.date;
+  }
+
   return {
     label: `Treino do dia · ${focus.label}`,
     focusLabel: focus.label,
     resume: focus.resume,
     bodyCat: focus.bodyCat,
     logs,
+    lastTrained,
   };
 }
 
