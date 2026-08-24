@@ -18,6 +18,7 @@ import {
   Zap,
   Activity,
   Waves,
+  ArrowLeft,
 } from "lucide-react";
 import * as Accordion from "@radix-ui/react-accordion";
 import { useAuth } from "~/hooks/useAuth";
@@ -153,6 +154,16 @@ export default function EquipamentoPage() {
 
   return (
     <>
+      {/* Voltar ao fluxo do treino */}
+      <div className="px-4 pt-3">
+        <Link
+          href="/treino"
+          className="tactile flex w-full items-center justify-center gap-2 rounded-xl border border-brand/35 bg-brand/10 py-2.5 text-[13px] font-bold text-brand"
+        >
+          <ArrowLeft className="h-4 w-4" /> Voltar para o Treino
+        </Link>
+      </div>
+
       <TopBar title="Equipamentos" subtitle={`Catálogo · ${CANON.length} grupos · ${totalExercises} exercícios`} />
 
       {/* Busca por nome */}

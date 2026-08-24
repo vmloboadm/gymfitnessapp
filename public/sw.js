@@ -2,7 +2,7 @@
  * Offline shell + cache runtime com estrategia network-first p/ páginas,
  * stale-while-revalidate p/ assets, background sync e escuta de push.
  */
-const CACHE_VERSION = "gymfitness-v7";
+const CACHE_VERSION = "gymfitness-v8";
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 

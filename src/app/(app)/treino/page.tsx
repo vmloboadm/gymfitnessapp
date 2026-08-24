@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   RotateCcw,
   Lock,
+  X,
 } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -431,8 +432,15 @@ export default function TreinoHomePage() {
               <p className="gf-label text-brand">
                 Guia rápido · {BODY_CATS[bodyCat]?.map((c) => CAT_LABEL[c] ?? c).join(" / ") ?? "Selecionado"}
               </p>
-              <button onClick={() => setBodyCat(null)} className="text-[11px] font-semibold text-muted-foreground">
-                limpar
+              <button
+                onClick={() => {
+                  navigator.vibrate?.(10);
+                  setBodyCat(null);
+                }}
+                className="gf-touch tactile flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[11px] font-bold text-muted-foreground transition-colors hover:border-brand/40 hover:text-foreground"
+                aria-label="Fechar categoria e voltar ao treino"
+              >
+                <X className="h-3 w-3" /> Fechar
               </button>
             </div>
             <div className="mt-2 space-y-1.5">

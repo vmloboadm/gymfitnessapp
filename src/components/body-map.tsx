@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import Model, { type Muscle } from "react-body-highlighter";
 import { cn } from "~/lib/utils";
 import { recoveryState } from "~/lib/today-workout";
@@ -115,7 +116,29 @@ export default function BodyMap({
       </div>
 
       {/* figura anatômica + rótulos permanentes */}
-      <div className="relative mx-auto max-w-[280px] px-6 pb-1 pt-2">
+      <div className="relative mx-auto max-w-[300px] px-6 pb-2 pt-2">
+        {/* palco: vinheta de profundidade */}
+        <span
+          className="pointer-events-none absolute inset-x-4 bottom-4 top-8 rounded-[28px]"
+          style={{ background: "radial-gradient(80% 60% at 50% 30%, rgba(59,91,140,0.20), transparent 70%)" }}
+          aria-hidden
+        />
+        {/* sombra de contato no chão (dá peso real à figura) */}
+        <span
+          className="pointer-events-none absolute bottom-1 left-1/2 h-3 w-36 -translate-x-1/2 rounded-full"
+          style={{ background: "radial-gradient(closest-side, rgba(0,0,0,0.55), transparent)", filter: "blur(3px)" }}
+          aria-hidden
+        />
+        {/* halo pulsante quando há grupo selecionado */}
+        {activeGroup ? (
+          <motion.span
+            className="pointer-events-none absolute inset-x-14 bottom-12 top-14 rounded-full"
+            style={{ background: "radial-gradient(closest-side, rgba(244,113,30,0.20), transparent)", filter: "blur(16px)" }}
+            animate={{ opacity: [0.5, 0.9, 0.5] }}
+            transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+            aria-hidden
+          />
+        ) : null}
         {/* balão de confirmação (só no toque): nome + contagem */}
         {activeGroup ? (
           <span className="absolute left-1/2 top-3 z-10 -translate-x-1/2 whitespace-nowrap rounded-full border border-brand/50 bg-[#0B1A33]/95 px-3 py-1 text-[11px] font-bold text-[#FFB27A] shadow-lg">
@@ -150,20 +173,28 @@ export default function BodyMap({
           />
         ) : null}
 
-        <Model
-          type={isBack ? "posterior" : "anterior"}
-          bodyColor="#16305A"
-          highlightedColors={HIGHLIGHTS}
-          data={data}
-          onClick={(stats) => {
-            const group = groups.find((g) => g.muscles.includes(stats.muscle as Muscle));
-            if (group) {
-              navigator.vibrate?.(15);
-              onSelect(group.catId);
-            }
-          }}
-          style={{ width: "100%", cursor: "pointer", position: "relative", zIndex: 1 }}
-        />
+        <motion.div
+          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+          className="relative z-[1]"
+        >
+          <Model
+            type={isBack ? "posterior" : "anterior"}
+            bodyColor="#1B3A66"
+            highlightedColors={HIGHLIGHTS}
+            data={data}
+            onClick={(stats) => {
+              const group = groups.find((g) => g.muscles.includes(stats.muscle as Muscle));
+              if (group) {
+                navigator.vibrate?.(15);
+                onSelect(group.catId);
+              }
+            }}
+            svgStyle={{ filter: activeGroup ? "drop-shadow(0 6px 18px rgba(244,113,30,0.25)) drop-shadow(0 2px 6px rgba(0,0,0,0.5))" : "drop-shadow(0 4px 14px rgba(0,0,0,0.45))" }}
+            style={{ width: "100%", cursor: "pointer" }}
+          />
+        </motion.div>
       </div>
 
       {/* legenda de estado */}
