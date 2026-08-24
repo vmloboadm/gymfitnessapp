@@ -686,7 +686,7 @@ export default function HomePage() {
             {GYM_HIGHLIGHTS.map((h) => (
               <div key={h.title} className="w-[72%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4">
                 <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-brand">
-                  <span aria-hidden>{h.icon}</span> {h.tag}
+                  {h.tag}
                 </p>
                 <p className="mt-1.5 text-[14px] font-bold text-[#F4F6FB]">{h.title}</p>
                 <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{h.body}</p>
@@ -711,7 +711,7 @@ export default function HomePage() {
                 <p className="text-[10px] font-bold uppercase tracking-widest text-warning">Dica GymFitness</p>
                 <p className="mt-1.5 line-clamp-3 text-[13px] font-medium leading-snug text-[#D6DCEC]">{structuredTip.text}</p>
                 {structuredTip.source ? (
-                  <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-brand">📷 {structuredTip.source.handle ?? "@gymfitness"}</p>
+                  <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-brand">{structuredTip.source.handle ?? "@gymfitness"}</p>
                 ) : null}
               </div>
             ) : null}
@@ -728,7 +728,7 @@ export default function HomePage() {
 
         {/* Marcador de build, confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 24/08 v22 ✓
+          GymFitness · build 24/08 v23 ✓
         </p>
           </>
         ) : null}

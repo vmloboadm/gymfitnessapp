@@ -46,6 +46,7 @@ export function openAiCoach(query: string) {
 export default function AiCoach() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const concise = (s: string) => s.split(/(?<=[.!?])\s+/).slice(0, 3).join(" ");
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [thinking, setThinking] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
@@ -91,7 +92,7 @@ export default function AiCoach() {
     setThinking(true);
     setTimeout(() => {
       setThinking(false);
-      setBubbles((prev) => [...prev, { id: idRef.current++, role: "ai", text: answerFor(q), done: false }]);
+      setBubbles((prev) => [...prev, { id: idRef.current++, role: "ai", text: concise(answerFor(q)), done: false }]);
     }, 650);
   };
 

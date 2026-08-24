@@ -16,6 +16,7 @@ import { Badge } from "~/components/ui/badge";
 import { formatDate } from "~/lib/utils/format";
 import { isDemoMode, demoMetricsData } from "~/lib/demo-bridge";
 import { sortedAchievements } from "~/lib/achievements";
+import { CustomIcon, groupForName } from "~/components/common/CustomIcon";
 import type { StudentSubscriptions } from "~/lib/types/models";
 
 /**
@@ -204,8 +205,8 @@ export default function PerfilPage() {
             </span>
             <div className="flex flex-1 -space-x-1.5">
               {earned.slice(0, 4).map((a) => (
-                <span key={a.id} className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand/25 bg-brand-soft text-lg" title={a.name}>
-                  {a.icon}
+                <span key={a.id} className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand/25 bg-brand-soft" title={a.name}>
+                  <CustomIcon name={groupForName(a.name)} size={20} />
                 </span>
               ))}
               {earned.length === 0 ? (

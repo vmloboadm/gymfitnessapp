@@ -11,6 +11,7 @@ import { cn } from "~/lib/utils";
 import { formatDate } from "~/lib/utils/format";
 import { isDemoMode } from "~/lib/demo-bridge";
 import { sortedAchievements, type StudentAchievement } from "~/lib/achievements";
+import { CustomIcon, groupForName } from "~/components/common/CustomIcon";
 
 type Ach = StudentAchievement & { gym_id?: string | null };
 
@@ -133,7 +134,11 @@ export default function ConquistasPage() {
                   )}
                 >
                   <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-card/70 text-2xl">
-                    {a.icon ?? (earned ? "🏅" : <Lock className="h-5 w-5 text-muted-foreground" />)}
+                    {earned ? (
+                    <CustomIcon name={groupForName(a.name)} size={26} />
+                  ) : (
+                    <Lock className="h-5 w-5 text-muted-foreground" />
+                  )}
                   </span>
                   <p className="mt-2 truncate text-[13px] font-bold text-foreground">{a.name}</p>
                   <p className="mt-0.5 line-clamp-2 min-h-[28px] text-[11px] leading-snug text-muted-foreground">{a.description}</p>

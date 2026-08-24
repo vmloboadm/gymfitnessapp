@@ -8,6 +8,7 @@ import { formatMMSS } from "~/lib/workout-session";
 import { nextToUnlock, unlockAchievement, type StudentAchievement } from "~/lib/achievements";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
+import { RewardModal } from "~/components/common/RewardModal";
 
 /**
  * Tela de Resumo/Comemoração pós-treino (Fase 4):
@@ -28,6 +29,7 @@ export default function WorkoutSummary({
 }) {
   const [achievement] = useState<StudentAchievement | null>(() => nextToUnlock());
   const [unlocked, setUnlocked] = useState(false);
+  const [rewardOpen, setRewardOpen] = useState(true);
   const [rpe, setRpe] = useState<string | null>(null);
 
   useEffect(() => {
@@ -61,6 +63,14 @@ export default function WorkoutSummary({
 
   return (
     <>
+      <RewardModal
+        open={!!achievement && rewardOpen}
+        onClose={() => setRewardOpen(false)}
+        icon={achievement?.icon}
+        name={achievement?.name ?? ""}
+        points={achievement?.points ?? 0}
+        shareText={shareText}
+      />
       <TopBar title="Resumo do treino" subtitle="Bom trabalho hoje" />
       <div className="mx-auto max-w-md space-y-5 p-4 pb-10">
         {/* stats */}
