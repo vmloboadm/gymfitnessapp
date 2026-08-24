@@ -241,6 +241,11 @@ export default function CheckinPage() {
   const [nfcActive, setNfcActive] = useState(false);
   const nfcAbortRef = useRef<AbortController | null>(null);
 
+  const todayLocalKey = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
   const startNfcScan = async () => {
     if (!("NDEFReader" in window)) {
       toast.info("No iPhone a leitura é do próprio sistema", {
@@ -320,6 +325,7 @@ useEffect(() => {
   const doEntry = async (source: "nfc" | "qrcode" | "app" = "app") => {
     if (demo) {
       setGymEntry({ id: "ck-demo-" + Date.now(), checked_at: new Date().toISOString(), source });
+      try { localStorage.setItem("gymfit_last_checkin", todayLocalKey()); } catch {}
       toast.success("Check-in de entrada realizado!");
       return;
     }
@@ -335,6 +341,7 @@ useEffect(() => {
       return;
     }
     setGymEntry(inserted as any);
+    try { localStorage.setItem("gymfit_last_checkin", todayLocalKey()); } catch {}
     toast.success("Check-in de entrada realizado!");
   };
 
@@ -343,6 +350,7 @@ useEffect(() => {
     if (session) await endSession();
     if (demo) {
       setGymEntry(null);
+      try { localStorage.removeItem("gymfit_last_checkin"); } catch {}
       toast.success("Check-out realizado. Treino concluído!");
       return;
     }
@@ -356,6 +364,7 @@ useEffect(() => {
       return;
     }
     setGymEntry(null);
+    try { localStorage.removeItem("gymfit_last_checkin"); } catch {}
     toast.success("Check-out realizado. Treino concluído!");
   };
 

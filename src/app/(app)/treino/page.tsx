@@ -31,8 +31,9 @@ import AiCoach, { openAiCoach } from "~/components/ai/coach-chat";
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
 import { weekdayName } from "~/lib/utils/calculations";
-import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
 import { todayWorkoutTitle } from "~/lib/academia";
+import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
+import { getTodayWorkout } from "~/lib/today-workout";
 import { cap, formatDate } from "~/lib/utils/format";
 import { isDemoMode, demoTreinoData, demoLib } from "~/lib/demo-bridge";
 import type { DemoExercise } from "~/lib/demo-data";
@@ -121,7 +122,9 @@ export default function TreinoHomePage() {
   const { data, loading, error, refetch } = useAsyncQuery<TreinoData>(
     async (): Promise<FetchResult<TreinoData>> => {
       if (demo) {
-        return { data: demoTreinoData() as TreinoData, error: null };
+        const base = demoTreinoData() as TreinoData;
+        // FONTE ÚNICA: logs idênticos aos da home (mesmo objeto em memória)
+        return { data: { ...base, logs: getTodayWorkout().logs as typeof base.logs }, error: null };
       }
       const supabase = supabaseBrowser();
       if (!user || !profile) return errorResult("Sessão indisponível");
@@ -181,7 +184,13 @@ export default function TreinoHomePage() {
   );
 
   const todayKey = new Date().toISOString().slice(0, 10);
-  const focus = useMemo(() => nextWorkoutFromLogs(data?.logs ?? []), [data?.logs]);
+  // MESMA FONTE da home — nunca diverge
+  const tw = useMemo(() => (demo ? getTodayWorkout() : resolveFromLogs(data?.logs ?? [])), [demo, data?.logs]);
+  const focus = { label: tw.focusLabel, resume: tw.resume, bodyCat: tw.bodyCat };
+  function resolveFromLogs(logs: NonNullable<TreinoData["logs"]>) {
+    const f = nextWorkoutFromLogs(logs);
+    return { focusLabel: String(f.label), resume: !!f.resume, bodyCat: String(f.bodyCat), label: `Treino do dia · ${String(f.label)}` };
+  }
   const todayLogs = useMemo(() => (data?.logs ?? []).filter((l) => l.date.slice(0, 10) === todayKey).length, [data, todayKey]);
   const totalToday = data?.details.length ?? 0;
   const finishedToday = totalToday > 0 && todayLogs >= totalToday;
@@ -247,7 +256,7 @@ export default function TreinoHomePage() {
       <>
         <TopBar title="Hoje" subtitle={cap(weekdayName())} />
         <div className="space-y-6 p-4">
-          <EmptyState title="Nenhum treino ativo" description="Quando seu personal atribuir um programa, ele aparece aqui." icon={Dumbbell} />
+          <EmptyState title="Sem treino prescrito para hoje" description="Quando seu personal atribuir um programa, ele aparece aqui — e os planos disponíveis já dão um gostinho do que vem por aí." icon={Dumbbell} />
         </div>
         <AiCoach />
       </>
@@ -497,7 +506,7 @@ export default function TreinoHomePage() {
                     <div className="min-w-0 space-y-1">
                       <p className="flex items-center gap-1.5 text-sm font-semibold text-white">
                         <CalendarDays className="h-4 w-4 text-[#FF9A5C]" />
-                        {todayWorkoutTitle(data.program?.name)} · {focus.label}
+                        {tw.label}
                       </p>
                       <p className="text-xs text-white/70">
                         {totalToday} {totalToday === 1 ? "exercício" : "exercícios"} | {totalSets(data.details)} séries

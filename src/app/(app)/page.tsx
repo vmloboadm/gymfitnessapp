@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, type Variants } from "framer-motion";
-import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ArrowUpRight, ScanLine } from "lucide-react";
+import { ChevronRight, ChevronDown, Activity, Award, Trophy, CheckCircle2, Gem, Crown, ArrowUpRight, ScanLine } from "lucide-react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -15,6 +15,7 @@ import { cn } from "~/lib/utils";
 import { calcStreak, weekdayName, startOfWeek } from "~/lib/utils/calculations";
 import { cap } from "~/lib/utils/format";
 import { leagueFor } from "~/lib/utils/leagues";
+import { getTodayWorkout, type TodayWorkout } from "~/lib/today-workout";
 import AiCoach from "~/components/ai/coach-chat";
 import PersonalHome from "~/components/personal/PersonalHome";
 import { LivePulse } from "~/components/dashboard/LivePulse";
@@ -171,6 +172,20 @@ export default function HomePage() {
   const demo = isDemoMode();
   const [showMore, setShowMore] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  // Check-in contextual: lido da MESMA fonte que a aba Check-in grava (localStorage por dia)
+  const [isCheckedInToday] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const d = new Date();
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    try { return window.localStorage.getItem("gymfit_last_checkin") === key; } catch { return false; }
+  });
+  const heroRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (isCheckedInToday && heroRef.current) {
+      const t = setTimeout(() => heroRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 350);
+      return () => clearTimeout(t);
+    }
+  }, [isCheckedInToday]);
 
   useEffect(() => {
     if (loading) return;
@@ -217,7 +232,9 @@ export default function HomePage() {
     [user?.id, profile?.id, demo]
   );
 
-  const logs = useMemo(() => data?.logs ?? [], [data]);
+  // FONTE ÚNICA: no demo, o MESMO objeto de logs da aba Treino (singleton).
+  const twSingleton = demo ? getTodayWorkout() : null;
+  const logs = useMemo<WorkoutLogs[]>(() => (demo ? twSingleton!.logs : data?.logs ?? []), [demo, twSingleton, data]);
   const streak = useMemo(() => calcStreak(logs.map((l) => l.date)), [logs]);
   const sessionsWeek = useMemo(() => {
     const days = new Set();
@@ -299,8 +316,10 @@ export default function HomePage() {
 
   // Treino de hoje = próximo da SEQUÊNCIA da ficha (não decide por fadiga).
   // Se faltou um dia, retoma o treino perdido — é o que aparece no hero.
-  const focus = useMemo(() => nextWorkoutFromLogs(logs), [logs]);
-  const todayLabel = `Treino do dia · ${focus.label}`;
+  // focus derivado da MESMA fonte — label idêntico ao da aba Treino
+  const focusLabel = twSingleton ? twSingleton.focusLabel : nextWorkoutFromLogs(logs).label;
+  const focusResume = twSingleton ? twSingleton.resume : nextWorkoutFromLogs(logs).resume;
+  const todayLabel = `Treino do dia · ${focusLabel}`;
   const activeDays = monthDays.days.filter((d) => d.level > 0).length;
   const remaining = Math.max(0, META_SEMANAL - sessionsWeek);
 
@@ -319,7 +338,7 @@ export default function HomePage() {
   const selectedDetail = selectedDay ? dayStats.get(selectedDay) ?? null : null;
 
   // Aviso complementar de fadiga (não muda o treino sugerido)
-  const fatigueNotice = focus.resume
+  const fatigueNotice = focusResume
     ? "Você faltou ontem — este treino ficou pendente da ficha, segue de onde parou."
     : null;
 
@@ -345,27 +364,20 @@ export default function HomePage() {
 
   return (
       <div className="mx-auto max-w-md pb-32 pt-8">
-        {/* CHEGUEI NA ACADEMIA — primeiro elemento, impossível ignorar */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="px-4 pb-5"
-        >
-          <Link
-            href="/checkin"
-            className="tactile block rounded-2xl bg-[#F4711E] px-5 py-4 text-center shadow-[0_0_20px_rgba(244,113,30,0.4)]"
-            style={{ willChange: "transform" }}
-          >
-            <motion.span
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="flex items-center justify-center gap-2.5 text-[15px] font-black text-black"
-            >
+        {/* CHECK-IN CONTEXTUAL: some após o check-in do dia; foco vai pro treino */}
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="px-4 pb-5">
+          {isCheckedInToday ? (
+            <span className="flex items-center justify-center gap-2 rounded-full border border-success/40 bg-success/12 px-4 py-2 text-[12px] font-bold text-success">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Check-in feito · Treinando agora
+            </span>
+          ) : (
+          <Link href="/checkin" className="tactile block rounded-2xl bg-[#F4711E] px-5 py-4 text-center shadow-[0_0_20px_rgba(244,113,30,0.4)]" style={{ willChange: "transform" }}>
+            <motion.span whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex items-center justify-center gap-2.5 text-[15px] font-black text-black">
               <ScanLine className="h-5 w-5" />
               Cheguei na academia — fazer check-in
             </motion.span>
           </Link>
+          )}
         </motion.div>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 px-4">
         {/* LINHA 1 — Logo + Saudação */}
@@ -473,15 +485,15 @@ export default function HomePage() {
           </div>
         </motion.section>
 
-        {/* TREINO DE HOJE — ação principal, logo após as métricas */}
-        <motion.div variants={item}>
+        {/* TREINO DE HOJE — ação principal; recebe o scroll quando check-in feito */}
+        <motion.div variants={item} ref={heroRef}>
           <HeroWorkout
-            image={FOCUS_IMAGE[focus.bodyCat] ?? "/workout/workout-hero.jpg"}
+            image={FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? "/workout/workout-hero.jpg"}
             title={todayLabel}
             exerciseCount={exCount}
             estMin={45}
             sessionsWeek={sessionsWeek}
-            sessionLabel={focus.resume ? "Retomando onde parou" : "Treino de hoje"}
+            sessionLabel={focusResume ? "Retomando onde parou" : "Treino de hoje"}
             notice={fatigueNotice ?? undefined}
             ready
           />
@@ -670,7 +682,7 @@ export default function HomePage() {
 
         {/* Marcador de build — confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 24/08 v4 ✓
+          GymFitness · build 24/08 v5 ✓
         </p>
           </>
         ) : null}
