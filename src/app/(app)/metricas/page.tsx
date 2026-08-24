@@ -2,7 +2,12 @@
 
 import { useMemo } from "react";
 import { Scale, Ruler, Percent, Activity, TrendingDown, TrendingUp } from "lucide-react";
-import { PesoLineChart } from "~/components/charts";
+import dynamic from "next/dynamic";
+
+const PesoLineChartD = dynamic(() => import("~/components/charts").then((m) => ({ default: m.PesoLineChart })), {
+  ssr: false,
+  loading: () => <div className="skeleton-line h-36 w-full rounded-xl" />,
+});
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -188,7 +193,7 @@ export default function MetricasPage() {
           <div className="gf-rise rounded-xl border border-border bg-card/50 p-4" style={{ animationDelay: "60ms" }}>
             <p className="mb-2 gf-section">Evolução do peso</p>
             <div className="h-36">
-              <PesoLineChart data={weightSeries} />
+              <PesoLineChartD data={weightSeries} />
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
               {weightSeries.length} medições registradas. O que importa é a tendência das semanas, não o número de um dia.

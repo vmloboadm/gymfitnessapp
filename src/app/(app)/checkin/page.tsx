@@ -158,7 +158,7 @@ export default function CheckinPage() {
         meta: null,
       };
       setSession(fakeSession);
-      toast.success(`${eq?.name ?? "Equipamento"} em uso`);
+      toast.success(`Treino liberado em ${eq?.name ?? "aparelho"}`);
       resetTimer();
       return;
     }
@@ -192,7 +192,7 @@ export default function CheckinPage() {
       return;
     }
     setSession(inserted as EquipmentSessions);
-    toast.success("Equipamento ocupado");
+    toast.success("Aparelho seu por agora. Bora!");
     resetTimer();
     refetch();
   };

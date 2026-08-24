@@ -1,11 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
 import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, CalendarClock, ChevronRight, Scale, Award, ListMusic, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -21,6 +22,11 @@ import type { StudentSubscriptions } from "~/lib/types/models";
  * Perfil DESTILADO: identidade, matrícula, peso, conquistas e ações.
  * Gráficos duplicados e recordes mockados saíram (vivem em Progresso/Métricas).
  */
+const WeightAreaD = dynamic(() => import("~/components/charts/PerfilWeightArea"), {
+  ssr: false,
+  loading: () => <div className="skeleton-line h-32 w-full rounded-xl" />,
+});
+
 export default function PerfilPage() {
   const { user, profile } = useAuth();
   const router = useRouter();
@@ -174,19 +180,7 @@ export default function PerfilPage() {
           </div>
           {weightSeries.length > 0 ? (
             <div className="h-32">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={weightSeries} margin={{ top: 4, right: 8, bottom: 0, left: -22 }}>
-                  <defs>
-                    <linearGradient id="pf-weight" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#F4711E" stopOpacity={0.45} />
-                      <stop offset="100%" stopColor="#F4711E" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#8B95A9" }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, fontSize: 12 }} formatter={(v: any) => [`${v} kg`, "Peso"]} />
-                  <Area type="monotone" dataKey="peso" stroke="#F4711E" strokeWidth={2.5} fill="url(#pf-weight)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              <WeightAreaD data={weightSeries} />
             </div>
           ) : (
             <p className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground">
