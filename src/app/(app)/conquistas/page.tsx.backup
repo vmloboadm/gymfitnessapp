@@ -100,7 +100,7 @@ export default function ConquistasPage() {
                 {earnedCount} de {data?.list.length ?? 0} liberadas nesta academia
               </p>
             </div>
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand/15"><CustomIcon name="peito" size={28} /></span>
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand/15 text-3xl">🏅</span>
           </div>
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-card/60">
             <motion.div

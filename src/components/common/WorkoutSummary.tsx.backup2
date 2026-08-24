@@ -66,7 +66,7 @@ export default function WorkoutSummary({
       <RewardModal
         open={!!achievement && rewardOpen}
         onClose={() => setRewardOpen(false)}
-        icon=""
+        icon={achievement?.icon}
         name={achievement?.name ?? ""}
         points={achievement?.points ?? 0}
         shareText={shareText}
@@ -124,7 +124,7 @@ export default function WorkoutSummary({
               animate={{ rotate: [0, -8, 8, 0], scale: [1, 1.08, 1] }}
               transition={{ duration: 1.2, delay: 0.35 }}
             >
-              <span className="text-4xl" aria-hidden>🏆</span>
+              <CustomIcon name={achievement?.name ?? ""} size={26} />
             </motion.span>
             <h2 className="relative mt-3 font-display text-xl font-black text-foreground">{achievement.name}</h2>
             <p className="relative mt-1 gf-card-text">{achievement.description}</p>

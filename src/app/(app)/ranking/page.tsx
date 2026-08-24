@@ -16,6 +16,7 @@ import { LEAGUES, leagueFor } from "~/lib/utils/leagues";
 import { cn } from "~/lib/utils";
 import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
 import { recentAchievements } from "~/lib/achievements";
+import { CustomIcon, groupForName } from "~/components/common/CustomIcon";
 import type { Leaderboard, Profiles } from "~/lib/types/models";
 
 // Ligas por faixa (gamificação estilo Duolingo)
@@ -252,7 +253,7 @@ export default function RankingPage() {
           <div className="grid grid-cols-3 gap-2">
             {recentAchievements(3).map((a) => (
               <div key={a.id} className="flex flex-col items-center gap-1 rounded-xl border border-brand/30 bg-brand-soft/25 px-2 py-3 text-center">
-                <span className="text-xl">{a.icon}</span>
+                <CustomIcon name={groupForName(a.name)} size={20} />
                 <span className="text-[9px] leading-tight text-muted-foreground">{a.name}</span>
               </div>
             ))}
