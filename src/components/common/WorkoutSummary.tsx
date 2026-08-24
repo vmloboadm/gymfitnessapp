@@ -49,8 +49,11 @@ export default function WorkoutSummary({
       }
       await navigator.clipboard.writeText(`${shareText} #GymFitness`);
       toast.success("Texto copiado! Cole no seu Instagram 📸");
-    } catch {
-      /* usuário cancelou o share — silencioso */
+    } catch (err: any) {
+      // usuário cancelou o share nativo: silencioso. Falha real de cópia: avisa.
+      if (err?.name !== "AbortError") {
+        toast.error("Não foi possível compartilhar agora", { description: "Tente pelo botão do WhatsApp." });
+      }
     }
   };
 

@@ -13,12 +13,20 @@ export type WorkoutSession = { startedAt: number };
 const KEY = "gymfit_session_v1";
 const EVENT = "gymfit-session";
 
+const MAX_SESSION_HOURS = 14; // sessão órfã (celular reiniciou, esqueceu de finalizar) expira sozinha
+
 function read(): WorkoutSession | null {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as WorkoutSession;
-    return typeof parsed?.startedAt === "number" ? parsed : null;
+    if (typeof parsed?.startedAt !== "number" || !Number.isFinite(parsed.startedAt)) return null;
+    const hours = (Date.now() - parsed.startedAt) / 3600000;
+    if (hours > MAX_SESSION_HOURS) {
+      localStorage.removeItem(KEY);
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }

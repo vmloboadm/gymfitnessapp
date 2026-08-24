@@ -39,6 +39,22 @@ export default function WorkoutInProgress({
   const current = exercises[doneCount];
   const allDone = doneCount >= exercises.length;
 
+  // harden: lista vazia nunca quebra — oferece encerrar direto
+  if (!exercises || exercises.length === 0) {
+    return (
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+        <CheckCircle2 className="h-12 w-12 text-muted-foreground" />
+        <p className="text-sm font-bold text-foreground">Nenhum exercício nesta sessão</p>
+        <button
+          onClick={() => { navigator.vibrate?.(40); onFinish(); }}
+          className="gf-touch rounded-xl border border-border px-6 py-3 text-sm font-bold text-foreground"
+        >
+          Voltar
+        </button>
+      </div>
+    );
+  }
+
   useEffect(() => {
     if (!allDone) return;
     navigator.vibrate?.([60, 40, 60]);
