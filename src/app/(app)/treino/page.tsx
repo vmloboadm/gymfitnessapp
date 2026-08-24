@@ -341,6 +341,7 @@ export default function TreinoHomePage() {
           </span>
           <SessionClock
             startedAt={daySession.startedAt}
+            fast={demo}
             onFinish={() => {
               setSummarySeconds(elapsedSeconds(daySession.startedAt, Date.now()));
               endDaySession();
@@ -501,6 +502,11 @@ export default function TreinoHomePage() {
     <>
       <TopBar title="Treino" subtitle={cap(weekdayName())} />
       {sessionBar}
+      {demo ? (
+        <p className="mx-auto max-w-md px-4 pt-1 text-center text-[9px] font-semibold uppercase tracking-widest text-warning">
+          demo acelerado · 1 min real = 1 h simulada
+        </p>
+      ) : null}
       <div className="space-y-8 p-4">
         {/* 1. STATUS ATUAL, linha compacta sem card pesado */}
         <div className="flex items-center gap-2 rounded-full border border-border bg-card/40 px-3 py-1.5">

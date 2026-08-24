@@ -1,8 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { TrendingUp, CalendarClock, Flame, CalendarDays, Target, Timer } from "lucide-react";
-import { FrequenciaLineChart, PesoLineChart, VolumeBarChart } from "~/components/charts";
+const ProgressoCharts = dynamic(() => import("~/components/charts/ProgressoCharts"), {
+  ssr: false,
+  loading: () => (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-border bg-card/50 p-4"><div className="skeleton-line h-28 w-full" /></div>
+      <div className="rounded-xl border border-border bg-card/40 p-4"><div className="skeleton-line h-[180px] w-full" /></div>
+    </div>
+  ),
+});
+const PesoLineChartD = dynamic(() => import("~/components/charts").then((m) => ({ default: m.PesoLineChart })), { ssr: false });
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -229,35 +239,13 @@ export default function ProgressoPage() {
           />
         ) : (
           <>
-            <div className="gf-rise rounded-xl border border-border bg-card/50 p-4" style={{ animationDelay: "120ms" }}>
-              <div className="mb-2 flex items-center justify-between">
-                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <span className="hero-live-dot" />
-                  Frequência da semana
-                </p>
-                {freq.deltaPct != null && freq.today > 0 ? (
-                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-sm font-bold tabular-nums text-brand">
-                    {freq.today} hoje · {formatPercent(freq.deltaPct)}
-                  </span>
-                ) : (
-                  <span className="text-sm font-bold tabular-nums text-foreground">{freq.today} hoje</span>
-                )}
-              </div>
-              <div className="h-28">
-                <FrequenciaLineChart data={freqCompare} />
-              </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Linha tracejada = média das últimas 4 semanas. {sessionsThisWeek} {sessionsThisWeek === 1 ? "dia" : "dias"} ativos na semana.
-              </p>
-            </div>
-
-            <div className="gf-rise rounded-xl border border-border bg-card/40 p-4" style={{ animationDelay: "180ms" }}>
-            <p className="mb-3 gf-section">Volume diário (kg)</p>
-            <VolumeBarChart data={chart} />
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Volume = carga × repetições de cada série, somadas no dia. Barras subindo = você está ficando mais forte.
-            </p>
-          </div>
+            {freqCompare.length > 0 && chart.length > 0 ? (
+              <ProgressoCharts
+                freqCompare={freqCompare}
+                volumeChart={chart}
+                sessionsThisWeek={sessionsThisWeek}
+              />
+            ) : null}
           </>
         )}
 
@@ -278,7 +266,7 @@ export default function ProgressoPage() {
           {evolution && evolution.length >= 2 ? (
             <>
               <div className="h-32">
-                <PesoLineChart data={evolution} left={-14} />
+                <PesoLineChartD data={evolution} left={-14} />
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">
                 Última bioimpedância: {evolution[evolution.length - 1]?.peso} kg · BF {evolution[evolution.length - 1]?.bf}%, acompanhamento do plano Pro.

@@ -379,7 +379,7 @@ export default function HomePage() {
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-wider text-success">Check-in feito</p>
                   <p className="flex items-baseline gap-1.5 leading-tight">
-                    <SessionClock startedAt={startedAt ?? Date.now()} compact />
+                    <SessionClock startedAt={startedAt ?? Date.now()} compact fast={demo} />
                     <span className="text-[10px] font-semibold text-muted-foreground">de treino</span>
                   </p>
                 </div>
@@ -722,7 +722,7 @@ export default function HomePage() {
 
         {/* Marcador de build, confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 24/08 v18 ✓
+          GymFitness · build 24/08 v19 ✓
         </p>
           </>
         ) : null}

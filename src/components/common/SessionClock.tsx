@@ -18,11 +18,14 @@ export function SessionClock({
   startedAt,
   onFinish,
   compact = false,
+  fast = false,
 }: {
   startedAt: number;
   /** Chamado quando o usuário escolhe encerrar (ou o sistema expira). */
   onFinish?: () => void;
   compact?: boolean;
+  /** Demo acelerado: 1 minuto real = 1 hora simulada (valida alerta 2h em 2min). */
+  fast?: boolean;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [ackUntil, setAckUntil] = useState(0);
@@ -32,8 +35,12 @@ export function SessionClock({
     return () => clearInterval(i);
   }, []);
 
-  const phase = sessionPhase(startedAt, now);
-  const secs = elapsedSeconds(startedAt, now);
+  // no modo rápido multiplicamos o tempo decorrido por 60
+  const mult = fast ? 60 : 1;
+  const simNow = startedAt + (now - startedAt) * mult;
+
+  const phase = sessionPhase(startedAt, simNow);
+  const secs = elapsedSeconds(startedAt, simNow);
 
   if (phase === "expirada") {
     return (
