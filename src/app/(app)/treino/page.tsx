@@ -496,10 +496,10 @@ export default function TreinoHomePage() {
       <TopBar title="Treino" subtitle={cap(weekdayName())} />
       {sessionBar}
       <div className="space-y-8 p-4">
-        {/* 1. STATUS ATUAL, como você chegou hoje */}
-        <div className="rounded-2xl border border-border bg-card/50 p-4">
-          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">Como você está hoje?</p>
-          <div className="grid grid-cols-3 gap-2">
+        {/* 1. STATUS ATUAL, linha compacta sem card pesado */}
+        <div className="flex items-center gap-2 rounded-full border border-border bg-card/40 px-3 py-1.5">
+          <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">Como está?</span>
+          <div className="flex flex-1 justify-end gap-1.5">
             {[
               { key: "leve", label: "Leve", icon: Frown, tone: "text-sky-400" },
               { key: "ok", label: "No ritmo", icon: Meh, tone: "text-warning" },
@@ -515,8 +515,8 @@ export default function TreinoHomePage() {
                     toast.success(`Feedback registrado: ${opt.label}`);
                   }}
                   className={cn(
-                    "tactile flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-xs font-semibold transition-colors",
-                    active ? "border-brand bg-brand-soft text-foreground" : "border-border bg-card/40 text-muted-foreground hover:text-foreground"
+                    "tactile flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors",
+                    active ? "border-brand bg-brand-soft text-brand" : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <Icon className={cn("h-4 w-4", opt.tone)} />
@@ -526,7 +526,7 @@ export default function TreinoHomePage() {
             })}
           </div>
           {feeling ? (
-            <p className="mt-2 text-[11px] text-brand">Anotado! O Personal Digital ajusta a intensidade do treino para amanhã.</p>
+            <p className="-mt-3 pl-3 text-[10px] text-brand">Anotado! O Personal Digital ajusta amanhã.</p>
           ) : null}
         </div>
 

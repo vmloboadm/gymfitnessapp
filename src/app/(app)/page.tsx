@@ -21,7 +21,6 @@ import { useWorkoutSession, elapsedSeconds } from "~/lib/workout-session";
 import { GYM_HIGHLIGHTS, TIPS_STRUCTURED } from "~/components/dashboard/mocks";
 import AiCoach from "~/components/ai/coach-chat";
 import PersonalHome from "~/components/personal/PersonalHome";
-import { LivePulse } from "~/components/dashboard/LivePulse";
 import { StreakFlame, FlameStageHint } from "~/components/dashboard/StreakFlame";
 import { PerformanceRing } from "~/components/dashboard/PerformanceRing";
 import { HeroWorkout } from "~/components/dashboard/HeroWorkout";
@@ -441,10 +440,6 @@ export default function HomePage() {
           </div>
         </motion.div>
 
-        <motion.div variants={item}>
-          <LivePulse online={online} />
-        </motion.div>
-
         {/* COCKPIT, Anel da meta + Streak + Liga */}
         <motion.section variants={item} className="pm-surface overflow-hidden">
           <div className="px-2 pb-6 pt-1">
@@ -504,6 +499,12 @@ export default function HomePage() {
                 </Link>
               </motion.div>
             </div>
+
+            {/* Ocupação ao vivo, discreta (distill: saiu da seção própria) */}
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-[10px] font-semibold text-[#7E8AA0]">
+              <span className="hero-live-dot" style={{ transform: "scale(0.7)" }} />
+              {online} pessoas treinando agora na academia
+            </p>
 
             {/* Título do mês consolidado como linha secundária da liga (#7) */}
             <p className="mt-4 text-center text-[11px] leading-snug text-[#7E8AA0]">
@@ -679,12 +680,12 @@ export default function HomePage() {
           </div>
         </motion.section>
 
-        {/* 5A. DESTAQUES DA ACADEMIA */}
+        {/* HOJE NA ACADEMIA — um só carrossel, zero duplicação */}
         <motion.section variants={item}>
-          <p className="gf-section mb-2 px-1">Destaques da academia</p>
+          <p className="gf-section mb-2 px-1">Hoje na academia</p>
           <div className="scrollbar-hide -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
             {GYM_HIGHLIGHTS.map((h) => (
-              <div key={h.title} className="w-[78%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4">
+              <div key={h.title} className="w-[72%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4">
                 <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-brand">
                   <span aria-hidden>{h.icon}</span> {h.tag}
                 </p>
@@ -692,37 +693,30 @@ export default function HomePage() {
                 <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{h.body}</p>
               </div>
             ))}
-          </div>
-        </motion.section>
-
-        {/* 5. MAIS PRA VOCÊ, carrossel horizontal (menos scroll vertical) */}
-        <motion.section variants={item}>
-          <p className="gf-section mb-2 px-1">Mais pra você</p>
-          <div className="scrollbar-hide -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
-            {mundo ? (
-              <Link href="/feed" className="w-[80%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4 transition-colors hover:border-brand/30">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-brand">{mundo.source}</p>
-                <p className="mt-1.5 line-clamp-2 text-[13px] font-semibold leading-snug text-[#F4F6FB]">{mundo.title}</p>
-                <p className="mt-2 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{mundo.body}</p>
-              </Link>
-            ) : null}
             {destaque ? (
-              <div className="w-[80%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4">
+              <div className="w-[72%] shrink-0 snap-start rounded-[18px] border border-success/30 bg-success/[0.06] p-4">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-success">Destaque da galera</p>
                 <p className="mt-1.5 line-clamp-3 text-[13px] font-medium leading-snug text-[#D6DCEC]">{destaque.text}</p>
                 <p className="mt-2 text-[11px] font-semibold text-muted-foreground">{destaque.author}</p>
               </div>
             ) : null}
-            <div className="w-[80%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-warning">Dica GymFitness</p>
-              <p className="mt-1.5 line-clamp-3 text-[13px] font-medium leading-snug text-[#D6DCEC]">{structuredTip.text}</p>
-              {structuredTip.source ? (
-                <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-brand">
-                  📷 {structuredTip.source.handle ?? "@gymfitness"} · post completo em breve
-                </p>
-              ) : null}
-            </div>
-            <Link href="/personals" className="w-[80%] shrink-0 snap-start rounded-[18px] border border-brand/35 bg-gradient-to-br from-brand/15 via-card to-card p-4 transition-colors hover:border-brand/60">
+            {mundo ? (
+              <Link href="/feed" className="w-[72%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4 transition-colors hover:border-brand/30">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-brand">{mundo.source}</p>
+                <p className="mt-1.5 line-clamp-2 text-[13px] font-semibold leading-snug text-[#F4F6FB]">{mundo.title}</p>
+                <p className="mt-2 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{mundo.body}</p>
+              </Link>
+            ) : null}
+            {structuredTip ? (
+              <div className="w-[72%] shrink-0 snap-start rounded-[18px] border border-warning/25 bg-warning/[0.05] p-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-warning">Dica GymFitness</p>
+                <p className="mt-1.5 line-clamp-3 text-[13px] font-medium leading-snug text-[#D6DCEC]">{structuredTip.text}</p>
+                {structuredTip.source ? (
+                  <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-brand">📷 {structuredTip.source.handle ?? "@gymfitness"}</p>
+                ) : null}
+              </div>
+            ) : null}
+            <Link href="/personals" className="w-[72%] shrink-0 snap-start rounded-[18px] border border-brand/35 bg-gradient-to-br from-brand/15 via-card to-card p-4 transition-colors hover:border-brand/60">
               <p className="text-[10px] font-bold uppercase tracking-widest text-brand">Personals da casa</p>
               <p className="mt-1.5 line-clamp-2 text-[13px] font-semibold leading-snug text-[#F4F6FB]">Acelere com acompanhamento premium</p>
               <p className="mt-2 text-[11px] font-semibold text-brand">Ver personais →</p>
@@ -735,7 +729,7 @@ export default function HomePage() {
 
         {/* Marcador de build, confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 24/08 v13 ✓
+          GymFitness · build 24/08 v15 ✓
         </p>
           </>
         ) : null}
