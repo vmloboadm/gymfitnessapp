@@ -13,7 +13,8 @@ export type WorkoutSession = { startedAt: number };
 const KEY = "gymfit_session_v1";
 const EVENT = "gymfit-session";
 
-const MAX_SESSION_HOURS = 14; // sessão órfã (celular reiniciou, esqueceu de finalizar) expira sozinha
+export const MAX_SESSION_HOURS = 4;
+export const SESSION_WARN_HOURS = 2; // sessão órfã (celular reiniciou, esqueceu de finalizar) expira sozinha
 
 function read(): WorkoutSession | null {
   try {
@@ -24,6 +25,7 @@ function read(): WorkoutSession | null {
     const hours = (Date.now() - parsed.startedAt) / 3600000;
     if (hours > MAX_SESSION_HOURS) {
       localStorage.removeItem(KEY);
+      window.dispatchEvent(new Event(EVENT));
       return null;
     }
     return parsed;
@@ -78,4 +80,13 @@ export function formatMMSS(totalSec: number): string {
   const m = String(Math.floor(totalSec / 60)).padStart(2, "0");
   const s = String(totalSec % 60).padStart(2, "0");
   return `${m}:${s}`;
+}
+
+/** Fase da sessão para UI: normal <2h · alerta >=2h · null já expirou (>=4h). */
+export function sessionPhase(startedAt: number, now: number): "ativa" | "alerta" | "expirada" | null {
+  const hours = (now - startedAt) / 3600000;
+  if (!Number.isFinite(hours) || hours < 0) return null;
+  if (hours >= MAX_SESSION_HOURS) return "expirada";
+  if (hours >= SESSION_WARN_HOURS) return "alerta";
+  return "ativa";
 }

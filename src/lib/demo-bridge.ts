@@ -18,12 +18,14 @@ import {
   demoSeedInfo,
   demoLib,
   demoLibCategory,
+  demoOpenSessions,
   type DemoCategory,
   type DemoExercise,
 } from "./demo-data";
 
 export {
   demoEquipment,
+  demoOpenSessions,
   demoVariations,
   demoExercises,
   demoWorkoutProgram,

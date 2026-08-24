@@ -13,6 +13,7 @@ import { formatNumber } from "~/lib/utils/format";
 import {
   isDemoMode,
   demoKpis,
+  demoOpenSessions,
   demoOcupacaoHorario,
   demoCheckinPorPlano,
   demoManutencaoRecorrente,
@@ -107,6 +108,27 @@ export default function DashboardPage() {
         <StatCard label="Aparelhos" value={`${formatNumber(kpis?.equipment ?? 0)}`} icon={BarChart3} context="cadastrados" />
         <StatCard label="Treinando agora" value={formatNumber(kpis?.activeCheckins ?? 0)} icon={TrendingUp} context="no momento" />
       </div>
+
+      {/* ALERTA DE SEGURANÇA — sessões abertas há mais de 2h */}
+      {(() => {
+        const open = isDemoMode() ? (demoOpenSessions() as any[]).filter((s: any) => Date.now() - new Date(s.started_at).getTime() >= 2 * 3600000) : [];
+        if (open.length === 0) return null;
+        return (
+          <div className="mt-4 rounded-xl border border-destructive/40 bg-destructive/10 p-4">
+            <p className="text-[11px] font-black uppercase tracking-widest text-destructive">
+              ⚠ Sessões abertas há mais de 2h — verificar ocorrência
+            </p>
+            <div className="mt-2 space-y-1.5">
+              {open.map((s: any) => (
+                <div key={s.id} className="flex items-center justify-between rounded-lg bg-card/60 px-3 py-2">
+                  <span className="text-sm font-bold text-foreground">{s.student_name}</span>
+                  <span className="text-xs text-muted-foreground">{s.equipment_name} · desde {new Date(s.started_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Ocupação por horário */}
       <div className="rounded-2xl border border-border bg-card/50 p-4">

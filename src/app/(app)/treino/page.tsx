@@ -38,7 +38,8 @@ import { ExerciseInfoSheet, iconForExercise, type ExerciseDetail } from "~/compo
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
 import { todayWorkoutTitle } from "~/lib/academia";
-import { useWorkoutSession, elapsedSeconds, formatMMSS } from "~/lib/workout-session";
+import { useWorkoutSession, elapsedSeconds } from "~/lib/workout-session";
+import { SessionClock } from "~/components/common/SessionClock";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
 
 /* mapa exercício→grupo para dados reais (categories canônicas) */
@@ -212,12 +213,6 @@ export default function TreinoHomePage() {
   );
   const router = useRouter();
   const { session: daySession, end: endDaySession } = useWorkoutSession();
-  const [nowTick2, setNowTick2] = useState(Date.now());
-  useEffect(() => {
-    if (!daySession) return;
-    const i = setInterval(() => setNowTick2(Date.now()), 1000);
-    return () => clearInterval(i);
-  }, [daySession]);
 
   const programRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -344,10 +339,14 @@ export default function TreinoHomePage() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
           </span>
-          <span className="pm-num text-[18px] leading-none text-foreground">
-            {formatMMSS(elapsedSeconds(daySession.startedAt, nowTick2))}
-          </span>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">treinando</span>
+          <SessionClock
+            startedAt={daySession.startedAt}
+            onFinish={() => {
+              setSummarySeconds(elapsedSeconds(daySession.startedAt, Date.now()));
+              endDaySession();
+              setPhase("done");
+            }}
+          />
         </div>
         <button
           onClick={() => {

@@ -504,3 +504,12 @@ export const demoLib: DemoCategory[] = [
 export function demoLibCategory(catId: string): DemoCategory | undefined {
   return demoLib.find((c) => c.id === catId);
 }
+
+
+/** Sessões de aparelho em aberto agora (fonte real: equipment_sessions active). */
+export function demoOpenSessions() {
+  return [
+    { id: "os-1", student_name: "Pedro Rocha", equipment_name: "Leg Press 45°", started_at: new Date(Date.now() - 145 * 60000).toISOString() },
+    { id: "os-2", student_name: "Ana Souza", equipment_name: "Supino Reto", started_at: new Date(Date.now() - 40 * 60000).toISOString() },
+  ];
+}

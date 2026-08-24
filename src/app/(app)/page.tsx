@@ -17,7 +17,8 @@ import { calcStreak, weekdayName, startOfWeek } from "~/lib/utils/calculations";
 import { cap } from "~/lib/utils/format";
 import { leagueFor } from "~/lib/utils/leagues";
 import { getTodayWorkout, type TodayWorkout } from "~/lib/today-workout";
-import { useWorkoutSession, elapsedSeconds } from "~/lib/workout-session";
+import { useWorkoutSession } from "~/lib/workout-session";
+import { SessionClock } from "~/components/common/SessionClock";
 import { GYM_HIGHLIGHTS, TIPS_STRUCTURED } from "~/components/dashboard/mocks";
 import AiCoach from "~/components/ai/coach-chat";
 import PersonalHome from "~/components/personal/PersonalHome";
@@ -179,12 +180,7 @@ export default function HomePage() {
   const { session, end: endSession } = useWorkoutSession();
   const isCheckedInToday = !!session;
   const startedAt = session?.startedAt ?? null;
-  const [nowTickHome, setNowTickHome] = useState(Date.now());
-  useEffect(() => {
-    if (!session) return;
-    const i = setInterval(() => setNowTickHome(Date.now()), 1000);
-    return () => clearInterval(i);
-  }, [session]);
+
   const heroRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (isCheckedInToday && heroRef.current) {
@@ -382,12 +378,9 @@ export default function HomePage() {
                 </span>
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-wider text-success">Check-in feito</p>
-                  <p className="pm-num text-[18px] leading-tight text-foreground">
-                    {(() => {
-                      const s = startedAt ? elapsedSeconds(startedAt, nowTickHome) : 0;
-                      return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-                    })()}
-                    <span className="ml-1 text-[10px] font-semibold text-muted-foreground">de treino</span>
+                  <p className="flex items-baseline gap-1.5 leading-tight">
+                    <SessionClock startedAt={startedAt ?? Date.now()} compact />
+                    <span className="text-[10px] font-semibold text-muted-foreground">de treino</span>
                   </p>
                 </div>
               </div>
@@ -729,7 +722,7 @@ export default function HomePage() {
 
         {/* Marcador de build, confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 24/08 v17 ✓
+          GymFitness · build 24/08 v18 ✓
         </p>
           </>
         ) : null}

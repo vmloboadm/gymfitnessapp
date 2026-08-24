@@ -15,6 +15,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { TopBar } from "~/components/layout/TopBar";
 import { cn } from "~/lib/utils";
 import { demoAlunosPersonal } from "~/lib/demo-bridge";
+import { demoOpenSessions } from "~/lib/demo-data";
 
 /**
  * Dashboard MOBILE-FIRST do Personal, nada de anel/streak de aluno.
@@ -36,6 +37,15 @@ export default function PersonalHomePage() {
 
   const radar = useMemo(() => {
     const alerts: Array<{ level: "critico" | "atencao" | "elogio"; name: string; msg: string }> = [];
+
+    // SESSÕES ABERTAS >= 2H — possível ocorrência (aluno passou mal, esqueceu checkout)
+    for (const s of demoOpenSessions()) {
+      const h = (Date.now() - new Date(s.started_at).getTime()) / 3600000;
+      if (h >= 2) {
+        alerts.push({ level: "critico", name: s.student_name, msg: `Sessão aberta há ${h.toFixed(1)}h em "${s.equipment_name}" — verificar na sala agora` });
+      }
+    }
+
     for (const s of students) {
       const d = daysSince(s.last_workout);
       if (d >= 3) alerts.push({ level: "critico", name: s.name, msg: `sem check-in há ${d} dias · streak ${s.streak}d` });
