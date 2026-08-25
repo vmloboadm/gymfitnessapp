@@ -13,7 +13,7 @@ export function RewardModal({
   icon,
   name,
   points,
-  videoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+  videoUrl = "https://www.youtube.com/results?search_query=fitness+victory+celebration",
   shareText,
 }: {
   open: boolean;

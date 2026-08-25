@@ -117,14 +117,14 @@ const BODY_COUNTS = (() => {
 
 const IMG: string | null = "/workout/workout-strength.jpg";
 const YT = (q: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q + " execução")}`;
-const VID_M = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
-const VID_F = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4";
+// const VID_M = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"; // REPLACED WITH YOUTUBE SEARCH
+// const VID_F = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"; // REPLACED WITH YOUTUBE SEARCH
 const UNS = (id: string) => `https://images.unsplash.com/${id}?w=300&h=300&fit=crop&q=70`;
 const DEFAULT_DEMO_EX: Array<{ id: string; name: string; picto: string; sets: number; reps: string; rest: number; info: string; tips?: string[] | null; imageUrl: string | null; videoUrl: string | null; thumbUrl: string | null; videoUrlMale: string | null; videoUrlFemale: string | null }> = [
-  { id: "d1", name: "Supino Reto", picto: "🏋️", sets: 4, reps: "10", rest: 90, imageUrl: IMG as string | null, videoUrl: YT("Supino Reto"), info: "Empurre sem travar o cotovelo.", thumbUrl: UNS("photo-1517836357463-d25dfeac3438"), videoUrlMale: VID_M, videoUrlFemale: VID_F },
-  { id: "d2", name: "Crucifixo com Halteres", picto: "🦾", sets: 3, reps: "12", rest: 60, imageUrl: IMG as string | null, videoUrl: YT("Crucifixo Halteres"), info: "Abra até a linha do peito e volte controlando.", thumbUrl: UNS("photo-1549060279-7e168fcee0c2"), videoUrlMale: VID_M, videoUrlFemale: VID_F },
-  { id: "d3", name: "Desenvolvimento Militar", picto: "🏋️", sets: 3, reps: "10", rest: 75, imageUrl: IMG as string | null, videoUrl: YT("Desenvolvimento Militar"), info: "Core firme, sem arco lombar.", thumbUrl: UNS("photo-1583454110551-21f2fa2afe61"), videoUrlMale: VID_M, videoUrlFemale: VID_F },
-  { id: "d4", name: "Elevação Lateral", picto: "🪶", sets: 4, reps: "15", rest: 45, imageUrl: IMG as string | null, videoUrl: YT("Elevação Lateral"), info: "Cotovelos levemente flexionados.", thumbUrl: UNS("photo-1571019613454-1cb2f99b2d8b"), videoUrlMale: VID_M, videoUrlFemale: VID_F },
+  { id: "d1", name: "Supino Reto", picto: "🏋️", sets: 4, reps: "10", rest: 90, imageUrl: IMG as string | null, videoUrl: YT("Supino Reto"), info: "Empurre sem travar o cotovelo.", thumbUrl: UNS("photo-1517836357463-d25dfeac3438"), videoUrlMale: YT("Supino Reto"), videoUrlFemale: YT("Supino Reto") },
+  { id: "d2", name: "Crucifixo com Halteres", picto: "🦾", sets: 3, reps: "12", rest: 60, imageUrl: IMG as string | null, videoUrl: YT("Crucifixo Halteres"), info: "Abra até a linha do peito e volte controlando.", thumbUrl: UNS("photo-1549060279-7e168fcee0c2"), videoUrlMale: YT("Crucifixo com Halteres"), videoUrlFemale: YT("Crucifixo com Halteres") },
+  { id: "d3", name: "Desenvolvimento Militar", picto: "🏋️", sets: 3, reps: "10", rest: 75, imageUrl: IMG as string | null, videoUrl: YT("Desenvolvimento Militar"), info: "Core firme, sem arco lombar.", thumbUrl: UNS("photo-1583454110551-21f2fa2afe61"), videoUrlMale: YT("Desenvolvimento Militar"), videoUrlFemale: YT("Desenvolvimento Militar") },
+  { id: "d4", name: "Elevação Lateral", picto: "🪶", sets: 4, reps: "15", rest: 45, imageUrl: IMG as string | null, videoUrl: YT("Elevação Lateral"), info: "Cotovelos levemente flexionados.", thumbUrl: UNS("photo-1571019613454-1cb2f99b2d8b"), videoUrlMale: YT("Elevação Lateral"), videoUrlFemale: YT("Elevação Lateral") },
 ];
 
 export default function TreinoHomePage() {

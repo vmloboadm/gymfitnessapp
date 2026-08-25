@@ -37,7 +37,7 @@ function answerFor(q: string): string {
     return concise("Sentir queda na última série é normal (é a falência chegando). Se isso virou rotina, não é preguiça, pode ser volume alto demais. Duas correções: (1) deixa 1–2 repetições sempre em reserva nas primeiras séries e (2) revisa o descanso, 90s a 120s aumenta bastante a sua recuperação entre séries.");
   }
   if (s.includes("peso") || s.includes("carga") || s.includes("aumentar") || s.includes("progress") || s.includes("evolu")) {
-    return "Regra de progressão simples e segura: quando você concluir todas as séries com 2 repetições de sobra na última, suba a carga. Ex.: 4×12 com folga → 4×8 com o peso novo, subindo 1–2 reps por semana até voltar a 12. Carga sobe de pouco em pouco; o real segredo é a consistência."
+    return concise("Regra de progressão simples e segura: quando você concluir todas as séries com 2 repetições de sobra na última, suba a carga. Ex.: 4×12 com folga → 4×8 com o peso novo, subindo 1–2 reps por semana até voltar a 12. Carga sobe de pouco em pouco; o real segredo é a consistência.");
   }
   if (s.includes("crucifixo") || s.includes("aparelho ocupado") || s.includes("substitu") || s.includes("trocar")) {
     return concise("Ótima escolha. Trocar o aparelho ocupado por um exercício de músculo igual mantém o estímulo do dia. Ex.: supino reto → crucifixo com halteres (mesma dorsoflexão), agachamento → leg press (mesma cadeia). Só não troque puxado por empurrado, o estímulo muda de grupo.");
