@@ -25,23 +25,39 @@ const ALLOWED_TABLES = [
 
 /**
  * POST /api/sync, flush da fila offline (blueprint §5.5).
- * Recebe a lista de ações e aplica sobre o banco em ordem, com checagem de
- * tabela permitida (nunca confia no cliente). Sem service role configurado,
- * retorna erro estrutural (fallback honesto, sem falsa sensação de sucesso).
+ * SEGURANÇA: autentica o JWT do chamador e aplica inserts com o token dele
+ * (RLS vigora). NUNCA usa service_role em rota aberta, nem confia em
+ * student_id/gym_id vindos do cliente.
  */
 export async function POST(request: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!url || !serviceRole) {
+  if (!url || !anonKey) {
     return NextResponse.json(
-      {
-        ok: false,
-        error:
-          "SUPABASE_SERVICE_ROLE_KEY não configurada, sincronização offline indisponível.",
-        synced: 0,
-      },
+      { ok: false, error: "Supabase não configurado.", synced: 0 },
       { status: 503 }
+    );
+  }
+
+  const authHeader = request.headers.get("authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) {
+    return NextResponse.json(
+      { ok: false, error: "Não autenticado.", synced: 0 },
+      { status: 401 }
+    );
+  }
+
+  // Cliente enxerga apenas para validar o token (auth.getUser ignora RLS).
+  const verifier = createClient<Database>(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: userData, error: userError } = await verifier.auth.getUser(token);
+  if (userError || !userData.user) {
+    return NextResponse.json(
+      { ok: false, error: "Sessão inválida ou expirada.", synced: 0 },
+      { status: 401 }
     );
   }
 
@@ -69,8 +85,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createClient<Database>(url, serviceRole, {
+  // Inserts rodam com o JWT do usuário: RLS garante que ele só escreve
+  // nos próprios registros da própria academia (student_id/gym_id forjados
+  // são rejeitados pelas policies).
+  const supabase = createClient<Database>(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
   });
 
   const results: Array<{ id: string; ok: boolean; error: string | null }> = [];

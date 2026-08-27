@@ -5,7 +5,8 @@ import type { Database } from "~/lib/types/database";
 import { buildFrequencySeries, WEEK_DAYS } from "~/lib/academia";
 
 type Cached = { data: ReturnType<typeof buildFrequencySeries>; at: number };
-let cache: Cached | null = null;
+// Cache por usuário: NUNCA compartilhar dado de frequência entre sessões.
+const cacheByUser = new Map<string, Cached>();
 const TTL_MS = 10 * 60 * 1000;
 
 /**
@@ -49,8 +50,9 @@ export async function GET() {
   }
 
   const now = Date.now();
-  if (cache && now - cache.at < TTL_MS) {
-    return NextResponse.json({ ok: true, cache: true, ...cache.data });
+  const cached = cacheByUser.get(user.id);
+  if (cached && now - cached.at < TTL_MS) {
+    return NextResponse.json({ ok: true, cache: true, ...cached.data });
   }
 
   const since = new Date();
@@ -75,6 +77,12 @@ export async function GET() {
   }
 
   const normalized = buildFrequencySeries((data ?? []) as Array<{ checked_at: string }>, WEEK_DAYS);
-  cache = { data: normalized, at: now };
+  cacheByUser.set(user.id, { data: normalized, at: now });
+  if (cacheByUser.size > 500) {
+    // evita crescimento descontrolado em server de longa vida
+    for (const [k, v] of cacheByUser) {
+      if (now - v.at > TTL_MS) cacheByUser.delete(k);
+    }
+  }
   return NextResponse.json({ ok: true, cache: false, ...normalized });
 }
