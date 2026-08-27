@@ -738,7 +738,7 @@ export default function TreinoHomePage() {
                     completed={false}
                     isActive={false}
                     onToggleComplete={() => {
-                      toast("Toque em Iniciar para marcar no cronômetro", { icon: "⏱️" });
+                      toast("Toque em Iniciar para marcar no cronômetro");
                     }}
                     machineFor={machineByExercise.get(d.exercise?.name ?? "") ?? ""}
                     sessionStart={eqSessions[d.exercise_id ?? d.id] ?? null}
