@@ -17,8 +17,11 @@ export default function AuthLayout({
         <div className="absolute inset-0 bg-[radial-gradient(60%_40%_at_50%_20%,rgba(244,113,30,0.18),transparent_60%)]" />
         <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E")` }} />
       </div>
-      <div className="relative flex flex-1 items-center justify-center px-4 py-10">
+      <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-10">
         <main className="w-full max-w-md">{children}</main>
+        <p className="mt-6 text-center text-xs font-medium tracking-wide text-white/35">
+          GymFitness · Performance dark · acesso seguro
+        </p>
       </div>
     </div>
   );

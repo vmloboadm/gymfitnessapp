@@ -81,8 +81,15 @@ export function LoginForm() {
   }
 
   return (
-    <div className="w-full rounded-[24px] border border-white/[0.08] bg-white/[0.06] p-6 shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-7">
-      <div className="flex flex-col items-center gap-3 text-center">
+    <div className="relative w-full overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.06] p-6 shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-7">
+      {/* linha de acento superior + brilho interno */}
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" aria-hidden />
+      <span className="pointer-events-none absolute -top-16 left-1/2 h-32 w-[120%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(244,113,30,0.18),transparent_70%)] blur-2xl" aria-hidden />
+      <div className="relative flex flex-col items-center gap-3 text-center">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white/60">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#F4711E] shadow-[0_0_8px_rgba(244,113,30,0.7)]" />
+          Acesso exclusivo · GymFitness
+        </span>
         <img
           src="/images/logo-academia.png"
           alt="GymFitness"
