@@ -31,13 +31,14 @@ import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncS
 import { Badge } from "~/components/ui/badge";
 import BodyMap from "~/components/body-map";
 import WorkoutInProgress from "~/components/common/WorkoutInProgress";
-import AiCoach, { openAiCoach } from "~/components/ai/coach-chat";
+import { openAiCoach } from "~/components/ai/coach-bus";
+import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
-import { ExerciseInfoSheet, iconForExercise, type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
+import { ExerciseInfoSheet, type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
+import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
-import { todayWorkoutTitle } from "~/lib/academia";
 import { useWorkoutSession, elapsedSeconds } from "~/lib/workout-session";
 import { SessionClock } from "~/components/common/SessionClock";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
@@ -120,11 +121,11 @@ const YT = (q: string) => `https://www.youtube.com/results?search_query=${encode
 // const VID_M = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"; // REPLACED WITH YOUTUBE SEARCH
 // const VID_F = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"; // REPLACED WITH YOUTUBE SEARCH
 const UNS = (id: string) => `https://images.unsplash.com/${id}?w=300&h=300&fit=crop&q=70`;
-const DEFAULT_DEMO_EX: Array<{ id: string; name: string; picto: string; sets: number; reps: string; rest: number; info: string; tips?: string[] | null; imageUrl: string | null; videoUrl: string | null; thumbUrl: string | null; videoUrlMale: string | null; videoUrlFemale: string | null }> = [
-  { id: "d1", name: "Supino Reto", picto: "🏋️", sets: 4, reps: "10", rest: 90, imageUrl: IMG as string | null, videoUrl: YT("Supino Reto"), info: "Empurre sem travar o cotovelo.", thumbUrl: UNS("photo-1517836357463-d25dfeac3438"), videoUrlMale: YT("Supino Reto"), videoUrlFemale: YT("Supino Reto") },
-  { id: "d2", name: "Crucifixo com Halteres", picto: "🦾", sets: 3, reps: "12", rest: 60, imageUrl: IMG as string | null, videoUrl: YT("Crucifixo Halteres"), info: "Abra até a linha do peito e volte controlando.", thumbUrl: UNS("photo-1549060279-7e168fcee0c2"), videoUrlMale: YT("Crucifixo com Halteres"), videoUrlFemale: YT("Crucifixo com Halteres") },
-  { id: "d3", name: "Desenvolvimento Militar", picto: "🏋️", sets: 3, reps: "10", rest: 75, imageUrl: IMG as string | null, videoUrl: YT("Desenvolvimento Militar"), info: "Core firme, sem arco lombar.", thumbUrl: UNS("photo-1583454110551-21f2fa2afe61"), videoUrlMale: YT("Desenvolvimento Militar"), videoUrlFemale: YT("Desenvolvimento Militar") },
-  { id: "d4", name: "Elevação Lateral", picto: "🪶", sets: 4, reps: "15", rest: 45, imageUrl: IMG as string | null, videoUrl: YT("Elevação Lateral"), info: "Cotovelos levemente flexionados.", thumbUrl: UNS("photo-1571019613454-1cb2f99b2d8b"), videoUrlMale: YT("Elevação Lateral"), videoUrlFemale: YT("Elevação Lateral") },
+const DEFAULT_DEMO_EX: Array<{ id: string; name: string; sets: number; reps: string; rest: number; info: string; tips?: string[] | null; imageUrl: string | null; videoUrl: string | null; thumbUrl: string | null; videoUrlMale: string | null; videoUrlFemale: string | null }> = [
+  { id: "d1", name: "Supino Reto", sets: 4, reps: "10", rest: 90, imageUrl: IMG as string | null, videoUrl: YT("Supino Reto"), info: "Empurre sem travar o cotovelo.", thumbUrl: UNS("photo-1517836357463-d25dfeac3438"), videoUrlMale: YT("Supino Reto"), videoUrlFemale: YT("Supino Reto") },
+  { id: "d2", name: "Crucifixo com Halteres", sets: 3, reps: "12", rest: 60, imageUrl: IMG as string | null, videoUrl: YT("Crucifixo Halteres"), info: "Abra até a linha do peito e volte controlando.", thumbUrl: UNS("photo-1549060279-7e168fcee0c2"), videoUrlMale: YT("Crucifixo com Halteres"), videoUrlFemale: YT("Crucifixo com Halteres") },
+  { id: "d3", name: "Desenvolvimento Militar", sets: 3, reps: "10", rest: 75, imageUrl: IMG as string | null, videoUrl: YT("Desenvolvimento Militar"), info: "Core firme, sem arco lombar.", thumbUrl: UNS("photo-1583454110551-21f2fa2afe61"), videoUrlMale: YT("Desenvolvimento Militar"), videoUrlFemale: YT("Desenvolvimento Militar") },
+  { id: "d4", name: "Elevação Lateral", sets: 4, reps: "15", rest: 45, imageUrl: IMG as string | null, videoUrl: YT("Elevação Lateral"), info: "Cotovelos levemente flexionados.", thumbUrl: UNS("photo-1571019613454-1cb2f99b2d8b"), videoUrlMale: YT("Elevação Lateral"), videoUrlFemale: YT("Elevação Lateral") },
 ];
 
 export default function TreinoHomePage() {
@@ -137,11 +138,12 @@ export default function TreinoHomePage() {
      No demo, tocar na instrução simula a leitura da tag. */
   const [eqSessions, setEqSessions] = useState<Record<string, number>>({});
   const [nowTick, setNowTick] = useState(Date.now());
+  const eqSessionCount = Object.keys(eqSessions).length;
   useEffect(() => {
-    if (Object.keys(eqSessions).length === 0) return;
+    if (eqSessionCount === 0) return;
     const i = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(i);
-  }, [Object.keys(eqSessions).length]);
+  }, [eqSessionCount]);
   const [rpe, setRpe] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "active" | "done">("idle");
   const [bodyCat, setBodyCat] = useState<string | null>(() => {
@@ -231,7 +233,6 @@ export default function TreinoHomePage() {
   const todayKey = new Date().toISOString().slice(0, 10);
   // MESMA FONTE da home, nunca diverge
   const tw = useMemo(() => (demo ? getTodayWorkout() : resolveFromLogs(data?.logs ?? [])), [demo, data?.logs]);
-  const focus = { label: tw.focusLabel, resume: tw.resume, bodyCat: tw.bodyCat };
   function resolveFromLogs(logs: NonNullable<TreinoData["logs"]>) {
     const f = nextWorkoutFromLogs(logs);
     const lastTrained: Record<string, string | null> = {};
@@ -258,13 +259,53 @@ export default function TreinoHomePage() {
     endDaySession();
     navigator.vibrate?.([60, 40, 90]);
     setPhase("done");
-    toast.success("Treino concluído! 💪");
+    toast.success("Treino concluído!");
+  };
+
+  // Conclusões desta sessão (otimista, local): alimenta contador e reordenação
+  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
+  const doneCount = doneIds.size;
+  const toggleDone = (id: string) => {
+    navigator.vibrate?.(30);
+    setDoneIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const startWorkout = (list: typeof DEFAULT_DEMO_EX) => {
     setSession(list);
     setPhase("active");
   };
+
+  /** Sessão construída a partir do TREINO DE HOJE real (não mais lista fixa). */
+  const sessionFromDetails = ((data?.details ?? []).map((d) => ({
+    id: d.exercise_id ?? d.id,
+    name: d.exercise?.name ?? "Exercício",
+    sets: d.sets,
+    reps: String(d.reps),
+    rest: d.rest_seconds ?? 60,
+    info: d.exercise?.tips?.[0] ?? null,
+    tips: d.exercise?.tips ?? null,
+    imageUrl: (d.exercise as { image_url?: string | null })?.image_url ?? null,
+    videoUrl:
+      (d.exercise as { video_url?: string | null })?.video_url ?? null,
+    thumbUrl: null,
+    videoUrlMale: null,
+    videoUrlFemale: null,
+  })) as typeof DEFAULT_DEMO_EX);
+
+  /** Check-in validou? → entra DIRETO na execução (sem clique extra). */
+  useEffect(() => {
+    if (!demo || phase !== "idle") return;
+    if (typeof window === "undefined") return;
+    if (sessionStorage.getItem("gf_autostart") !== "1") return;
+    sessionStorage.removeItem("gf_autostart");
+    startWorkout(sessionFromDetails.length > 0 ? sessionFromDetails : DEFAULT_DEMO_EX);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demo, phase, data?.details]);
 
   const bodyExercises = useMemo(() => {
     if (!demo || !bodyCat) return [];
@@ -299,42 +340,21 @@ export default function TreinoHomePage() {
     );
   }
 
-  // GATE: sem sessão validada por scan, o treino não abre
-  if (!daySession) {
-    return (
-      <>
-        <TopBar title="Treino" subtitle="Bloqueado" />
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mx-auto max-w-md space-y-4 p-4 pt-10 text-center">
-          <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-[24px] border border-brand/30 bg-brand/10">
-            <Lock className="h-9 w-9 text-brand" />
-          </span>
-          <h2 className="text-lg font-black text-foreground">Faça o check-in para liberar</h2>
-          <p className="gf-card-text mx-auto max-w-[300px]">
-            Escaneie o QR da portaria ou encoste o celular no leitor NFC. Validou, treino liberado.
-          </p>
-          <Link
-            href="/checkin?scan=1"
-            onClick={(e) => {
-              e.preventDefault();
-              // engenharia reversa do fluxo: lembra EXATAMENTE onde o usuário estava,
-              // incluindo ?ir=hoje quando ele veio do card "Treino do dia" do dashboard
-              const cur = window.location.pathname + window.location.search;
-              router.push(`/checkin?scan=1&from=${encodeURIComponent(cur)}`);
-            }}
-            className="gf-touch tactile mx-auto flex w-full max-w-[320px] items-center justify-center gap-2 rounded-2xl bg-[#F4711E] py-4 text-[15px] font-black text-black shadow-[0_0_30px_rgba(244,113,30,0.5)] transition-transform active:scale-[0.98]"
-          >
-            <ScanLine className="h-5 w-5" /> Escanear e liberar treino
-          </Link>
-          <Link href="/" className="block text-xs font-semibold text-muted-underline hover:underline text-muted-foreground">
-            voltar ao início
-          </Link>
-        </motion.div>
-      </>
-    );
-  }
+  // Sem check-in NÃO bloqueia mais a tela: mostra aviso discreto e libera tudo
+  const needsCheckin = !daySession;
+  const checkinBanner = needsCheckin ? (
+    <div className="mx-auto max-w-md px-4 pt-3">
+      <Link href="/checkin?scan=1" className="flex items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning/[0.08] px-4 py-2.5">
+        <span className="flex items-center gap-2 text-[12px] font-bold text-warning">
+          <Lock className="h-4 w-4" /> Faça o check-in na portaria pra registrar presença
+        </span>
+        <ScanLine className="h-4 w-4 shrink-0 text-warning" />
+      </Link>
+    </div>
+  ) : null;
 
   // BARRA FIXA DE SESSÃO
-  const sessionBar = (
+  const sessionBar = daySession ? (
     <div className="sticky top-[56px] z-20 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
       <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-4 py-2">
         <div className="flex items-center gap-2.5">
@@ -366,7 +386,7 @@ export default function TreinoHomePage() {
         </button>
       </div>
     </div>
-  );
+  ) : null;
 
   // Treino em andamento (demo), substitui a navegação normal.
   if (phase === "active" && demo) {
@@ -406,6 +426,7 @@ export default function TreinoHomePage() {
       <>
         <TopBar title="Treino" subtitle="Encerrado" />
         <div className="space-y-6 p-4">
+        {checkinBanner}
           <div className="rounded-[20px] border border-success/35 bg-gradient-to-b from-success/15 to-card p-5 text-center">
             <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success/20">
               <CheckCircle2 className="h-7 w-7 text-success" />
@@ -596,8 +617,8 @@ export default function TreinoHomePage() {
                   }
                   className="gf-touch flex w-full items-center gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left transition-colors hover:border-brand/40"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-brand">
-                    {(() => { const I = iconForExercise(e.name); return <I className="h-5 w-5" />; })()}
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
+                    <FitnessIcon glyph={fitnessForName(e.name)} size={22} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold text-foreground">{e.name}</span>
@@ -689,12 +710,12 @@ export default function TreinoHomePage() {
                         {totalToday} {totalToday === 1 ? "exercício" : "exercícios"} | {totalSets(data.details)} séries
                       </p>
                       <p className="pm-num text-sm text-[#FF9A5C]">
-                        {todayLogs} de {totalToday} exercícios concluídos hoje
+                        {demo ? doneCount : Math.max(todayLogs, doneCount)} de {totalToday} exercícios concluídos hoje
                       </p>
                     </div>
                     {demo ? (
                       <button
-                        onClick={() => startWorkout(DEFAULT_DEMO_EX)}
+                        onClick={() => startWorkout(sessionFromDetails)}
                         className="gf-touch flex shrink-0 items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-bold text-brand-foreground shadow-lg shadow-brand/30"
                       >
                         <Play className="h-4 w-4" /> Iniciar
@@ -707,7 +728,7 @@ export default function TreinoHomePage() {
                     <motion.div
                       className="h-full rounded-full bg-[#FF7A2F]"
                       initial={false}
-                      animate={{ width: `${Math.min(100, (todayLogs / Math.max(totalToday, 1)) * 100)}%` }}
+                      animate={{ width: `${Math.min(100, ((demo ? doneCount : Math.max(todayLogs, doneCount)) / Math.max(totalToday, 1)) * 100)}%` }}
                       transition={{ duration: 0.4 }}
                     />
                   </div>
@@ -715,10 +736,19 @@ export default function TreinoHomePage() {
               </div>
 
               <div className="space-y-2">
-                {data.details.map((d) => (
+                {[...data.details]
+                  .sort((a, b) => Number(doneIds.has(a.exercise_id ?? a.id)) - Number(doneIds.has(b.exercise_id ?? b.id)))
+                  .map((d, idx) => {
+                  const exId = d.exercise_id ?? d.id;
+                  const completed = doneIds.has(exId);
+                  const activeIdx = data.details.findIndex((x) => !doneIds.has(x.exercise_id ?? x.id));
+                  return (
                   <ExerciseRow
                     key={d.id}
                     item={d}
+                    completed={completed}
+                    isActive={!completed && idx === activeIdx}
+                    onToggleComplete={() => toggleDone(exId)}
                     machineFor={machineByExercise.get(d.exercise?.name ?? "") ?? ""}
                     sessionStart={eqSessions[d.exercise_id ?? d.id] ?? null}
                     now={nowTick}
@@ -736,7 +766,7 @@ export default function TreinoHomePage() {
                         delete next[id];
                         return next;
                       });
-                      toast.success("Exercício finalizado. Bom trabalho! 💪");
+                      toast.success("Exercício finalizado. Bom trabalho!");
                     }}
                     onInfo={() =>
                       setDetailEx({
@@ -748,7 +778,8 @@ export default function TreinoHomePage() {
                       })
                     }
                   />
-                ))}
+                  );
+                  })}
               </div>
             </div>
           )}
@@ -824,6 +855,9 @@ function ExerciseRow({
   onStart,
   onFinish,
   onInfo,
+  completed,
+  isActive,
+  onToggleComplete,
 }: {
   item: TreinoDay;
   machineFor: string;
@@ -832,6 +866,9 @@ function ExerciseRow({
   onStart?: () => void;
   onFinish?: () => void;
   onInfo: () => void;
+  completed: boolean;
+  isActive: boolean;
+  onToggleComplete: () => void;
 }) {
   const elapsed = sessionStart && now ? Math.max(0, Math.floor((now - sessionStart) / 1000)) : 0;
   const demoModeHint = isDemoMode();
@@ -848,16 +885,52 @@ function ExerciseRow({
   const photo = ex?.photo_url ?? ex?.imageUrl ?? null;
   const video = ex?.video_url ?? ex?.videoUrl ?? null;
 
+  const glyph = fitnessForName(item.exercise?.name ?? "");
+
   return (
-    <div className="rounded-xl border border-border bg-card/40 p-4">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => !completed && onToggleComplete()}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && !completed) {
+          e.preventDefault();
+          onToggleComplete();
+        }
+      }}
+      aria-pressed={completed}
+      aria-label={`${completed ? "Desmarcar" : "Concluir"} ${item.exercise?.name ?? "exercício"}`}
+      className={cn(
+        "cursor-pointer rounded-xl border p-4 transition-all select-none",
+        completed
+          ? "border-success/60 bg-success/[0.08]"
+          : isActive
+            ? "border-[#F4711E] bg-[#F4711E]/[0.06] shadow-[0_0_15px_rgba(244,113,30,0.3)]"
+            : "border-border bg-card/40"
+      )}
+    >
       <div className="flex items-start gap-3">
         {photo ? (
-          <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-white/[0.06]">
+          <span className={cn("relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-white/[0.06]", completed && "opacity-50")}>
             <Image src={photo} alt="" fill sizes="56px" className="object-cover" />
           </span>
-        ) : null}
+        ) : (
+          <span
+            className={cn(
+              "flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border",
+              completed ? "border-success/40 bg-success/10" : isActive ? "border-[#F4711E]/40 bg-[#F4711E]/10" : "border-white/[0.06] bg-muted/40"
+            )}
+          >
+            <FitnessIcon glyph={glyph} size={28} variant={completed ? "success" : "brand"} />
+          </span>
+        )}
         <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="text-sm font-semibold text-foreground">{item.exercise?.name ?? "Exercício"}</p>
+          <p className={cn("flex items-center gap-1.5 text-sm font-semibold", completed ? "text-muted-foreground line-through" : "text-foreground")}>
+            {item.exercise?.name ?? "Exercício"}
+            {isActive && !completed ? (
+              <span className="rounded-full bg-[#F4711E]/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-[#F4711E]">agora</span>
+            ) : null}
+          </p>
           <p className="text-xs text-muted-foreground">
             {item.sets} × {item.reps} · descanso {item.rest_seconds}s
             {item.technique && item.technique !== "standard" ? ` · ${item.technique}` : ""}
@@ -877,20 +950,38 @@ function ExerciseRow({
           </div>
         </div>
         <button
-          onClick={onInfo}
+          onClick={(e) => { e.stopPropagation(); onInfo(); }}
           aria-label={`Ficha técnica de ${item.exercise?.name}`}
           title="Como fazer"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
+          className="gf-touch flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
         >
           <Info className="h-3.5 w-3.5" />
         </button>
         <button
-          onClick={() => openAiCoach(`Sobre o exercício ${item.exercise?.name ?? "desse"}: como executar com segurança e ajustar a carga?`)}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
+          onClick={(e) => {
+            e.stopPropagation();
+            openAiCoach(`Sobre o exercício ${item.exercise?.name ?? "desse"}: como executar com segurança e ajustar a carga?`);
+          }}
+          className="gf-touch flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
           aria-label={`Perguntar ao Personal Digital sobre ${item.exercise?.name}`}
           title="Perguntar ao Personal Digital"
         >
           <MessageCircle className="h-3.5 w-3.5" />
+        </button>
+        {/* toggle de conclusão: check verde quando feito */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleComplete(); }}
+          aria-label={completed ? `Desmarcar ${item.exercise?.name}` : `Concluir ${item.exercise?.name}`}
+          className={cn(
+            "gf-touch flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all",
+            completed
+              ? "border-success bg-success text-black shadow-[0_0_12px_rgba(34,197,94,0.4)]"
+              : isActive
+                ? "border-[#F4711E] text-[#F4711E]"
+                : "border-border text-muted-foreground"
+          )}
+        >
+          <CheckCircle2 className={cn("h-5 w-5", completed && "fill-current")} />
         </button>
       </div>
 
@@ -914,7 +1005,7 @@ function ExerciseRow({
             <span className="text-[11px] font-semibold text-success">em andamento</span>
           </div>
           <button
-            onClick={onFinish}
+            onClick={(e) => { e.stopPropagation(); onFinish?.(); }}
             className="gf-touch tactile rounded-full bg-success px-4 py-1.5 text-[11px] font-bold text-black transition-transform active:scale-95"
           >
             Finalizar
@@ -922,7 +1013,7 @@ function ExerciseRow({
         </div>
       ) : machineFor ? (
         <button
-          onClick={onStart}
+          onClick={(e) => { e.stopPropagation(); onStart?.(); }}
           className="tactile mt-2.5 flex w-full items-center justify-between rounded-xl border border-brand/30 bg-brand/[0.07] px-3 py-2.5 text-left transition-colors hover:border-brand/50"
         >
           <span className="flex items-center gap-1.5 text-[11px] font-medium text-brand">
@@ -977,7 +1068,7 @@ function HistoryList({ logs }: { logs: WorkoutLogs[] }) {
         sessions.length === 0 ? (
           <div className="animate-fade-in mt-2 rounded-xl border border-dashed border-border bg-card/30 px-4 py-6 text-center">
             <p className="text-[13px] font-semibold text-foreground">Seu histórico aparece aqui</p>
-            <p className="mt-1 text-[12px] text-muted-foreground">Termine o primeiro treino e este espaço começa a contar sua história. 💪</p>
+            <p className="mt-1 text-[12px] text-muted-foreground">Termine o primeiro treino e este espaço começa a contar sua história.</p>
           </div>
         ) : (
           <div className="animate-fade-in mt-2 space-y-1.5">

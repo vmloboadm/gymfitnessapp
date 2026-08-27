@@ -13,9 +13,9 @@ import {
 } from "lucide-react";
 
 /**
- * CustomIcon — ZERO emojis, ZERO ícones genéricos para músculos.
- * Lucide PREENCHIDO na cor da marca. Quando os bonecos 3D chegarem em
- * /public/assets/custom-icons/, este componente passa a servir as imagens.
+ * CustomIcon — ZERO emojis, ZERO assets externos.
+ * Estética Linear/Whoop: Lucide com stroke da marca e preenchimento
+ * translúcido sutil (efeito "glow tech"), nunca fill sólido/cartoon.
  */
 const MAP: Record<string, LucideIcon> = {
   peito: Dumbbell,
@@ -51,8 +51,8 @@ export function CustomIcon({
       className={className}
       width={size}
       height={size}
-      strokeWidth={1.5}
-      fill="currentColor"
+      strokeWidth={1.8}
+      fill="rgba(244, 113, 30, 0.2)"
       style={{ color: "#F4711E" }}
       aria-hidden
     />

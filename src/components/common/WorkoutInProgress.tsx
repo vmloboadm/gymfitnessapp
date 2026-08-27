@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, CheckCircle2, ChevronRight, Info, PlayCircle } from "lucide-react";
-import { iconForExercise, type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
+import { Check, CheckCircle2, ChevronRight, Info, PlayCircle, Timer } from "lucide-react";
+import { type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
+import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { ExerciseVideoModal } from "~/components/common/ExerciseVideoModal";
 import Image from "next/image";
@@ -12,7 +13,6 @@ import { cn } from "~/lib/utils";
 type WExercise = {
   id: string;
   name: string;
-  picto: string;
   sets: number;
   reps: string;
   rest: number;
@@ -40,6 +40,7 @@ export default function WorkoutInProgress({
   onFinish: () => void;
 }) {
   const [doneCount, setDoneCount] = useState(0);
+  const [restLeft, setRestLeft] = useState(0); // segundos de descanso
   const [detailEx, setDetailEx] = useState<ExerciseDetail | null>(null);
   const [videoEx, setVideoEx] = useState<{ name: string; poster?: string | null; url: string } | null>(null);
   const current = exercises[doneCount];
@@ -50,6 +51,13 @@ export default function WorkoutInProgress({
     if (!allDone) return;
     navigator.vibrate?.([60, 40, 60]);
   }, [allDone]);
+
+  // descanso automático após concluir um exercício
+  useEffect(() => {
+    if (restLeft <= 0) return;
+    const i = setInterval(() => setRestLeft((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(i);
+  }, [restLeft > 0]);
 
   // harden: lista vazia nunca quebra — oferece encerrar direto
   if (!exercises || exercises.length === 0) {
@@ -69,12 +77,16 @@ export default function WorkoutInProgress({
 
   const markCurrent = () => {
     navigator.vibrate?.(35);
+    const nextEx = exercises[doneCount + 1];
+    setRestLeft(nextEx?.rest ?? 60);
     setDoneCount((c) => Math.min(exercises.length, c + 1));
   };
 
+  const glyph = current?.name ? fitnessForName(current.name) : "weight-lifting-up";
+
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
-      {/* progresso simples */}
+      {/* progresso simples — fonte única do contador */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/90 p-4 backdrop-blur">
         <div className="mx-auto max-w-md">
           <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
@@ -91,7 +103,7 @@ export default function WorkoutInProgress({
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-md flex-1 space-y-5 p-4 pb-8">
+      <div className="mx-auto w-full max-w-md flex-1 space-y-3 p-4 pb-28">
         {/* CHECKLIST */}
         <div className="space-y-2">
           {exercises.map((e, i) => {
@@ -106,7 +118,11 @@ export default function WorkoutInProgress({
                 transition={{ delay: i * 0.05 }}
                 className={cn(
                   "flex items-center gap-3 rounded-xl border p-3 transition-colors",
-                  done ? "border-success/40 bg-success/[0.08]" : isNow ? "border-brand/50 bg-brand/[0.07]" : "border-border bg-card/40 opacity-70"
+                  done
+                    ? "border-success/40 bg-success/[0.08]"
+                    : isNow
+                      ? "border-[#F4711E] bg-[#F4711E]/[0.06] shadow-[0_0_15px_rgba(244,113,30,0.3)]"
+                      : "border-border bg-card/40 opacity-50"
                 )}
               >
                 <button
@@ -133,7 +149,7 @@ export default function WorkoutInProgress({
                     alt=""
                     fill
                     sizes="64px"
-                    className="object-cover"
+                    className={cn("object-cover", !isNow && "opacity-60")}
                   />
                   <span className="absolute inset-0 flex items-center justify-center bg-black/35">
                     <PlayCircle className="h-6 w-6 text-white drop-shadow" />
@@ -145,71 +161,43 @@ export default function WorkoutInProgress({
                   </p>
                   <p className="text-[11px] text-muted-foreground">
                     {e.sets} × {e.reps}
-                    {isNow ? <span className="ml-1.5 font-bold text-brand">· agora</span> : null}
+                    {isNow ? <span className="ml-1.5 font-bold text-[#F4711E]">· agora</span> : null}
                   </p>
                 </div>
                 {done ? (
                   <Check className="h-4 w-4 shrink-0 text-success" />
                 ) : isNow ? (
-                  <ChevronRight className="h-4 w-4 shrink-0 text-brand" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[#F4711E]" />
                 ) : null}
               </motion.div>
             );
           })}
         </div>
 
-        {/* AÇÃO ÚNICA contextual */}
+        {/* CARD DO EXERCÍCIO ATIVO — destaque glow tech */}
         {!allDone && current ? (
-          <>
-            <motion.div
-              key={current.id}
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="overflow-hidden rounded-[22px] border border-brand/40 bg-gradient-to-b from-brand/20 via-card to-card p-6 text-center"
-            >
-              <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-card/70 text-brand shadow-inner">
-                {(() => { const I = iconForExercise(current.name); return <I className="h-11 w-11" />; })()}
-              </span>
-              <h1 className="mt-3 text-xl font-black leading-tight text-foreground">{current.name}</h1>
-              <p className="mt-1 gf-card-text">{current.sets} × {current.reps} no seu ritmo</p>
-            </motion.div>
-
-            <button
-              onClick={markCurrent}
-              className="gf-touch flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-4 text-lg font-black text-brand-foreground shadow-lg shadow-brand/30 transition-transform active:scale-[0.98]"
-            >
-              <Check className="h-5 w-5" />
-              Concluído: {current.name.split(" ")[0]}
-            </button>
-          </>
-        ) : (
-          <>
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="rounded-[22px] border border-success/40 bg-gradient-to-b from-success/15 to-card p-6 text-center"
-            >
-              <CheckCircle2 className="mx-auto h-12 w-12 text-success" />
-              <h2 className="mt-2 text-lg font-black text-foreground">Todos os exercícios prontos!</h2>
-              <p className="mt-1 gf-card-text">Toque abaixo pra registrar esse treino.</p>
-            </motion.div>
-            <button
-              onClick={() => {
-                navigator.vibrate?.(60);
-                onFinish();
-              }}
-              className="gf-touch flex w-full items-center justify-center gap-2 rounded-2xl bg-success py-4 text-lg font-black text-black shadow-lg shadow-success/30 transition-transform active:scale-[0.98]"
-            >
-              Finalizar treino
-            </button>
-          </>
-        )}
-
-        {/* próximo */}
-        {!allDone && exercises[doneCount + 1] ? (
-          <p className="text-center text-xs text-muted-foreground">
-            Próximo: <span className="font-semibold text-foreground">{exercises[doneCount + 1].name}</span>
-          </p>
+          <motion.div
+            key={current.id}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="rounded-[22px] border border-[#F4711E] bg-gradient-to-b from-[#F4711E]/[0.10] via-card to-card p-5 text-center shadow-[0_0_15px_rgba(244,113,30,0.3)]"
+          >
+            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-card/70 shadow-inner">
+              <FitnessIcon glyph={glyph} size={36} />
+            </span>
+            <h1 className="mt-2.5 text-lg font-black leading-tight text-foreground">{current.name}</h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">{current.sets} × {current.reps} no seu ritmo</p>
+          </motion.div>
+        ) : allDone ? (
+          <motion.div
+            initial={{ scale: 0.96, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="rounded-[22px] border border-success/40 bg-gradient-to-b from-success/15 to-card p-5 text-center"
+          >
+            <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
+            <h2 className="mt-2 text-base font-black text-foreground">Todos os exercícios prontos!</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">Toque abaixo pra registrar esse treino.</p>
+          </motion.div>
         ) : null}
 
         <ExerciseVideoModal
@@ -237,6 +225,43 @@ export default function WorkoutInProgress({
             </>
           ) : null}
         </BottomSheet>
+      </div>
+
+      {/* FOOTER FIXO — ação única, slim, sempre acessível */}
+      <div className="sticky bottom-0 z-10 border-t border-border bg-background/95 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] backdrop-blur">
+        <div className="mx-auto max-w-md">
+          {allDone ? (
+            <button
+              onClick={() => {
+                navigator.vibrate?.(60);
+                onFinish();
+              }}
+              className="gf-touch flex w-full items-center justify-center gap-2 rounded-xl bg-success py-3.5 text-[15px] font-black text-black shadow-lg shadow-success/25 transition-transform active:scale-[0.98]"
+            >
+              <Check className="h-[18px] w-[18px]" />
+              Finalizar treino
+            </button>
+          ) : current ? (
+            restLeft > 0 ? (
+              <button
+                onClick={() => setRestLeft(0)}
+                className="gf-touch flex w-full items-center justify-center gap-2 rounded-xl border border-brand/50 bg-brand/10 py-3.5 text-[15px] font-black text-brand transition-transform active:scale-[0.98]"
+              >
+                <Timer className="h-[18px] w-[18px]" />
+                Descanso {Math.floor(restLeft / 60)}:{String(restLeft % 60).padStart(2, "0")}
+                <span className="text-[11px] font-semibold opacity-70">· pular</span>
+              </button>
+            ) : (
+              <button
+                onClick={markCurrent}
+                className="gf-touch flex w-full items-center justify-center gap-2 rounded-xl bg-[#F4711E] py-3.5 text-[15px] font-black text-black shadow-[0_0_20px_rgba(244,113,30,0.35)] transition-transform active:scale-[0.98]"
+              >
+                <Check className="h-[18px] w-[18px]" />
+                Concluído · {current.name.split(" ")[0]}
+              </button>
+            )
+          ) : null}
+        </div>
       </div>
     </div>
   );

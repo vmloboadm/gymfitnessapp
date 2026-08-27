@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Send, X, Sparkles } from "lucide-react";
+import { Dumbbell, Send, X, Sparkles } from "lucide-react";
 
 /**
  * Personal Digital, bolha de chat flutuante presente nas telas principais do
@@ -45,9 +45,7 @@ function answerFor(q: string): string {
   return concise("Boa pergunta! Sou seu coach de treino. Sobre isso: o ideal é respeitar a sua recuperação e manter consistência, aliás, esse ponto já é coberto pelo seu plano. Me conte mais do contexto (qual exercício, qual dor, qual intensidade) que eu trago uma resposta mais específica. E lembre: qualquer ponto de dúvida vale você anotar aqui que a gente conversa em tempo real.");
 }
 
-export function openAiCoach(query: string) {
-  document.dispatchEvent(new CustomEvent("gf-ask-ai", { detail: { query } }));
-}
+// openAiCoach mudou para ~/components/ai/coach-bus (evita puxar o chat no bundle)
 
 export default function AiCoach() {
   const [open, setOpen] = useState(false);
@@ -78,11 +76,10 @@ export default function AiCoach() {
       setInput("");
       setBubbles((prev) => [...prev, { id: idRef.current++, role: "user", text: query }]);
       setThinking(true);
-      const response = answerFor(query);
-      setTimeout(() => {
+      void askCoach(query).then((response) => {
         setThinking(false);
         setBubbles((prev) => [...prev, { id: idRef.current++, role: "ai", text: response, done: false }]);
-      }, 650);
+      });
     }
   }, [pending, open]);
 
@@ -90,16 +87,33 @@ export default function AiCoach() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [bubbles, thinking, open]);
 
+  /** Pergunta à IA real (/api/coach). Sem chave configurada ou se o provedor
+   *  falhar, cai no cérebro local — nunca fica sem responder. */
+  async function askCoach(q: string): Promise<string> {
+    try {
+      const res = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: q }),
+      });
+      const data = (await res.json()) as { ok?: boolean; reply?: string };
+      if (data.ok && data.reply) return data.reply;
+    } catch {
+      // offline → fallback
+    }
+    return concise(answerFor(q));
+  }
+
   const send = (text: string) => {
     const q = text.trim();
     if (!q || thinking) return;
     setInput("");
     setBubbles((prev) => [...prev, { id: idRef.current++, role: "user", text: q }]);
     setThinking(true);
-    setTimeout(() => {
+    void askCoach(q).then((reply) => {
       setThinking(false);
-      setBubbles((prev) => [...prev, { id: idRef.current++, role: "ai", text: concise(answerFor(q)), done: false }]);
-    }, 650);
+      setBubbles((prev) => [...prev, { id: idRef.current++, role: "ai", text: reply, done: false }]);
+    });
   };
 
   return (
@@ -110,7 +124,7 @@ export default function AiCoach() {
         whileTap={{ scale: 0.9 }}
         aria-label={open ? "Fechar Personal Digital" : "Abrir Personal Digital"}
       >
-        {open ? <X className="h-6 w-6" /> : <Bot className="h-6 w-6" />}
+        {open ? <X className="h-6 w-6" /> : <Dumbbell className="h-6 w-6" />}
         {!open && <span className="hero-live-dot absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-success" />}
       </motion.button>
 
@@ -129,7 +143,7 @@ export default function AiCoach() {
                   <Sparkles className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-foreground">Personal Digital</p>
+                  <p className="text-sm font-bold text-foreground">Personal GF</p>
                   <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
                     <span className="h-1.5 w-1.5 rounded-full bg-success" /> online · responde em tempo real
                   </p>
@@ -167,7 +181,7 @@ export default function AiCoach() {
                 ) : (
                   <div key={b.id} className="flex items-end gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
-                      <Bot className="h-3.5 w-3.5" />
+                      <Dumbbell className="h-3.5 w-3.5" />
                     </span>
                     <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[13px] leading-relaxed text-foreground">
                       <StreamingText text={b.text} />
@@ -179,7 +193,7 @@ export default function AiCoach() {
               {thinking && (
                 <div className="flex items-end gap-2">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
-                    <Bot className="h-3.5 w-3.5" />
+                    <Dumbbell className="h-3.5 w-3.5" />
                   </span>
                   <div className="flex items-center gap-1 rounded-2xl rounded-tl-sm border border-border bg-card/60 px-4 py-3">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand [animation-delay:0ms]" />
@@ -195,13 +209,13 @@ export default function AiCoach() {
                 e.preventDefault();
                 send(input);
               }}
-              className="flex items-center gap-2 border-t border-border bg-card/40 p-3"
+              className="flex items-center gap-2 border-t border-white/10 bg-[#0A0F1C] p-3"
             >
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Pergunte ao coach..."
-                className="flex-1 rounded-xl border border-border bg-card/60 px-3.5 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                className="flex-1 rounded-xl border border-white/10 bg-white/[0.05] px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-gray-400 focus:border-brand/60"
               />
               <button
                 type="submit"

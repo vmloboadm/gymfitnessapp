@@ -235,7 +235,7 @@ export default function BodyMap({
       </div>
 
       {!anyState && !activeGroup ? (
-        <p className="mt-1 text-center text-[10px] text-muted-foreground">Treine para começar a pintar seu mapa 🎨</p>
+        <p className="mt-1 text-center text-[10px] text-muted-foreground">Treine para começar a pintar seu mapa</p>
       ) : null}
     </div>
   );

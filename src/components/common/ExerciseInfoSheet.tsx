@@ -2,32 +2,16 @@
 
 import Image from "next/image";
 import { Play } from "lucide-react";
-import {
-  Activity,
-  BicepsFlexed,
-  Dumbbell,
-  Flame,
-  Footprints,
-  HeartPulse,
-  Mountain,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { curatedSearch, findInDatabase } from "~/lib/exercises-database";
+import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 
-/** Ícone do grupo pelo nome do exercício (sem emoji, identidade Lucide). */
-export function iconForExercise(name: string): LucideIcon {
-  const n = name.toLowerCase();
-  if (/esteira|bike|corrida|cardio|remo/.test(n)) return HeartPulse;
-  if (/rosca|bíceps|biceps/.test(n)) return BicepsFlexed;
-  if (/tríceps|triceps|corda|francês/.test(n)) return Zap;
-  if (/agachamento|leg press|extensora|flexora|perna|afundo/.test(n)) return Footprints;
-  if (/remada|puxada|barra fixa|pulldown|dorsal/.test(n)) return Mountain;
-  if (/desenvolvimento|elevação|elevacao|ombro/.test(n)) return Zap;
-  if (/supino|crucifixo|peck|voador|peito/.test(n)) return Dumbbell;
-  if (/prancha|abdom|core/.test(n)) return Flame;
-  return Activity;
+/**
+ * Retorna o glifo (nome do SVG) para o exercício.
+ * Usa FitnessIcon internamente para renderização.
+ */
+export function iconForExercise(name: string): string {
+  return fitnessForName(name);
 }
 
 export type ExerciseDetail = {
@@ -49,7 +33,7 @@ export function ExerciseInfoSheet({
   ex: ExerciseDetail | null;
   onClose: () => void;
 }) {
-  const Icon = ex ? iconForExercise(ex.name) : Dumbbell;
+  const glyph = ex ? fitnessForName(ex.name) : "weight-lifting-up";
   // YouTube CURADO: banco próprio primeiro, busca Jeff Nippard como garantia
   const ytUrl = ex ? (ex.videoUrl ?? findInDatabase(ex.name)?.youtubeUrl ?? curatedSearch(ex.name)) : curatedSearch('');
   const steps = ex
@@ -66,7 +50,7 @@ export function ExerciseInfoSheet({
         <>
           <div className="mb-3 flex items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/12 text-brand">
-              <Icon className="h-5 w-5" />
+              <FitnessIcon glyph={glyph} size={22} />
             </span>
             <h3 className="min-w-0 text-base font-black leading-tight text-foreground">{ex.name}</h3>
           </div>

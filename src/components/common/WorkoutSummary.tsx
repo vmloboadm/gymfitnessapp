@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Camera, CheckCircle2, Copy, MessageCircle, Timer, Dumbbell } from "lucide-react";
+import { Camera, CheckCircle2, Copy, MessageCircle, Timer, Dumbbell , Trophy} from "lucide-react";
 import { TopBar } from "~/components/layout/TopBar";
 import { formatMMSS } from "~/lib/workout-session";
 import { nextToUnlock, unlockAchievement, type StudentAchievement } from "~/lib/achievements";
@@ -40,7 +40,7 @@ export default function WorkoutSummary({
     }
   }, [achievement]);
 
-  const shareText = `Acabei de esmagar meu treino na GymFitness! 💪🔥 ${formatMMSS(seconds)} de treino · ${done}/${total} exercícios`;
+  const shareText = `Acabei de esmagar meu treino na GymFitness! ${formatMMSS(seconds)} de treino · ${done}/${total} exercícios`;
 
   const shareInstagram = async () => {
     try {
@@ -50,7 +50,7 @@ export default function WorkoutSummary({
         return;
       }
       await navigator.clipboard.writeText(`${shareText} #GymFitness`);
-      toast.success("Texto copiado! Cole no seu Instagram 📸");
+      toast.success("Texto copiado! Cole no seu Instagram");
     } catch (err: any) {
       // usuário cancelou o share nativo: silencioso. Falha real de cópia: avisa.
       if (err?.name !== "AbortError") {
@@ -124,7 +124,7 @@ export default function WorkoutSummary({
               animate={{ rotate: [0, -8, 8, 0], scale: [1, 1.08, 1] }}
               transition={{ duration: 1.2, delay: 0.35 }}
             >
-              <span className="text-4xl" aria-hidden>🏆</span>
+              <Trophy className="mx-auto h-10 w-10 text-[#FBBF24]" strokeWidth={1.8} fill="rgba(251, 191, 36, 0.2)" aria-hidden />
             </motion.span>
             <h2 className="relative mt-3 font-display text-xl font-black text-foreground">{achievement.name}</h2>
             <p className="relative mt-1 gf-card-text">{achievement.description}</p>
