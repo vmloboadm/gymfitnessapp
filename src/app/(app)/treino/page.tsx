@@ -52,7 +52,9 @@ const DEMO_EX_GROUP_REAL: Record<string, string> = {
 };
 import { getTodayWorkout } from "~/lib/today-workout";
 import { cap, formatDate } from "~/lib/utils/format";
-import { isDemoMode, demoTreinoData, demoLib } from "~/lib/demo-bridge";
+import { isDemoMode, demoTreinoData, demoLib, demoPersonais } from "~/lib/demo-bridge";
+import { BottomSheet } from "~/components/ui/bottom-sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import type { DemoExercise } from "~/lib/demo-data";
 import type {
   Exercises,
@@ -152,6 +154,7 @@ export default function TreinoHomePage() {
     return foco && foco in BODY_CATS ? foco : null;
   });
   const [session, setSession] = useState<typeof DEFAULT_DEMO_EX | null>(null);
+  const [planSheet, setPlanSheet] = useState<string | null>(null);
 
   const { data, loading, error, refetch } = useAsyncQuery<TreinoData>(
     async (): Promise<FetchResult<TreinoData>> => {
@@ -803,7 +806,14 @@ export default function TreinoHomePage() {
                 ghost: ["Rosca Direta", "Tríceps Corda", "Crucifixo Máquina", "Cadeira Extensora"],
               },
             ].map((p) => (
-              <div key={p.name} className="relative overflow-hidden rounded-[16px] border border-border bg-card/40 p-3.5">
+              <button
+                key={p.name}
+                onClick={() => {
+                  navigator.vibrate?.(15);
+                  setPlanSheet(p.name);
+                }}
+                className="tactile relative overflow-hidden rounded-[16px] border border-border bg-card/40 p-3.5 text-left transition-colors hover:border-brand/30 hover:bg-card/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
                     <Lock className="h-3.5 w-3.5 text-brand" />
@@ -826,11 +836,50 @@ export default function TreinoHomePage() {
                 <p className="mt-2.5 flex items-center gap-1 rounded-lg bg-brand/10 py-1.5 text-center justify-center text-[10px] font-semibold text-brand">
                   <Lock className="h-2.5 w-2.5" /> Solicite ao seu Personal
                 </p>
-              </div>
+              </button>
             ))}
           </div>
           </div>
         </details>
+
+        {/* Sheet: plano bloqueado → personais + WhatsApp */}
+        <BottomSheet open={!!planSheet} onClose={() => setPlanSheet(null)}>
+          {planSheet ? (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-black text-foreground">{planSheet}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Plano bloqueado — fale com um personal da casa no WhatsApp com mensagem pronta.</p>
+              </div>
+              {demoPersonais().slice(0, 3).map((p, i) => {
+                const msg = encodeURIComponent(`Olá ${p.trainer.name.split(" ")[0]}! Gostaria de solicitar acompanhamento no treino ${planSheet} — GymFitness.`);
+                const phone = `552299999000${i + 1}`;
+                return (
+                  <div key={p.id} className="flex items-center gap-3 rounded-xl border border-border bg-card/40 p-3">
+                    <Avatar className="h-12 w-12 border border-brand/20">
+                      <AvatarImage src={`https://i.pravatar.cc/160?img=${12 + i * 11}`} alt={p.trainer.name} />
+                      <AvatarFallback>{p.trainer.name[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-foreground">{p.trainer.name}</p>
+                      <p className="text-xs text-muted-foreground">Personal · responde rápido</p>
+                    </div>
+                    <a
+                      href={`https://wa.me/${phone}?text=${msg}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setPlanSheet(null)}
+                      className="tactile inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-[#25D366] px-4 text-sm font-bold text-white shadow-md hover:bg-[#1DA851] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      WhatsApp
+                    </a>
+                  </div>
+                );
+              })}
+              <p className="text-center text-xs text-muted-foreground">Mensagem já vem preenchida — é só enviar.</p>
+            </div>
+          ) : null}
+        </BottomSheet>
 
         {/* 5. HISTÓRICO RECENTE, accordion fechado por padrão */}
         <HistoryList logs={data.logs} />

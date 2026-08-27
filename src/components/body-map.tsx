@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { RotateCw } from "lucide-react";
 import Model, { type Muscle } from "react-body-highlighter";
 import { cn } from "~/lib/utils";
 import { recoveryState } from "~/lib/today-workout";
@@ -174,28 +175,46 @@ export default function BodyMap({
           />
         ) : null}
 
-        <motion.div
-          initial={{ opacity: 0, y: 10, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
-          className="relative z-[1]"
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={side}
+            initial={{ opacity: 0, rotateY: isBack ? -15 : 15, scale: 0.98 }}
+            animate={{ opacity: 1, rotateY: 0, scale: 1 }}
+            exit={{ opacity: 0, rotateY: isBack ? 15 : -15, scale: 0.98 }}
+            transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }}
+            className="relative z-[1]"
+            style={{ perspective: 800 }}
+          >
+            <Model
+              type={isBack ? "posterior" : "anterior"}
+              bodyColor="#1B3A66"
+              highlightedColors={HIGHLIGHTS}
+              data={data}
+              onClick={(stats) => {
+                const group = groups.find((g) => g.muscles.includes(stats.muscle as Muscle));
+                if (group) {
+                  navigator.vibrate?.(15);
+                  onSelect(group.catId);
+                }
+              }}
+              svgStyle={{ filter: activeGroup ? "drop-shadow(0 6px 18px rgba(244,113,30,0.25)) drop-shadow(0 2px 6px rgba(0,0,0,0.5))" : "drop-shadow(0 4px 14px rgba(0,0,0,0.45))" }}
+              style={{ width: "100%", cursor: "pointer" }}
+            />
+          </motion.div>
+        </AnimatePresence>
+
+        {/* botão girar sobre a ilustração — pedido confirmado */}
+        <button
+          onClick={() => {
+            navigator.vibrate?.(15);
+            setSide((s) => (s === "front" ? "back" : "front"));
+          }}
+          aria-label={`Ver ${isBack ? "frente" : "costas"}`}
+          className="tactile absolute bottom-1 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/10 bg-[#0B1A33]/90 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg backdrop-blur hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
-          <Model
-            type={isBack ? "posterior" : "anterior"}
-            bodyColor="#1B3A66"
-            highlightedColors={HIGHLIGHTS}
-            data={data}
-            onClick={(stats) => {
-              const group = groups.find((g) => g.muscles.includes(stats.muscle as Muscle));
-              if (group) {
-                navigator.vibrate?.(15);
-                onSelect(group.catId);
-              }
-            }}
-            svgStyle={{ filter: activeGroup ? "drop-shadow(0 6px 18px rgba(244,113,30,0.25)) drop-shadow(0 2px 6px rgba(0,0,0,0.5))" : "drop-shadow(0 4px 14px rgba(0,0,0,0.45))" }}
-            style={{ width: "100%", cursor: "pointer" }}
-          />
-        </motion.div>
+          <RotateCw className="h-3.5 w-3.5" />
+          Girar
+        </button>
       </div>
 
       {/* legenda de estado */}
