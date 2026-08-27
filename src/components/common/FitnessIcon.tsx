@@ -102,7 +102,7 @@ export function fitnessForName(
 
 export { GROUP_MAP as FITNESS_GROUP_MAP };
 
-/** SVG local tingido de laranja da marca (#F4711E) ou verde de sucesso. */
+/** SVG local já com fill #F4711E (sem fundo preto). Brilha no dark. */
 export function FitnessIcon({
   glyph,
   size = 24,
@@ -114,10 +114,11 @@ export function FitnessIcon({
   className?: string;
   variant?: "brand" | "success";
 }) {
-  const filter =
+  // SVGs já são laranja; success vira verde via hue-rotate
+  const style: React.CSSProperties =
     variant === "success"
-      ? "invert(68%) sepia(42%) saturate(1800%) hue-rotate(90deg) brightness(95%)"
-      : "invert(58%) sepia(85%) saturate(2200%) hue-rotate(347deg) brightness(102%)";
+      ? { filter: "hue-rotate(85deg) saturate(1.4) brightness(1.05)", opacity: 0.98 }
+      : { opacity: 0.98, filter: "drop-shadow(0 0 6px rgba(244,113,30,0.25))" };
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -127,10 +128,7 @@ export function FitnessIcon({
       height={size}
       aria-hidden
       className={cn("shrink-0", className)}
-      style={{
-        filter,
-        opacity: 0.95,
-      }}
+      style={style}
     />
   );
 }

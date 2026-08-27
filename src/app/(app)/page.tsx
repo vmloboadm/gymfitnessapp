@@ -199,15 +199,8 @@ export default function HomePage() {
   const isCheckedInToday = !!session;
   const startedAt = session?.startedAt ?? null;
 
-  const heroRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (isCheckedInToday && heroRef.current) {
-      const t = setTimeout(() => heroRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 350);
-      return () => clearTimeout(t);
-    }
-    // isCheckedInToday é derivado de `session`: intencional não listar.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  // auto-scroll removido: não redireciona mais para o treino no load
+  // usuário permanece no topo; treino em destaque fica visível sem puxar a tela
 
   useEffect(() => {
     if (loading) return;
@@ -408,17 +401,15 @@ export default function HomePage() {
                   endSession();
                   toast.success("Treino finalizado. Descanse bem!");
                 }}
-                className="gf-touch tactile shrink-0 rounded-full bg-success px-4 py-2 text-[12px] font-black text-black transition-transform active:scale-95"
+                className="gf-touch tactile inline-flex min-h-[36px] shrink-0 items-center justify-center rounded-full bg-[#33D17A] px-5 py-2 text-[12px] font-black tracking-wide text-[#04150c] shadow-[0_4px_12px_rgba(51,209,122,0.3)] ring-1 ring-white/10 transition-all hover:bg-[#3DE68A] hover:shadow-[0_6px_16px_rgba(51,209,122,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-95"
               >
                 Finalizar treino
               </button>
             </div>
           ) : (
-          <Link href="/checkin" className="tactile block rounded-2xl bg-[#F4711E] px-5 py-4 text-center shadow-[0_0_20px_rgba(244,113,30,0.4)]" style={{ willChange: "transform" }}>
-            <motion.span whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex items-center justify-center gap-2.5 text-[15px] font-black text-black">
-              <ScanLine className="h-5 w-5" />
+          <Link href="/checkin" className="tactile flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-[#F4711E] px-6 py-4 text-[16px] font-black tracking-tight text-[#1a0d04] shadow-[0_8px_24px_rgba(244,113,30,0.35)] ring-1 ring-white/10 transition-all hover:bg-[#FF7A2F] hover:shadow-[0_12px_32px_rgba(244,113,30,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#050507] active:scale-[0.98]">
+              <ScanLine className="h-5 w-5 shrink-0" aria-hidden />
               Cheguei na academia, fazer check-in
-            </motion.span>
           </Link>
           )}
         </motion.div>
@@ -526,8 +517,8 @@ export default function HomePage() {
           </div>
         </motion.section>
 
-        {/* TREINO DE HOJE, ação principal; recebe o scroll quando check-in feito */}
-        <motion.div variants={item} ref={heroRef}>
+        {/* TREINO DE HOJE, ação principal */}
+        <motion.div variants={item}>
           <HeroWorkout
             image={FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? "/workout/workout-hero.jpg"}
             title={todayLabel}
@@ -550,10 +541,10 @@ export default function HomePage() {
               setShowMore((v) => !v);
             }}
             aria-expanded={showMore}
-            className="tactile flex w-full items-center justify-center gap-2 rounded-[16px] border border-white/[0.06] bg-white/[0.02] py-3.5 text-[13px] font-semibold text-[#B8C4D8] transition-colors hover:border-[#FF9A5C]/30 hover:text-[#F4F6FB]"
+            className="tactile flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[16px] border border-white/[0.08] bg-white/[0.04] py-3.5 text-[13px] font-semibold text-[#C8D4EA] shadow-sm transition-all hover:border-[#FF7A2F]/40 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F4711E]/50 active:scale-[0.98]"
           >
             {showMore ? "Ver menos" : "Ver mais"}
-            <ChevronDown className={cn("h-4 w-4 text-[#FF9A5C] transition-transform duration-200", showMore && "rotate-180")} />
+            <ChevronDown className={cn("h-4 w-4 text-[#FF9A5C] transition-transform duration-200", showMore && "rotate-180")} aria-hidden />
           </button>
         </motion.div>
 

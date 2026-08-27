@@ -219,16 +219,7 @@ export default function TreinoHomePage() {
   const router = useRouter();
   const { session: daySession, end: endDaySession } = useWorkoutSession();
 
-  const programRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (loading) return;
-    if (typeof window === "undefined") return;
-    const ir = new URLSearchParams(window.location.search).get("ir");
-    if (ir === "hoje" && programRef.current) {
-      const to = setTimeout(() => programRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
-      return () => clearTimeout(to);
-    }
-  }, [loading]);
+  // auto-scroll removido: permanece no topo, usuário decide navegar
 
   const todayKey = new Date().toISOString().slice(0, 10);
   // MESMA FONTE da home, nunca diverge
@@ -617,8 +608,8 @@ export default function TreinoHomePage() {
                   }
                   className="gf-touch flex w-full items-center gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left transition-colors hover:border-brand/40"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-                    <FitnessIcon glyph={fitnessForName(e.name)} size={22} />
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-[#0B1A33] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                    <FitnessIcon glyph={fitnessForName(e.name)} size={24} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold text-foreground">{e.name}</span>
