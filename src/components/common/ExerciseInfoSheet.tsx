@@ -33,7 +33,7 @@ export function ExerciseInfoSheet({
   ex: ExerciseDetail | null;
   onClose: () => void;
 }) {
-  const glyph = ex ? fitnessForName(ex.name) : "weight-lifting-up";
+  const glyph = ex ? fitnessForName(ex.name) : "dumbbell";
   // YouTube CURADO: banco próprio primeiro, busca Jeff Nippard como garantia
   const ytUrl = ex ? (ex.videoUrl ?? findInDatabase(ex.name)?.youtubeUrl ?? curatedSearch(ex.name)) : curatedSearch('');
   const steps = ex

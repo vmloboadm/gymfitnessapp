@@ -1,38 +1,42 @@
 "use client";
 
 import {
-  Activity,
-  BicepsFlexed,
-  Dumbbell,
-  Flame,
-  Footprints,
-  HeartPulse,
-  Mountain,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
+  AbsIcon,
+  BackIcon,
+  BicepsIcon,
+  CalvesIcon,
+  CardioIcon,
+  ChestIcon,
+  DumbbellIcon,
+  ForearmIcon,
+  GlutesIcon,
+  HamstringsIcon,
+  LegsIcon,
+  ShoulderIcon,
+  TricepsIcon,
+} from "./MuscleIcons";
 
 /**
- * CustomIcon — ZERO emojis, ZERO assets externos.
- * Estética Linear/Whoop: Lucide com stroke da marca e preenchimento
- * translúcido sutil (efeito "glow tech"), nunca fill sólido/cartoon.
+ * CustomIcon — ícones anatômicos por grupo muscular.
+ * Mesma API anterior, mas agora com SVGs coerentes em vez de Lucide genérico.
  */
-const MAP: Record<string, LucideIcon> = {
-  peito: Dumbbell,
-  costas: Mountain,
-  ombro: Zap,
-  braco: BicepsFlexed,
-  biceps: BicepsFlexed,
-  triceps: Zap,
-  antebraco: Activity,
-  abdomen: Flame,
-  core: Flame,
-  perna: Footprints,
-  quadriceps: Footprints,
-  posterior: Footprints,
-  gluteo: Activity,
-  panturrilha: Footprints,
-  cardio: HeartPulse,
+
+const MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  peito: ChestIcon,
+  costas: BackIcon,
+  ombro: ShoulderIcon,
+  braco: BicepsIcon,
+  biceps: BicepsIcon,
+  triceps: TricepsIcon,
+  antebraco: ForearmIcon,
+  abdomen: AbsIcon,
+  core: AbsIcon,
+  perna: LegsIcon,
+  quadriceps: LegsIcon,
+  posterior: HamstringsIcon,
+  gluteo: GlutesIcon,
+  panturrilha: CalvesIcon,
+  cardio: CardioIcon,
 };
 
 export function CustomIcon({
@@ -45,16 +49,11 @@ export function CustomIcon({
   className?: string;
 }) {
   const key = name.toLowerCase();
-  const Icon = MAP[key] ?? Dumbbell;
+  const Icon = MAP[key] ?? DumbbellIcon;
   return (
     <Icon
+      size={size}
       className={className}
-      width={size}
-      height={size}
-      strokeWidth={1.8}
-      fill="rgba(244, 113, 30, 0.2)"
-      style={{ color: "#F4711E" }}
-      aria-hidden
     />
   );
 }

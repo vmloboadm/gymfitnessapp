@@ -1,207 +1,212 @@
 "use client";
 
-import {
-  Activity,
-  Apple,
-  Award,
-  Backpack,
-  Beaker,
-  Bike,
-  BicepsFlexed,
-  Calendar,
-  ClipboardCheck,
-  Clock,
-  Coins,
-  Crown,
-  Dumbbell,
-  Flame,
-  Footprints,
-  Gem,
-  Hand,
-  HeartPulse,
-  Medal,
-  Moon,
-  MoveVertical,
-  Package,
-  PersonStanding,
-  Pill,
-  Ruler,
-  Scale,
-  StretchHorizontal,
-  Timer,
-  TrendingUp,
-  Trophy,
-  Utensils,
-  Zap,
-  ArrowUpFromLine,
-  Hammer,
-  Target,
-  Crosshair,
-  Shield,
-  type LucideIcon,
-} from "lucide-react";
 import { cn } from "~/lib/utils";
+import {
+  AbsIcon,
+  BackIcon,
+  BarbellIcon,
+  BicepsIcon,
+  CableIcon,
+  CalvesIcon,
+  CardioIcon,
+  ChecklistIcon,
+  ChestIcon,
+  DumbbellIcon,
+  FlameIcon,
+  ForearmIcon,
+  GlutesIcon,
+  HamstringsIcon,
+  LegsIcon,
+  PullupIcon,
+  RunIcon,
+  ShoulderIcon,
+  TricepsIcon,
+  TrophyIcon,
+  ScaleIcon,
+  CalendarIcon,
+} from "./MuscleIcons";
 
 /**
- * FitnessIcon — coerência máxima: 1 ícone único por exercício, sem repetição na mesma lista,
- * semanticamente ligado ao movimento (não decorativo). Toda a app usa lucide outline 1.9 #F4711E.
- * Cada glyph tem ícone distinto — prova visível na lista de treino.
+ * FitnessIcon — ícones anatômicos e de movimento, coerentes com o exercício.
+ * Cada glifo representa o grupo muscular ou o padrão de movimento, não um emoji genérico.
  */
 
 export type FitnessGlyph =
-  | "weight-lifting-up" | "weight-lifting-down" | "weight" | "weight-scale"
-  | "biceps" | "chest" | "forearm" | "female-legs" | "muscle-up"
-  | "muscular-torso"
-  | "gym-bag" | "gloves" | "headband-knot" | "body-balance"
-  | "run" | "running-shoe" | "cycling" | "heart-beats" | "high-kick"
-  | "high-punch" | "boxing-ring" | "punching-bag"
-  | "laurels-trophy" | "diamond-trophy" | "medallist" | "ribbon-medal"
-  | "podium-winner" | "jewel-crown"
-  | "flame" | "lightning-flame" | "health-potion" | "magic-potion" | "health-capsule"
-  | "growth" | "measure-tape" | "kitchen-scale" | "calendar" | "checklist"
-  | "alarm-clock" | "night-sleep" | "apple-core" | "banana" | "chicken-oven"
-  | "pineapple" | "opened-food-can" | "converse-shoe" | "coins-pile";
+  | "chest" | "chest-incline" | "chest-decline" | "chest-fly"
+  | "back" | "back-lat" | "back-row" | "pullup"
+  | "shoulder" | "shoulder-press" | "shoulder-lateral"
+  | "biceps" | "biceps-curl" | "hammer-curl"
+  | "triceps" | "triceps-pushdown" | "triceps-extension"
+  | "forearm" | "forearm-wrist"
+  | "legs" | "legs-squat" | "legs-press" | "legs-extension"
+  | "hamstrings" | "hamstrings-curl" | "stiff"
+  | "glutes" | "glutes-hip" | "glutes-abductor"
+  | "calves" | "calves-standing" | "calves-seated"
+  | "abs" | "abs-crunch" | "abs-plank"
+  | "cardio" | "run" | "bike" | "rower"
+  | "dumbbell" | "barbell" | "cable"
+  | "flame" | "trophy" | "scale" | "calendar" | "checklist";
 
-/** Cada glyph agora tem ícone ÚNICO — sem repetição. */
-const GLYPH_MAP: Record<FitnessGlyph, LucideIcon> = {
-  "weight-lifting-up": Dumbbell,        // Supino — press horizontal
-  "weight-lifting-down": Hammer,        // Supino declinado — variação
-  weight: Backpack,                     // Rosca — carga
-  "weight-scale": Scale,                // Balança
-  biceps: BicepsFlexed,                 // Biceps isolado
-  chest: Shield,                        // Peito
-  forearm: Hand,                        // Antebraço
-  "female-legs": PersonStanding,        // Agachamento
-  "muscle-up": ArrowUpFromLine,         // Puxada
-  "muscular-torso": StretchHorizontal,  // Crucifixo
-  "gym-bag": Backpack,                  // Bolsa (reuso ok, mas distinto de weight)
-  gloves: Crosshair,                    // Luvas — mira (distinto de Hand)
-  "headband-knot": Timer,              // Faixa
-  "body-balance": Target,               // Equilíbrio
-  run: Activity,                        // Corrida
-  "running-shoe": Footprints,           // Tênis
-  cycling: Bike,                        // Bike
-  "heart-beats": HeartPulse,            // Cardio
-  "high-kick": MoveVertical,            // Chute
-  "high-punch": Hammer,                 // Soco — martelo (distinto)
-  "boxing-ring": Shield,                // Ringue — escudo (distinto de Trophy)
-  "punching-bag": Package,              // Saco
-  "laurels-trophy": Trophy,             // Troféu louros
-  "diamond-trophy": Gem,                // Diamante
-  medallist: Award,                     // Medalha
-  "ribbon-medal": Medal,                // Fita — mesmo mas ok (só uso em ranking)
-  "podium-winner": Crown,               // Pódio
-  "jewel-crown": Crown,                 // Coroa — mesmo família mas distinto contexto
-  flame: Flame,                         // Chama
-  "lightning-flame": Zap,               // Raio
-  "health-potion": Pill,                // Potion
-  "magic-potion": Beaker,               // Poção — frasco (distinto)
-  "health-capsule": Pill,               // Cápsula — mesmo mas raro
-  growth: TrendingUp,                   // Crescimento
-  "measure-tape": Ruler,                // Fita
-  "kitchen-scale": Scale,               // Balança cozinha — mesmo que weight-scale mas ok (contexto nutri)
-  calendar: Calendar,                   // Calendário
-  checklist: ClipboardCheck,            // Checklist
-  "alarm-clock": Clock,                 // Relógio
-  "night-sleep": Moon,                  // Sono
-  "apple-core": Apple,                  // Maçã
-  banana: Apple,                        // Banana — mesmo (fruta)
-  "chicken-oven": Utensils,             // Frango
-  pineapple: Apple,                     // Abacaxi — mesmo fruta mas raro
-  "opened-food-can": Package,           // Lata
-  "converse-shoe": Footprints,          // Tênis casual — mesmo que running-shoe mas contexto lifestyle
-  "coins-pile": Coins,                  // Moedas
+const GLYPH_MAP: Record<FitnessGlyph, React.ComponentType<{ size?: number; className?: string }>> = {
+  chest: ChestIcon,
+  "chest-incline": ChestIcon,
+  "chest-decline": ChestIcon,
+  "chest-fly": ChestIcon,
+  back: BackIcon,
+  "back-lat": BackIcon,
+  "back-row": BackIcon,
+  pullup: PullupIcon,
+  shoulder: ShoulderIcon,
+  "shoulder-press": ShoulderIcon,
+  "shoulder-lateral": ShoulderIcon,
+  biceps: BicepsIcon,
+  "biceps-curl": BicepsIcon,
+  "hammer-curl": BicepsIcon,
+  triceps: TricepsIcon,
+  "triceps-pushdown": TricepsIcon,
+  "triceps-extension": TricepsIcon,
+  forearm: ForearmIcon,
+  "forearm-wrist": ForearmIcon,
+  legs: LegsIcon,
+  "legs-squat": LegsIcon,
+  "legs-press": LegsIcon,
+  "legs-extension": LegsIcon,
+  hamstrings: HamstringsIcon,
+  "hamstrings-curl": HamstringsIcon,
+  stiff: HamstringsIcon,
+  glutes: GlutesIcon,
+  "glutes-hip": GlutesIcon,
+  "glutes-abductor": GlutesIcon,
+  calves: CalvesIcon,
+  "calves-standing": CalvesIcon,
+  "calves-seated": CalvesIcon,
+  abs: AbsIcon,
+  "abs-crunch": AbsIcon,
+  "abs-plank": AbsIcon,
+  cardio: CardioIcon,
+  run: RunIcon,
+  bike: RunIcon,
+  rower: PullupIcon,
+  dumbbell: DumbbellIcon,
+  barbell: BarbellIcon,
+  cable: CableIcon,
+  flame: FlameIcon,
+  trophy: TrophyIcon,
+  scale: ScaleIcon,
+  calendar: CalendarIcon,
+  checklist: ChecklistIcon,
 };
 
-// Ajuste fino: garantir que glyphs que antes colidiam agora sejam únicos
-// Sobrescreve duplicatas com variantes distintas
-const DISTINCT_MAP: Record<string, LucideIcon> = {
-  "weight-lifting-down": Hammer,
-  chest: Shield,
-  "muscular-torso": StretchHorizontal,
-  "female-legs": PersonStanding,
-  "muscle-up": ArrowUpFromLine,
-  "body-balance": Target,
-  run: Activity,
-  "high-kick": MoveVertical,
-  "high-punch": Crosshair,
-  gloves: Hand,
-  "running-shoe": Footprints,
-};
-
-// Aplica distinção
-for (const [k, v] of Object.entries(DISTINCT_MAP)) {
-  (GLYPH_MAP as Record<string, LucideIcon>)[k] = v;
-}
-
-/** Exercício → glifo ÚNICO — lista completa sem fallback genérico */
 const EXERCISE_MAP: Record<string, FitnessGlyph> = {
-  "supino reto": "weight-lifting-up",          // Dumbbell
-  "supino inclinado": "weight-lifting-down",  // Hammer
-  "supino declinado": "chest",                 // Shield
-  "crucifixo com halteres": "muscular-torso", // StretchHorizontal
-  "crucifixo maquina": "chest",                // Shield (variante)
-  "voador": "muscular-torso",                  // StretchHorizontal
-  "peck deck": "chest",                        // Shield
-  "desenvolvimento militar": "biceps",         // BicepsFlexed
-  "desenvolvimento": "high-punch",             // Crosshair (distinto)
-  "elevacao lateral": "forearm",               // Hand
-  "elevacao frontal": "high-kick",             // MoveVertical
-  "rosca direta": "weight",                    // Backpack
-  "rosca martelo": "weight-scale",             // Scale
-  "triceps corda": "gloves",                   // Crosshair (mas distinto de high-punch)
-  "triceps testa": "gym-bag",                  // Backpack variante
-  "agachamento livre": "female-legs",          // PersonStanding
-  "agachamento smith": "body-balance",         // Target
-  "leg press": "weight-scale",                 // Scale
-  "leg press 45": "body-balance",              // Target
-  "cadeira extensora": "running-shoe",         // Footprints (extensão)
-  "cadeira flexora": "headband-knot",          // Timer (flexão)
-  "mesa flexora": "headband-knot",             // Timer
-  "panturrilha em pe": "converse-shoe",        // Footprints casual
-  "panturrilha sentado": "running-shoe",       // Footprints
-  "prancha abdominal": "measure-tape",         // Ruler
-  "abdominal maquina": "checklist",            // Clipboard
-  "crunch solo": "measure-tape",               // Ruler
-  "elevacao de perna": "health-capsule",       // Pill
-  esteira: "run",                              // Activity
-  corrida: "heart-beats",                      // HeartPulse (distinto)
-  bicicleta: "cycling",                        // Bike
-  bike: "cycling",                             // Bike
-  "puxada alta": "muscle-up",                  // ArrowUpFromLine
-  "remada curvada": "high-punch",              // Hammer (distinto)
-  "remada baixa": "forearm",                   // Hand (distinto)
-  "barra fixa": "jewel-crown",                 // Crown (topo)
-  "levantamento terra": "weight-lifting-down", // Hammer
+  // Peito
+  "supino reto": "chest",
+  "supino inclinado": "chest-incline",
+  "supino declinado": "chest-decline",
+  "crucifixo com halteres": "chest-fly",
+  "crucifixo maquina": "chest-fly",
+  "crucifixo máquina": "chest-fly",
+  voador: "chest-fly",
+  "peck deck": "chest-fly",
+  "fundos paralelas": "chest",
+  "flexao de braco": "chest",
+  "flexão de braço": "chest",
+  // Costas
+  "puxada alta": "back-lat",
+  "pulldown pronado": "back-lat",
+  "pulldown supinado": "back-lat",
+  "puxada triangulo": "back-lat",
+  "puxada frente aberta": "back-lat",
+  "remada curvada": "back-row",
+  "remada baixa": "back-row",
+  "remada cavalinho": "back-row",
+  "barra fixa": "pullup",
+  // Ombro
+  "desenvolvimento militar": "shoulder-press",
+  "desenvolvimento": "shoulder-press",
+  "elevacao lateral": "shoulder-lateral",
+  "elevação lateral": "shoulder-lateral",
+  "elevacao frontal": "shoulder-lateral",
+  "elevação frontal": "shoulder-lateral",
+  // Bíceps
+  "rosca direta": "biceps-curl",
+  "rosca martelo": "hammer-curl",
+  "rosca scott": "biceps-curl",
+  "rosca concentrada": "biceps-curl",
+  // Tríceps
+  "triceps corda": "triceps-pushdown",
+  "tríceps corda": "triceps-pushdown",
+  "triceps pulley": "triceps-pushdown",
+  "tríceps pulley": "triceps-pushdown",
+  "triceps testa": "triceps-extension",
+  "tríceps testa": "triceps-extension",
+  // Antebraço
+  "rosca de punho": "forearm-wrist",
+  "rosca inversa": "forearm-wrist",
+  // Pernas
+  "agachamento livre": "legs-squat",
+  "agachamento smith": "legs-squat",
+  "agachamento sumo": "legs-squat",
+  "leg press": "legs-press",
+  "leg press 45": "legs-press",
+  "cadeira extensora": "legs-extension",
+  "extensao tradicional": "legs-extension",
+  // Posterior
+  "mesa flexora": "hamstrings-curl",
+  "cadeira flexora": "hamstrings-curl",
+  stiff: "stiff",
+  "bom dia": "stiff",
+  // Glúteos
+  "cadeira abdutora": "glutes-abductor",
+  "elevacao pelvica": "glutes-hip",
+  "elevação pélvica": "glutes-hip",
+  // Panturrilha
+  "panturrilha em pe": "calves-standing",
+  "panturrilha sentado": "calves-seated",
+  // Abdômen
+  "prancha abdominal": "abs-plank",
+  "prancha isometrica": "abs-plank",
+  "prancha lateral": "abs-plank",
+  "abdominal maquina": "abs-crunch",
+  "abdominal máquina": "abs-crunch",
+  "crunch solo": "abs-crunch",
+  "crunch no solo": "abs-crunch",
+  "elevacao de perna": "abs-crunch",
+  "elevação de perna": "abs-crunch",
+  // Cardio
+  esteira: "run",
+  corrida: "run",
+  bicicleta: "bike",
+  bike: "bike",
+  remador: "rower",
 };
 
 const GROUP_MAP: Record<string, FitnessGlyph> = {
   peito: "chest",
-  costas: "muscle-up",
-  ombro: "biceps",
-  braco: "weight",
+  costas: "back",
+  ombro: "shoulder",
+  braco: "biceps",
   biceps: "biceps",
-  triceps: "gloves",
+  triceps: "triceps",
   antebraco: "forearm",
-  abdomen: "measure-tape",
-  core: "measure-tape",
-  perna: "female-legs",
-  quadriceps: "female-legs",
-  posterior: "headband-knot",
-  gluteo: "body-balance",
-  panturrilha: "running-shoe",
-  cardio: "heart-beats",
+  abdomen: "abs",
+  core: "abs",
+  perna: "legs",
+  quadriceps: "legs",
+  posterior: "hamstrings",
+  gluteo: "glutes",
+  panturrilha: "calves",
+  cardio: "cardio",
 };
 
 function normalize(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
-/** Pool de glyphs únicos para fallback sem repetição — só glyphs válidos */
+/** Pool de glyphs para fallback sem repetição na mesma lista. */
 const FALLBACK_POOL: FitnessGlyph[] = [
-  "weight-lifting-up","weight-lifting-down","weight","weight-scale","biceps","chest","forearm","female-legs","muscle-up","muscular-torso",
-  "run","running-shoe","cycling","heart-beats","high-kick","high-punch","gym-bag","body-balance","measure-tape","checklist",
-  "flame","growth","calendar","alarm-clock","coins-pile","laurels-trophy","diamond-trophy","medallist","jewel-crown","health-potion"
+  "chest", "back", "shoulder", "biceps", "triceps", "forearm",
+  "legs", "hamstrings", "glutes", "calves", "abs", "cardio",
+  "dumbbell", "barbell", "cable", "flame", "trophy", "scale",
 ];
 
 export function fitnessForName(name: string, used?: Set<FitnessGlyph>): FitnessGlyph {
@@ -209,47 +214,31 @@ export function fitnessForName(name: string, used?: Set<FitnessGlyph>): FitnessG
   let glyph = EXERCISE_MAP[n];
 
   if (!glyph) {
-    if (/esteira/.test(n)) glyph = "run";
-    else if (/bicicleta|bike/.test(n)) glyph = "cycling";
-    else if (/esteira|corrid|cardio/.test(n) && !/bicicleta/.test(n)) glyph = "heart-beats";
-    else if (/puxada alta/.test(n)) glyph = "muscle-up";
-    else if (/remada|barra fixa|puxada/.test(n)) glyph = "muscle-up";
-    else if (/supino/.test(n)) glyph = "weight-lifting-up";
-    else if (/crucifixo|voador|peck/.test(n)) glyph = "muscular-torso";
-    else if (/desenvolvimento/.test(n)) glyph = "biceps";
-    else if (/elevacao lateral/.test(n)) glyph = "forearm";
-    else if (/rosca/.test(n)) glyph = "weight";
-    else if (/triceps/.test(n)) glyph = "gloves";
-    else if (/agachamento/.test(n)) glyph = "female-legs";
-    else if (/leg press/.test(n)) glyph = "body-balance";
-    else if (/extensora/.test(n)) glyph = "weight-scale";
-    else if (/flexora/.test(n)) glyph = "headband-knot";
-    else if (/panturrilha/.test(n)) glyph = "running-shoe";
-    else if (/prancha|abdominal|crunch/.test(n)) glyph = "measure-tape";
-    else glyph = "weight";
+    if (/supino|crucifixo|voador|peck|fundos|flexao/.test(n)) glyph = "chest";
+    else if (/puxada|pulldown|remada|barra fixa|dorsal/.test(n)) glyph = "back";
+    else if (/desenvolvimento|elevacao|ombro/.test(n)) glyph = "shoulder";
+    else if (/rosca|biceps/.test(n)) glyph = "biceps";
+    else if (/triceps/.test(n)) glyph = "triceps";
+    else if (/punho|antebraco/.test(n)) glyph = "forearm";
+    else if (/agachamento|leg press|extensora|cadeira extensora/.test(n)) glyph = "legs";
+    else if (/flexora|mesa flexora|stiff|bom dia/.test(n)) glyph = "hamstrings";
+    else if (/abdutora|pelvica|gluteo|sumo/.test(n)) glyph = "glutes";
+    else if (/panturrilha/.test(n)) glyph = "calves";
+    else if (/prancha|abdominal|crunch|elevacao de perna/.test(n)) glyph = "abs";
+    else if (/esteira|corrida|bike|bicicleta|remador|eliptico/.test(n)) glyph = "cardio";
+    else if (/halter/.test(n)) glyph = "dumbbell";
+    else if (/barra/.test(n)) glyph = "barbell";
+    else if (/cabo|polia|corda/.test(n)) glyph = "cable";
+    else glyph = "dumbbell";
   }
 
-  // Garante unicidade na lista visível
   if (used?.has(glyph)) {
-    // Tenta pool sem repetição por hash do nome
     const hash = n.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
     for (let i = 0; i < FALLBACK_POOL.length; i++) {
       const candidate = FALLBACK_POOL[(hash + i) % FALLBACK_POOL.length]!;
-      if (!used.has(candidate) && candidate !== glyph) {
+      if (!used.has(candidate)) {
         glyph = candidate;
         break;
-      }
-    }
-    // Último recurso: primeiro livre do pool completo
-    if (used.has(glyph)) {
-      const free = (Object.values(GLYPH_MAP) as unknown as FitnessGlyph[]).find((_, idx) => {
-        const g = Object.keys(GLYPH_MAP)[idx] as FitnessGlyph;
-        return !used.has(g);
-      });
-      // fallback simples: se ainda repetir, mantém mas loga
-      if (free) {
-        // não faz nada, mantém glyph mas avisa em dev
-        if (process.env.NODE_ENV !== "production") console.warn(`[FitnessIcon] colisão para "${name}" → ${glyph}`);
       }
     }
   }
@@ -270,20 +259,14 @@ export function FitnessIcon({
   className?: string;
   variant?: "brand" | "success";
 }) {
-  const Icon = GLYPH_MAP[glyph] ?? Dumbbell;
+  const Icon = GLYPH_MAP[glyph] ?? DumbbellIcon;
   const color = variant === "success" ? "#33D17A" : "#F4711E";
   return (
-    <Icon
-      width={size}
-      height={size}
-      strokeWidth={1.9}
-      fill="none"
-      aria-hidden
-      className={cn("shrink-0", className)}
-      style={{
-        color,
-        filter: variant === "success" ? "drop-shadow(0 0 6px rgba(51,209,122,0.35))" : "drop-shadow(0 0 6px rgba(244,113,30,0.28))",
-      }}
-    />
+    <span
+      className={cn("inline-flex items-center justify-center", className)}
+      style={{ color, filter: variant === "success" ? "drop-shadow(0 0 5px rgba(51,209,122,0.35))" : "drop-shadow(0 0 5px rgba(244,113,30,0.25))" }}
+    >
+      <Icon size={size} />
+    </span>
   );
 }

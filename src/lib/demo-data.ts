@@ -11,136 +11,24 @@ export const isDemo = (): boolean => process.env.NEXT_PUBLIC_DEMO_MODE === "1";
 // ---------------------------------------------------------------------------
 
 export const demoEquipment = [
-  {
-    id: "eq-demo-001",
-    gym_id: "00000000-0000-0000-0000-000000000001",
-    name: "Supino Reto",
-    category: "strength",
-    capacity: 8,
-    status: "available",
-    nfc_tag_url: "gym://eq/001",
-    qr_url: "EQ001",
-    map_position: { x: 12, y: 18 },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "eq-demo-002",
-    gym_id: "00000000-0000-0000-0000-000000000001",
-    name: "Agachamento Smith",
-    category: "strength",
-    capacity: 6,
-    status: "available",
-    nfc_tag_url: "gym://eq/002",
-    qr_url: "EQ002",
-    map_position: { x: 30, y: 14 },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "eq-demo-003",
-    gym_id: "00000000-0000-0000-0000-000000000001",
-    name: "Leg Press 45°",
-    category: "strength",
-    capacity: 10,
-    status: "available",
-    nfc_tag_url: "gym://eq/003",
-    qr_url: "EQ003",
-    map_position: { x: 50, y: 20 },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "eq-demo-004",
-    gym_id: "00000000-0000-0000-0000-000000000001",
-    name: "Puxada Alta",
-    category: "strength",
-    capacity: 6,
-    status: "available",
-    nfc_tag_url: "gym://eq/004",
-    qr_url: "EQ004",
-    map_position: { x: 70, y: 12 },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "eq-demo-005",
-    gym_id: "00000000-0000-0000-0000-000000000001",
-    name: "Esteira Elétrica",
-    category: "cardio",
-    capacity: 6,
-    status: "available",
-    nfc_tag_url: "gym://eq/005",
-    qr_url: "EQ005",
-    map_position: { x: 88, y: 24 },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "eq-demo-006",
-    gym_id: "00000000-0000-0000-0000-000000000001",
-    name: "Bicicleta Ergométrica",
-    category: "cardio",
-    capacity: 8,
-    status: "in_use",
-    nfc_tag_url: "gym://eq/006",
-    qr_url: "EQ006",
-    map_position: { x: 88, y: 40 },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "eq-demo-007",
-    gym_id: "00000000-0000-0000-0000-000000000001",
-    name: "Cadeira Extensora",
-    category: "strength",
-    capacity: 6,
-    status: "available",
-    nfc_tag_url: "gym://eq/007",
-    qr_url: "EQ007",
-    map_position: { x: 22, y: 34 },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "eq-demo-008",
-    gym_id: "00000000-0000-0000-0000-000000000001",
-    name: "Remada Curvada",
-    category: "strength",
-    capacity: 6,
-    status: "maintenance",
-    nfc_tag_url: null,
-    qr_url: "EQ008",
-    map_position: { x: 45, y: 42 },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "eq-demo-009",
-    gym_id: "00000000-0000-0000-0000-000000000001",
-    name: "Mesa Flexora",
-    category: "strength",
-    capacity: 6,
-    status: "available",
-    nfc_tag_url: "gym://eq/009",
-    qr_url: "EQ009",
-    map_position: { x: 62, y: 38 },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "eq-demo-010",
-    gym_id: "00000000-0000-0000-0000-000000000001",
-    name: "Crossover Polia",
-    category: "strength",
-    capacity: 4,
-    status: "available",
-    nfc_tag_url: "gym://eq/010",
-    qr_url: "EQ010",
-    map_position: { x: 78, y: 50 },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
+  { id: "eq-demo-001", gym_id: "00000000-0000-0000-0000-000000000001", name: "Supino Reto", category: "strength", capacity: 8, status: "available", nfc_tag_url: "gym://eq/001", qr_url: "EQ001", map_position: { x: 12, y: 18 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-002", gym_id: "00000000-0000-0000-0000-000000000001", name: "Agachamento Smith", category: "strength", capacity: 6, status: "available", nfc_tag_url: "gym://eq/002", qr_url: "EQ002", map_position: { x: 30, y: 14 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-003", gym_id: "00000000-0000-0000-0000-000000000001", name: "Leg Press 45°", category: "strength", capacity: 10, status: "available", nfc_tag_url: "gym://eq/003", qr_url: "EQ003", map_position: { x: 50, y: 20 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-004", gym_id: "00000000-0000-0000-0000-000000000001", name: "Puxada Alta", category: "strength", capacity: 6, status: "available", nfc_tag_url: "gym://eq/004", qr_url: "EQ004", map_position: { x: 70, y: 12 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-005", gym_id: "00000000-0000-0000-0000-000000000001", name: "Esteira Elétrica", category: "cardio", capacity: 6, status: "available", nfc_tag_url: "gym://eq/005", qr_url: "EQ005", map_position: { x: 88, y: 24 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-006", gym_id: "00000000-0000-0000-0000-000000000001", name: "Bicicleta Ergométrica", category: "cardio", capacity: 8, status: "in_use", nfc_tag_url: "gym://eq/006", qr_url: "EQ006", map_position: { x: 88, y: 40 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-007", gym_id: "00000000-0000-0000-0000-000000000001", name: "Cadeira Extensora", category: "strength", capacity: 6, status: "available", nfc_tag_url: "gym://eq/007", qr_url: "EQ007", map_position: { x: 22, y: 34 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-008", gym_id: "00000000-0000-0000-0000-000000000001", name: "Remada Curvada / Baixa", category: "strength", capacity: 6, status: "maintenance", nfc_tag_url: null, qr_url: "EQ008", map_position: { x: 45, y: 42 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-009", gym_id: "00000000-0000-0000-0000-000000000001", name: "Mesa Flexora", category: "strength", capacity: 6, status: "available", nfc_tag_url: "gym://eq/009", qr_url: "EQ009", map_position: { x: 62, y: 38 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-010", gym_id: "00000000-0000-0000-0000-000000000001", name: "Crossover / Polia", category: "strength", capacity: 4, status: "available", nfc_tag_url: "gym://eq/010", qr_url: "EQ010", map_position: { x: 78, y: 50 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-011", gym_id: "00000000-0000-0000-0000-000000000001", name: "Desenvolvimento Militar", category: "strength", capacity: 5, status: "available", nfc_tag_url: "gym://eq/011", qr_url: "EQ011", map_position: { x: 35, y: 28 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-012", gym_id: "00000000-0000-0000-0000-000000000001", name: "Rosca Scott", category: "strength", capacity: 4, status: "available", nfc_tag_url: "gym://eq/012", qr_url: "EQ012", map_position: { x: 55, y: 32 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-013", gym_id: "00000000-0000-0000-0000-000000000001", name: "Cadeira Abdutora", category: "strength", capacity: 4, status: "available", nfc_tag_url: "gym://eq/013", qr_url: "EQ013", map_position: { x: 15, y: 50 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-014", gym_id: "00000000-0000-0000-0000-000000000001", name: "Panturrilha em Pé", category: "strength", capacity: 4, status: "available", nfc_tag_url: "gym://eq/014", qr_url: "EQ014", map_position: { x: 82, y: 46 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-015", gym_id: "00000000-0000-0000-0000-000000000001", name: "Barra Fixa", category: "strength", capacity: 4, status: "available", nfc_tag_url: null, qr_url: "EQ015", map_position: { x: 68, y: 28 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-016", gym_id: "00000000-0000-0000-0000-000000000001", name: "Elíptico", category: "cardio", capacity: 5, status: "available", nfc_tag_url: "gym://eq/016", qr_url: "EQ016", map_position: { x: 92, y: 32 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-017", gym_id: "00000000-0000-0000-0000-000000000001", name: "Remador", category: "cardio", capacity: 5, status: "available", nfc_tag_url: "gym://eq/017", qr_url: "EQ017", map_position: { x: 92, y: 48 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "eq-demo-018", gym_id: "00000000-0000-0000-0000-000000000001", name: "Abdominal (Máquina)", category: "strength", capacity: 4, status: "available", nfc_tag_url: "gym://eq/018", qr_url: "EQ018", map_position: { x: 42, y: 56 }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ] as any[];
 
 // ---------------------------------------------------------------------------
@@ -196,8 +84,14 @@ export const demoVariations: Record<string, any[]> = {
 export const demoExercises = [
   { id: "ex-demo-001", name: "Supino Reto", category: "strength", muscles: ["chest"], tips: ["Mantenha escápulas retraídas"], technique_default: "standard", high_impact: false },
   { id: "ex-demo-002", name: "Agachamento", category: "strength", muscles: ["legs"], tips: ["Joelhos acompanham os pés"], technique_default: "standard", high_impact: false },
+  { id: "ex-demo-003", name: "Crucifixo com Halteres", category: "strength", muscles: ["chest"], tips: ["Abra até a linha do peito"], technique_default: "standard", high_impact: false },
+  { id: "ex-demo-004", name: "Desenvolvimento Militar", category: "strength", muscles: ["shoulders"], tips: ["Core firme, sem arco lombar"], technique_default: "standard", high_impact: false },
   { id: "ex-demo-005", name: "Puxada Alta", category: "strength", muscles: ["back"], tips: ["Puxe com cotovelos baixos"], technique_default: "standard", high_impact: false },
   { id: "ex-demo-006", name: "Esteira", category: "cardio", muscles: ["legs"], tips: ["Comece em ritmo leve"], technique_default: "standard", high_impact: true },
+  { id: "ex-demo-007", name: "Rosca Direta", category: "strength", muscles: ["biceps"], tips: ["Sem balançar o tronco"], technique_default: "standard", high_impact: false },
+  { id: "ex-demo-008", name: "Tríceps Corda", category: "strength", muscles: ["triceps"], tips: ["Cotovelos fixos, abra as pontas"], technique_default: "standard", high_impact: false },
+  { id: "ex-demo-009", name: "Leg Press 45°", category: "strength", muscles: ["legs"], tips: ["Lombar colada no banco"], technique_default: "standard", high_impact: false },
+  { id: "ex-demo-010", name: "Prancha Isométrica", category: "strength", muscles: ["core"], tips: ["Corpo reto, ative o core"], technique_default: "standard", high_impact: false },
 ] as any[];
 
 // ---------------------------------------------------------------------------
@@ -240,22 +134,16 @@ const we = (n: number, exId: string, sets: number, reps: string, rest: number) =
 
 export const demoWorkoutExercises = [
   we(1, "ex-demo-001", 4, "10", 90), // Supino Reto
-  we(2, "ex-demo-007", 3, "12", 60), // Desenvolvimento Militar
-  we(3, "ex-demo-005", 4, "10", 75), // Puxada Alta
-  we(4, "ex-demo-008", 3, "12", 45), // Rosca Direta
-  we(5, "ex-demo-002", 4, "8", 90),  // Agachamento
-  we(6, "ex-demo-006", 1, "15min", 0), // Esteira (finalizador)
+  we(2, "ex-demo-003", 3, "12", 60), // Crucifixo com Halteres
+  we(3, "ex-demo-004", 3, "10", 75), // Desenvolvimento Militar
+  we(4, "ex-demo-005", 4, "10", 75), // Puxada Alta
+  we(5, "ex-demo-007", 3, "12", 45), // Rosca Direta
+  we(6, "ex-demo-008", 3, "15", 45), // Tríceps Corda
+  we(7, "ex-demo-002", 4, "8", 90),  // Agachamento
+  we(8, "ex-demo-009", 3, "12", 60), // Leg Press 45°
+  we(9, "ex-demo-010", 3, "45s", 30), // Prancha Isométrica
+  we(10, "ex-demo-006", 1, "15min", 0), // Esteira (finalizador)
 ] as any[];
-
-// novos exercícios do catálogo usado acima
-for (const extra of [
-  { id: "ex-demo-007", name: "Desenvolvimento Militar", category: "strength", muscles: ["shoulders"], tips: ["Core firme, sem arco lombar"], technique_default: "standard", high_impact: false },
-  { id: "ex-demo-008", name: "Rosca Direta", category: "strength", muscles: ["biceps"], tips: ["Sem balançar o tronco"], technique_default: "standard", high_impact: false },
-]) {
-  if (!demoExercises.some((e: any) => e.id === extra.id)) {
-    (demoExercises as any[]).push({ ...extra, gym_id: "00000000-0000-0000-0000-000000000001", equipment_id: null, photo_url: null, video_url: null, created_at: new Date().toISOString() } as any);
-  }
-}
 
 export const demoWorkoutLogs = () => {
   const logs = [] as any[];
@@ -372,137 +260,180 @@ const ex = (id: string, name: string, picto: string, info: string, equipment: st
 
 export const demoLib: DemoCategory[] = [
   {
-    id: "peito", name: "Peito", icon: "💪",
+    id: "peito", name: "Peito", icon: "chest",
     subs: [
       {
         id: "peito-geral", name: "Peitoral", exercises: [
-          ex("lib-su1", "Supino Reto", "🏋️", "Deite no banco, pés firmes, barra na altura das axilas. Empurre sem travar o cotovelo.", "Supino Reto", [], "eq-demo-001"),
-          ex("lib-su2", "Supino Inclinado", "🏋️", "Banco a 30–45°. Foco na porção clavicular do peitoral.", "Supino Reto", [], "eq-demo-001"),
-          ex("lib-fl1", "Crucifixo com Halteres", "🦾", "Abra os braços lentamente até a linha do peito e volte fechando dos dois lados.", null, ["halter"]),
-          ex("lib-pk1", "Voador (Peck Deck)", "🦾", "Sente com escápulas encostadas e aproxime os braços à frente do peito.", "Voador (Peck Deck)"),
+          ex("lib-su1", "Supino Reto", "chest", "Deite no banco, pés firmes, barra na altura das axilas. Empurre sem travar o cotovelo.", "Supino Reto", ["barra"], "eq-demo-001"),
+          ex("lib-su2", "Supino Inclinado", "chest-incline", "Banco a 30–45°. Foco na porção clavicular do peitoral.", "Supino Reto", ["barra"], "eq-demo-001"),
+          ex("lib-su3", "Supino Declinado", "chest-decline", "Banco declinado, foco na porção esternal/inferior do peitoral.", "Supino Reto", ["barra"], "eq-demo-001"),
+          ex("lib-su4", "Supino com Halteres", "chest", "Maior amplitude e ativação de estabilizadores.", "Supino Reto", ["halter"], "eq-demo-001"),
+          ex("lib-fl1", "Crucifixo com Halteres", "chest-fly", "Abra os braços lentamente até a linha do peito e volte fechando dos dois lados.", null, ["halter"]),
+          ex("lib-fl2", "Crucifixo na Polia Baixa", "cable", "Cruze os braços à frente do peito, mantendo leve flexão de cotovelo.", "Crossover / Polia", ["cabo"], "eq-demo-010"),
+          ex("lib-pk1", "Voador (Peck Deck)", "chest-fly", "Sente com escápulas encostadas e aproxime os braços à frente do peito.", "Voador (Peck Deck)", ["máquina"]),
+          ex("lib-cr1", "Flexão de Braço", "chest", "Corpo reto, cotovelos a 45° do tronco. Variação: joelhos no chão.", null, ["peso corporal"]),
+          ex("lib-par1", "Fundos (Paralelas)", "chest", "Corpo vertical, desça até cotovelo a ~90° e suba com controle.", "Paralela", ["peso corporal"]),
         ],
       },
-      { id: "peito-braco", name: "Peito + Tríceps", exercises: [
-        ex("lib-par1", "Fundos (Paralelas)", "🤸", "Corpo vertical, desça até cotovelo a ~90° e suba com controle.", "Paralela", ["peso corporal"]),
-        ex("lib-cr1", "Flexão de Braço", "🤸", "Corpo reto, cotovelos a 45° do tronco. Variação: joelhos no chão.", null, ["peso corporal"]),
-      ] },
     ],
   },
   {
-    id: "costas", name: "Costas", icon: "🦾",
+    id: "costas", name: "Costas", icon: "back",
     subs: [
       { id: "costas-dorsal", name: "Dorsal", exercises: [
-        ex("lib-pu1", "Puxada Alta (Pulldown)", "⛰️", "Puxe a barra até a clavícula, cotovelos para baixo, sem balançar.", "Puxada Alta", [], "eq-demo-004"),
-        ex("lib-pu2", "Pulldown Supinado", "⛰️", "Empunhadura invertida, foco na parte baixa do dorsal.", "Puxada Alta", [], "eq-demo-004"),
-        ex("lib-bf1", "Barra Fixa", "🤾", "Puxe o queixo até acima da barra; faça negativa se precisar.", "Barra Fixa", ["peso corporal"]),
+        ex("lib-pu1", "Puxada Alta Aberta", "back-lat", "Puxe a barra até a clavícula, cotovelos para baixo, sem balançar.", "Puxada Alta", ["máquina"], "eq-demo-004"),
+        ex("lib-pu2", "Puxada Alta Fechada", "back-lat", "Maior ênfase no meio das costas e bíceps.", "Puxada Alta", ["máquina"], "eq-demo-004"),
+        ex("lib-pu3", "Pulldown Supinado", "back-lat", "Empunhadura invertida, foco na parte baixa do dorsal.", "Puxada Alta", ["máquina"], "eq-demo-004"),
+        ex("lib-pu4", "Puxada com Triângulo", "back-lat", "Cotovelos junto ao corpo, puxe até o esterno.", "Puxada Alta", ["máquina"], "eq-demo-004"),
+        ex("lib-bf1", "Barra Fixa", "pullup", "Puxe o queixo até acima da barra; faça negativa se precisar.", "Barra Fixa", ["peso corporal"], "eq-demo-015"),
+        ex("lib-bf2", "Barra Fixa Pronada", "pullup", "Maior ênfase no dorsal e no meio das costas.", "Barra Fixa", ["peso corporal"], "eq-demo-015"),
+        ex("lib-bf3", "Barra Fixa Supinada", "pullup", "Maior ativação de bíceps junto com o dorsal.", "Barra Fixa", ["peso corporal"], "eq-demo-015"),
       ] },
-      { id: "costas-romboid", name: "Trapézio / Romboides", exercises: [
-        ex("lib-re1", "Remada Curvada", "🧗", "Tronco a ~45°, puxe a barra em direção ao abdômen.", "Remada Curvada / Baixa", [], "eq-demo-008"),
-        ex("lib-re2", "Remada Baixa (Cabo)", "🧗", "Sentado, puxe a polia até a região do estômago, escápulas juntas.", "Remada Baixa", [], "eq-demo-008"),
+      { id: "costas-espessura", name: "Espessura / Meio das Costas", exercises: [
+        ex("lib-re1", "Remada Curvada", "back-row", "Tronco a ~45°, puxe a barra em direção ao abdômen.", "Remada Curvada / Baixa", ["barra"], "eq-demo-008"),
+        ex("lib-re2", "Remada Baixa (Cabo)", "back-row", "Sentado, puxe a polia até a região do estômago, escápulas juntas.", "Remada Curvada / Baixa", ["cabo"], "eq-demo-008"),
+        ex("lib-re3", "Remada Unilateral", "back-row", "Apoie uma mão e um joelho no banco, puxe o halter em direção ao quadril.", null, ["halter"]),
+        ex("lib-re4", "Remada Cavalinho", "back-row", "Apoio no banco inclinado, puxe os halters em direção ao abdômen.", "Remada Curvada / Baixa", ["halter"], "eq-demo-008"),
+        ex("lib-re5", "Remada na Polia Baixa", "back-row", "Puxe a barra em direção ao abdômen, cotovelos perto do corpo.", "Crossover / Polia", ["cabo"], "eq-demo-010"),
+        ex("lib-sh1", "Shrugg", "back", "Eleve os ombros em direção às orelhas, segurando halteres ou barra.", null, ["barra", "halter"]),
       ] },
     ],
   },
   {
-    id: "ombro", name: "Ombro", icon: "🏋️",
+    id: "ombro", name: "Ombro", icon: "shoulder",
     subs: [
       { id: "ombro-deltoide", name: "Deltoide", exercises: [
-        ex("lib-de1", "Desenvolvimento Militar", "🏋️", "Empurre a barra acima da cabeça, core firme, sem arco lombar.", "Desenvolvimento Militar"),
-        ex("lib-el1", "Elevação Lateral", "🪶", "Levante os halteres até a linha dos ombros, cotovelos levemente flexionados.", null, ["halter"]),
-        ex("lib-el2", "Elevação Frontal", "🪶", "Eleve um halter de cada vez até a altura dos olhos.", null, ["halter"]),
+        ex("lib-de1", "Desenvolvimento Militar", "shoulder-press", "Empurre a barra acima da cabeça, core firme, sem arco lombar.", "Desenvolvimento Militar", ["barra"], "eq-demo-011"),
+        ex("lib-de2", "Desenvolvimento com Halteres", "shoulder-press", "Maior amplitude e controle de cada lado.", "Desenvolvimento Militar", ["halter"], "eq-demo-011"),
+        ex("lib-de3", "Desenvolvimento Arnold", "shoulder-press", "Rotação dos punhos durante a subida.", null, ["halter"]),
+        ex("lib-el1", "Elevação Lateral", "shoulder-lateral", "Levante os halteres até a linha dos ombros, cotovelos levemente flexionados.", null, ["halter"]),
+        ex("lib-el2", "Elevação Frontal", "shoulder-lateral", "Eleve um halter de cada vez até a altura dos olhos.", null, ["halter"]),
+        ex("lib-el3", "Elevação Lateral na Polia", "cable", "Cotovelo levemente flexionado, abra o braço lateralmente.", "Crossover / Polia", ["cabo"], "eq-demo-010"),
+        ex("lib-de4", "Desenvolvimento na Máquina", "shoulder-press", "Movimento guiado, bom para iniciantes.", "Desenvolvimento Militar", ["máquina"], "eq-demo-011"),
       ] },
     ],
   },
   {
-    id: "biceps", name: "Bíceps", icon: "🩹",
+    id: "biceps", name: "Bíceps", icon: "biceps",
     subs: [
       { id: "biceps-curto", name: "Bíceps", exercises: [
-        ex("lib-ro1", "Rosca Direta", "🩹", "Cotovelos fixos ao tronco, suba a barra sem balançar o corpo.", null, ["barra", "halter"]),
-        ex("lib-ro2", "Rosca Scott", "🩹", "Braços apoiados na banco Scott, amplitude sem travar.", "Rosca Scott"),
-        ex("lib-ro3", "Rosca Concentrada", "🩹", "Coxa apoiando o cotovelo, controle total na subida.", null, ["halter"]),
+        ex("lib-ro1", "Rosca Direta", "biceps-curl", "Cotovelos fixos ao tronco, suba a barra sem balançar o corpo.", null, ["barra"]),
+        ex("lib-ro2", "Rosca Alternada", "biceps-curl", "Suba um braço de cada vez, controlegem a descida.", null, ["halter"]),
+        ex("lib-ro3", "Rosca Scott", "biceps-curl", "Braços apoiados no banco Scott, amplitude sem travar.", "Rosca Scott", ["barra"], "eq-demo-012"),
+        ex("lib-ro4", "Rosca Concentrada", "biceps-curl", "Coxa apoiando o cotovelo, controle total na subida.", null, ["halter"]),
+        ex("lib-ro5", "Rosca Martelo", "hammer-curl", "Empunhadura neutra, trabalha braquial e antebraço.", null, ["halter"]),
+        ex("lib-ro6", "Rosca na Polia Baixa", "cable", "Cotovelos fixos junto ao corpo, puxe a barra para cima.", "Crossover / Polia", ["cabo"], "eq-demo-010"),
+        ex("lib-ro7", "Rosca 21", "biceps-curl", "7 reps na metade inferior, 7 na metade superior, 7 completas.", null, ["barra", "halter"]),
       ] },
     ],
   },
   {
-    id: "triceps", name: "Tríceps", icon: "🥓",
+    id: "triceps", name: "Tríceps", icon: "triceps",
     subs: [
       { id: "triceps-longo", name: "Tríceps", exercises: [
-        ex("lib-tr1", "Tríceps Pulley", "🥓", "Cotovelos fixos, puxe a polia até estender totalmente o braço.", "Tríceps Pulley", [], "eq-demo-010"),
-        ex("lib-tr2", "Tríceps Testa", "🥓", "Deite no banco, flexione o antebraço atrás da cabeça e estenda.", null, ["barra", "halter"]),
-        ex("lib-tr3", "Tríceps Corda", "🥓", "Cabo com corda, abra as pontas ao final do movimento.", null, ["cabo"]),
+        ex("lib-tr1", "Tríceps Pulley", "triceps-pushdown", "Cotovelos fixos, puxe a polia até estender totalmente o braço.", "Tríceps Pulley", ["cabo"], "eq-demo-010"),
+        ex("lib-tr2", "Tríceps Testa", "triceps-extension", "Deite no banco, flexione o antebraço atrás da cabeça e estenda.", null, ["barra", "halter"]),
+        ex("lib-tr3", "Tríceps Corda", "triceps-pushdown", "Cabo com corda, abra as pontas ao final do movimento.", "Crossover / Polia", ["cabo"], "eq-demo-010"),
+        ex("lib-tr4", "Tríceps Francês", "triceps-extension", "Acima da cabeça, desça o peso atrás da nuca com controle.", null, ["halter"]),
+        ex("lib-tr5", "Tríceps Máquina", "triceps-pushdown", "Movimento guiado, bom para isolar o tríceps.", "Tríceps Pulley", ["máquina"], "eq-demo-010"),
+        ex("lib-tr6", "Mergulho (Paralelas)", "triceps-pushdown", "Corpo reto, cotovelos para trás, desça até ~90°.", "Paralela", ["peso corporal"]),
       ] },
     ],
   },
   {
-    id: "antebraco", name: "Antebraço", icon: "🦾",
+    id: "antebraco", name: "Antebraço", icon: "forearm",
     subs: [
       { id: "antebraco-geral", name: "Antebraço / Punho", exercises: [
-        ex("lib-ro4", "Rosca de Punho", "🖐️", "Antebraços apoiados, flexione o punho com a barra.", null, ["barra", "halter"]),
-        ex("lib-ro5", "Rosca Inversa", "🖐️", "Empunhadura pronada, movimente apenas os punhos.", null, ["barra"]),
+        ex("lib-ro8", "Rosca de Punho", "forearm-wrist", "Antebraços apoiados, flexione o punho com a barra.", null, ["barra", "halter"]),
+        ex("lib-ro9", "Rosca Inversa", "forearm-wrist", "Empunhadura pronada, movimente apenas os punhos.", null, ["barra"]),
+        ex("lib-ro10", "Extensão de Punho", "forearm-wrist", "Antebraços apoiados, estenda os punhos contra a resistência.", null, ["barra", "halter"]),
+        ex("lib-ro11", "Farmer Walk", "forearm", "Segure halteres pesados e caminhe mantendo postura.", null, ["halter"]),
       ] },
     ],
   },
   {
-    id: "inferiores", name: "Inferiores", icon: "🦵",
+    id: "inferiores", name: "Inferiores", icon: "legs",
     subs: [
       { id: "inf-quadriceps", name: "Quadríceps", exercises: [
-        ex("lib-ag1", "Agachamento no Smith", "🏋️", "Pés à frente da barra, desça até a coxa paralela ao chão.", "Agachamento Smith", [], "eq-demo-002"),
-        ex("lib-ag2", "Leg Press 45°", "🦵", "Pés na largura dos ombros, desça mantendo lombar colada.", "Leg Press 45°", [], "eq-demo-003"),
-        ex("lib-ag3", "Cadeira Extensora", "🦵", "Estenda as pernas até travar levemente, sem soltar o peso.", "Cadeira Extensora", [], "eq-demo-007"),
-        ex("lib-ag4", "Agachamento Livre", "🏋️", "Barra nas costas, desça com controle; palma aberta.", null, ["barra"]),
+        ex("lib-ag1", "Agachamento no Smith", "legs-squat", "Pés à frente da barra, desça até a coxa paralela ao chão.", "Agachamento Smith", ["máquina"], "eq-demo-002"),
+        ex("lib-ag2", "Agachamento Livre", "legs-squat", "Barra nas costas, desça com controle; palma aberta.", null, ["barra"]),
+        ex("lib-ag3", "Agachamento Frontal", "legs-squat", "Barra apoiada nos ombros frontais, core firme.", null, ["barra"]),
+        ex("lib-ag4", "Agachamento Sumô", "legs-squat", "Pés bem abertos, desça ativando glúteo e adutores.", null, ["barra", "halter"]),
+        ex("lib-ag5", "Agachamento Búlgaro", "legs-squat", "Um pé atrás no banco, desça com o pé da frente.", null, ["halter"]),
+        ex("lib-lp1", "Leg Press 45°", "legs-press", "Pés na largura dos ombros, desça mantendo lombar colada.", "Leg Press 45°", ["máquina"], "eq-demo-003"),
+        ex("lib-lp2", "Leg Press Pés Altos", "legs-press", "Maior ênfase no posterior e glúteo.", "Leg Press 45°", ["máquina"], "eq-demo-003"),
+        ex("lib-lp3", "Leg Press Unilateral", "legs-press", "Trabalhe uma perna por vez para corrigir desequilíbrios.", "Leg Press 45°", ["máquina"], "eq-demo-003"),
+        ex("lib-ce1", "Cadeira Extensora", "legs-extension", "Estenda as pernas até travar levemente, sem soltar o peso.", "Cadeira Extensora", ["máquina"], "eq-demo-007"),
+        ex("lib-af1", "Afundo", "legs-squat", "Dê um passo à frente e desça até o joelho traseiro quase tocar o chão.", null, ["peso corporal", "halter"]),
       ] },
       { id: "inf-posterior", name: "Posterior", exercises: [
-        ex("lib-mf1", "Mesa Flexora", "🦵", "Flexione as pernas levando o calcanhar em direção ao glúteo.", "Mesa Flexora", [], "eq-demo-009"),
-        ex("lib-mf2", "Stiff", "🦵", "Quadril para trás, pernas semiflexionadas, sinta o posterior trabalhando."),
-        ex("lib-mf3", "Bom Dia", "🦵", "Com barra nas costas, incline o tronco mantendo coluna neutra.", null, ["barra"]),
+        ex("lib-mf1", "Mesa Flexora", "hamstrings-curl", "Flexione as pernas levando o calcanhar em direção ao glúteo.", "Mesa Flexora", ["máquina"], "eq-demo-009"),
+        ex("lib-mf2", "Cadeira Flexora", "hamstrings-curl", "Movimento guiado, controle a fase excêntrica.", "Mesa Flexora", ["máquina"], "eq-demo-009"),
+        ex("lib-st1", "Stiff", "stiff", "Quadril para trás, pernas semiflexionadas, sinta o posterior trabalhando.", null, ["barra", "halter"]),
+        ex("lib-bd1", "Bom Dia", "stiff", "Com barra nas costas, incline o tronco mantendo coluna neutra.", null, ["barra"]),
+        ex("lib-hd1", "Hiperextensão Lombar", "back", "Máquina de hiperextensão, estenda o tronco com controle.", null, ["máquina"]),
       ] },
       { id: "inf-gluteo", name: "Glúteos", exercises: [
-        ex("lib-gl1", "Cadeira Abdutora", "🍑", "Afaste as pernas contra a resistência, controlando a volta.", "Cadeira Abdutora", [], "eq-demo-013"),
-        ex("lib-gl2", "Agachamento Sumô", "🍑", "Pés bem abertos, desça ativando glúteo e adutores."),
-        ex("lib-gl3", "Elevação Pélvica", "🍑", "Deite de costas, suba o quadril apertando o glúteo no topo.", null, ["peso corporal"]),
+        ex("lib-gl1", "Cadeira Abdutora", "glutes-abductor", "Afaste as pernas contra a resistência, controlando a volta.", "Cadeira Abdutora", ["máquina"], "eq-demo-013"),
+        ex("lib-gl2", "Elevação Pélvica", "glutes-hip", "Deite de costas, suba o quadril apertando o glúteo no topo.", null, ["peso corporal", "barra"]),
+        ex("lib-gl3", "Hip Thrust", "glutes-hip", "Costas apoiadas no banco, empurre o peso com os glúteos.", null, ["barra"]),
+        ex("lib-gl4", "Passada", "glutes-hip", "Passo longo à frente, empurre pelo calcanhar.", null, ["peso corporal", "halter"]),
+        ex("lib-gl5", "Kickback", "glutes-hip", "Apoie as mãos e um joelho, estenda a perna para trás.", null, ["peso corporal"]),
       ] },
       { id: "inf-panturrilha", name: "Panturrilha", exercises: [
-        ex("lib-pa1", "Panturrilha em Pé", "🦶", "Suba na ponta dos pés com peso, segure 1s no topo.", "Panturrilha em Pé"),
-        ex("lib-pa2", "Panturrilha Sentado", "🦶", "Joelhos a 90°, eleve os calcanhares com peso sobre as coxas.", null, ["halter"]),
+        ex("lib-pa1", "Panturrilha em Pé", "calves-standing", "Suba na ponta dos pés com peso, segure 1s no topo.", "Panturrilha em Pé", ["máquina"], "eq-demo-014"),
+        ex("lib-pa2", "Panturrilha no Leg Press", "calves-standing", "Pés na ponta da plataforma, eleve os calcanhares.", "Leg Press 45°", ["máquina"], "eq-demo-003"),
+        ex("lib-pa3", "Panturrilha Sentado", "calves-seated", "Joelhos a 90°, eleve os calcanhares com peso sobre as coxas.", null, ["halter", "máquina"]),
+        ex("lib-pa4", "Panturrilha em Pé Unilateral", "calves-standing", "Um pé por vez, maior amplitude e controle.", null, ["peso corporal"]),
       ] },
     ],
   },
   {
-    id: "abdomen", name: "Abdômen / Core", icon: "🔥",
+    id: "abdomen", name: "Abdômen / Core", icon: "abs",
     subs: [
       { id: "abd-superior", name: "Abdômen", exercises: [
-        ex("lib-ab1", "Abdominal na Máquina", "🔥", "Encoste a parte superior na almofada e faça a flexão sem puxar a cabeça.", "Abdominal (Máquina)"),
-        ex("lib-ab2", "Crunch no Solo", "🔥", "Lombar colada no chão, olhe para o teto ao subir.", null, ["peso corporal"]),
-        ex("lib-ab3", "Prancha Isométrica", "🔥", "Corpo reto, ative o core e sustente o tempo proposto.", null, ["peso corporal"]),
+        ex("lib-ab1", "Abdominal na Máquina", "abs-crunch", "Encoste a parte superior na almofada e faça a flexão sem puxar a cabeça.", "Abdominal (Máquina)", ["máquina"], "eq-demo-018"),
+        ex("lib-ab2", "Crunch no Solo", "abs-crunch", "Lombar colada no chão, olhe para o teto ao subir.", null, ["peso corporal"]),
+        ex("lib-ab3", "Crunch na Polia Alta", "cable", "Puxe a corda flexionando o tronco.", "Crossover / Polia", ["cabo"], "eq-demo-010"),
+        ex("lib-ab4", "Prancha Isométrica", "abs-plank", "Corpo reto, ative o core e sustente o tempo proposto.", null, ["peso corporal"]),
+        ex("lib-ab5", "Prancha com Elevação de Perna", "abs-plank", "Mantenha a prancha e eleve uma perna de cada vez.", null, ["peso corporal"]),
       ] },
       { id: "abd-infra", name: "Infra / Oblíquos", exercises: [
-        ex("lib-ab4", "Elevação de Perna (Infra)", "🔥", "Pendure-se ou apoie-se, eleve as pernas controlando o core.", null, ["peso corporal"]),
-        ex("lib-ab5", "Prancha Lateral", "🔥", "Apoie o cotovelo, mantenha o quadril alinhado.", null, ["peso corporal"]),
+        ex("lib-ab6", "Elevação de Perna (Infra)", "abs-crunch", "Pendure-se ou apoie-se, eleve as pernas controlando o core.", null, ["peso corporal"]),
+        ex("lib-ab7", "Prancha Lateral", "abs-plank", "Apoie o cotovelo, mantenha o quadril alinhado.", null, ["peso corporal"]),
+        ex("lib-ab8", "Russian Twist", "abs-crunch", "Rotação do tronco com halter ou peso corporal.", null, ["halter", "peso corporal"]),
+        ex("lib-ab9", "Bicicleta no Solo", "abs-crunch", "Rotação alternada de cotovelo e joelho oposto.", null, ["peso corporal"]),
+        ex("lib-ab10", "Mountain Climber", "abs-crunch", "Posição de prancha, traga os joelhos em direção ao peito alternadamente.", null, ["peso corporal"]),
       ] },
     ],
   },
   {
-    id: "cardio", name: "Cardio", icon: "🏃",
+    id: "cardio", name: "Cardio", icon: "cardio",
     subs: [
       { id: "cardio-maquinas", name: "Máquinas", exercises: [
-        ex("lib-es1", "Esteira", "🏃", "Comece leve e aumente a inclinação 1 a 1 a cada 2 min.", "Esteira Elétrica", [], "eq-demo-005"),
-        ex("lib-bi1", "Bicicleta Ergométrica", "🚴", "Cadência confortável, ajuste a resistência por percepção.", "Bicicleta Ergométrica", [], "eq-demo-006"),
-        ex("lib-ell", "Elíptico", "🚶", "Movimento contínuo, empurre com os calcanhares.", "Elíptico"),
-        ex("lib-row", "Remador", "🚣", "Empurre com as pernas, depois puxe com os braços; solte na ordem inversa.", "Remador"),
+        ex("lib-es1", "Esteira", "run", "Comece leve e aumente a inclinação 1 a 1 a cada 2 min.", "Esteira Elétrica", ["máquina"], "eq-demo-005"),
+        ex("lib-bi1", "Bicicleta Ergométrica", "bike", "Cadência confortável, ajuste a resistência por percepção.", "Bicicleta Ergométrica", ["máquina"], "eq-demo-006"),
+        ex("lib-ell", "Elíptico", "cardio", "Movimento contínuo, empurre com os calcanhares.", "Elíptico", ["máquina"], "eq-demo-016"),
+        ex("lib-row", "Remador", "rower", "Empurre com as pernas, depois puxe com os braços; solte na ordem inversa.", "Remador", ["máquina"], "eq-demo-017"),
       ] },
       { id: "cardio-hiit", name: "HIIT / Funcional", exercises: [
-        ex("lib-bur", "Burpee", "🤸", "Flexão → impulso → salto com as mãos acima da cabeça.", null, ["peso corporal"]),
-        ex("lib-crd", "Pular Corda", "🪢", "Pulos rápidos, aterrisse suave na ponta dos pés.", null, ["corda"]),
-        ex("lib-kett", "Swing de Kettlebell", "🪨", "Balanço pélvico empurrando o kettlebell à frente até a altura do peito.", null, ["kettlebell"]),
+        ex("lib-bur", "Burpee", "cardio", "Flexão → impulso → salto com as mãos acima da cabeça.", null, ["peso corporal"]),
+        ex("lib-crd", "Pular Corda", "cardio", "Pulos rápidos, aterrisse suave na ponta dos pés.", null, ["corda"]),
+        ex("lib-kett", "Swing de Kettlebell", "cardio", "Balanço pélvico empurrando o kettlebell à frente até a altura do peito.", null, ["kettlebell"]),
+        ex("lib-box", "Box Jump", "cardio", "Salto em cima do box com amortecimento suave.", null, ["box"]),
+        ex("lib-spr", "Sprint na Esteira", "run", "Corridas curtas e intensas com intervalo de recuperação.", "Esteira Elétrica", ["máquina"], "eq-demo-005"),
       ] },
     ],
   },
   {
-    id: "alongamento", name: "Alongamento", icon: "🧘",
+    id: "alongamento", name: "Alongamento", icon: "abs",
     subs: [
       { id: "along-geral", name: "Flexibilidade / Mobilidade", exercises: [
-        ex("lib-yl1", "Alongamento de Posterior", "🧘", "Sentado, alcance os pés mantendo a coluna alongada.", null, ["peso corporal"]),
-        ex("lib-yl2", "Quadril (Borboleta)", "🧘", "Plantas dos pés juntas, puxe os calcanhares para perto do corpo."),
-        ex("lib-yl3", "Mobilidade de Ombro", "🧘", "Gire os braços lentamente, aumentando a amplitude aos poucos."),
+        ex("lib-yl1", "Alongamento de Posterior", "legs", "Sentado, alcance os pés mantendo a coluna alongada.", null, ["peso corporal"]),
+        ex("lib-yl2", "Quadril (Borboleta)", "legs", "Plantas dos pés juntas, puxe os calcanhares para perto do corpo.", null, ["peso corporal"]),
+        ex("lib-yl3", "Mobilidade de Ombro", "shoulder", "Gire os braços lentamente, aumentando a amplitude aos poucos.", null, ["peso corporal"]),
+        ex("lib-yl4", "Alongamento de Peito", "chest", "Apoie o braço estendido na parede e rotacione o tronco.", null, ["peso corporal"]),
+        ex("lib-yl5", "Gato e Vaca", "abs", "Movimento lento de flexão e extensão lombar em quadrupedia.", null, ["peso corporal"]),
       ] },
     ],
   },

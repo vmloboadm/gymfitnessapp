@@ -13,7 +13,6 @@ import {
   Frown,
   Play,
   Sparkles,
-  Nfc,
   MessageCircle,
   CheckCircle2,
   RotateCcw,
@@ -134,16 +133,6 @@ export default function TreinoHomePage() {
   const [feeling, setFeeling] = useState<string | null>(null);
   const [detailEx, setDetailEx] = useState<ExerciseDetail | null>(null);
   const [summarySeconds, setSummarySeconds] = useState<number | null>(null);
-  /* Sessão POR APARELHO (fluxo NFC contextual): exercícioId → início.
-     No demo, tocar na instrução simula a leitura da tag. */
-  const [eqSessions, setEqSessions] = useState<Record<string, number>>({});
-  const [nowTick, setNowTick] = useState(Date.now());
-  const eqSessionCount = Object.keys(eqSessions).length;
-  useEffect(() => {
-    if (eqSessionCount === 0) return;
-    const i = setInterval(() => setNowTick(Date.now()), 1000);
-    return () => clearInterval(i);
-  }, [eqSessionCount]);
   const [rpe, setRpe] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "active" | "done">("idle");
   const [bodyCat, setBodyCat] = useState<string | null>(() => {
@@ -247,19 +236,17 @@ export default function TreinoHomePage() {
   const totalToday = data?.details.length ?? 0;
   const finishedToday = totalToday > 0 && todayLogs >= totalToday;
 
-  const machineByExercise = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!demo) return map;
-    demoLib.forEach((c) => c.subs.forEach((s) => s.exercises.forEach((e) => e.machineId && map.set(e.name, e.machineId))));
-    return map;
-  }, [demo]);
 
-  const conclude = () => {
+
+  const conclude = (completedIds?: string[]) => {
     setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
     endDaySession();
+    if (completedIds?.length) {
+      setDoneIds((prev) => new Set([...prev, ...completedIds]));
+    }
     navigator.vibrate?.([60, 40, 90]);
     setPhase("done");
-    toast.success("Treino concluído!");
+    toast.success("Treino registrado!");
   };
 
   // Conclusões desta sessão (otimista, local): alimenta contador e reordenação
@@ -391,7 +378,7 @@ export default function TreinoHomePage() {
   // Treino em andamento (demo), substitui a navegação normal.
   if (phase === "active" && demo) {
     const demoExercises = session ?? DEFAULT_DEMO_EX;
-    return <WorkoutInProgress exercises={demoExercises} onFinish={conclude} />;
+    return <WorkoutInProgress exercises={demoExercises} onFinish={(ids) => conclude(ids)} />;
   }
 
   if (!data?.workouts) {
@@ -636,7 +623,7 @@ export default function TreinoHomePage() {
                   </button>
                   {e.machineId ? (
                     <Badge variant="outline" className="shrink-0 !px-2 !text-[9px]">
-                      <Nfc className="mr-1 h-3 w-3 text-brand" /> NFC
+                      <ScanLine className="mr-1 h-3 w-3 text-brand" /> NFC
                     </Badge>
                   ) : null}
                 </button>
@@ -749,25 +736,6 @@ export default function TreinoHomePage() {
                     completed={completed}
                     isActive={!completed && idx === activeIdx}
                     onToggleComplete={() => toggleDone(exId)}
-                    machineFor={machineByExercise.get(d.exercise?.name ?? "") ?? ""}
-                    sessionStart={eqSessions[d.exercise_id ?? d.id] ?? null}
-                    now={nowTick}
-                    onStart={() => {
-                      const id = d.exercise_id ?? d.id;
-                      navigator.vibrate?.(40);
-                      setEqSessions((prev) => ({ ...prev, [id]: Date.now() }));
-                      toast.success("Sessão iniciada, cronômetro rodando");
-                    }}
-                    onFinish={() => {
-                      const id = d.exercise_id ?? d.id;
-                      navigator.vibrate?.(60);
-                      setEqSessions((prev) => {
-                        const next = { ...prev };
-                        delete next[id];
-                        return next;
-                      });
-                      toast.success("Exercício finalizado. Bom trabalho!");
-                    }}
                     onInfo={() =>
                       setDetailEx({
                         name: d.exercise?.name ?? "Exercício",
@@ -781,6 +749,23 @@ export default function TreinoHomePage() {
                   );
                   })}
               </div>
+
+              {/* Ação de finalizar — aparece assim que algum exercício for marcado */}
+              {doneCount > 0 ? (
+                <button
+                  onClick={() => {
+                    navigator.vibrate?.([60, 40, 60]);
+                    setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
+                    endDaySession();
+                    setPhase("done");
+                    toast.success("Treino finalizado!");
+                  }}
+                  className="gf-touch flex w-full items-center justify-center gap-2 rounded-xl bg-success py-3.5 text-sm font-black text-black shadow-lg shadow-success/25"
+                >
+                  <CheckCircle2 className="h-5 w-5" />
+                  Finalizar treino · {doneCount} de {totalToday} exercícios
+                </button>
+              ) : null}
             </div>
           )}
         </div>
@@ -849,31 +834,17 @@ export default function TreinoHomePage() {
 
 function ExerciseRow({
   item,
-  machineFor,
-  sessionStart,
-  now,
-  onStart,
-  onFinish,
   onInfo,
   completed,
   isActive,
   onToggleComplete,
 }: {
   item: TreinoDay;
-  machineFor: string;
-  sessionStart?: number | null;
-  now?: number;
-  onStart?: () => void;
-  onFinish?: () => void;
   onInfo: () => void;
   completed: boolean;
   isActive: boolean;
   onToggleComplete: () => void;
 }) {
-  const elapsed = sessionStart && now ? Math.max(0, Math.floor((now - sessionStart) / 1000)) : 0;
-  const demoModeHint = isDemoMode();
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
-  const ss = String(elapsed % 60).padStart(2, "0");
   const suggestion =
     item.exercise?.name === "Supino Reto"
       ? "Aparelho ocupado? Crucifixo com halteres no banco livre, mesmo estímulo, sem espera."
@@ -884,16 +855,15 @@ function ExerciseRow({
   const ex = item.exercise as (Exercises & { imageUrl?: string; videoUrl?: string }) | null;
   const photo = ex?.photo_url ?? ex?.imageUrl ?? null;
   const video = ex?.video_url ?? ex?.videoUrl ?? null;
-
   const glyph = fitnessForName(item.exercise?.name ?? "");
 
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={() => !completed && onToggleComplete()}
+      onClick={() => onToggleComplete()}
       onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && !completed) {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onToggleComplete();
         }
@@ -928,12 +898,11 @@ function ExerciseRow({
           <p className={cn("flex items-center gap-1.5 text-sm font-semibold", completed ? "text-muted-foreground line-through" : "text-foreground")}>
             {item.exercise?.name ?? "Exercício"}
             {isActive && !completed ? (
-              <span className="rounded-full bg-[#F4711E]/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-[#F4711E]">agora</span>
+              <span className="rounded-full bg-[#F4711E]/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-[#F4711E]">próximo</span>
             ) : null}
           </p>
           <p className="text-xs text-muted-foreground">
-            {item.sets} × {item.reps} · descanso {item.rest_seconds}s
-            {item.technique && item.technique !== "standard" ? ` · ${item.technique}` : ""}
+            {item.sets} séries × {item.reps} reps · descanso {item.rest_seconds}s
           </p>
           <div className="flex items-center gap-1.5 pt-1">
             {video ? (
@@ -941,6 +910,7 @@ function ExerciseRow({
                 href={video}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
                 className="tactile inline-flex items-center gap-1 rounded-full bg-brand/12 px-2.5 py-1 text-[10px] font-bold text-brand transition-colors hover:bg-brand/20"
               >
                 <Play className="h-3 w-3 fill-current" /> Ver vídeo
@@ -968,7 +938,6 @@ function ExerciseRow({
         >
           <MessageCircle className="h-3.5 w-3.5" />
         </button>
-        {/* toggle de conclusão: check verde quando feito */}
         <button
           onClick={(e) => { e.stopPropagation(); onToggleComplete(); }}
           aria-label={completed ? `Desmarcar ${item.exercise?.name}` : `Concluir ${item.exercise?.name}`}
@@ -985,44 +954,11 @@ function ExerciseRow({
         </button>
       </div>
 
-      {/* Sugestão GymFitness, destaque secundário discreto */}
       {suggestion ? (
         <p className="mt-2.5 border-l-2 border-brand/50 bg-brand/[0.06] py-1.5 pl-2.5 pr-2 text-[11px] leading-snug text-muted-foreground">
           <Sparkles className="mr-1 inline h-3 w-3 align-[-2px] text-brand" />
           {suggestion}
         </p>
-      ) : null}
-
-      {/* Fluxo NFC contextual por exercício */}
-      {sessionStart ? (
-        <div className="mt-2.5 flex items-center justify-between rounded-xl border border-success/40 bg-success/10 px-3 py-2.5">
-          <div className="flex items-center gap-2.5">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
-            </span>
-            <span className="pm-num text-[20px] leading-none text-foreground">{mm}:{ss}</span>
-            <span className="text-[11px] font-semibold text-success">em andamento</span>
-          </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); onFinish?.(); }}
-            className="gf-touch tactile rounded-full bg-success px-4 py-1.5 text-[11px] font-bold text-black transition-transform active:scale-95"
-          >
-            Finalizar
-          </button>
-        </div>
-      ) : machineFor ? (
-        <button
-          onClick={(e) => { e.stopPropagation(); onStart?.(); }}
-          className="tactile mt-2.5 flex w-full items-center justify-between rounded-xl border border-brand/30 bg-brand/[0.07] px-3 py-2.5 text-left transition-colors hover:border-brand/50"
-        >
-          <span className="flex items-center gap-1.5 text-[11px] font-medium text-brand">
-            <Nfc className="h-3.5 w-3.5" /> Encoste o celular no aparelho para começar a contar
-          </span>
-          {demoModeHint ? (
-            <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand">simular</span>
-          ) : null}
-        </button>
       ) : null}
 
       {item.exercise?.tips?.length ? <p className="mt-2 text-xs text-muted-foreground">{item.exercise.tips[0]}</p> : null}
