@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 /** Bottom Sheet deslizante de baixo (mobile-first), fecha no backdrop. */
@@ -32,7 +33,16 @@ export function BottomSheet({
             transition={{ type: "spring", stiffness: 320, damping: 32 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" aria-hidden />
+            <div className="relative">
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" aria-hidden />
+              <button
+                onClick={onClose}
+                aria-label="Fechar"
+                className="tactile absolute right-0 top-0 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
             {children}
           </motion.div>
         </motion.div>

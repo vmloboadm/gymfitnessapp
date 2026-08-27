@@ -24,12 +24,12 @@ export function streakStage(streak: number) {
   };
 }
 
-/* Intensidade visual por estágio: tamanho, tom e preenchimento da chama. */
+/* Intensidade visual por estágio: glow cresce com o streak — pedido pendente. */
 const STAGE_LOOK = [
-  { scale: 0.74, color: "#9AA5B8", glow: 0 },
-  { scale: 0.9, color: "#FFA36B", glow: 4 },
-  { scale: 1.05, color: "#FF8A3C", glow: 8 },
-  { scale: 1.22, color: "#F4711E", glow: 14 },
+  { scale: 0.74, color: "#7E8AA0", glow: 0 },
+  { scale: 0.92, color: "#FF8A3C", glow: 10 },
+  { scale: 1.08, color: "#F4711E", glow: 18 },
+  { scale: 1.28, color: "#FF6F16", glow: 28 },
 ];
 
 /** Chama do streak, ícone Lucide com variação de intensidade por estágio.
@@ -46,18 +46,33 @@ export function StreakFlame({ streak, size = 42 }: { streak: number; size?: numb
       className="relative inline-flex shrink-0 items-center justify-center"
       style={{ width: size, height: size }}
     >
+      {/* halo de fundo que cresce com o streak */}
+      {look.glow > 0 && (
+        <span
+          aria-hidden
+          className="absolute rounded-full"
+          style={{
+            width: dim * 1.6,
+            height: dim * 1.6,
+            background: `radial-gradient(circle, ${look.color}22 0%, transparent 70%)`,
+            filter: `blur(${look.glow * 0.6}px)`,
+          }}
+        />
+      )}
       <Flame
         style={{
           width: dim,
           height: dim,
           color: look.color,
-          filter: look.glow ? `drop-shadow(0 0 ${look.glow}px ${look.color})` : undefined,
+          filter: look.glow
+            ? `drop-shadow(0 0 ${look.glow}px ${look.color}) drop-shadow(0 0 ${look.glow * 0.6}px ${look.color}88)`
+            : undefined,
           animation: reduced ? undefined : "flame-flicker 0.9s ease-in-out infinite",
           transformOrigin: "50% 90%",
         }}
-        strokeWidth={1.75}
+        strokeWidth={1.8}
         fill={look.color}
-        fillOpacity={0.28 + stage.idx * 0.18}
+        fillOpacity={0.32 + stage.idx * 0.22}
       />
     </span>
   );

@@ -52,7 +52,7 @@ export function PerformanceRing({ done, goal }: { done: number; goal: number }) 
   const gradientId = doneGoal ? "pm-ringdone" : "pm-ringprog";
 
   return (
-    <div className="relative h-full w-full sm:h-[184px] sm:w-[184px] md:h-[208px] md:w-[208px] lg:h-[224px] lg:w-[224px]">
+    <div className="relative h-[148px] w-[148px] sm:h-[160px] sm:w-[160px] md:h-[172px] md:w-[172px]">
       <svg viewBox="0 0 230 230" className="h-full w-full">
         <defs>
           <linearGradient id="pm-ringbase" x1="0" y1="0" x2="0" y2="1">

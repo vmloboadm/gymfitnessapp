@@ -35,7 +35,7 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[#081020]/95 backdrop-blur supports-[backdrop-filter]:bg-[#081020]/85">
+    <nav id="bottom-nav" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[#081020]/95 backdrop-blur supports-[backdrop-filter]:bg-[#081020]/85">
       <div className="relative mx-auto max-w-md">
         {/* fades indicando que dá para rolar (affordance) */}
         <span className="pointer-events-none absolute right-0 top-0 z-10 h-full w-8 bg-gradient-to-l from-[#081020] to-transparent" aria-hidden />
