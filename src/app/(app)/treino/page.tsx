@@ -772,16 +772,51 @@ export default function TreinoHomePage() {
                   );
                   })}
               </div>
+
+              {/* Finalizar direto da lista — sem precisar abrir "Iniciar" */}
+              {doneCount > 0 && (
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-success/30 bg-success/10 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold leading-tight text-foreground">
+                      {doneCount}/{totalToday} concluídos
+                    </p>
+                    <p className="text-xs leading-tight text-muted-foreground">
+                      Finalize sem entrar no cronômetro
+                    </p>
+                  </div>
+                  <button
+                    onClick={conclude}
+                    className="tactile inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-full bg-success px-6 text-sm font-black tracking-tight text-black shadow-[0_4px_12px_rgba(51,209,122,0.3)] transition-all hover:bg-[#3DE68A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.98]"
+                  >
+                    Finalizar
+                  </button>
+                </div>
+              )}
+              {doneCount > 0 && doneCount < totalToday && (
+                <button
+                  onClick={() => {
+                    const allIds = data.details.map((d) => d.exercise_id ?? d.id);
+                    setDoneIds(new Set(allIds));
+                    toast.success("Todos marcados como concluídos");
+                  }}
+                  className="tactile mt-2 w-full rounded-xl border border-dashed border-white/10 py-2.5 text-xs font-semibold text-muted-foreground hover:border-success/30 hover:text-success"
+                >
+                  Marcar todos como feitos →
+                </button>
+              )}
             </div>
           )}
         </div>
 
-        {/* 4. PLANOS DISPONÍVEIS, preview bloqueado, liberação pelo personal */}
-        <div>
-          <div className="mb-2 flex items-center justify-between">
+        {/* 4. PLANOS DISPONÍVEIS — colapsável para não esticar a tela */}
+        <details className="group">
+          <summary className="tactile flex cursor-pointer list-none items-center justify-between rounded-xl border border-border bg-card/40 px-4 py-3">
             <h2 className="text-sm font-semibold text-foreground">Planos disponíveis</h2>
-            <span className="text-[10px] font-semibold text-muted-foreground">liberação pelo personal</span>
-          </div>
+            <span className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+              liberação pelo personal <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+            </span>
+          </summary>
+          <div className="mt-3">
           <div className="grid grid-cols-2 gap-3">
             {[
               {
@@ -827,7 +862,8 @@ export default function TreinoHomePage() {
               </div>
             ))}
           </div>
-        </div>
+          </div>
+        </details>
 
         {/* 5. HISTÓRICO RECENTE, accordion fechado por padrão */}
         <HistoryList logs={data.logs} />
