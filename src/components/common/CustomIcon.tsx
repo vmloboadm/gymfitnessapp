@@ -51,9 +51,9 @@ export function CustomIcon({
       className={className}
       width={size}
       height={size}
-      strokeWidth={1.9}
-      fill="none"
-      style={{ color: "#F4711E", filter: "drop-shadow(0 0 4px rgba(244,113,30,0.25))" }}
+      strokeWidth={1.8}
+      fill="rgba(244, 113, 30, 0.2)"
+      style={{ color: "#F4711E" }}
       aria-hidden
     />
   );
