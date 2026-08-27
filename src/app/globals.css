@@ -45,8 +45,12 @@
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
 }
 
+html.dark {
+  color-scheme: dark;
+}
+
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not(.dark) {
     --bg-base: #F5F7FC;
     --bg-card: #FFFFFF;
     --bg-elevated: #FFFFFF;

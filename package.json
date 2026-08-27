@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+  "smoke": "node scripts/smoke.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

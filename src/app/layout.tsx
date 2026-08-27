@@ -7,7 +7,8 @@ import { AppProviders } from "./providers";
 const sora = Sora({
   subsets: ["latin"],
   variable: "--font-display",
-  weight: ["400", "500", "600", "700", "800"],
+  // apenas pesos realmente usados nos títulos (menos arquivos na cabeça do doc)
+  weight: ["600", "700", "800"],
 });
 
 const inter = Inter({
@@ -19,12 +20,20 @@ const inter = Inter({
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
-  weight: ["400", "500", "600", "700"],
+  // contadores/badges usam semibold e bold apenas
+  weight: ["600", "700"],
 });
 
 export const metadata: Metadata = {
   title: "GymFitness",
   description: "App de academia com check-in NFC e métrica real",
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#070B14",
 };
 
 export default function RootLayout({
@@ -33,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className="dark" style={{ colorScheme: "dark" }}>
       <body className={`${inter.variable} ${sora.variable} ${jetbrainsMono.variable} antialiased`}>
         <AppProviders>{children}</AppProviders>
         <Toaster position="top-center" richColors closeButton />
