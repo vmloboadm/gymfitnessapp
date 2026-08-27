@@ -701,7 +701,7 @@ export default function TreinoHomePage() {
                         {totalToday} {totalToday === 1 ? "exercício" : "exercícios"} | {totalSets(data.details)} séries
                       </p>
                       <p className="pm-num text-sm text-[#FF9A5C]">
-                        {demo ? doneCount : Math.max(todayLogs, doneCount)} de {totalToday} exercícios concluídos hoje
+                        {todayLogs} de {totalToday} concluídos hoje
                       </p>
                     </div>
                     {demo ? (
@@ -719,7 +719,7 @@ export default function TreinoHomePage() {
                     <motion.div
                       className="h-full rounded-full bg-[#FF7A2F]"
                       initial={false}
-                      animate={{ width: `${Math.min(100, ((demo ? doneCount : Math.max(todayLogs, doneCount)) / Math.max(totalToday, 1)) * 100)}%` }}
+                      animate={{ width: `${Math.min(100, (todayLogs / Math.max(totalToday, 1)) * 100)}%` }}
                       transition={{ duration: 0.4 }}
                     />
                   </div>
@@ -727,19 +727,16 @@ export default function TreinoHomePage() {
               </div>
 
               <div className="space-y-2">
-                {[...data.details]
-                  .sort((a, b) => Number(doneIds.has(a.exercise_id ?? a.id)) - Number(doneIds.has(b.exercise_id ?? b.id)))
-                  .map((d, idx) => {
-                  const exId = d.exercise_id ?? d.id;
-                  const completed = doneIds.has(exId);
-                  const activeIdx = data.details.findIndex((x) => !doneIds.has(x.exercise_id ?? x.id));
+                {data.details.map((d) => {
                   return (
                   <ExerciseRow
                     key={d.id}
                     item={d}
-                    completed={completed}
-                    isActive={!completed && idx === activeIdx}
-                    onToggleComplete={() => toggleDone(exId)}
+                    completed={false}
+                    isActive={false}
+                    onToggleComplete={() => {
+                      toast("Toque em Iniciar para marcar no cronômetro", { icon: "⏱️" });
+                    }}
                     machineFor={machineByExercise.get(d.exercise?.name ?? "") ?? ""}
                     sessionStart={eqSessions[d.exercise_id ?? d.id] ?? null}
                     now={nowTick}
@@ -773,37 +770,7 @@ export default function TreinoHomePage() {
                   })}
               </div>
 
-              {/* Finalizar — só quando completo: ponto único de conclusão (sem duplicar com o cronômetro) */}
-              {doneCount === totalToday && totalToday > 0 && (
-                <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-success/30 bg-success/10 px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold leading-tight text-foreground">
-                      {doneCount}/{totalToday} concluídos — pronto!
-                    </p>
-                    <p className="text-xs leading-tight text-muted-foreground">
-                      Conclusão definitiva aqui
-                    </p>
-                  </div>
-                  <button
-                    onClick={conclude}
-                    className="tactile inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-full bg-success px-6 text-sm font-black tracking-tight text-black shadow-[0_4px_12px_rgba(51,209,122,0.3)] transition-all hover:bg-[#3DE68A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.98]"
-                  >
-                    Finalizar
-                  </button>
-                </div>
-              )}
-              {doneCount > 0 && doneCount < totalToday && (
-                <button
-                  onClick={() => {
-                    const allIds = data.details.map((d) => d.exercise_id ?? d.id);
-                    setDoneIds(new Set(allIds));
-                    toast.success("Todos marcados — agora finalize");
-                  }}
-                  className="tactile mt-2 w-full rounded-xl border border-dashed border-white/10 py-2.5 text-xs font-semibold text-muted-foreground hover:border-success/30 hover:text-success"
-                >
-                  Marcar todos como feitos →
-                </button>
-              )}
+              {/* Fluxo único: marcar/finalizar só no cronômetro (Iniciar) — sem atalho duplicado aqui */}
             </div>
           )}
         </div>
