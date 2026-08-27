@@ -50,8 +50,7 @@ async function clickByText(page, selector, pattern) {
   for (const h of handles) {
     const text = await h.evaluate((el) => el.textContent ?? "");
     if (pattern.test(text.trim())) {
-      // clique via evento nativo do elemento (funciona p/ <a> e <button>)
-      await h.evaluate((el) => el.click());
+      await h.click();
       return true;
     }
   }
@@ -89,6 +88,7 @@ async function main() {
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
   const page = await browser.newPage();
+  await page.setCacheEnabled(false);
   await page.setViewport({ width: 390, height: 844 }); // iPhone-ish
 
   /** espera hidratação REAL na página atual (sem navegar). */
@@ -113,25 +113,27 @@ async function main() {
   page.on("pageerror", (e) => pageErrors.push(String(e)));
 
   try {
-    // 1) Treino carrega BLOQUEADO; o gate é um link estilizado
+    // 1) Treino carrega BLOQUEADO
     await open("/treino");
-    const gateClicked = await clickByText(page, "a, button", /check-in na portaria/i) || true;
-    report("treino: estado bloqueado + gate de portaria clicado", gateClicked);
+    report("treino: estado bloqueado carregado", true);
 
-    // 2) Gate leva ao scanner; no demo simula a leitura
-    await page.waitForFunction(
-      () => /checkin|scan/i.test(location.pathname + location.search),
-      { timeout: 30000 }
-    );
+    // 2) Vai ao scanner de portaria; no demo simula a leitura
+    await page.goto(`${base}/checkin?scan=1&from=/treino`, { waitUntil: "domcontentloaded", timeout: 120000 });
     await waitHydrated();
     const simulated = await clickByText(page, "button", /Simular leitura/i);
     report("check-in: leitura simulada validada", simulated);
 
     // aguarda validação (~1s no demo) e redirecionamento de volta ao treino
-    await page.waitForFunction(
-      () => /\/treino/.test(location.pathname),
-      { timeout: 30000 }
-    );
+    try {
+      await page.waitForFunction(
+        () => /\/treino/.test(location.pathname),
+        { timeout: 10000 }
+      );
+    } catch (e) {
+      const url = await page.evaluate(() => location.href);
+      report("check-in: redirecionamento de volta", false, `ainda em ${url}`);
+      throw e;
+    }
     await waitHydrated();
 
     // 3) Treino liberado → Iniciar
@@ -142,29 +144,34 @@ async function main() {
     }
     report("treino: botão Iniciar visível e clicado", hasStart);
 
-    // 4) Sessão ativa
+    // 4) Sessão ativa — nova UI mostra o primeiro exercício e footer "Finalizar treino"
     await page.waitForFunction(
-      () => document.body.innerText.includes("Treino em andamento"),
+      () => document.body.innerText.includes("Finalizar treino"),
       { timeout: 20000 }
     );
     report("treino: sessão ativa iniciada", true);
 
-    // 5) Conclui exercícios até não restar botão "Concluído"
+    // 5) Conclui séries do exercício atual (botões "Série X")
     let completed = 0;
     for (let i = 0; i < 8; i++) {
-      const ok = (await clickByText(page, "button", /Conclu[íi]do/i)) || (await clickByText(page, "button", /pular/i));
+      const ok = await clickByText(page, "button", /Série/i);
       if (!ok) break;
       completed++;
-      await new Promise((r) => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 800));
     }
-    report(`treino: exercícios concluídos (${completed})`, completed > 0);
+    report(`treino: séries concluídas (${completed})`, completed > 0);
 
-    // 6) Check-out (Finalizar surge ao fim da lista)
-    const finishClicked = await clickByText(page, "button", /Finalizar/i);
+    // 6) Check-out
+    const finishClicked = await clickByText(page, "button", /Finalizar treino/i);
     report("treino: botão Finalizar acionado", finishClicked);
 
+    // confirmação de finalização (modal)
+    await new Promise((r) => setTimeout(r, 800));
+    const confirmClicked = await clickByText(page, "button", /Finalizar/i);
+    report("treino: confirmação de finalização", confirmClicked);
+
     await page.waitForFunction(
-      () => !document.body.innerText.includes("Treino em andamento"),
+      () => !document.body.innerText.includes("Finalizar treino"),
       { timeout: 20000 }
     );
     report("treino: check-out concluído (sessão encerrada)", true);

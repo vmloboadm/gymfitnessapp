@@ -331,7 +331,7 @@ export default function TreinoHomePage() {
   const needsCheckin = !daySession;
   const checkinBanner = needsCheckin ? (
     <div className="mx-auto max-w-md px-4 pt-3">
-      <Link href="/checkin?scan=1" className="flex items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning/[0.08] px-4 py-2.5">
+      <Link href="/checkin?scan=1&from=/treino" className="flex items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning/[0.08] px-4 py-2.5">
         <span className="flex items-center gap-2 text-[12px] font-bold text-warning">
           <Lock className="h-4 w-4" /> Faça o check-in na portaria pra registrar presença
         </span>
@@ -891,7 +891,7 @@ function ExerciseRow({
               completed ? "border-success/40 bg-success/10" : isActive ? "border-[#F4711E]/40 bg-[#F4711E]/10" : "border-white/[0.06] bg-muted/40"
             )}
           >
-            <FitnessIcon glyph={glyph} size={28} variant={completed ? "success" : "brand"} />
+            <FitnessIcon glyph={glyph} size={28} />
           </span>
         )}
         <div className="min-w-0 flex-1 space-y-0.5">
