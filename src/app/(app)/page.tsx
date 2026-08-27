@@ -737,7 +737,7 @@ export default function HomePage() {
 
         {/* Marcador de build, confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 26/08 v26
+          GymFitness · build 27/08 v27
         </p>
           </>
         ) : null}
