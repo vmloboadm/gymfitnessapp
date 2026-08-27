@@ -11,7 +11,7 @@ import { cn } from "~/lib/utils";
 import { formatDate } from "~/lib/utils/format";
 import { isDemoMode } from "~/lib/demo-bridge";
 import { sortedAchievements, type StudentAchievement } from "~/lib/achievements";
-import { CustomIcon, groupForName } from "~/components/common/CustomIcon";
+import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 
 type Ach = StudentAchievement & { gym_id?: string | null };
 
@@ -100,7 +100,7 @@ export default function ConquistasPage() {
                 {earnedCount} de {data?.list.length ?? 0} liberadas nesta academia
               </p>
             </div>
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand/15"><CustomIcon name="peito" size={28} /></span>
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand/15"><FitnessIcon glyph="chest" size={28} /></span>
           </div>
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-card/60">
             <motion.div
@@ -135,7 +135,7 @@ export default function ConquistasPage() {
                 >
                   <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-card/70 text-2xl">
                     {earned ? (
-                    <CustomIcon name={groupForName(a.name)} size={26} />
+                    <FitnessIcon glyph={fitnessForName(a.name)} size={26} />
                   ) : (
                     <Lock className="h-5 w-5 text-muted-foreground" />
                   )}

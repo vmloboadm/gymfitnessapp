@@ -16,7 +16,7 @@ import { LEAGUES, leagueFor } from "~/lib/utils/leagues";
 import { cn } from "~/lib/utils";
 import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
 import { recentAchievements } from "~/lib/achievements";
-import { CustomIcon, groupForName } from "~/components/common/CustomIcon";
+import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import type { Leaderboard, Profiles } from "~/lib/types/models";
 
 // Ligas por faixa (gamificação estilo Duolingo)
@@ -188,7 +188,7 @@ export default function RankingPage() {
           </div>
         </div>
 
-        {/* Pódio, top 3 da semana em destaque */}
+        {/* Pódio, top 3 da semana em destaque — 1º central, mais alto */}
         {!loading && !error && data && data.rows.length >= 3 ? (
           <div className="gf-rise rounded-[20px] border border-border bg-card/40 p-4" style={{ animationDelay: "120ms" }}>
             <p className="gf-section mb-3">Pódio da semana</p>
@@ -196,15 +196,12 @@ export default function RankingPage() {
               {[1, 0, 2].map((pos) => {
                 const row = data.rows[pos];
                 if (!row) return null;
-                const heights = ["h-20", "h-28", "h-14"];
+                // altura por MÉRITO: 1º mais alto no centro
+                const height = pos === 0 ? "h-28" : pos === 1 ? "h-20" : "h-14";
+                const avatarSize = pos === 0 ? "h-16 w-16" : "h-14 w-14";
                 const MedalIcon = pos === 0 ? Crown : Medal;
+                const medalColor = pos === 0 ? "#FBBF24" : pos === 1 ? "#E5E7EB" : "#D97706";
                 const medalTone = pos === 0 ? "text-[#FBBF24]" : pos === 1 ? "text-[#E5E7EB]" : "text-[#D97706]";
-                const glowColor = pos === 0 ? "#FBBF24" : pos === 1 ? "#E5E7EB" : "#D97706";
-                const tones = [
-                  "bg-gradient-to-b from-[#FBBF24]/20 to-transparent",
-                  "bg-gradient-to-b from-[#E5E7EB]/15 to-transparent",
-                  "bg-gradient-to-b from-[#D97706]/20 to-transparent",
-                ];
                 return (
                   <Link
                     key={row.id}
@@ -215,11 +212,16 @@ export default function RankingPage() {
                     <MedalIcon className={cn("h-5 w-5", medalTone)} aria-hidden />
                     <Avatar
                       className={cn(
-                        "h-14 w-14 ring-2 transition-transform group-hover:scale-105",
-                        pos === 0 ? "ring-[#FBBF24]" : pos === 1 ? "ring-[#E5E7EB]" : "ring-[#D97706]"
+                        "ring-[3px] transition-transform group-hover:scale-105",
+                        avatarSize
                       )}
-                      style={{ boxShadow: `0 0 22px ${glowColor}66` }}
+                      style={{ boxShadow: `0 0 22px ${medalColor}66` }}
                     >
+                      <span
+                        className="absolute inset-0 rounded-full"
+                        style={{ boxShadow: `inset 0 0 0 3px ${medalColor}` }}
+                        aria-hidden
+                      />
                       <AvatarImage src={row.student?.avatar_url ?? avatarFor(row.student_id)} alt={row.student?.name ?? "Atleta"} />
                       <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
                         {(row.student?.name?.[0] ?? "?").toUpperCase()}
@@ -230,8 +232,12 @@ export default function RankingPage() {
                       {row.student_id === (user?.id ?? ME) ? " (você)" : ""}
                     </p>
                     <div
-                      className={cn("flex w-full items-start justify-center rounded-t-xl border-t border-x pt-2", heights[pos], tones[pos])}
-                      style={{ borderColor: `${glowColor}88`, boxShadow: `inset 0 12px 24px -12px ${glowColor}55` }}
+                      className={cn(
+                        "flex w-full items-start justify-center rounded-t-xl border-t border-x pt-2",
+                        height,
+                        pos === 0 ? "bg-gradient-to-b from-[#FBBF24]/20 to-transparent" : pos === 1 ? "bg-gradient-to-b from-[#E5E7EB]/15 to-transparent" : "bg-gradient-to-b from-[#D97706]/20 to-transparent"
+                      )}
+                      style={{ borderColor: `${medalColor}88`, boxShadow: `inset 0 12px 24px -12px ${medalColor}55` }}
                     >
                       <span className="gf-hero-num text-base">{formatNumber(row.points)}</span>
                     </div>
@@ -253,7 +259,7 @@ export default function RankingPage() {
           <div className="grid grid-cols-3 gap-2">
             {recentAchievements(3).map((a) => (
               <div key={a.id} className="flex flex-col items-center gap-1 rounded-xl border border-brand/30 bg-brand-soft/25 px-2 py-3 text-center">
-                <CustomIcon name={groupForName(a.name)} size={20} />
+                <FitnessIcon glyph={fitnessForName(a.name)} size={20} />
                 <span className="text-[9px] leading-tight text-muted-foreground">{a.name}</span>
               </div>
             ))}
@@ -261,7 +267,7 @@ export default function RankingPage() {
           <p className="mt-2 text-[10px] text-muted-foreground">Últimas conquistas · lista completa no seu Perfil</p>
         </div>
 
-        {/* Ranking numérico */}
+        {/* Ranking numérico — continuação direta do pódio (4º em diante) */}
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h3 className="flex items-center gap-1.5 text-sm font-bold text-foreground">
@@ -271,6 +277,9 @@ export default function RankingPage() {
               reset {formatDate(weekStart.toISOString())}
             </Badge>
           </div>
+          <p className="mb-2 text-[10px] text-muted-foreground">
+            4º lugar em diante · mesma liga, ordenado por pontos
+          </p>
 
           {loading ? (
             <SkeletonList rows={8} />
@@ -283,7 +292,7 @@ export default function RankingPage() {
               icon={Users}
             />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 pb-4">
               {data?.rows.slice(3).map((row, i) => {
                 const league = leagueFor(row.points);
                 const glyphC = LEAGUE_GLYPHS[league.id]?.color ?? "#B8C4D8";
@@ -297,21 +306,7 @@ export default function RankingPage() {
                     style={{ borderLeft: `3px solid ${glyphC}`, animationDelay: `${Math.min(i * 40, 320)}ms` }}
                   >
                     <div className="w-7 shrink-0 text-center">
-                      {i === 0 ? (
-                        <span className="mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-warning/15">
-                          <Crown className="h-4 w-4 text-warning" />
-                        </span>
-                      ) : i === 1 ? (
-                        <span className="mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-slate-400/15">
-                          <Medal className="h-4 w-4 text-slate-300" />
-                        </span>
-                      ) : i === 2 ? (
-                        <span className="mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-brand/15">
-                          <Medal className="h-4 w-4 text-brand" />
-                        </span>
-                      ) : (
-                        <span className="gf-hero-num text-sm text-muted-foreground">{i + 4}</span>
-                      )}
+                      <span className="gf-hero-num text-sm font-bold text-muted-foreground">{i + 4}</span>
                     </div>
                     <Avatar className="h-9 w-9">
                       <AvatarImage src={row.student?.avatar_url ?? avatarFor(row.student_id)} alt={row.student?.name ?? "Atleta"} />
@@ -319,27 +314,10 @@ export default function RankingPage() {
                         {(row.student?.name?.[0] ?? "?").toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-foreground">
-                        {row.student?.name ?? "Aluno"}
-                        {row.student_id === (user?.id ?? ME) ? <span className="ml-1 text-xs text-brand">(você)</span> : null}
-                      </p>
-                      <p className="gf-hero-num flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <span>{formatNumber(row.load_kg)} kg · {row.sessions} {row.sessions === 1 ? "sessão" : "sessões"}</span>
-                        <LeagueGlyph id={league.id} size={10} className="inline" />
-                      </p>
-                    </div>
-
-                  {i >= 3 ? (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] overflow-hidden rounded-b-xl">
-                      <motion.div
-                        className="h-full bg-gradient-to-r from-brand/70 to-brand"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, (row.points / Math.max(data.rows[0]?.points ?? 1, 1)) * 100)}%` }}
-                        transition={{ duration: 0.9, delay: 0.3 + Math.min(i * 0.05, 0.6), ease: [0.2, 0.8, 0.2, 1] }}
-                      />
-                    </div>
-                  ) : null}
+                    <p className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                      {row.student?.name ?? "Aluno"}
+                      {row.student_id === (user?.id ?? ME) ? <span className="ml-1 text-xs text-brand">(você)</span> : null}
+                    </p>
                     <span className="gf-hero-num shrink-0 text-sm text-foreground">{formatNumber(row.points)}<span className="text-[10px] text-muted-foreground"> pts</span></span>
                   </div>
                 );
@@ -347,6 +325,41 @@ export default function RankingPage() {
             </div>
           )}
         </div>
+
+        {/* Card fixo: você fora do pódio — quanto falta pro Top 3 */}
+        {!loading && !error && data && myRank >= 3 && mine ? (
+          (() => {
+            const third = data.rows[2];
+            const target = third?.points ?? 0;
+            const gap = Math.max(0, target - mine.points);
+            const pct = target > 0 ? Math.min(100, (mine.points / target) * 100) : 100;
+            return (
+              <div
+                className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+64px)] z-30 mx-auto max-w-md px-4"
+                aria-live="polite"
+              >
+                <div className="rounded-2xl border border-brand/50 bg-[#081020]/95 p-3.5 shadow-[0_0_24px_rgba(244,113,30,0.25)] backdrop-blur">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="font-black text-foreground">
+                      Você está em <span className="text-[#F4711E]">{myRank + 1}º</span> lugar
+                    </span>
+                    <span className="font-semibold text-muted-foreground">
+                      {gap > 0 ? `faltam ${formatNumber(gap)} pts pro 3º` : "no pódio!"}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-card">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-brand to-warning"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.9, ease: [0.2, 0.8, 0.2, 1] }}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })()
+        ) : null}
 
         {/* Explanations */}
         <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "240ms" }}>

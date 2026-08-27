@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Camera } from "lucide-react";
+
 
 /**
  * RewardModal — comemoração estilo Duolingo/Strava:

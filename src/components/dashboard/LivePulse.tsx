@@ -4,13 +4,11 @@ import { motion } from "framer-motion";
 import { Activity } from "lucide-react";
 import { MiniEcg } from "./ECGLine";
 import { livePulse } from "./mocks";
-import { useReducedMotion } from "~/hooks/useReducedMotion";
 
 /** Pulso da academia, termômetro vivo de ocupação (FOMO & social proof).
     O ícone de batimento é um ECG contínuo (trilha em loop), nunca imagem parada. */
 export function LivePulse({ online }: { online: number }) {
   const hour = new Date().getHours();
-  const reduced = useReducedMotion();
   const { phrase, occupancy } = livePulse(hour, online);
   const pct = Math.max(8, Math.round(occupancy * 100));
 

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { getSupabaseBrowser } from "~/lib/supabase/client";
+import { logger } from "~/lib/logger";
 
 type QueueAction = {
   id: string;
@@ -29,16 +31,28 @@ export function OfflineSyncListener() {
       if (queue.length === 0) return;
 
       try {
+        const supabase = getSupabaseBrowser();
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) return; // sem sessão, não há como sincronizar com segurança
+
         const res = await fetch("/api/sync", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({ actions: queue }),
         });
         if (res.ok) {
           window.localStorage.removeItem(STORAGE_KEY);
+          logger.info("sync.flush_ok", { count: queue.length });
+        } else {
+          logger.warn("sync.flush_rejected", { status: res.status, count: queue.length });
         }
-      } catch {
+      } catch (err) {
         // offline de novo, mantém a fila para a próxima tentativa
+        logger.warn("sync.flush_offline", { count: queue.length, err });
       }
     };
 

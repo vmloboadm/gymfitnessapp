@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ScanLine, Check, X, LogIn, LogOut, Dumbbell, HeartPulse, Zap, Wrench } from "lucide-react";
+import { ScanLine, Check, X, LogIn, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { Button } from "~/components/ui/button";
-import { Badge } from "~/components/ui/badge";
-import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
+import { SkeletonList, ErrorState } from "~/components/common/AsyncStates";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { toast } from "sonner";
 import type { Equipment, EquipmentSessions } from "~/lib/types/models";
@@ -23,14 +22,8 @@ import {
 } from "~/lib/demo-bridge";
 import { cn } from "~/lib/utils";
 
-type CategoryMeta = { icon: any; label: string };
 
-const categoryMeta: Record<string, CategoryMeta> = {
-  strength: { icon: Dumbbell, label: "Força" },
-  cardio: { icon: HeartPulse, label: "Cardio" },
-  functional: { icon: Zap, label: "Funcional" },
-  flexibility: { icon: Zap, label: "Flexibilidade" },
-};
+
 
 export default function CheckinPage() {
   const { user, profile } = useAuth();
@@ -238,12 +231,13 @@ export default function CheckinPage() {
       return;
     }
     if (doorMode) {
-      // tag da PORTARIA: qualquer leitura valida a entrada do dia
+      // tag da PORTARIA: valida entrada e leva DIRETO à tela de execução
       navigator.vibrate?.([60, 40, 60]);
       startDaySession();
-      toast.success("Entrada validada! Treino liberado 💪");
+      sessionStorage.setItem("gf_autostart", "1");
       stopScanning();
-      backToOrigin();
+      toast.success("Entrada validada! Treino liberado");
+      router.push("/treino");
       return;
     }
     toast.error("Código não corresponde a nenhum equipamento");
@@ -260,12 +254,6 @@ export default function CheckinPage() {
   const [nfcActive, setNfcActive] = useState(false);
   const nfcAbortRef = useRef<AbortController | null>(null);
 
-  const todayLocalKey = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  };
-
-
   const backToOrigin = () => router.replace(cameFrom ?? "/");
 
   const startNfcScan = async () => {
@@ -275,17 +263,30 @@ export default function CheckinPage() {
       });
       return;
     }
+    // Tipagem mínima da Web NFC API (sem @types/web-nfc no projeto).
+    type NdefRecord = { data?: ArrayBuffer };
+    type NdefMessage = { records?: NdefRecord[] };
+    type NdefReaderLike = {
+      scan: (opts: { signal: AbortSignal }) => Promise<void>;
+      addEventListener: (
+        ev: "reading" | "readingerror",
+        cb: (e?: { message?: NdefMessage }) => void
+      ) => void;
+    };
+
     try {
-      const ndef = new (window as any).NDEFReader();
+      const Ctor = (window as unknown as { NDEFReader: new () => NdefReaderLike })
+        .NDEFReader;
+      const ndef = new Ctor();
       navigator.vibrate?.(20);
       setNfcActive(true);
       nfcAbortRef.current = new AbortController();
       await ndef.scan({ signal: nfcAbortRef.current.signal });
 
-      ndef.addEventListener("reading", ({ message }: any) => {
+      ndef.addEventListener("reading", (evt) => {
         const decoder = new TextDecoder();
         let text = "";
-        for (const record of message.records ?? []) {
+        for (const record of evt?.message?.records ?? []) {
           text += decoder.decode(record.data ?? new ArrayBuffer(0));
         }
         setNfcActive(false);
@@ -296,9 +297,9 @@ export default function CheckinPage() {
         setNfcActive(false);
         toast.error("Não deu para ler a tag. Aproxime de novo ou use o QR.");
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setNfcActive(false);
-      if (err?.name !== "AbortError") {
+      if ((err as { name?: string } | null)?.name !== "AbortError") {
         toast.error("Não foi possível iniciar o NFC.", { description: "Verifique a permissão e se o NFC está ligado." });
       }
     }
@@ -369,9 +370,11 @@ useEffect(() => {
 
   const doEntry = async (source: "nfc" | "qrcode" | "app" = "app") => {
     if (demo) {
+      sessionStorage.setItem("gf_autostart", "1");
       setGymEntry({ id: "ck-demo-" + Date.now(), checked_at: new Date().toISOString(), source });
       startDaySession();
       toast.success("Check-in de entrada realizado!");
+      router.push("/treino");
       return;
     }
     if (!user || !profile) return;
@@ -492,7 +495,7 @@ endWorkoutSession();
                         setMockValidating(false);
                         navigator.vibrate?.([60, 40, 60]);
                         startDaySession();
-                        toast.success("Entrada validada! Treino liberado 💪");
+                        toast.success("Entrada validada! Treino liberado");
                         backToOrigin();
                       }, 1000);
                     }}

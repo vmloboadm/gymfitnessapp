@@ -27,8 +27,9 @@ import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Badge } from "~/components/ui/badge";
-import AiCoach from "~/components/ai/coach-chat";
+import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
+import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import { isDemoMode, demoLib, demoEquipment, demoTreinoData } from "~/lib/demo-bridge";
 import type { Equipment } from "~/lib/types/models";
 import type { LucideIcon } from "lucide-react";
@@ -69,7 +70,7 @@ function buildPesosLiberos(demoLib: DemoCategory[], ql: string): DemoCategory | 
     (e) => !subs.some((s) => s.exercises.some((x) => x.id === e.id))
   );
   if (leftovers.length > 0) subs.push({ id: "livres", name: "Livre", exercises: leftovers });
-  return { id: "pesos", name: "Pesos Livres", icon: "🎯", subs };
+  return { id: "pesos", name: "Pesos Livres", icon: "pesos", subs };
 }
 
 export default function EquipamentoPage() {
@@ -301,7 +302,9 @@ function ExerciseRow({
 
   return (
     <div className={cn("flex items-center gap-3 rounded-xl border p-3 transition-colors", inToday ? "border-brand/45 bg-brand-soft/20" : "border-border bg-card/40")}>
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-xl">{e.picto}</span>
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">
+        <FitnessIcon glyph={fitnessForName(e.name)} size={24} />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-semibold text-foreground">
           {e.name}
@@ -352,7 +355,9 @@ function InfoSheet({ ex, onClose }: { ex: DemoExercise; onClose: () => void }) {
       <div className="w-full max-w-md rounded-t-2xl border border-border bg-background p-5 pb-8 md:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-soft text-2xl">{ex.picto}</span>
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-soft">
+              <FitnessIcon glyph={fitnessForName(ex.name)} size={28} />
+            </span>
             <div>
               <h3 className="text-lg font-bold text-foreground">{ex.name}</h3>
               {ex.equipment ? (

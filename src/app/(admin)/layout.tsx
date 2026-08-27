@@ -44,7 +44,7 @@ export default function AdminLayout({
       </div>
 
       <main className="lg:pl-64">
-        <div className="mx-auto max-w-6xl px-4 pb-28 pt-4 md:px-6 lg:py-6">{children}</div>
+        <main className="mx-auto max-w-6xl px-4 pb-28 pt-4 md:px-6 lg:py-6">{children}</main>
       </main>
 
       {/* bottom nav mobile-first */}

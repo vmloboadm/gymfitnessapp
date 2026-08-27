@@ -44,7 +44,6 @@ export function recoveryState(catId: string, lastISO: string | null | undefined)
   return h >= (RECOVERY_HOURS[catId] ?? 24) ? "recuperado" : "recuperando";
 }
 
-const DAY_LABELS: Record<string, string> = {};
 
 function build(logs: WorkoutLogs[], categoryOf?: (exerciseId: string) => string | null): TodayWorkout {
   const focus = nextWorkoutFromLogs(logs);

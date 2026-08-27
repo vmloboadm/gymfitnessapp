@@ -76,7 +76,21 @@ export interface Database {
       student_trainers: RowTables<StudentTrainers>;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      purchase_day_pass: {
+        Args: {
+          p_gym_slug: string;
+          p_name: string;
+          p_email?: string | null;
+          p_phone?: string | null;
+        };
+        Returns: Array<{ id: string; code: string; expires_at: string }>;
+      };
+      my_day_passes: {
+        Args: { p_codes: string[] };
+        Returns: DayPasses[];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

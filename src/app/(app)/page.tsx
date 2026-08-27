@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
-import { ChevronRight, ChevronDown, Activity, Award, Trophy, CheckCircle2, Gem, Crown, ArrowUpRight, ScanLine } from "lucide-react";
+import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLine } from "lucide-react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -16,11 +16,11 @@ import { cn } from "~/lib/utils";
 import { calcStreak, weekdayName, startOfWeek } from "~/lib/utils/calculations";
 import { cap } from "~/lib/utils/format";
 import { leagueFor } from "~/lib/utils/leagues";
-import { getTodayWorkout, type TodayWorkout } from "~/lib/today-workout";
 import { useWorkoutSession } from "~/lib/workout-session";
+import { getTodayWorkout } from "~/lib/today-workout";
 import { SessionClock } from "~/components/common/SessionClock";
 import { GYM_HIGHLIGHTS, TIPS_STRUCTURED } from "~/components/dashboard/mocks";
-import AiCoach from "~/components/ai/coach-chat";
+import { AiCoach } from "~/components/ai/AiCoachLazy";
 import PersonalHome from "~/components/personal/PersonalHome";
 import { StreakFlame, FlameStageHint } from "~/components/dashboard/StreakFlame";
 import { PerformanceRing } from "~/components/dashboard/PerformanceRing";
@@ -42,16 +42,6 @@ import {
 } from "~/components/dashboard/mocks";
 import type { WorkoutLogs, Leaderboard } from "~/lib/types/models";
 
-const TIPS = [
-  "Beba água antes do treino: hidratação vale até 20% da sua força.",
-  "Aquecer 10 minutinhos antes evita lesão e melhora todo o treino.",
-  "Durma 7 a 8 horas: é no sono que o músculo treinado cresce.",
-  "Se não deu pra treinar ontem, retome hoje, o importante é não desistir.",
-  "Aumente a carga aos poucos, a cada 2 semanas, para o músculo evoluir.",
-  "Escolha um horário fixo: quem treina sempre no mesmo horário falta menos.",
-  "Pós-treino: coma proteína e carbo em até 1 hora para se recuperar melhor.",
-  "Fôlego é treino: a cada semana, tente mais 1 repetição no último exercício.",
-];
 const META_SEMANAL = 7; // mock: virá do onboarding (frequência escolhida pelo aluno)
 const ME_ID = "00000000-0000-0000-0000-000000000099";
 
@@ -169,6 +159,28 @@ function LeagueGlyphMotion({ id }: { id: string }) {
   );
 }
 
+
+/** Número que conta do 0 ao valor (600ms). Zero JS-lib em telas lentas. */
+function CountUp({ value, suffix = "", className }: { value: number; suffix?: string; className?: string }) {
+  const reduce = useReducedMotion();
+  const [shown, setShown] = useState(() => (reduce ? value : 0));
+  useEffect(() => {
+    if (reduce) { setShown(value); return; }
+    let raf = 0;
+    const t0 = performance.now();
+    const dur = 600;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - t0) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setShown(Math.round(value * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, reduce]);
+  return <span className={className}>{shown}{suffix}</span>;
+}
+
 export default function HomePage() {
   const { user, profile, loading } = useAuth();
   const router = useRouter();
@@ -193,6 +205,8 @@ export default function HomePage() {
       const t = setTimeout(() => heroRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 350);
       return () => clearTimeout(t);
     }
+    // isCheckedInToday é derivado de `session`: intencional não listar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   useEffect(() => {
@@ -308,7 +322,6 @@ export default function HomePage() {
   const destaque = destaques[new Date().getDate() % Math.max(1, destaques.length)];
   const mundo = (demo ? demoMundoFit() : [])[0];
   const online = demo ? demoOnlineAgora() : 0;
-  const tip = TIPS[new Date().getDate() % TIPS.length];
   const structuredTip = TIPS_STRUCTURED[new Date().getDate() % TIPS_STRUCTURED.length];
 
   const hour = today.getHours();
@@ -393,7 +406,7 @@ export default function HomePage() {
               <button
                 onClick={() => {
                   endSession();
-                  toast.success("Treino finalizado. Descanse bem! 🌙");
+                  toast.success("Treino finalizado. Descanse bem!");
                 }}
                 className="gf-touch tactile shrink-0 rounded-full bg-success px-4 py-2 text-[12px] font-black text-black transition-transform active:scale-95"
               >
@@ -469,28 +482,24 @@ export default function HomePage() {
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.94 }}
-                initial={{ opacity: 0, scale: 0.85, y: 12 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 18, delay: 0.1 }}
-                className="relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[18px] border border-white/[0.06] bg-white/[0.02] px-3 py-5 after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
+                className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[18px] border border-white/[0.06] bg-white/[0.02] px-3 py-5 after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
+                style={{ animationDelay: "80ms" }}
               >
                 {showConfetti ? <ConfettiBurst /> : null}
                 <StreakFlame streak={streak} size={30} />
-                <p className="pm-num mt-1 text-[26px] text-[#F4F6FB]">{streakCount}</p>
+                <p className="pm-num mt-1 text-[26px] text-[#F4F6FB]"><CountUp value={streakCount} /></p>
                 <p className="text-[12px] font-medium text-[#7E8AA0]">dias seguidos</p>
                 <FlameStageHint streak={streak} />
               </motion.div>
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.94 }}
-                initial={{ opacity: 0, scale: 0.85, y: 12 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 18, delay: 0.22 }}
-                className="relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[18px] border border-white/[0.06] bg-white/[0.02] px-3 py-5 after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
+                className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[18px] border border-white/[0.06] bg-white/[0.02] px-3 py-5 after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
+                style={{ animationDelay: "160ms" }}
               >
                 <LeagueGlyphMotion id={myLeague.id} />
                 <p className="pm-num mt-1 text-[26px] text-[#F4F6FB]">
-                  {myRank > 0 ? `${rankCount}º` : "-"}
+                  {myRank > 0 ? <CountUp value={rankCount} suffix="º" /> : "-"}
                 </p>
                 <p className="text-[12px] font-medium text-[#7E8AA0]">{myLeague.label}</p>
                 <Link href="/ranking" className="text-[11px] font-semibold text-brand">
@@ -728,7 +737,7 @@ export default function HomePage() {
 
         {/* Marcador de build, confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 24/08 v23 ✓
+          GymFitness · build 26/08 v26
         </p>
           </>
         ) : null}

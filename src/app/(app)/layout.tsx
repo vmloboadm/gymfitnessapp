@@ -26,7 +26,7 @@ export default function AppLayout({
           Sem internet{pendingCount > 0 ? ` · ${pendingCount} ação(ões) sincroniza(m) quando voltar` : " · dados salvos no aparelho"}
         </div>
       ) : null}
-      {children}
+      <main>{children}</main>
       <BottomNav />
     </div>
   );

@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, CalendarClock, ChevronRight, Scale, Award, ListMusic, FileText } from "lucide-react";
+import { LogOut, CalendarClock, ChevronRight, Scale, ListMusic, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -16,7 +16,7 @@ import { Badge } from "~/components/ui/badge";
 import { formatDate } from "~/lib/utils/format";
 import { isDemoMode, demoMetricsData } from "~/lib/demo-bridge";
 import { sortedAchievements } from "~/lib/achievements";
-import { CustomIcon, groupForName } from "~/components/common/CustomIcon";
+import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import type { StudentSubscriptions } from "~/lib/types/models";
 
 /**
@@ -206,7 +206,7 @@ export default function PerfilPage() {
             <div className="flex flex-1 -space-x-1.5">
               {earned.slice(0, 4).map((a) => (
                 <span key={a.id} className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand/25 bg-brand-soft" title={a.name}>
-                  <CustomIcon name={groupForName(a.name)} size={20} />
+                  <FitnessIcon glyph={fitnessForName(a.name)} size={20} />
                 </span>
               ))}
               {earned.length === 0 ? (

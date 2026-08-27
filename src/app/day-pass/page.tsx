@@ -17,22 +17,30 @@ import type { DayPasses } from "~/lib/types/models";
  * Day-pass público (blueprint day-pass): compra avulsa de acesso diário.
  * Público por design, o middleware já libera /day-pass sem login.
  */
+const DAY_PASS_CODES_KEY = "gf_day_pass_codes";
+
 export default function DayPassPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [buying, setBuying] = useState(false);
 
-  // lista day-passes do usuário (query sem filtro é no futuro: precisa do gym ativo)
+  // lista apenas os passes comprados NESTE dispositivo (códigos locais).
+  // A tabela não é mais legível por anônimos — leitura via RPC my_day_passes.
   const { data, loading, error, refetch } = useAsyncQuery<DayPasses[]>(
     async () => {
-      const { data, error } = await supabaseBrowser()
-        .from("day_passes")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(10);
+      let codes: string[] = [];
+      try {
+        codes = JSON.parse(window.localStorage.getItem(DAY_PASS_CODES_KEY) ?? "[]") as string[];
+      } catch {
+        codes = [];
+      }
+      if (codes.length === 0) return { data: [], error: null };
+      const { data, error } = await supabaseBrowser().rpc("my_day_passes", {
+        p_codes: codes.slice(0, 20),
+      });
       if (error) return { data: null, error };
-      return { data: data as DayPasses[], error: null };
+      return { data: (data ?? []) as unknown as DayPasses[], error: null };
     },
     []
   );
@@ -43,25 +51,35 @@ export default function DayPassPage() {
       return;
     }
     setBuying(true);
-    const gymRes = await supabaseBrowser().from("gyms").select("id").limit(1).maybeSingle();
-    const gymId = gymRes.data?.id ?? "00000000-0000-0000-0000-000000000001";
-    const { error } = await supabaseBrowser()
-      .from("day_passes")
-      .insert({
-        gym_id: gymId,
-        code: `DP-${Date.now().toString(36).toUpperCase()}`,
-        name: name.trim(),
-        email: email.trim() || null,
-        phone: phone.trim() || null,
-        status: "active" as const,
-        expires_at: new Date(Date.now() + 24 * 3600000).toISOString(),
-      } as never);
+    // Compra via RPC: código gerado server-side (imprevisível), gym resolvida
+    // pelo slug oficial. Retorna somente o pass recém-criado.
+    const { data: created, error } = await supabaseBrowser().rpc("purchase_day_pass", {
+      p_gym_slug: "gymfitness",
+      p_name: name.trim(),
+      p_email: email.trim() || null,
+      p_phone: phone.trim() || null,
+    });
     setBuying(false);
-    if (error) {
-      toast.error("Falha ao gerar day-pass", { description: error.message });
+    if (error || !created || (created as unknown[]).length === 0) {
+      toast.error("Falha ao gerar day-pass", {
+        description: error?.message ?? "Resposta vazia do servidor.",
+      });
       return;
     }
+    const pass = (created as unknown as Array<{ code: string }>)[0];
+    try {
+      const prev = JSON.parse(
+        window.localStorage.getItem(DAY_PASS_CODES_KEY) ?? "[]"
+      ) as string[];
+      window.localStorage.setItem(
+        DAY_PASS_CODES_KEY,
+        JSON.stringify([pass.code, ...prev].slice(0, 20))
+      );
+    } catch {
+      window.localStorage.setItem(DAY_PASS_CODES_KEY, JSON.stringify([pass.code]));
+    }
     toast.success("Day-pass gerado. Apresente o código na recepção.");
+    setName("");
     setEmail("");
     setPhone("");
     refetch();

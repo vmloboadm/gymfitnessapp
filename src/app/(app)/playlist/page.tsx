@@ -12,14 +12,14 @@ import { cn } from "~/lib/utils";
  */
 
 const TRACKS = [
-  { id: "t1", title: "Eye of the Tiger", artist: "Survivor", bpm: 109, dur: "4:04", emoji: "🐯", tag: "Aquecimento" },
-  { id: "t2", title: "Stronger", artist: "Kanye West", bpm: 104, dur: "5:12", emoji: "🔥", tag: "Acelera" },
-  { id: "t3", title: "Till I Collapse", artist: "Eminem", bpm: 171, dur: "4:57", emoji: "🥊", tag: "Supino" },
-  { id: "t4", title: "Thunderstruck", artist: "AC/DC", bpm: 133, dur: "4:52", emoji: "⚡", tag: "Cardio" },
-  { id: "t5", title: "Believer", artist: "Imagine Dragons", bpm: 125, dur: "3:24", emoji: "🙌", tag: "Perna" },
-  { id: "t6", title: "Run the World (Girls)", artist: "Beyoncé", bpm: 127, dur: "3:56", emoji: "👑", tag: "HIIT" },
-  { id: "t7", title: "Can't Stop", artist: "Red Hot Chili Peppers", bpm: 121, dur: "4:29", emoji: "🎸", tag: "Cooldown" },
-  { id: "t8", title: "Sair das Trevas", artist: "GymFitness · Curated", bpm: 90, dur: "3:02", emoji: "🧘", tag: "Alongamento" },
+  { id: "t1", title: "Eye of the Tiger", artist: "Survivor", bpm: 109, dur: "4:04", tag: "Aquecimento" },
+  { id: "t2", title: "Stronger", artist: "Kanye West", bpm: 104, dur: "5:12", tag: "Acelera" },
+  { id: "t3", title: "Till I Collapse", artist: "Eminem", bpm: 171, dur: "4:57", tag: "Supino" },
+  { id: "t4", title: "Thunderstruck", artist: "AC/DC", bpm: 133, dur: "4:52", tag: "Cardio" },
+  { id: "t5", title: "Believer", artist: "Imagine Dragons", bpm: 125, dur: "3:24", tag: "Perna" },
+  { id: "t6", title: "Run the World (Girls)", artist: "Beyoncé", bpm: 127, dur: "3:56", tag: "HIIT" },
+  { id: "t7", title: "Can't Stop", artist: "Red Hot Chili Peppers", bpm: 121, dur: "4:29", tag: "Cooldown" },
+  { id: "t8", title: "Sair das Trevas", artist: "GymFitness · Curated", bpm: 90, dur: "3:02", tag: "Alongamento" },
 ];
 
 const TAGS = ["Todas", ...new Set(TRACKS.map((t) => t.tag))];
@@ -66,8 +66,8 @@ export default function PlaylistPage() {
             style={{ background: "radial-gradient(90% 90% at 15% -10%, var(--brand-soft), transparent 55%)" }}
           />
           <div className="relative flex items-center gap-4">
-            <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-card text-3xl shadow-inner">
-              {current?.emoji ?? "🎧"}
+            <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-card shadow-inner">
+              <Music2 className="h-7 w-7" strokeWidth={1.8} fill="rgba(244, 113, 30, 0.2)" style={{ color: "#F4711E" }} aria-hidden />
               {playing ? (
                 <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center">
                   <span className="absolute h-4 w-4 animate-ping rounded-full bg-success opacity-50" />

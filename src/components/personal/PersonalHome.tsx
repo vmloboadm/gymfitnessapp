@@ -25,7 +25,6 @@ import { demoOpenSessions } from "~/lib/demo-data";
 
 const WA_BASE = "https://wa.me/5522999990001?text=";
 
-type Status = "hoje" | "descanso" | "inativo" | "critico" | "elogio";
 
 function daysSince(iso: string): number {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
@@ -99,7 +98,7 @@ export default function PersonalHomePage() {
           <div className="space-y-2">
             {radar.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-card/30 px-4 py-6 text-center text-sm text-muted-foreground">
-                Nenhum alerta, todo mundo no ritmo. 🎯
+                Nenhum alerta, todo mundo no ritmo.
               </div>
             ) : (
               radar.map((a, i) => {

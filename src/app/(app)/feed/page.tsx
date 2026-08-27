@@ -326,7 +326,7 @@ export default function FeedPage() {
                     </div>
                     {post.type === "conquista" ? (
                       <span className="shrink-0 rounded-full bg-success/15 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-success">
-                        🏆 Conquista
+                        Conquista
                       </span>
                     ) : null}
                   </div>

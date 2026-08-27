@@ -13,7 +13,7 @@ import type { CommunityFeat } from "./mocks";
 import type { Notifications } from "~/lib/types/models";
 
 /** Conquistas da Galera, feitos de colegas com foto de perfil e reação "Dar Fogo".
-    A primeira reação 🔥 gera notificação real para o dono da conquista. */
+    A primeira reação gera notificação real para o dono da conquista. */
 export function CommunityHighlight({ feat }: { feat: CommunityFeat }) {
   const { user, profile } = useAuth();
   const [reacted, setReacted] = useState(false);
@@ -29,7 +29,7 @@ export function CommunityHighlight({ feat }: { feat: CommunityFeat }) {
       gym_id: profile.gym_id,
       user_id: feat.ownerId,
       channel: "push",
-      title: "Você recebeu uma reação 🔥",
+      title: "Você recebeu uma reação",
       body: `${profile.name?.split(" ")[0] ?? "Alguém"} deu fogo na sua conquista.`,
     };
     await supabase.from("notifications").insert(payload as Notifications);
@@ -41,7 +41,7 @@ export function CommunityHighlight({ feat }: { feat: CommunityFeat }) {
     setCount(newCount);
     setReacted(true);
     void sendNotification().then(() => {
-      toast.success("Reação enviada 🔥", {
+      toast.success("Reação enviada", {
         description: `${feat.author} foi notificado(a) sobre sua reação.`,
       });
     });

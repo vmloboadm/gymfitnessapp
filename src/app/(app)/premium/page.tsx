@@ -85,7 +85,7 @@ export default function PremiumPage() {
           <select
             value={type}
             onChange={(e) => setType(e.target.value as PremiumRequests["request_type"])}
-            className="mb-3 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mb-3 w-full rounded-xl border border-input bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {(Object.keys(REQUEST_LABEL) as PremiumRequests["request_type"][]).map((t) => (
               <option key={t} value={t}>{REQUEST_LABEL[t]}</option>

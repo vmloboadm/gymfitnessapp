@@ -34,7 +34,7 @@ const DEMO_NOTIFS: NotifItem[] = [
   {
     id: "dn-1",
     kind: "streak",
-    title: "Sequência em risco! 🔥",
+    title: "Sequência em risco!",
     body: "Você está a 1 treino de manter sua sequência de 8 dias. Corre pra academia hoje!",
     created_at: new Date(Date.now() - 1800000).toISOString(),
     read_at: null,
@@ -50,7 +50,7 @@ const DEMO_NOTIFS: NotifItem[] = [
   {
     id: "dn-3",
     kind: "conquista",
-    title: "Conquista liberada: Semana Completa ⚡",
+    title: "Conquista liberada: Semana Completa",
     body: "Você bateu a meta semanal com folga. +120 pts no seu ranking!",
     created_at: new Date(Date.now() - 86400000).toISOString(),
     read_at: new Date(Date.now() - 80000000).toISOString(),

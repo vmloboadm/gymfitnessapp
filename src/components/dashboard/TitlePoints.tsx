@@ -92,8 +92,8 @@ const MEDALS: MedalDef[] = [
   { id: "iron-will", label: "Vontade de Ferro", icon: Crown, color: "#FFC24D", category: "consistencia", req: { ci: 40, streak: 30, auloes: 1 }, rarity: "legendary", how: "40 treinos no mês, 30 dias seguidos e pelo menos 1 aulão." },
   // Social
   { id: "first-react", label: "Primeira Reação", icon: Users, color: "#38BDF8", category: "social", req: { reacoes: 1 }, rarity: "common", how: "De 1 DAR FOGO (reação) numa conquista de um colega." },
-  { id: "hype-welder", label: "Criador de Hype", icon: Flame, color: "#FB7185", category: "social", req: { reacoes: 5 }, rarity: "rare", how: "Reaja 🔥 5 conquistas de colegas." },
-  { id: "mega-hype", label: "Sensei do Hype", icon: Crown, color: "#A78BFA", category: "social", req: { recebidas: 10 }, rarity: "epic", how: "Receba 10 reações 🔥 nas suas conquistas." },
+  { id: "hype-welder", label: "Criador de Hype", icon: Flame, color: "#FB7185", category: "social", req: { reacoes: 5 }, rarity: "rare", how: "Reaja a 5 conquistas de colegas." },
+  { id: "mega-hype", label: "Sensei do Hype", icon: Crown, color: "#A78BFA", category: "social", req: { recebidas: 10 }, rarity: "epic", how: "Receba 10 reações nas suas conquistas." },
   // Carga
   { id: "first-pr", label: "Primeiro Recorde", icon: Dumbbell, color: "#FBBF24", category: "carga", req: { recordes: 1 }, rarity: "common", how: "Bata seu recorde pessoal em 1 exercício." },
   { id: "pr-master", label: "Caçador de Records", icon: Zap, color: "#F97316", category: "carga", req: { recordes: 3 }, rarity: "epic", how: "Bata recorde pessoal em 3 exercícios diferentes." },
@@ -279,7 +279,7 @@ export function MedalsCard({
                           {m.label}
                         </p>
                         <p className="pm-mono text-[8px] leading-snug text-[#6E7A90]">
-                          {isOk ? "conquistada ✓" : "toque e leia como fazer"}
+                          {isOk ? "conquistada" : "toque e leia como fazer"}
                         </p>
                         {isOk && m.rarity !== "common" && (
                           <span className="absolute -top-1 -right-1 rounded-full bg-brand/90 px-1.5 py-0.5 text-[7px] font-bold uppercase text-white">
