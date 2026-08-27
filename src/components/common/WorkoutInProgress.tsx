@@ -203,6 +203,15 @@ export default function WorkoutInProgress({
                     Ver execução
                   </button>
                 </div>
+
+                {/* AÇÃO PRIMÁRIA NO CARD — sem precisar scrollar até o footer */}
+                <button
+                  onClick={markCurrent}
+                  className="tactile mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#F4711E] text-[15px] font-black tracking-tight text-black shadow-[0_4px_12px_rgba(244,113,30,0.35)] hover:bg-[#FF7A2F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.98]"
+                >
+                  <Check className="h-5 w-5" />
+                  Marcar como feito
+                </button>
               </div>
 
               {/* descanso como barra secundária, NÃO rouba a primária */}
@@ -322,7 +331,7 @@ export default function WorkoutInProgress({
         </BottomSheet>
       </div>
 
-      {/* FOOTER — uma primária que morpha, nunca some (skill) */}
+      {/* FOOTER — definitivo: só Finalizar (quando completo) ou descanso. Marcar fica no card (sem scroll) */}
       <div className="sticky bottom-0 z-10 border-t border-white/[0.06] bg-[#050507]/95 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] backdrop-blur">
         <div className="mx-auto max-w-md">
           <AnimatePresence mode="wait" initial={false}>
@@ -340,41 +349,46 @@ export default function WorkoutInProgress({
                 className="tactile flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-success text-[16px] font-black tracking-tight text-black shadow-[0_8px_20px_rgba(51,209,122,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.98]"
               >
                 <Check className="h-5 w-5" />
-                Finalizar treino
+                Finalizar treino — único ponto de conclusão
               </motion.button>
             ) : primaryState === "rest" ? (
-              <motion.button
+              <motion.div
                 key="rest"
                 initial={reduce ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
                 transition={{ duration: 0.18 }}
-                onClick={markCurrent}
-                className="tactile flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[#F4711E] text-[16px] font-black tracking-tight text-black shadow-[0_8px_20px_rgba(244,113,30,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.98]"
+                className="flex items-center justify-between rounded-2xl border border-brand/30 bg-brand/10 px-4 py-3"
               >
-                <Check className="h-5 w-5" />
-                Concluído · {current?.name.split(" ")[0]}
-                <span className="ml-1 rounded-full bg-black/15 px-2 py-0.5 text-xs font-bold">
-                  {Math.floor(restLeft / 60)}:{String(restLeft % 60).padStart(2, "0")}
+                <span className="flex items-center gap-2 text-sm font-bold text-brand">
+                  <Timer className="h-4 w-4" />
+                  Descanso {Math.floor(restLeft / 60)}:{String(restLeft % 60).padStart(2, "0")}
                 </span>
-              </motion.button>
+                <button
+                  onClick={() => {
+                    navigator.vibrate?.(15);
+                    setRestLeft(0);
+                  }}
+                  className="text-xs font-bold text-brand underline-offset-4 hover:underline"
+                >
+                  Pular descanso →
+                </button>
+              </motion.div>
             ) : (
-              <motion.button
-                key="next"
+              <motion.p
+                key="hint"
                 initial={reduce ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
                 transition={{ duration: 0.18 }}
-                onClick={markCurrent}
-                className="tactile flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[#F4711E] text-[16px] font-black tracking-tight text-[#1a0d04] shadow-[0_8px_20px_rgba(244,113,30,0.35)] hover:bg-[#FF7A2F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.98]"
+                className="py-2 text-center text-xs font-medium text-muted-foreground"
               >
-                <Check className="h-5 w-5" />
-                Marcar como feito
-              </motion.button>
+                ↑ Toque em <span className="font-bold text-[#F4711E]">Marcar como feito</span> no card acima
+              </motion.p>
             )}
           </AnimatePresence>
-          <p className="mt-2 text-center text-xs text-muted-foreground">
-            {allDone ? "Pronto pra registrar" : `${doneCount} de ${exercises.length} • toque pra avançar`}
+          <p className="mt-2 text-center text-[10px] font-medium tracking-wide text-white/40">
+            {allDone ? "Conclusão definitiva aqui" : `${doneCount} de ${exercises.length} • progresso salvo automaticamente`}
           </p>
         </div>
       </div>

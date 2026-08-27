@@ -773,15 +773,15 @@ export default function TreinoHomePage() {
                   })}
               </div>
 
-              {/* Finalizar direto da lista — sem precisar abrir "Iniciar" */}
-              {doneCount > 0 && (
+              {/* Finalizar — só quando completo: ponto único de conclusão (sem duplicar com o cronômetro) */}
+              {doneCount === totalToday && totalToday > 0 && (
                 <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-success/30 bg-success/10 px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-bold leading-tight text-foreground">
-                      {doneCount}/{totalToday} concluídos
+                      {doneCount}/{totalToday} concluídos — pronto!
                     </p>
                     <p className="text-xs leading-tight text-muted-foreground">
-                      Finalize sem entrar no cronômetro
+                      Conclusão definitiva aqui
                     </p>
                   </div>
                   <button
@@ -797,7 +797,7 @@ export default function TreinoHomePage() {
                   onClick={() => {
                     const allIds = data.details.map((d) => d.exercise_id ?? d.id);
                     setDoneIds(new Set(allIds));
-                    toast.success("Todos marcados como concluídos");
+                    toast.success("Todos marcados — agora finalize");
                   }}
                   className="tactile mt-2 w-full rounded-xl border border-dashed border-white/10 py-2.5 text-xs font-semibold text-muted-foreground hover:border-success/30 hover:text-success"
                 >
