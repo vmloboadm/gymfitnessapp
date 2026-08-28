@@ -121,7 +121,7 @@ const YT = (q: string) => `https://www.youtube.com/results?search_query=${encode
 // const VID_F = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"; // REPLACED WITH YOUTUBE SEARCH
 const UNS = (id: string) => `https://images.unsplash.com/${id}?w=300&h=300&fit=crop&q=70`;
 const DEFAULT_DEMO_EX: Array<{ id: string; name: string; sets: number; reps: string; rest: number; info: string; tips?: string[] | null; imageUrl: string | null; videoUrl: string | null; thumbUrl: string | null; videoUrlMale: string | null; videoUrlFemale: string | null }> = [
-  { id: "d1", name: "Supino Reto", sets: 4, reps: "10", rest: 90, imageUrl: IMG as string | null, videoUrl: YT("Supino Reto"), info: "Empurre sem travar o cotovelo.", thumbUrl: UNS("photo-1517836357463-d25dfeac3438"), videoUrlMale: YT("Supino Reto"), videoUrlFemale: YT("Supino Reto") },
+  { id: "d1", name: "Supino Reto", sets: 4, reps: "10", rest: 90, imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqHkC2h0vB6PpTZ6wPJMs88U2ep-tRZoc2mx1FZbVREw&s=10", videoUrl: YT("Supino Reto"), info: "Empurre sem travar o cotovelo.", thumbUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqHkC2h0vB6PpTZ6wPJMs88U2ep-tRZoc2mx1FZbVREw&s=10", videoUrlMale: YT("Supino Reto"), videoUrlFemale: YT("Supino Reto") },
   { id: "d2", name: "Crucifixo com Halteres", sets: 3, reps: "12", rest: 60, imageUrl: IMG as string | null, videoUrl: YT("Crucifixo Halteres"), info: "Abra até a linha do peito e volte controlando.", thumbUrl: UNS("photo-1549060279-7e168fcee0c2"), videoUrlMale: YT("Crucifixo com Halteres"), videoUrlFemale: YT("Crucifixo com Halteres") },
   { id: "d3", name: "Desenvolvimento Militar", sets: 3, reps: "10", rest: 75, imageUrl: IMG as string | null, videoUrl: YT("Desenvolvimento Militar"), info: "Core firme, sem arco lombar.", thumbUrl: UNS("photo-1583454110551-21f2fa2afe61"), videoUrlMale: YT("Desenvolvimento Militar"), videoUrlFemale: YT("Desenvolvimento Militar") },
   { id: "d4", name: "Elevação Lateral", sets: 4, reps: "15", rest: 45, imageUrl: IMG as string | null, videoUrl: YT("Elevação Lateral"), info: "Cotovelos levemente flexionados.", thumbUrl: UNS("photo-1571019613454-1cb2f99b2d8b"), videoUrlMale: YT("Elevação Lateral"), videoUrlFemale: YT("Elevação Lateral") },
@@ -879,19 +879,19 @@ function ExerciseRow({
             : "border-border bg-card/40"
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-4">
         {photo ? (
-          <span className={cn("relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-white/[0.06]", completed && "opacity-50")}>
-            <Image src={photo} alt="" fill sizes="56px" className="object-cover" />
+          <span className={cn("relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-white/[0.06]", completed && "opacity-50")}>
+            <Image src={photo} alt="" fill sizes="80px" className="object-cover" />
           </span>
         ) : (
           <span
             className={cn(
-              "flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border",
+              "flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border",
               completed ? "border-success/40 bg-success/10" : isActive ? "border-[#F4711E]/40 bg-[#F4711E]/10" : "border-white/[0.06] bg-muted/40"
             )}
           >
-            <FitnessIcon glyph={glyph} size={28} />
+            <FitnessIcon glyph={glyph} size={36} />
           </span>
         )}
         <div className="min-w-0 flex-1 space-y-0.5">

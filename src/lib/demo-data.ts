@@ -82,7 +82,7 @@ export const demoVariations: Record<string, any[]> = {
 // ---------------------------------------------------------------------------
 
 export const demoExercises = [
-  { id: "ex-demo-001", name: "Supino Reto", category: "strength", muscles: ["chest"], tips: ["Mantenha escápulas retraídas"], technique_default: "standard", high_impact: false },
+  { id: "ex-demo-001", name: "Supino Reto", category: "strength", muscles: ["chest"], tips: ["Mantenha escápulas retraídas"], technique_default: "standard", high_impact: false, photo_url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqHkC2h0vB6PpTZ6wPJMs88U2ep-tRZoc2mx1FZbVREw&s=10" },
   { id: "ex-demo-002", name: "Agachamento", category: "strength", muscles: ["legs"], tips: ["Joelhos acompanham os pés"], technique_default: "standard", high_impact: false },
   { id: "ex-demo-003", name: "Crucifixo com Halteres", category: "strength", muscles: ["chest"], tips: ["Abra até a linha do peito"], technique_default: "standard", high_impact: false },
   { id: "ex-demo-004", name: "Desenvolvimento Militar", category: "strength", muscles: ["shoulders"], tips: ["Core firme, sem arco lombar"], technique_default: "standard", high_impact: false },

@@ -406,7 +406,7 @@ export function demoRelatorios() {
 
 export function demoBiblioteca() {
   return [
-    { id: "ex-demo-001", name: "Supino Reto", category: "Peito", muscles: ["Peitoral"], photo_url: null, tips: ["Escápulas retraídas e pés firmes no chão"], high_impact: false },
+    { id: "ex-demo-001", name: "Supino Reto", category: "Peito", muscles: ["Peitoral"], photo_url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqHkC2h0vB6PpTZ6wPJMs88U2ep-tRZoc2mx1FZbVREw&s=10", tips: ["Escápulas retraídas e pés firmes no chão"], high_impact: false },
     { id: "ex-demo-002", name: "Agachamento", category: "Perna", muscles: ["Quadríceps", "Glúteo"], photo_url: null, tips: ["Joelhos acompanham a linha dos pés"], high_impact: false },
     { id: "ex-demo-003", name: "Leg Press 45°", category: "Perna", muscles: ["Quadríceps", "Glúteo"], photo_url: null, tips: ["Não trave totalmente os joelhos"], high_impact: false },
     { id: "ex-demo-004", name: "Remada Curvada", category: "Costas", muscles: ["Dorsal", "Trapézio"], photo_url: null, tips: ["Cotovelos próximos ao corpo"], high_impact: false },
