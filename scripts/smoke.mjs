@@ -144,34 +144,55 @@ async function main() {
     }
     report("treino: botão Iniciar visível e clicado", hasStart);
 
-    // 4) Sessão ativa — nova UI mostra o primeiro exercício e footer "Finalizar treino"
+    // 4) Sessão ativa — aparece o primeiro exercício com botões de série
     await page.waitForFunction(
-      () => document.body.innerText.includes("Finalizar treino"),
+      () => document.querySelectorAll('button[aria-label*="Marcar série" i]').length > 0,
       { timeout: 20000 }
     );
     report("treino: sessão ativa iniciada", true);
 
-    // 5) Conclui séries do exercício atual (botões "Série X")
+    // 5) Marca séries do exercício atual (botões por aria-label)
     let completed = 0;
-    for (let i = 0; i < 8; i++) {
-      const ok = await clickByText(page, "button", /Série/i);
+    for (let i = 0; i < 10; i++) {
+      const ok = await page.evaluate(() => {
+        const btns = [...document.querySelectorAll('button[aria-label*="Marcar série" i]')];
+        if (btns.length === 0) return false;
+        (btns[0]).click();
+        return true;
+      });
       if (!ok) break;
       completed++;
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 500));
     }
     report(`treino: séries concluídas (${completed})`, completed > 0);
 
-    // 6) Check-out
-    const finishClicked = await clickByText(page, "button", /Finalizar treino/i);
+    // 6) Check-out: botão Finalizar do header → modal → confirmar
+    const finishClicked = await page.evaluate(() => {
+      const btns = [...document.querySelectorAll("button")];
+      const b = btns.find((e) => (e.textContent ?? "").trim() === "Finalizar");
+      if (b) {
+        b.click();
+        return true;
+      }
+      return false;
+    });
     report("treino: botão Finalizar acionado", finishClicked);
 
     // confirmação de finalização (modal)
     await new Promise((r) => setTimeout(r, 800));
-    const confirmClicked = await clickByText(page, "button", /Finalizar/i);
+    const confirmClicked = await page.evaluate(() => {
+      const btns = [...document.querySelectorAll("button")].filter((e) => (e.textContent ?? "").trim() === "Finalizar");
+      const b = btns[btns.length - 1];
+      if (b) {
+        b.click();
+        return true;
+      }
+      return false;
+    });
     report("treino: confirmação de finalização", confirmClicked);
 
     await page.waitForFunction(
-      () => !document.body.innerText.includes("Finalizar treino"),
+      () => document.querySelectorAll('button[aria-label*="Marcar série" i]').length === 0,
       { timeout: 20000 }
     );
     report("treino: check-out concluído (sessão encerrada)", true);

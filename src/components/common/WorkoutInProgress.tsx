@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, ChevronLeft, Info, MoreHorizontal, PlayCircle, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Info, PlayCircle, Timer, X } from "lucide-react";
+import Image from "next/image";
 import { type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
@@ -27,11 +28,18 @@ export type WExercise = {
 type SetRecord = { reps: string; done: boolean };
 type ExerciseProgress = { sets: SetRecord[] };
 
+function fmt(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 /**
- * Treino em andamento — estilo Strong/Hevy.
+ * Sessão de treino ativa — padrão Strong/Hevy.
  *
- * Tela limpa: exercício atual em destaque, séries como chips grandes,
- * reps editáveis, botão Finalizar sempre acessível.
+ * Header fixo enxuto, foto real do exercício, linhas de série compactas
+ * com reps editáveis, descanso automático e CTA único de progressão.
+ * A BottomNav global fica oculta (body.session-active) durante a sessão.
  */
 export default function WorkoutInProgress({
   exercises,
@@ -45,13 +53,24 @@ export default function WorkoutInProgress({
   const [detailEx, setDetailEx] = useState<ExerciseDetail | null>(null);
   const [videoEx, setVideoEx] = useState<{ name: string; poster?: string | null; url: string } | null>(null);
   const [showFinish, setShowFinish] = useState(false);
+  const [restLeft, setRestLeft] = useState<number | null>(null);
+  const restInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // imersão: topo da página + esconde BottomNav global
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.body.classList.add("session-active");
+    return () => {
+      document.body.classList.remove("session-active");
+      if (restInterval.current) clearInterval(restInterval.current);
+    };
+  }, []);
 
   useEffect(() => {
     setProgress((prev) => {
       const next: Record<string, ExerciseProgress> = {};
       for (const ex of exercises) {
-        const existing = prev[ex.id];
-        next[ex.id] = existing ?? {
+        next[ex.id] = prev[ex.id] ?? {
           sets: Array.from({ length: ex.sets }, () => ({ reps: String(ex.reps), done: false })),
         };
       }
@@ -59,13 +78,26 @@ export default function WorkoutInProgress({
     });
   }, [exercises]);
 
-  const completedIds = useMemo(() => {
-    return exercises
-      .filter((e) => progress[e.id]?.sets.every((s) => s.done))
-      .map((e) => e.id);
-  }, [progress, exercises]);
+  const startRest = useCallback((seconds: number) => {
+    if (!seconds || seconds <= 0) return;
+    if (restInterval.current) clearInterval(restInterval.current);
+    setRestLeft(seconds);
+    restInterval.current = setInterval(() => {
+      setRestLeft((v) => {
+        if (v === null || v <= 1) {
+          if (restInterval.current) clearInterval(restInterval.current);
+          return null;
+        }
+        return v - 1;
+      });
+    }, 1000);
+  }, []);
 
-  const totalDoneSets = useMemo(
+  const completedIds = useMemo(
+    () => exercises.filter((e) => progress[e.id]?.sets.every((s) => s.done)).map((e) => e.id),
+    [progress, exercises]
+  );
+  const doneSets = useMemo(
     () => exercises.reduce((acc, e) => acc + (progress[e.id]?.sets.filter((s) => s.done).length ?? 0), 0),
     [progress, exercises]
   );
@@ -73,17 +105,21 @@ export default function WorkoutInProgress({
 
   const current = exercises[currentIdx];
   const currentProgress = current ? progress[current.id] : null;
+  const currentAllDone = !!currentProgress?.sets.length && currentProgress.sets.every((s) => s.done);
   const nextEx = exercises[currentIdx + 1];
+  const isLast = currentIdx === exercises.length - 1;
 
   const toggleSet = (idx: number) => {
     if (!current) return;
-    navigator.vibrate?.(15);
+    const willBeDone = !currentProgress?.sets[idx]?.done;
+    navigator.vibrate?.(willBeDone ? 15 : 8);
     setProgress((prev) => {
       const p = prev[current.id];
       if (!p) return prev;
       const sets = p.sets.map((s, i) => (i === idx ? { ...s, done: !s.done } : s));
       return { ...prev, [current.id]: { sets } };
     });
+    if (willBeDone) startRest(current.rest);
   };
 
   const setReps = (idx: number, reps: string) => {
@@ -105,19 +141,38 @@ export default function WorkoutInProgress({
       const allDone = p.sets.every((s) => s.done);
       return { ...prev, [current.id]: { sets: p.sets.map((s) => ({ ...s, done: !allDone })) } };
     });
+    if (!currentAllDone) startRest(current.rest);
   };
 
   const goNext = () => {
-    if (currentIdx < exercises.length - 1) setCurrentIdx((i) => i + 1);
+    if (!isLast) {
+      navigator.vibrate?.(20);
+      setCurrentIdx((i) => i + 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
   const goPrev = () => {
-    if (currentIdx > 0) setCurrentIdx((i) => i - 1);
+    if (currentIdx > 0) {
+      setCurrentIdx((i) => i - 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const advanceOrFinish = () => {
+    if (isLast) {
+      setShowFinish(true);
+    } else {
+      goNext();
+    }
   };
 
   const handleFinish = () => {
     navigator.vibrate?.([50, 30, 50]);
+    if (restInterval.current) clearInterval(restInterval.current);
     onFinish(completedIds);
   };
+
+  const photo = current?.thumbUrl ?? current?.imageUrl ?? null;
 
   if (!exercises || exercises.length === 0) {
     return (
@@ -132,157 +187,223 @@ export default function WorkoutInProgress({
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
-        <button onClick={goPrev} disabled={currentIdx === 0} className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground disabled:opacity-30">
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <div className="text-center">
-          <p className="text-xs font-semibold text-muted-foreground">{currentIdx + 1} de {exercises.length}</p>
-          <div className="mx-auto mt-1 h-1 w-24 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${((currentIdx + 1) / exercises.length) * 100}%` }} />
+      {/* Header fixo */}
+      <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-md items-center gap-2 px-3 py-2.5">
+          <button
+            onClick={goPrev}
+            disabled={currentIdx === 0}
+            aria-label="Exercício anterior"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground disabled:opacity-25"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              Exercício {currentIdx + 1} de {exercises.length}
+            </p>
+            <div className="mx-auto mt-1 h-1 w-full max-w-[180px] overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-brand transition-all duration-300"
+                style={{ width: `${((currentIdx + 1) / exercises.length) * 100}%` }}
+              />
+            </div>
           </div>
+          <button
+            onClick={() => setShowFinish(true)}
+            className="shrink-0 rounded-full bg-success px-3.5 py-1.5 text-[11px] font-black text-black"
+          >
+            Finalizar
+          </button>
         </div>
-        <button onClick={() => setShowFinish(true)} className="rounded-full bg-success px-3 py-1.5 text-[11px] font-black text-black">
-          Finalizar
-        </button>
       </header>
 
-      {/* Exercício atual */}
-      <main className="flex-1 px-4 pt-6 pb-28">
+      {/* Timer de descanso */}
+      <AnimatePresence>
+        {restLeft !== null && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="sticky top-[57px] z-20 border-b border-brand/20 bg-brand/[0.08] backdrop-blur"
+          >
+            <div className="mx-auto flex max-w-md items-center justify-center gap-3 px-4 py-2">
+              <Timer className="h-4 w-4 text-brand" />
+              <span className="text-sm font-black tabular-nums text-brand">{fmt(restLeft)}</span>
+              <span className="text-[11px] font-semibold text-muted-foreground">descanso</span>
+              <button
+                onClick={() => {
+                  if (restInterval.current) clearInterval(restInterval.current);
+                  setRestLeft(null);
+                }}
+                className="ml-2 rounded-full border border-border px-2.5 py-0.5 text-[10px] font-bold text-muted-foreground"
+              >
+                Pular
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Conteúdo */}
+      <main className="flex-1 px-4 pb-40 pt-4">
         <AnimatePresence mode="wait">
           {current && (
             <motion.div
               key={current.id}
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: 24 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.18 }}
               className="mx-auto max-w-md"
             >
-              {/* Título do exercício */}
-              <div className="mb-6 flex items-start gap-4">
-                <FitnessIcon glyph={fitnessForName(current.name)} size={52} />
+              {/* Hero do exercício */}
+              <div className="mb-5 flex items-center gap-4">
+                {photo ? (
+                  <span className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-2xl border border-white/[0.08]">
+                    <Image src={photo} alt="" fill sizes="72px" className="object-cover" />
+                  </span>
+                ) : (
+                  <FitnessIcon glyph={fitnessForName(current.name)} size={72} className="rounded-2xl" />
+                )}
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-[22px] font-black leading-tight text-foreground">{current.name}</h1>
-                  <p className="mt-0.5 text-sm text-muted-foreground">{current.sets} séries · {current.reps} reps</p>
+                  <h1 className="text-xl font-black leading-tight text-foreground">{current.name}</h1>
+                  <p className="mt-1 text-[13px] font-semibold text-muted-foreground">
+                    {current.sets} séries × {current.reps} reps
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() =>
+                        setDetailEx({
+                          name: current.name,
+                          info: current.info ?? null,
+                          tips: current.tips ?? null,
+                          imageUrl: current.imageUrl ?? null,
+                          videoUrl: current.videoUrl ?? null,
+                        })
+                      }
+                      className="flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] font-bold text-muted-foreground"
+                    >
+                      <Info className="h-3 w-3" /> Ficha
+                    </button>
+                    {(current.videoUrlMale ?? current.videoUrl ?? current.videoUrlFemale) && (
+                      <button
+                        onClick={() => {
+                          const url = current.videoUrlMale ?? current.videoUrl ?? current.videoUrlFemale;
+                          if (url) setVideoEx({ name: current.name, poster: current.thumbUrl ?? current.imageUrl ?? null, url });
+                        }}
+                        className="flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] font-bold text-muted-foreground"
+                      >
+                        <PlayCircle className="h-3 w-3" /> Vídeo
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Ações rápidas */}
-              <div className="mb-6 flex gap-2">
-                <button
-                  onClick={() => setDetailEx({ name: current.name, info: current.info ?? null, tips: current.tips ?? null, imageUrl: current.imageUrl ?? null, videoUrl: current.videoUrl ?? null })}
-                  className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground"
-                >
-                  <Info className="h-3.5 w-3.5" /> Ficha
-                </button>
-                {(current.videoUrlMale ?? current.videoUrl ?? current.videoUrlFemale) && (
-                  <button
-                    onClick={() => {
-                      const url = current.videoUrlMale ?? current.videoUrl ?? current.videoUrlFemale;
-                      if (url) setVideoEx({ name: current.name, poster: current.thumbUrl ?? current.imageUrl ?? null, url });
-                    }}
-                    className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground"
-                  >
-                    <PlayCircle className="h-3.5 w-3.5" /> Vídeo
-                  </button>
-                )}
+              {/* Cabeçalho da tabela de séries */}
+              <div className="mb-1.5 grid grid-cols-[48px_1fr_56px_48px] items-center gap-2 px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
+                <span>Série</span>
+                <span>Reps</span>
+                <span className="text-right">Feita</span>
+                <span />
               </div>
 
               {/* Séries */}
-              <div className="space-y-2.5">
+              <div className="space-y-1.5">
                 {currentProgress?.sets.map((s, i) => (
                   <div
                     key={i}
                     className={cn(
-                      "flex items-center gap-3 rounded-2xl border p-3 transition-colors",
-                      s.done ? "border-success/40 bg-success/[0.08]" : "border-border bg-card/50"
+                      "grid grid-cols-[48px_1fr_56px_48px] items-center gap-2 rounded-xl border py-2 pl-3 pr-2 transition-colors",
+                      s.done ? "border-success/35 bg-success/[0.07]" : "border-border bg-card/40"
                     )}
                   >
-                    <button
-                      onClick={() => toggleSet(i)}
-                      className={cn(
-                        "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 transition-all",
-                        s.done ? "border-success bg-success text-black" : "border-border text-muted-foreground"
-                      )}
-                    >
-                      <Check className={cn("h-5 w-5", s.done && "stroke-[3]")} />
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <p className={cn("text-sm font-bold", s.done ? "text-muted-foreground line-through" : "text-foreground")}>
-                        Série {i + 1}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Toque para marcar feita</p>
-                    </div>
-                    <div className="flex items-center gap-2">
+                    <span className={cn("text-sm font-black", s.done ? "text-success" : "text-foreground")}>
+                      {i + 1}
+                    </span>
+                    <div className="flex items-center gap-1.5">
                       <input
                         type="tel"
                         inputMode="numeric"
                         value={s.reps}
                         onChange={(e) => setReps(i, e.target.value)}
-                        className="h-10 w-14 rounded-xl border border-border bg-background text-center text-base font-bold text-foreground outline-none focus:border-brand"
+                        aria-label={`Reps da série ${i + 1}`}
+                        className="h-10 w-14 rounded-lg border border-border bg-background text-center text-[15px] font-black text-foreground outline-none focus:border-brand"
                       />
-                      <span className="text-xs font-semibold text-muted-foreground">reps</span>
+                      <span className="text-[11px] font-semibold text-muted-foreground">reps</span>
                     </div>
+                    <span className={cn("text-right text-xs font-bold tabular-nums", s.done ? "text-success" : "text-muted-foreground/50")}>
+                      {s.done ? "✓" : `${current.reps}×`}
+                    </span>
+                    <button
+                      onClick={() => toggleSet(i)}
+                      aria-label={s.done ? `Desmarcar série ${i + 1}` : `Marcar série ${i + 1} como feita`}
+                      aria-pressed={s.done}
+                      className={cn(
+                        "flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all active:scale-90",
+                        s.done ? "border-success bg-success text-black" : "border-border text-muted-foreground/60"
+                      )}
+                    >
+                      <Check className={cn("h-5 w-5", s.done && "stroke-[3]")} />
+                    </button>
                   </div>
                 ))}
               </div>
 
-              {/* Marcar todas */}
               <button
                 onClick={markAll}
-                className="mt-4 w-full rounded-xl border border-border py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-card"
+                className="mt-3 w-full rounded-xl border border-border py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-card"
               >
-                {currentProgress?.sets.every((s) => s.done) ? "Desmarcar todas" : "Marcar todas como feitas"}
+                {currentAllDone ? "Desmarcar todas" : "Marcar todas como feitas"}
               </button>
 
-              {/* Descanso sugerido */}
-              <div className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                <span>Descanso sugerido: <span className="font-bold text-foreground">{current.rest}s</span></span>
-              </div>
+              {/* Próximo exercício */}
+              {nextEx && (
+                <div className="mt-6">
+                  <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">A seguir</p>
+                  <button
+                    onClick={goNext}
+                    className="flex w-full items-center gap-3 rounded-xl border border-border bg-card/40 p-3 text-left"
+                  >
+                    <FitnessIcon glyph={fitnessForName(nextEx.name)} size={40} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-foreground">{nextEx.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {nextEx.sets} séries × {nextEx.reps} reps
+                      </p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+                  </button>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Próximo exercício */}
-        {nextEx && (
-          <div className="mx-auto mt-8 max-w-md">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Próximo</p>
-            <button
-              onClick={goNext}
-              className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card/40 p-3 text-left"
-            >
-              <FitnessIcon glyph={fitnessForName(nextEx.name)} size={40} />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-foreground">{nextEx.name}</p>
-                <p className="text-xs text-muted-foreground">{nextEx.sets} séries · {nextEx.reps} reps</p>
-              </div>
-              <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
-            </button>
-          </div>
-        )}
       </main>
 
-      {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
+      {/* CTA fixo */}
+      <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold text-muted-foreground">
-              {completedIds.length} de {exercises.length} exercícios
-            </p>
-            <p className="text-[10px] text-muted-foreground/70">{totalDoneSets} de {totalSets} séries feitas</p>
+          <div className="w-[72px] shrink-0">
+            <p className="text-sm font-black tabular-nums text-foreground">{doneSets}/{totalSets}</p>
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">séries</p>
           </div>
           <button
-            onClick={() => setShowFinish(true)}
-            className="rounded-xl bg-success px-5 py-2.5 text-sm font-black text-black shadow-lg shadow-success/20"
+            onClick={advanceOrFinish}
+            className={cn(
+              "flex-1 rounded-xl py-3.5 text-sm font-black shadow-lg transition-transform active:scale-[0.98]",
+              currentAllDone
+                ? "bg-brand text-brand-foreground shadow-brand/25"
+                : "bg-muted text-muted-foreground shadow-none"
+            )}
           >
-            Finalizar treino
+            {isLast ? "Finalizar treino" : currentAllDone ? "Próximo exercício →" : `${currentProgress?.sets.filter((s) => !s.done).length ?? 0} séries restantes`}
           </button>
         </div>
       </footer>
 
-      {/* Confirmação */}
+      {/* Confirmação de finalização */}
       <AnimatePresence>
         {showFinish && (
           <motion.div
@@ -301,25 +422,23 @@ export default function WorkoutInProgress({
             >
               <div className="flex items-start justify-between gap-3">
                 <h3 className="text-base font-black text-foreground">Finalizar treino?</h3>
-                <button onClick={() => setShowFinish(false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <button
+                  onClick={() => setShowFinish(false)}
+                  aria-label="Fechar"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground"
+                >
                   <X className="h-4 w-4" />
                 </button>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Você fez <span className="font-bold text-foreground">{totalDoneSets}</span> séries em{" "}
-                <span className="font-bold text-foreground">{completedIds.length}</span> exercícios.
+                Você fez <span className="font-bold text-foreground">{doneSets}</span> séries em{" "}
+                <span className="font-bold text-foreground">{completedIds.length}</span> de {exercises.length} exercícios.
               </p>
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setShowFinish(false)}
-                  className="rounded-xl border border-border py-3 text-sm font-bold text-foreground"
-                >
+                <button onClick={() => setShowFinish(false)} className="rounded-xl border border-border py-3 text-sm font-bold text-foreground">
                   Continuar
                 </button>
-                <button
-                  onClick={handleFinish}
-                  className="rounded-xl bg-success py-3 text-sm font-black text-black shadow-lg shadow-success/25"
-                >
+                <button onClick={handleFinish} className="rounded-xl bg-success py-3 text-sm font-black text-black shadow-lg shadow-success/25">
                   Finalizar
                 </button>
               </div>

@@ -268,21 +268,24 @@ export default function TreinoHomePage() {
   };
 
   /** Sessão construída a partir do TREINO DE HOJE real (não mais lista fixa). */
-  const sessionFromDetails = ((data?.details ?? []).map((d) => ({
-    id: d.exercise_id ?? d.id,
-    name: d.exercise?.name ?? "Exercício",
-    sets: d.sets,
-    reps: String(d.reps),
-    rest: d.rest_seconds ?? 60,
-    info: d.exercise?.tips?.[0] ?? null,
-    tips: d.exercise?.tips ?? null,
-    imageUrl: (d.exercise as { image_url?: string | null })?.image_url ?? null,
-    videoUrl:
-      (d.exercise as { video_url?: string | null })?.video_url ?? null,
-    thumbUrl: null,
-    videoUrlMale: null,
-    videoUrlFemale: null,
-  })) as typeof DEFAULT_DEMO_EX);
+  const sessionFromDetails = ((data?.details ?? []).map((d) => {
+    const ex = d.exercise as ({ photo_url?: string | null; image_url?: string | null; video_url?: string | null } | null) | undefined;
+    const img = ex?.photo_url ?? ex?.image_url ?? null;
+    return {
+      id: d.exercise_id ?? d.id,
+      name: d.exercise?.name ?? "Exercício",
+      sets: d.sets,
+      reps: String(d.reps),
+      rest: d.rest_seconds ?? 60,
+      info: d.exercise?.tips?.[0] ?? null,
+      tips: d.exercise?.tips ?? null,
+      imageUrl: img,
+      videoUrl: ex?.video_url ?? null,
+      thumbUrl: img,
+      videoUrlMale: null,
+      videoUrlFemale: null,
+    };
+  }) as typeof DEFAULT_DEMO_EX);
 
   /** Check-in validou? → entra DIRETO na execução (sem clique extra). */
   useEffect(() => {

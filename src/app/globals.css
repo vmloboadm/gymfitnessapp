@@ -588,3 +588,10 @@ body::before {
     animation: none;
   }
 }
+/* Sessão de treino ativa: esconde a navegação inferior pra imersão total */
+body.session-active #bottom-nav {
+  display: none;
+}
+body.session-active {
+  padding-bottom: 0 !important;
+}
