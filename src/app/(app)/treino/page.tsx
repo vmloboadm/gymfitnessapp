@@ -12,14 +12,10 @@ import {
   Meh,
   Frown,
   Play,
-  Sparkles,
-  MessageCircle,
   CheckCircle2,
   RotateCcw,
   Lock,
-  X,
   ScanLine,
-  Info,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
@@ -28,14 +24,10 @@ import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Badge } from "~/components/ui/badge";
-import BodyMap from "~/components/body-map";
 import WorkoutInProgress from "~/components/common/WorkoutInProgress";
-import { openAiCoach } from "~/components/ai/coach-bus";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
-import { ExerciseInfoSheet, type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
-import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
 import { useWorkoutSession, elapsedSeconds } from "~/lib/workout-session";
@@ -51,8 +43,7 @@ const DEMO_EX_GROUP_REAL: Record<string, string> = {
 };
 import { getTodayWorkout } from "~/lib/today-workout";
 import { cap, formatDate } from "~/lib/utils/format";
-import { isDemoMode, demoTreinoData, demoLib } from "~/lib/demo-bridge";
-import type { DemoExercise } from "~/lib/demo-data";
+import { isDemoMode, demoTreinoData } from "~/lib/demo-bridge";
 import type {
   Exercises,
   StudentWorkouts,
@@ -78,43 +69,6 @@ function errorResult<T>(message: string): FetchResult<T> {
   return { data: null, error: { message } };
 }
 
-const CAT_LABEL: Record<string, string> = {
-  strength: "Força",
-  cardio: "Cardio",
-  peito: "Peito",
-  costas: "Costas",
-  ombro: "Ombro",
-  biceps: "Bíceps",
-  triceps: "Tríceps",
-  perna: "Perna",
-  gluteo: "Glúteo",
-  core: "Core",
-  panturrilha: "Panturrilha",
-};
-
-/* Região do mapa corporal → categorias da biblioteca de exercícios */
-const BODY_CATS: Record<string, string[]> = {
-  peito: ["peito"],
-  costas: ["costas"],
-  perna: ["inferiores"],
-  ombro: ["ombro"],
-  braco: ["biceps", "triceps", "antebraco"],
-  abdomen: ["abdomen"],
-};
-
-const BODY_COUNTS = (() => {
-  const cat = (ids: string[]) =>
-    demoLib.filter((c) => ids.includes(c.id)).reduce((acc, c) => acc + c.subs.reduce((s, sub) => s + sub.exercises.length, 0), 0);
-  return {
-    peito: cat(BODY_CATS.peito),
-    costas: cat(BODY_CATS.costas),
-    perna: cat(BODY_CATS.perna),
-    ombro: cat(BODY_CATS.ombro),
-    braco: cat(BODY_CATS.braco),
-    abdomen: cat(BODY_CATS.abdomen),
-  };
-})();
-
 const IMG: string | null = "/workout/workout-strength.jpg";
 const YT = (q: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q + " execução")}`;
 // const VID_M = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"; // REPLACED WITH YOUTUBE SEARCH
@@ -131,15 +85,9 @@ export default function TreinoHomePage() {
   const { user, profile } = useAuth();
   const demo = isDemoMode();
   const [feeling, setFeeling] = useState<string | null>(null);
-  const [detailEx, setDetailEx] = useState<ExerciseDetail | null>(null);
   const [summarySeconds, setSummarySeconds] = useState<number | null>(null);
   const [rpe, setRpe] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "active" | "done">("idle");
-  const [bodyCat, setBodyCat] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    const foco = new URLSearchParams(window.location.search).get("foco");
-    return foco && foco in BODY_CATS ? foco : null;
-  });
   const [session, setSession] = useState<typeof DEFAULT_DEMO_EX | null>(null);
 
   const { data, loading, error, refetch } = useAsyncQuery<TreinoData>(
@@ -252,15 +200,6 @@ export default function TreinoHomePage() {
   // Conclusões desta sessão (otimista, local): alimenta contador e reordenação
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const doneCount = doneIds.size;
-  const toggleDone = (id: string) => {
-    navigator.vibrate?.(30);
-    setDoneIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   const startWorkout = (list: typeof DEFAULT_DEMO_EX) => {
     setSession(list);
@@ -296,12 +235,6 @@ export default function TreinoHomePage() {
     startWorkout(sessionFromDetails.length > 0 ? sessionFromDetails : DEFAULT_DEMO_EX);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demo, phase, data?.details]);
-
-  const bodyExercises = useMemo(() => {
-    if (!demo || !bodyCat) return [];
-    const ids = BODY_CATS[bodyCat] ?? [];
-    return demoLib.filter((c) => ids.includes(c.id)).flatMap((c) => c.subs.flatMap((s) => s.exercises));
-  }, [demo, bodyCat]);
 
   if (loading) {
     return (
@@ -556,110 +489,7 @@ export default function TreinoHomePage() {
           ) : null}
         </div>
 
-        {/* 2. MAPA CORPORAL, toque na região para ver os aparelhos */}
-        <BodyMap
-          counts={BODY_COUNTS}
-          onSelect={(catId) => setBodyCat((prev) => (prev === catId ? null : catId))}
-          activeCat={bodyCat ?? ""}
-          lastTrained={tw.lastTrained}
-        />
-
-        {/* Grupo selecionado: lista de exercícios/aparelhos p/ começar */}
-        {bodyCat && demo ? (
-          <div className="gf-card gf-glass !p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="gf-label text-brand">
-                Guia rápido · {BODY_CATS[bodyCat]?.map((c) => CAT_LABEL[c] ?? c).join(" / ") ?? "Selecionado"}
-              </p>
-              <button
-                onClick={() => {
-                  navigator.vibrate?.(10);
-                  setBodyCat(null);
-                }}
-                className="gf-touch tactile flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[11px] font-bold text-muted-foreground transition-colors hover:border-brand/40 hover:text-foreground"
-                aria-label="Fechar categoria e voltar ao treino"
-              >
-                <X className="h-3 w-3" /> Fechar
-              </button>
-            </div>
-            <div className="mt-2 space-y-1.5">
-              {bodyExercises.slice(0, 8).map((e: DemoExercise) => (
-                <button
-                  key={e.id}
-                  onClick={() =>
-                    startWorkout(
-                      bodyExercises.slice(0, 6).map((x) => ({
-                        id: x.id,
-                        name: x.name,
-                        picto: x.picto,
-                        sets: 3,
-                        reps: "10",
-                        rest: 75,
-                        info: x.info,
-                        tips: x.tags ?? null,
-                        imageUrl: x.imageUrl ?? null,
-                        videoUrl: x.videoUrl ?? null,
-                        thumbUrl: (x as any).thumbUrl ?? null,
-                        videoUrlMale: (x as any).videoUrlMale ?? null,
-                        videoUrlFemale: (x as any).videoUrlFemale ?? null,
-                      }))
-                    )
-                  }
-                  className="gf-touch flex w-full items-center gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left transition-colors hover:border-brand/40"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-                    <FitnessIcon glyph={fitnessForName(e.name)} size={22} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-semibold text-foreground">{e.name}</span>
-                    <span className="block truncate text-[11px] text-muted-foreground">{e.equipment ?? "Exercício livre"}</span>
-                  </span>
-                  <button
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      setDetailEx({ name: e.name, info: e.info, tips: e.tags ?? null, imageUrl: e.imageUrl ?? null, videoUrl: e.videoUrl ?? null });
-                    }}
-                    aria-label={`Ver ficha de ${e.name}`}
-                    className="gf-touch tactile flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
-                  >
-                    <Info className="h-4 w-4" />
-                  </button>
-                  {e.machineId ? (
-                    <Badge variant="outline" className="shrink-0 !px-2 !text-[9px]">
-                      <ScanLine className="mr-1 h-3 w-3 text-brand" /> NFC
-                    </Badge>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() =>
-                startWorkout(
-                  bodyExercises.slice(0, 6).map((x) => ({
-                    id: x.id,
-                    name: x.name,
-                    picto: x.picto,
-                    sets: 3,
-                    reps: "10",
-                    rest: 75,
-                    info: x.info,
-                    tips: x.tags ?? null,
-                    imageUrl: x.imageUrl ?? null,
-                    videoUrl: x.videoUrl ?? null,
-                    thumbUrl: (x as any).thumbUrl ?? null,
-                    videoUrlMale: (x as any).videoUrlMale ?? null,
-                    videoUrlFemale: (x as any).videoUrlFemale ?? null,
-                  }))
-                )
-              }
-              className="gf-touch mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-bold text-brand-foreground shadow-lg shadow-brand/25"
-            >
-              <Play className="h-4 w-4" /> Começar treino ({Math.min(bodyExercises.length, 6)} exercícios)
-            </button>
-          </div>
-        ) : null}
-
-        {/* 3. TREINO DE HOJE, programa ativo + exercícios */}
+        {/* 2. TREINO DE HOJE, programa ativo + início direto da sessão */}
         <div>
           <div className="mb-2 flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-foreground">Treino de hoje</h2>
@@ -703,16 +533,7 @@ export default function TreinoHomePage() {
                         {demo ? doneCount : Math.max(todayLogs, doneCount)} de {totalToday} exercícios concluídos hoje
                       </p>
                     </div>
-                    {demo ? (
-                      <button
-                        onClick={() => startWorkout(sessionFromDetails)}
-                        className="gf-touch flex shrink-0 items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-bold text-brand-foreground shadow-lg shadow-brand/30"
-                      >
-                        <Play className="h-4 w-4" /> Iniciar
-                      </button>
-                    ) : (
-                      <ChevronRight className="h-4 w-4 shrink-0 text-white/50" />
-                    )}
+                    {!demo ? <ChevronRight className="h-4 w-4 shrink-0 text-white/50" /> : null}
                   </div>
                   <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/15">
                     <motion.div
@@ -722,53 +543,19 @@ export default function TreinoHomePage() {
                       transition={{ duration: 0.4 }}
                     />
                   </div>
+                  {demo ? (
+                    <button
+                      onClick={() => {
+                        navigator.vibrate?.([60, 40, 90]);
+                        startWorkout(sessionFromDetails);
+                      }}
+                      className="gf-touch tactile mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-[15px] font-black text-brand-foreground shadow-lg shadow-brand/35 transition-transform active:scale-[0.98]"
+                    >
+                      <Play className="h-5 w-5 fill-current" /> Iniciar treino
+                    </button>
+                  ) : null}
                 </div>
               </div>
-
-              <div className="space-y-2">
-                {[...data.details]
-                  .sort((a, b) => Number(doneIds.has(a.exercise_id ?? a.id)) - Number(doneIds.has(b.exercise_id ?? b.id)))
-                  .map((d, idx) => {
-                  const exId = d.exercise_id ?? d.id;
-                  const completed = doneIds.has(exId);
-                  const activeIdx = data.details.findIndex((x) => !doneIds.has(x.exercise_id ?? x.id));
-                  return (
-                  <ExerciseRow
-                    key={d.id}
-                    item={d}
-                    completed={completed}
-                    isActive={!completed && idx === activeIdx}
-                    onToggleComplete={() => toggleDone(exId)}
-                    onInfo={() =>
-                      setDetailEx({
-                        name: d.exercise?.name ?? "Exercício",
-                        info: d.exercise?.tips?.[0] ?? null,
-                        tips: d.exercise?.tips ?? null,
-                        imageUrl: (d.exercise as any)?.imageUrl ?? d.exercise?.photo_url ?? null,
-                        videoUrl: (d.exercise as any)?.videoUrl ?? (d.exercise as any)?.video_url ?? null,
-                      })
-                    }
-                  />
-                  );
-                  })}
-              </div>
-
-              {/* Ação de finalizar — aparece assim que algum exercício for marcado */}
-              {doneCount > 0 ? (
-                <button
-                  onClick={() => {
-                    navigator.vibrate?.([60, 40, 60]);
-                    setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
-                    endDaySession();
-                    setPhase("done");
-                    toast.success("Treino finalizado!");
-                  }}
-                  className="gf-touch flex w-full items-center justify-center gap-2 rounded-xl bg-success py-3.5 text-sm font-black text-black shadow-lg shadow-success/25"
-                >
-                  <CheckCircle2 className="h-5 w-5" />
-                  Finalizar treino · {doneCount} de {totalToday} exercícios
-                </button>
-              ) : null}
             </div>
           )}
         </div>
@@ -828,144 +615,9 @@ export default function TreinoHomePage() {
 
         {/* 5. HISTÓRICO RECENTE, accordion fechado por padrão */}
         <HistoryList logs={data.logs} />
-        <ExerciseInfoSheet ex={detailEx} onClose={() => setDetailEx(null)} />
       </div>
       <AiCoach />
     </>
-  );
-}
-
-function ExerciseRow({
-  item,
-  onInfo,
-  completed,
-  isActive,
-  onToggleComplete,
-}: {
-  item: TreinoDay;
-  onInfo: () => void;
-  completed: boolean;
-  isActive: boolean;
-  onToggleComplete: () => void;
-}) {
-  const suggestion =
-    item.exercise?.name === "Supino Reto"
-      ? "Aparelho ocupado? Crucifixo com halteres no banco livre, mesmo estímulo, sem espera."
-      : item.exercise?.name === "Agachamento"
-        ? "Smith ocupado? Leg press 45° é um bom substituto de hoje."
-        : null;
-  const catLabel = item.exercise?.category ? CAT_LABEL[item.exercise.category] ?? item.exercise.category : "-";
-  const ex = item.exercise as (Exercises & { imageUrl?: string; videoUrl?: string }) | null;
-  const photo = ex?.photo_url ?? ex?.imageUrl ?? null;
-  const video = ex?.video_url ?? ex?.videoUrl ?? null;
-  const glyph = fitnessForName(item.exercise?.name ?? "");
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onToggleComplete()}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onToggleComplete();
-        }
-      }}
-      aria-pressed={completed}
-      aria-label={`${completed ? "Desmarcar" : "Concluir"} ${item.exercise?.name ?? "exercício"}`}
-      className={cn(
-        "cursor-pointer rounded-xl border p-4 transition-all select-none",
-        completed
-          ? "border-success/60 bg-success/[0.08]"
-          : isActive
-            ? "border-[#F4711E] bg-[#F4711E]/[0.06] shadow-[0_0_15px_rgba(244,113,30,0.3)]"
-            : "border-border bg-card/40"
-      )}
-    >
-      <div className="flex items-start gap-4">
-        {photo ? (
-          <span className={cn("relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-white/[0.06]", completed && "opacity-50")}>
-            <Image src={photo} alt="" fill sizes="80px" className="object-cover" />
-          </span>
-        ) : (
-          <span
-            className={cn(
-              "flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border",
-              completed ? "border-success/40 bg-success/10" : isActive ? "border-[#F4711E]/40 bg-[#F4711E]/10" : "border-white/[0.06] bg-muted/40"
-            )}
-          >
-            <FitnessIcon glyph={glyph} size={36} />
-          </span>
-        )}
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <p className={cn("flex items-center gap-1.5 text-sm font-semibold", completed ? "text-muted-foreground line-through" : "text-foreground")}>
-            {item.exercise?.name ?? "Exercício"}
-            {isActive && !completed ? (
-              <span className="rounded-full bg-[#F4711E]/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-[#F4711E]">próximo</span>
-            ) : null}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {item.sets} séries × {item.reps} reps · descanso {item.rest_seconds}s
-          </p>
-          <div className="flex items-center gap-1.5 pt-1">
-            {video ? (
-              <a
-                href={video}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="tactile inline-flex items-center gap-1 rounded-full bg-brand/12 px-2.5 py-1 text-[10px] font-bold text-brand transition-colors hover:bg-brand/20"
-              >
-                <Play className="h-3 w-3 fill-current" /> Ver vídeo
-              </a>
-            ) : null}
-            <Badge variant="outline">{catLabel}</Badge>
-          </div>
-        </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onInfo(); }}
-          aria-label={`Ficha técnica de ${item.exercise?.name}`}
-          title="Como fazer"
-          className="gf-touch flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
-        >
-          <Info className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            openAiCoach(`Sobre o exercício ${item.exercise?.name ?? "desse"}: como executar com segurança e ajustar a carga?`);
-          }}
-          className="gf-touch flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
-          aria-label={`Perguntar ao Personal Digital sobre ${item.exercise?.name}`}
-          title="Perguntar ao Personal Digital"
-        >
-          <MessageCircle className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleComplete(); }}
-          aria-label={completed ? `Desmarcar ${item.exercise?.name}` : `Concluir ${item.exercise?.name}`}
-          className={cn(
-            "gf-touch flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all",
-            completed
-              ? "border-success bg-success text-black shadow-[0_0_12px_rgba(34,197,94,0.4)]"
-              : isActive
-                ? "border-[#F4711E] text-[#F4711E]"
-                : "border-border text-muted-foreground"
-          )}
-        >
-          <CheckCircle2 className={cn("h-5 w-5", completed && "fill-current")} />
-        </button>
-      </div>
-
-      {suggestion ? (
-        <p className="mt-2.5 border-l-2 border-brand/50 bg-brand/[0.06] py-1.5 pl-2.5 pr-2 text-[11px] leading-snug text-muted-foreground">
-          <Sparkles className="mr-1 inline h-3 w-3 align-[-2px] text-brand" />
-          {suggestion}
-        </p>
-      ) : null}
-
-      {item.exercise?.tips?.length ? <p className="mt-2 text-xs text-muted-foreground">{item.exercise.tips[0]}</p> : null}
-    </div>
   );
 }
 
