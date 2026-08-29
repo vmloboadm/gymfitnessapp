@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -79,6 +79,15 @@ export default function EquipamentoPage() {
   const [q, setQ] = useState("");
   const [info, setInfo] = useState<DemoExercise | null>(null);
   const [activeCat, setActiveCat] = useState("todos");
+
+  // Deep link do explorador muscular (/equipamento?grupo=peito)
+  useEffect(() => {
+    const g = new URLSearchParams(window.location.search).get("grupo");
+    if (g && ALL_IDS.includes(g)) {
+      setActiveCat(g);
+      setOpenCats([g]);
+    }
+  }, []);
   const [openCats, setOpenCats] = useState<string[]>([]);
 
   const eqStatus = useMemo(() => {

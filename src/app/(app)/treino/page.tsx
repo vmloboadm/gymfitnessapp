@@ -25,6 +25,7 @@ import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Badge } from "~/components/ui/badge";
 import WorkoutInProgress from "~/components/common/WorkoutInProgress";
+import { BodyExplorer } from "~/components/common/BodyExplorer";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
@@ -559,6 +560,9 @@ export default function TreinoHomePage() {
             </div>
           )}
         </div>
+
+        {/* 3. BIBLIOTECA POR MÚSCULO, explorador anatômico interativo */}
+        <BodyExplorer />
 
         {/* 4. PLANOS DISPONÍVEIS, preview bloqueado, liberação pelo personal */}
         <div>
