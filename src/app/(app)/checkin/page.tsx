@@ -231,10 +231,9 @@ export default function CheckinPage() {
       return;
     }
     if (doorMode) {
-      // tag da PORTARIA: valida entrada e leva DIRETO à tela de execução
+      // tag da PORTARIA: valida entrada e volta ao treino (aluno inicia quando quiser)
       navigator.vibrate?.([60, 40, 60]);
       startDaySession();
-      sessionStorage.setItem("gf_autostart", "1");
       stopScanning();
       toast.success("Entrada validada! Treino liberado");
       router.push("/treino");
@@ -370,7 +369,6 @@ useEffect(() => {
 
   const doEntry = async (source: "nfc" | "qrcode" | "app" = "app") => {
     if (demo) {
-      sessionStorage.setItem("gf_autostart", "1");
       setGymEntry({ id: "ck-demo-" + Date.now(), checked_at: new Date().toISOString(), source });
       startDaySession();
       toast.success("Check-in de entrada realizado!");

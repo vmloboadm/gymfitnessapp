@@ -31,7 +31,7 @@ import { cn } from "~/lib/utils";
 import { toast } from "sonner";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
-import { useWorkoutSession, elapsedSeconds } from "~/lib/workout-session";
+import { useWorkoutSession, elapsedSeconds, readSessionProgress } from "~/lib/workout-session";
 import { SessionClock } from "~/components/common/SessionClock";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
 
@@ -90,6 +90,11 @@ export default function TreinoHomePage() {
   const [rpe, setRpe] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "active" | "done">("idle");
   const [session, setSession] = useState<typeof DEFAULT_DEMO_EX | null>(null);
+  const [hasSavedProgress, setHasSavedProgress] = useState(false);
+
+  useEffect(() => {
+    setHasSavedProgress(!!readSessionProgress());
+  }, [phase]);
 
   const { data, loading, error, refetch } = useAsyncQuery<TreinoData>(
     async (): Promise<FetchResult<TreinoData>> => {
@@ -155,7 +160,7 @@ export default function TreinoHomePage() {
     [user?.id, profile?.id, demo]
   );
   const router = useRouter();
-  const { session: daySession, end: endDaySession } = useWorkoutSession();
+  const { session: daySession, start: startDaySession, end: endDaySession } = useWorkoutSession();
 
   const programRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -226,16 +231,6 @@ export default function TreinoHomePage() {
       videoUrlFemale: null,
     };
   }) as typeof DEFAULT_DEMO_EX);
-
-  /** Check-in validou? → entra DIRETO na execução (sem clique extra). */
-  useEffect(() => {
-    if (!demo || phase !== "idle") return;
-    if (typeof window === "undefined") return;
-    if (sessionStorage.getItem("gf_autostart") !== "1") return;
-    sessionStorage.removeItem("gf_autostart");
-    startWorkout(sessionFromDetails.length > 0 ? sessionFromDetails : DEFAULT_DEMO_EX);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [demo, phase, data?.details]);
 
   if (loading) {
     return (
@@ -315,7 +310,7 @@ export default function TreinoHomePage() {
   // Treino em andamento (demo), substitui a navegação normal.
   if (phase === "active" && demo) {
     const demoExercises = session ?? DEFAULT_DEMO_EX;
-    return <WorkoutInProgress exercises={demoExercises} onFinish={(ids) => conclude(ids)} />;
+    return <WorkoutInProgress exercises={demoExercises} onFinish={(ids) => conclude(ids)} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />;
   }
 
   if (!data?.workouts) {
@@ -450,11 +445,6 @@ export default function TreinoHomePage() {
     <>
       <TopBar title="Treino" subtitle={cap(weekdayName())} />
       {sessionBar}
-      {demo ? (
-        <p className="mx-auto max-w-md px-4 pt-1 text-center text-[9px] font-semibold uppercase tracking-widest text-warning">
-          demo acelerado · 1 min real = 1 h simulada
-        </p>
-      ) : null}
       <div className="space-y-8 p-4">
         {/* 1. STATUS ATUAL, linha compacta sem card pesado */}
         <div className="flex items-center gap-2 rounded-full border border-border bg-card/40 px-3 py-1.5">
@@ -548,11 +538,12 @@ export default function TreinoHomePage() {
                     <button
                       onClick={() => {
                         navigator.vibrate?.([60, 40, 90]);
+                        if (!daySession) startDaySession();
                         startWorkout(sessionFromDetails);
                       }}
                       className="gf-touch tactile mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-[15px] font-black text-brand-foreground shadow-lg shadow-brand/35 transition-transform active:scale-[0.98]"
                     >
-                      <Play className="h-5 w-5 fill-current" /> Iniciar treino
+                      <Play className="h-5 w-5 fill-current" /> {hasSavedProgress ? "Continuar treino" : "Iniciar treino"}
                     </button>
                   ) : null}
                 </div>

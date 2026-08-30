@@ -90,3 +90,47 @@ export function sessionPhase(startedAt: number, now: number): "ativa" | "alerta"
   if (hours >= SESSION_WARN_HOURS) return "alerta";
   return "ativa";
 }
+
+// ---------------------------------------------------------------------------
+// Progresso da sessão em execução (séries marcadas) — sobrevive à navegação:
+// o aluno pode circular pelo app com o treino rolando e voltar sem perder nada.
+// Guardado junto da sessão-do-dia; expira com ela (4h) e limpa ao finalizar.
+// ---------------------------------------------------------------------------
+
+const KEY_PROGRESS = "gymfit_session_progress_v1";
+
+export type SavedExerciseProgress = {
+  exercises: unknown[];
+  progress: Record<string, { sets: Array<{ reps: string; done: boolean }> }>;
+  currentIdx: number;
+  savedAt: number;
+};
+
+export function saveSessionProgress(data: Omit<SavedExerciseProgress, "savedAt">): void {
+  try {
+    localStorage.setItem(KEY_PROGRESS, JSON.stringify({ ...data, savedAt: Date.now() }));
+  } catch {}
+}
+
+export function readSessionProgress(): SavedExerciseProgress | null {
+  try {
+    const raw = localStorage.getItem(KEY_PROGRESS);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SavedExerciseProgress;
+    if (!parsed?.exercises?.length || typeof parsed.currentIdx !== "number") return null;
+    // expira junto com a sessão do dia (4h)
+    if (!read() || Date.now() - parsed.savedAt > MAX_SESSION_HOURS * 3600000) {
+      localStorage.removeItem(KEY_PROGRESS);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSessionProgress(): void {
+  try {
+    localStorage.removeItem(KEY_PROGRESS);
+  } catch {}
+}

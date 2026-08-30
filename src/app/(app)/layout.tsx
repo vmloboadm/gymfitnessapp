@@ -1,6 +1,7 @@
 "use client";
 
 import { BottomNav } from "~/components/layout/BottomNav";
+import { LiveWorkoutBar } from "~/components/layout/LiveWorkoutBar";
 import { useOfflineQueue } from "~/hooks/useOfflineQueue";
 import { CloudOff } from "lucide-react";
 
@@ -27,6 +28,7 @@ export default function AppLayout({
         </div>
       ) : null}
       <main>{children}</main>
+      <LiveWorkoutBar />
       <BottomNav />
     </div>
   );

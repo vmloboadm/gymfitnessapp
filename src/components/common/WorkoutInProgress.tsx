@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, ChevronLeft, ChevronRight, Info, PlayCircle, Timer, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Info, PlayCircle, Timer, X } from "lucide-react";
 import Image from "next/image";
 import { type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { ExerciseVideoModal } from "~/components/common/ExerciseVideoModal";
 import { cn } from "~/lib/utils";
+import { readSessionProgress, saveSessionProgress, clearSessionProgress } from "~/lib/workout-session";
 
 export type WExercise = {
   id: string;
@@ -44,9 +45,11 @@ function fmt(seconds: number): string {
 export default function WorkoutInProgress({
   exercises,
   onFinish,
+  onMinimize,
 }: {
   exercises: WExercise[];
   onFinish: (completedIds: string[]) => void;
+  onMinimize?: () => void;
 }) {
   const [progress, setProgress] = useState<Record<string, ExerciseProgress>>({});
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -67,16 +70,31 @@ export default function WorkoutInProgress({
   }, []);
 
   useEffect(() => {
-    setProgress((prev) => {
+    const saved = readSessionProgress();
+    const savedIds = saved ? (saved.exercises as Array<{ id?: string }>).map((e) => e?.id ?? "").join("|") : "";
+    const currentIds = exercises.map((e) => e.id).join("|");
+    if (saved && savedIds && savedIds === currentIds) {
+      // retoma exatamente de onde parou (aluno circulou pelo app)
+      setProgress(saved.progress as Record<string, ExerciseProgress>);
+      setCurrentIdx(Math.min(saved.currentIdx, exercises.length - 1));
+      return;
+    }
+    setProgress(() => {
       const next: Record<string, ExerciseProgress> = {};
       for (const ex of exercises) {
-        next[ex.id] = prev[ex.id] ?? {
+        next[ex.id] = {
           sets: Array.from({ length: ex.sets }, () => ({ reps: String(ex.reps), done: false })),
         };
       }
       return next;
     });
   }, [exercises]);
+
+  // persiste a cada mudança — navegar pelo app não perde séries
+  useEffect(() => {
+    if (!exercises.length || !Object.keys(progress).length) return;
+    saveSessionProgress({ exercises, progress, currentIdx });
+  }, [exercises, progress, currentIdx]);
 
   const startRest = useCallback((seconds: number) => {
     if (!seconds || seconds <= 0) return;
@@ -169,6 +187,7 @@ export default function WorkoutInProgress({
   const handleFinish = () => {
     navigator.vibrate?.([50, 30, 50]);
     if (restInterval.current) clearInterval(restInterval.current);
+    clearSessionProgress();
     onFinish(completedIds);
   };
 
@@ -209,6 +228,16 @@ export default function WorkoutInProgress({
               />
             </div>
           </div>
+          {onMinimize && (
+            <button
+              onClick={onMinimize}
+              aria-label="Minimizar treino (continua em segundo plano)"
+              title="Minimizar — o treino continua rodando"
+              className="gf-touch flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
+            >
+              <ChevronDown className="h-5 w-5" />
+            </button>
+          )}
           <button
             onClick={() => setShowFinish(true)}
             className="shrink-0 rounded-full bg-success px-3.5 py-1.5 text-[11px] font-black text-black"
