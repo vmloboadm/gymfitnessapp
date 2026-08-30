@@ -82,9 +82,9 @@ export const demoVariations: Record<string, any[]> = {
 // ---------------------------------------------------------------------------
 
 export const demoExercises = [
-  { id: "ex-demo-001", name: "Supino Reto", category: "strength", muscles: ["chest"], tips: ["Mantenha escápulas retraídas"], technique_default: "standard", high_impact: false, photo_url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqHkC2h0vB6PpTZ6wPJMs88U2ep-tRZoc2mx1FZbVREw&s=10" },
+  { id: "ex-demo-001", name: "Supino Reto", category: "strength", muscles: ["chest"], tips: ["Mantenha escápulas retraídas"], technique_default: "standard", high_impact: false, photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-reto.webp" },
   { id: "ex-demo-002", name: "Agachamento", category: "strength", muscles: ["legs"], tips: ["Joelhos acompanham os pés"], technique_default: "standard", high_impact: false },
-  { id: "ex-demo-003", name: "Crucifixo com Halteres", category: "strength", muscles: ["chest"], tips: ["Abra até a linha do peito"], technique_default: "standard", high_impact: false },
+  { id: "ex-demo-003", name: "Crucifixo com Halteres", category: "strength", muscles: ["chest"], tips: ["Abra até a linha do peito"], technique_default: "standard", high_impact: false, photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crucifixo-com-halteres.webp" },
   { id: "ex-demo-004", name: "Desenvolvimento Militar", category: "strength", muscles: ["shoulders"], tips: ["Core firme, sem arco lombar"], technique_default: "standard", high_impact: false },
   { id: "ex-demo-005", name: "Puxada Alta", category: "strength", muscles: ["back"], tips: ["Puxe com cotovelos baixos"], technique_default: "standard", high_impact: false },
   { id: "ex-demo-006", name: "Esteira", category: "cardio", muscles: ["legs"], tips: ["Comece em ritmo leve"], technique_default: "standard", high_impact: true },
@@ -257,6 +257,20 @@ const UNSPLASH = (id: string) => `https://images.unsplash.com/${id}?w=300&h=300&
 
 const ex = (id: string, name: string, picto: string, info: string, equipment: string | null = null, tags: string[] = [], machineId?: string, thumbId = "photo-1517836357463-d25dfeac3438"): DemoExercise =>
   ({ id, name, picto, info, equipment, tags, machineId, imageUrl: UNSPLASH(thumbId), thumbUrl: UNSPLASH(thumbId), videoUrl: YT(name), videoUrlMale: YT(name), videoUrlFemale: YT(name) });
+
+/* Imagens reais por exercício — Storage do projeto (WebP 400px, sem hotlink).
+   Pipeline: scripts/fetch-exercise-images.mjs + upload (ver docs do lote). */
+export const EXERCISE_PHOTO_OVERRIDES: Record<string, string> = {
+  "lib-su1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-reto.webp",
+  "lib-su2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-inclinado.webp",
+  "lib-su3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-declinado.webp",
+  "lib-su4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-com-halteres.webp",
+  "lib-fl1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crucifixo-com-halteres.webp",
+  "lib-fl2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crucifixo-polia.webp",
+  "lib-pk1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/voador-peck-deck.webp",
+  "lib-cr1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/flexao-de-braco.webp",
+  "lib-par1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/fundos-paralelas.webp",
+};
 
 export const demoLib: DemoCategory[] = [
   {
@@ -438,6 +452,19 @@ export const demoLib: DemoCategory[] = [
     ],
   },
 ];
+
+// aplica as imagens reais do Storage sobre os placeholders genéricos
+for (const cat of demoLib) {
+  for (const sub of cat.subs) {
+    for (const ex of sub.exercises) {
+      const photo = EXERCISE_PHOTO_OVERRIDES[ex.id];
+      if (photo) {
+        ex.imageUrl = photo;
+        ex.thumbUrl = photo;
+      }
+    }
+  }
+}
 
 export function demoLibCategory(catId: string): DemoCategory | undefined {
   return demoLib.find((c) => c.id === catId);

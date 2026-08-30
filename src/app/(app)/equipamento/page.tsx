@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -311,9 +313,15 @@ function ExerciseRow({
 
   return (
     <div className={cn("flex items-center gap-3 rounded-xl border p-3 transition-colors", inToday ? "border-brand/45 bg-brand-soft/20" : "border-border bg-card/40")}>
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">
-        <FitnessIcon glyph={fitnessForName(e.name)} size={24} />
-      </span>
+      {e.imageUrl ? (
+        <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-white/[0.06]">
+          <Image src={e.imageUrl} alt="" fill sizes="44px" className="object-cover" />
+        </span>
+      ) : (
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">
+          <FitnessIcon glyph={fitnessForName(e.name)} size={24} />
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-semibold text-foreground">
           {e.name}

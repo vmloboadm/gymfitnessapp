@@ -680,9 +680,15 @@ export default function TreinoHomePage() {
                   onClick={() => router.push(`/equipamento?grupo=${libCat}`)}
                   className="gf-touch flex w-full items-center gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left"
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <Dumbbell className="h-4 w-4 text-muted-foreground" />
-                  </span>
+                  {e.imageUrl ? (
+                    <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-white/[0.06]">
+                      <Image src={e.imageUrl} alt="" fill sizes="40px" className="object-cover" />
+                    </span>
+                  ) : (
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <Dumbbell className="h-4 w-4 text-muted-foreground" />
+                    </span>
+                  )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold text-foreground">{e.name}</span>
                     <span className="block truncate text-[11px] text-muted-foreground">{e.equipment ?? "Exercício livre"}</span>
