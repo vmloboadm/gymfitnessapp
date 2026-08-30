@@ -2,7 +2,7 @@ import puppeteer from "puppeteer-core";
 import { existsSync } from "node:fs";
 import { mkdirSync } from "node:fs";
 
-const BASE = process.env.AUDIT_URL || "http://localhost:3000";
+const BASE = process.env.AUDIT_URL || "http://localhost:3002";
 const OUT = "docs/proofs";
 mkdirSync(OUT, { recursive: true });
 

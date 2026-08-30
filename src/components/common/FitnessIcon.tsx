@@ -3,16 +3,24 @@
 import { cn } from "~/lib/utils";
 import {
   Activity,
+  ArrowBigUp,
   ArrowDown,
+  ArrowDownFromLine,
   ArrowUp,
   ArrowUpFromLine,
+  Bike,
   BicepsFlexed,
+  ChevronsDown,
+  ChevronsUp,
   Dumbbell,
   Flame,
   Footprints,
   HeartPulse,
+  MoveHorizontal,
   MoveVertical,
+  PersonStanding,
   Timer,
+  Waves,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,21 +34,31 @@ import {
 export type FitnessGlyph =
   | "chest" | "back" | "shoulder" | "biceps" | "triceps" | "forearm"
   | "legs" | "hamstrings" | "glutes" | "calves" | "abs" | "cardio"
-  | "dumbbell" | "barbell" | "machine" | "cable" | "bodyweight" | "timer";
+  | "dumbbell" | "barbell" | "machine" | "cable" | "bodyweight" | "timer"
+  | "squat" | "legpress" | "run" | "bike" | "rower" | "pulldown" | "pullup" | "row" | "plank";
 
 const GROUP_META: Record<string, { label: string; initial: string; color: string; bg: string; icon: LucideIcon }> = {
   chest:         { label: "Peito",      initial: "P", color: "#F97316", bg: "rgba(249,115,22,0.14)", icon: Dumbbell },
   back:          { label: "Costas",     initial: "C", color: "#3B82F6", bg: "rgba(59,130,246,0.14)", icon: ArrowUpFromLine },
+  pulldown:      { label: "Puxada",     initial: "P", color: "#3B82F6", bg: "rgba(59,130,246,0.14)", icon: ArrowDownFromLine },
+  pullup:        { label: "Barra Fixa", initial: "B", color: "#3B82F6", bg: "rgba(59,130,246,0.14)", icon: ArrowUpFromLine },
+  row:           { label: "Remada",     initial: "R", color: "#3B82F6", bg: "rgba(59,130,246,0.14)", icon: MoveHorizontal },
   shoulder:      { label: "Ombro",      initial: "O", color: "#FBBF24", bg: "rgba(251,191,36,0.14)", icon: ArrowUp },
   biceps:        { label: "Bíceps",     initial: "B", color: "#EF4444", bg: "rgba(239,68,68,0.14)", icon: BicepsFlexed },
   triceps:       { label: "Tríceps",    initial: "T", color: "#A855F7", bg: "rgba(168,85,247,0.14)", icon: ArrowDown },
   forearm:       { label: "Antebraço",  initial: "A", color: "#EC4899", bg: "rgba(236,72,153,0.14)", icon: MoveVertical },
-  legs:          { label: "Pernas",     initial: "Q", color: "#22C55E", bg: "rgba(34,197,94,0.14)",  icon: Footprints },
-  hamstrings:    { label: "Posterior",  initial: "H", color: "#16A34A", bg: "rgba(22,163,74,0.14)",  icon: Footprints },
-  glutes:        { label: "Glúteos",    initial: "G", color: "#14B8A6", bg: "rgba(20,184,166,0.14)", icon: Footprints },
-  calves:        { label: "Panturrilha",initial: "L", color: "#06B6D4", bg: "rgba(6,182,212,0.14)",  icon: Footprints },
+  legs:          { label: "Pernas",     initial: "Q", color: "#22C55E", bg: "rgba(34,197,94,0.14)",  icon: PersonStanding },
+  squat:         { label: "Agachamento",initial: "A", color: "#22C55E", bg: "rgba(34,197,94,0.14)",  icon: PersonStanding },
+  legpress:      { label: "Leg Press",  initial: "L", color: "#22C55E", bg: "rgba(34,197,94,0.14)",  icon: MoveVertical },
+  hamstrings:    { label: "Posterior",  initial: "H", color: "#16A34A", bg: "rgba(22,163,74,0.14)",  icon: ChevronsDown },
+  glutes:        { label: "Glúteos",    initial: "G", color: "#14B8A6", bg: "rgba(20,184,166,0.14)", icon: ArrowBigUp },
+  calves:        { label: "Panturrilha",initial: "L", color: "#06B6D4", bg: "rgba(6,182,212,0.14)",  icon: ChevronsUp },
   abs:           { label: "Abdômen",    initial: "K", color: "#F59E0B", bg: "rgba(245,158,11,0.14)", icon: Flame },
+  plank:         { label: "Prancha",    initial: "P", color: "#F59E0B", bg: "rgba(245,158,11,0.14)", icon: Timer },
   cardio:        { label: "Cardio",     initial: "R", color: "#FB7185", bg: "rgba(251,113,133,0.14)", icon: HeartPulse },
+  run:           { label: "Corrida",    initial: "C", color: "#FB7185", bg: "rgba(251,113,133,0.14)", icon: Footprints },
+  bike:          { label: "Bike",       initial: "B", color: "#FB7185", bg: "rgba(251,113,133,0.14)", icon: Bike },
+  rower:         { label: "Remador",    initial: "R", color: "#FB7185", bg: "rgba(251,113,133,0.14)", icon: Waves },
   dumbbell:      { label: "Halter",     initial: "H", color: "#94A3B8", bg: "rgba(148,163,184,0.14)", icon: Dumbbell },
   barbell:       { label: "Barra",      initial: "B", color: "#94A3B8", bg: "rgba(148,163,184,0.14)", icon: Dumbbell },
   machine:       { label: "Máquina",    initial: "M", color: "#94A3B8", bg: "rgba(148,163,184,0.14)", icon: Activity },
@@ -62,18 +80,18 @@ const EXERCISE_MAP: Record<string, FitnessGlyph> = {
   "flexão de braço": "chest",
   "fundos paralelas": "chest",
 
-  "puxada alta": "back",
-  "pulldown pronado": "back",
-  "pulldown supinado": "back",
-  "puxada triangulo": "back",
-  "puxada frente aberta": "back",
-  "remada curvada": "back",
-  "remada baixa": "back",
-  "remada cavalinho": "back",
-  "remada unilateral": "back",
-  "barra fixa": "back",
-  "barra fixa pronada": "back",
-  "barra fixa supinada": "back",
+  "puxada alta": "pulldown",
+  "pulldown pronado": "pulldown",
+  "pulldown supinado": "pulldown",
+  "puxada triangulo": "pulldown",
+  "puxada frente aberta": "pulldown",
+  "remada curvada": "row",
+  "remada baixa": "row",
+  "remada cavalinho": "row",
+  "remada unilateral": "row",
+  "barra fixa": "pullup",
+  "barra fixa pronada": "pullup",
+  "barra fixa supinada": "pullup",
   shruug: "back",
 
   "desenvolvimento militar": "shoulder",
@@ -106,15 +124,15 @@ const EXERCISE_MAP: Record<string, FitnessGlyph> = {
   "extensao de punho": "forearm",
   "farmer walk": "forearm",
 
-  "agachamento livre": "legs",
-  "agachamento smith": "legs",
-  "agachamento frontal": "legs",
-  "agachamento sumo": "legs",
-  "agachamento bulgaro": "legs",
-  "leg press": "legs",
-  "leg press 45": "legs",
-  "leg press pes altos": "legs",
-  "leg press unilateral": "legs",
+  "agachamento livre": "squat",
+  "agachamento smith": "squat",
+  "agachamento frontal": "squat",
+  "agachamento sumo": "squat",
+  "agachamento bulgaro": "squat",
+  "leg press": "legpress",
+  "leg press 45": "legpress",
+  "leg press pes altos": "legpress",
+  "leg press unilateral": "legpress",
   "cadeira extensora": "legs",
   "extensao tradicional": "legs",
   afundo: "legs",
@@ -137,9 +155,9 @@ const EXERCISE_MAP: Record<string, FitnessGlyph> = {
   "panturrilha sentado": "calves",
   "panturrilha em pe unilateral": "calves",
 
-  "prancha abdominal": "abs",
-  "prancha isometrica": "abs",
-  "prancha lateral": "abs",
+  "prancha abdominal": "plank",
+  "prancha isometrica": "plank",
+  "prancha lateral": "plank",
   "abdominal maquina": "abs",
   "abdominal máquina": "abs",
   "crunch solo": "abs",
@@ -150,17 +168,17 @@ const EXERCISE_MAP: Record<string, FitnessGlyph> = {
   "bicicleta no solo": "abs",
   "mountain climber": "abs",
 
-  esteira: "cardio",
-  corrida: "cardio",
-  bicicleta: "cardio",
-  bike: "cardio",
-  remador: "cardio",
+  esteira: "run",
+  corrida: "run",
+  "sprint na esteira": "run",
+  bicicleta: "bike",
+  bike: "bike",
+  remador: "rower",
   eliptico: "cardio",
   burpee: "cardio",
   "pular corda": "cardio",
   "swing de kettlebell": "cardio",
   "box jump": "cardio",
-  "sprint na esteira": "cardio",
 };
 
 const GROUP_MAP: Record<string, FitnessGlyph> = {
@@ -186,8 +204,9 @@ function normalize(s: string): string {
 }
 
 const FALLBACK_POOL: FitnessGlyph[] = [
-  "chest", "back", "shoulder", "biceps", "triceps", "forearm",
-  "legs", "hamstrings", "glutes", "calves", "abs", "cardio",
+  "chest", "back", "pulldown", "pullup", "row", "shoulder", "biceps", "triceps", "forearm",
+  "legs", "squat", "legpress", "hamstrings", "glutes", "calves", "abs", "plank",
+  "cardio", "run", "bike", "rower",
   "dumbbell", "barbell", "machine", "cable", "bodyweight",
 ];
 
@@ -197,17 +216,25 @@ export function fitnessForName(name: string, used?: Set<FitnessGlyph>): FitnessG
 
   if (!glyph) {
     if (/supino|crucifixo|voador|peck|fundos|flexao/.test(n)) glyph = "chest";
-    else if (/puxada|pulldown|remada|barra fixa|dorsal|shruug/.test(n)) glyph = "back";
+    else if (/puxada|pulldown/.test(n)) glyph = "pulldown";
+    else if (/barra fixa/.test(n)) glyph = "pullup";
+    else if (/remada/.test(n)) glyph = "row";
+    else if (/dorsal|shruug/.test(n)) glyph = "back";
     else if (/desenvolvimento|elevacao|ombro/.test(n)) glyph = "shoulder";
     else if (/rosca|biceps/.test(n)) glyph = "biceps";
     else if (/triceps|mergulho/.test(n)) glyph = "triceps";
     else if (/punho|antebraco|farmer/.test(n)) glyph = "forearm";
-    else if (/agachamento|leg press|extensora|cadeira extensora|afundo/.test(n)) glyph = "legs";
+    else if (/agachamento/.test(n)) glyph = "squat";
+    else if (/leg press/.test(n)) glyph = "legpress";
+    else if (/extensora|afundo/.test(n)) glyph = "legs";
     else if (/flexora|mesa flexora|stiff|bom dia|hiperextensao/.test(n)) glyph = "hamstrings";
     else if (/abdutora|pelvica|hip thrust|gluteo|sumo|passada|kickback/.test(n)) glyph = "glutes";
     else if (/panturrilha/.test(n)) glyph = "calves";
     else if (/prancha|abdominal|crunch|elevacao de perna|russian|bicicleta|mountain/.test(n)) glyph = "abs";
-    else if (/esteira|corrida|bike|bicicleta|remador|eliptico|burpee|corda|kettlebell|box jump|sprint/.test(n)) glyph = "cardio";
+    else if (/esteira|corrida|sprint/.test(n)) glyph = "run";
+    else if (/bike|bicicleta/.test(n)) glyph = "bike";
+    else if (/remador/.test(n)) glyph = "rower";
+    else if (/eliptico|burpee|corda|kettlebell|box jump/.test(n)) glyph = "cardio";
     else if (/halter/.test(n)) glyph = "dumbbell";
     else if (/barra/.test(n)) glyph = "barbell";
     else if (/cabo|polia/.test(n)) glyph = "cable";

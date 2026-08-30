@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { toast } from "sonner";
+import { BUILD_LABEL } from "~/lib/build";
 
 export function LoginForm() {
   const router = useRouter();
@@ -182,6 +183,8 @@ export function LoginForm() {
           Cadastre-se
         </Link>
       </p>
+
+      <p className="pt-2 text-center text-[10px] font-semibold tracking-wide text-white/30">{BUILD_LABEL}</p>
     </div>
   );
 }

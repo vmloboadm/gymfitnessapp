@@ -18,6 +18,7 @@ import { isDemoMode, demoMetricsData } from "~/lib/demo-bridge";
 import { sortedAchievements } from "~/lib/achievements";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import type { StudentSubscriptions } from "~/lib/types/models";
+import { BUILD_LABEL } from "~/lib/build";
 
 /**
  * Perfil DESTILADO: identidade, matrícula, peso, conquistas e ações.
@@ -229,6 +230,11 @@ export default function PerfilPage() {
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           </Link>
         </div>
+
+        {/* tag de build — amarra evidências à versão em execução */}
+        <p className="pb-6 pt-4 text-center text-[10px] font-semibold tracking-wide text-muted-foreground/60">
+          {BUILD_LABEL}
+        </p>
       </div>
     </>
   );
