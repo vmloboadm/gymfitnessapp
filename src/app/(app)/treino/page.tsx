@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Lock,
   ScanLine,
+  ArrowUpRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
@@ -25,7 +26,8 @@ import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Badge } from "~/components/ui/badge";
 import WorkoutInProgress from "~/components/common/WorkoutInProgress";
-import { BodyExplorer } from "~/components/common/BodyExplorer";
+import BodyMap from "~/components/body-map";
+import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
@@ -44,7 +46,7 @@ const DEMO_EX_GROUP_REAL: Record<string, string> = {
 };
 import { getTodayWorkout } from "~/lib/today-workout";
 import { cap, formatDate } from "~/lib/utils/format";
-import { isDemoMode, demoTreinoData } from "~/lib/demo-bridge";
+import { isDemoMode, demoTreinoData, demoLib } from "~/lib/demo-bridge";
 import type {
   Exercises,
   StudentWorkouts,
@@ -70,6 +72,42 @@ function errorResult<T>(message: string): FetchResult<T> {
   return { data: null, error: { message } };
 }
 
+/* contagem de exercícios por grupo p/ o balão do mapa corporal */
+const BODY_COUNTS: Record<string, number> = (() => {
+  const CATS: Record<string, string[]> = {
+    peito: ["peito"],
+    costas: ["costas"],
+    perna: ["inferiores"],
+    ombro: ["ombro"],
+    braco: ["biceps", "triceps", "antebraco"],
+    abdomen: ["abdomen"],
+  };
+  const out: Record<string, number> = {};
+  for (const [k, ids] of Object.entries(CATS)) {
+    out[k] = demoLib
+      .filter((c) => ids.includes(c.id))
+      .reduce((a, c) => a + c.subs.reduce((acc, sub) => acc + sub.exercises.length, 0), 0);
+  }
+  return out;
+})();
+
+const GROUP_LABEL: Record<string, string> = {
+  peito: "Peito", costas: "Costas", perna: "Pernas", ombro: "Ombros", braco: "Braços", abdomen: "Abdômen",
+};
+
+const GROUP_CATS: Record<string, string[]> = {
+  peito: ["peito"], costas: ["costas"], perna: ["inferiores"], ombro: ["ombro"],
+  braco: ["biceps", "triceps", "antebraco"], abdomen: ["abdomen"],
+};
+
+function groupExercises(grupo: string, limit = 6) {
+  const ids = GROUP_CATS[grupo] ?? [];
+  return demoLib
+    .filter((c) => ids.includes(c.id))
+    .flatMap((c) => c.subs.flatMap((sub) => sub.exercises))
+    .slice(0, limit);
+}
+
 const IMG: string | null = "/workout/workout-strength.jpg";
 const YT = (q: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q + " execução")}`;
 // const VID_M = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"; // REPLACED WITH YOUTUBE SEARCH
@@ -91,6 +129,7 @@ export default function TreinoHomePage() {
   const [phase, setPhase] = useState<"idle" | "active" | "done">("idle");
   const [session, setSession] = useState<typeof DEFAULT_DEMO_EX | null>(null);
   const [hasSavedProgress, setHasSavedProgress] = useState(false);
+  const [libCat, setLibCat] = useState<string | null>(null);
 
   useEffect(() => {
     setHasSavedProgress(!!readSessionProgress());
@@ -552,8 +591,15 @@ export default function TreinoHomePage() {
           )}
         </div>
 
-        {/* 3. BIBLIOTECA POR MÚSCULO, explorador anatômico interativo */}
-        <BodyExplorer />
+        {/* 3. BIBLIOTECA POR MÚSCULO, mapa navy/laranja com escala de recuperação */}
+        <BodyMap
+          counts={BODY_COUNTS}
+          onSelect={(catId) => {
+            setLibCat((prev) => (prev === catId ? null : catId));
+          }}
+          activeCat={libCat ?? ""}
+          lastTrained={tw.lastTrained}
+        />
 
         {/* 4. PLANOS DISPONÍVEIS, preview bloqueado, liberação pelo personal */}
         <div>
@@ -611,6 +657,42 @@ export default function TreinoHomePage() {
         {/* 5. HISTÓRICO RECENTE, accordion fechado por padrão */}
         <HistoryList logs={data.logs} />
       </div>
+      {/* sheet: exercícios do grupo tocado no mapa */}
+      <BottomSheet open={!!libCat} onClose={() => setLibCat(null)}>
+        {libCat ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-black text-foreground">{GROUP_LABEL[libCat] ?? libCat}</h3>
+                <p className="text-xs text-muted-foreground">Biblioteca de exercícios</p>
+              </div>
+              <button
+                onClick={() => router.push(`/equipamento?grupo=${libCat}`)}
+                className="gf-touch flex shrink-0 items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs font-bold text-brand"
+              >
+                Catálogo <ArrowUpRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              {groupExercises(libCat).map((e) => (
+                <button
+                  key={e.id}
+                  onClick={() => router.push(`/equipamento?grupo=${libCat}`)}
+                  className="gf-touch flex w-full items-center gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Dumbbell className="h-4 w-4 text-muted-foreground" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-semibold text-foreground">{e.name}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">{e.equipment ?? "Exercício livre"}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </BottomSheet>
       <AiCoach />
     </>
   );

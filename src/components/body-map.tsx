@@ -5,16 +5,17 @@ import { AnimatePresence, motion } from "framer-motion";
 import { RotateCw } from "lucide-react";
 import Model, { type Muscle } from "react-body-highlighter";
 import { cn } from "~/lib/utils";
-import { recoveryState } from "~/lib/today-workout";
+import { recoveryState, type RecoveryState } from "~/lib/today-workout";
 
 /**
  * Mapa corporal GymFitness, SVG anatômico REAL (react-body-highlighter).
  *
- * Estados visíveis SEM tocar (cor com função):
- *   verde  = grupo recuperado/liberado
- *   âmbar  = treinado nas últimas 24–48h (ainda recuperando)
- *   neutro = sem registro recente
- * Laranja #F4711E + glow = grupo selecionado (toque), com balão de confirmação.
+ * Escala de recuperação SEMPRE visível (cor com função), 4 estados:
+ *   verde   = descansado (liberado)
+ *   amarelo = recuperando
+ *   laranja = ainda cansado
+ *   vermelho = exausto
+ * Grupo selecionado (toque) acende em laranja-claro + glow, com balão.
  */
 
 export type Side = "front" | "back";
@@ -76,17 +77,14 @@ export default function BodyMap({
   const groups = isBack ? BACK_GROUPS : FRONT_GROUPS;
   const labels = isBack ? BACK_LABELS : FRONT_LABELS;
 
-  // cor-com-função: laranja=ativo · verde=recuperado · âmbar=recuperando
-  const HIGHLIGHTS = ["#F4711E", "#4ADE80", "#FF9A5C"];
+  // cor-com-função: frequency → HIGHLIGHTS[frequency-1]
+  // 1 exausto · 2 cansado · 3 recuperando · 4 descansado · 5 selecionado
+  const HIGHLIGHTS = ["#EF4444", "#F4711E", "#FACC15", "#4ADE80", "#FFB27A"];
   const data: Array<{ name: string; muscles: Muscle[]; frequency: number }> = [];
-  let anyState = false;
   for (const g of groups) {
     const isActive = activeCat === g.catId;
-    const st = isActive ? "ativo" : recoveryState(g.catId, lastTrained?.[g.catId]);
-    if (st !== "nunca") anyState = true;
-    // ativo pinta SEMPRE (mesmo sem histórico); demais só quando têm estado
-    if (!isActive && st === "nunca") continue;
-    const freq = isActive ? 1 : st === "recuperado" ? 2 : 3;
+    const st: RecoveryState | "ativo" = isActive ? "ativo" : recoveryState(g.catId, lastTrained?.[g.catId]);
+    const freq = st === "ativo" ? 5 : st === "descansado" ? 4 : st === "recuperando" ? 3 : st === "cansado" ? 2 : 1;
     for (const m of g.muscles) data.push({ name: m, muscles: [m], frequency: freq });
   }
 
@@ -98,7 +96,7 @@ export default function BodyMap({
       <div className="mb-1 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-bold text-foreground">{title ?? "Onde quer treinar hoje?"}</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">{subtitle ?? "Verde liberado · Âmbar recuperando"}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{subtitle ?? "Toque num grupo pra ver os exercícios"}</p>
         </div>
         <div className="flex shrink-0 rounded-full border border-border bg-card/70 p-0.5">
           {([["front", "Frente"], ["back", "Costas"]] as const).map(([key, label]) => (
@@ -146,7 +144,7 @@ export default function BodyMap({
           <span className="absolute left-1/2 top-3 z-10 -translate-x-1/2 whitespace-nowrap rounded-full border border-brand/50 bg-[#0B1A33]/95 px-3 py-1 text-[11px] font-bold text-[#FFB27A] shadow-lg">
             {activeGroup.name}
             {counts[activeGroup.catId] > 0 ? (
-              <span className="ml-1 text-brand">· {counts[activeGroup.catId]} aparelhos</span>
+              <span className="ml-1 text-brand">· {counts[activeGroup.catId]} exercícios</span>
             ) : null}
           </span>
         ) : null}
@@ -217,12 +215,13 @@ export default function BodyMap({
         </button>
       </div>
 
-      {/* legenda de estado */}
+      {/* legenda fixa — sempre visível, 4 estados de recuperação */}
       <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
         {[
-          { label: "Recuperado", cls: "bg-[#4ADE80]" },
-          { label: "Recuperando", cls: "bg-[#FF9A5C]" },
-          { label: "Sem registro", cls: "bg-slate-500/70" },
+          { label: "Descansado", cls: "bg-[#4ADE80]" },
+          { label: "Recuperando", cls: "bg-[#FACC15]" },
+          { label: "Ainda cansado", cls: "bg-[#F4711E]" },
+          { label: "Exausto", cls: "bg-[#EF4444]" },
         ].map((l) => (
           <span key={l.label} className="flex items-center gap-1.5">
             <span className={cn("h-2 w-2 rounded-full", l.cls)} />
@@ -253,9 +252,6 @@ export default function BodyMap({
         ))}
       </div>
 
-      {!anyState && !activeGroup ? (
-        <p className="mt-1 text-center text-[10px] text-muted-foreground">Treine para começar a pintar seu mapa</p>
-      ) : null}
     </div>
   );
 }

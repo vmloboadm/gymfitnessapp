@@ -38,10 +38,31 @@ export const RECOVERY_HOURS: Record<string, number> = {
   panturrilha: 24,
 };
 
-export function recoveryState(catId: string, lastISO: string | null | undefined): "recuperado" | "recuperando" | "nunca" {
-  if (!lastISO) return "nunca";
+/**
+ * Escala de recuperação em 4 estados (cor-com-função no mapa corporal).
+ * Grupo grande (peito/costas/perna) precisa de mais tempo que o pequeno:
+ *   descansado  ≥72h (ou nunca treinado)   ≥48h (ou nunca)
+ *   recuperando 48–72h                      24–48h
+ *   cansado     24–48h                      12–24h
+ *   exausto     <24h                        <12h
+ */
+export type RecoveryState = "descansado" | "recuperando" | "cansado" | "exausto";
+
+const LARGE_GROUPS = new Set(["peito", "costas", "perna"]);
+
+export function recoveryState(catId: string, lastISO: string | null | undefined): RecoveryState {
+  if (!lastISO) return "descansado"; // nunca treinado = descansado
   const h = (Date.now() - new Date(lastISO).getTime()) / 3600000;
-  return h >= (RECOVERY_HOURS[catId] ?? 24) ? "recuperado" : "recuperando";
+  if (LARGE_GROUPS.has(catId)) {
+    if (h >= 72) return "descansado";
+    if (h >= 48) return "recuperando";
+    if (h >= 24) return "cansado";
+    return "exausto";
+  }
+  if (h >= 48) return "descansado";
+  if (h >= 24) return "recuperando";
+  if (h >= 12) return "cansado";
+  return "exausto";
 }
 
 
