@@ -83,15 +83,15 @@ export const demoVariations: Record<string, any[]> = {
 
 export const demoExercises = [
   { id: "ex-demo-001", name: "Supino Reto", category: "strength", muscles: ["chest"], tips: ["Mantenha escápulas retraídas"], technique_default: "standard", high_impact: false, photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-reto.webp" },
-  { id: "ex-demo-002", name: "Agachamento", category: "strength", muscles: ["legs"], tips: ["Joelhos acompanham os pés"], technique_default: "standard", high_impact: false },
+  { id: "ex-demo-002", name: "Agachamento", category: "strength", muscles: ["legs"], tips: ["Joelhos acompanham os pés"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/agachamento-livre.webp" },
   { id: "ex-demo-003", name: "Crucifixo com Halteres", category: "strength", muscles: ["chest"], tips: ["Abra até a linha do peito"], technique_default: "standard", high_impact: false, photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crucifixo-com-halteres.webp" },
-  { id: "ex-demo-004", name: "Desenvolvimento Militar", category: "strength", muscles: ["shoulders"], tips: ["Core firme, sem arco lombar"], technique_default: "standard", high_impact: false },
-  { id: "ex-demo-005", name: "Puxada Alta", category: "strength", muscles: ["back"], tips: ["Puxe com cotovelos baixos"], technique_default: "standard", high_impact: false },
-  { id: "ex-demo-006", name: "Esteira", category: "cardio", muscles: ["legs"], tips: ["Comece em ritmo leve"], technique_default: "standard", high_impact: true },
-  { id: "ex-demo-007", name: "Rosca Direta", category: "strength", muscles: ["biceps"], tips: ["Sem balançar o tronco"], technique_default: "standard", high_impact: false },
-  { id: "ex-demo-008", name: "Tríceps Corda", category: "strength", muscles: ["triceps"], tips: ["Cotovelos fixos, abra as pontas"], technique_default: "standard", high_impact: false },
-  { id: "ex-demo-009", name: "Leg Press 45°", category: "strength", muscles: ["legs"], tips: ["Lombar colada no banco"], technique_default: "standard", high_impact: false },
-  { id: "ex-demo-010", name: "Prancha Isométrica", category: "strength", muscles: ["core"], tips: ["Corpo reto, ative o core"], technique_default: "standard", high_impact: false },
+  { id: "ex-demo-004", name: "Desenvolvimento Militar", category: "strength", muscles: ["shoulders"], tips: ["Core firme, sem arco lombar"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/desenvolvimento-militar.webp" },
+  { id: "ex-demo-005", name: "Puxada Alta", category: "strength", muscles: ["back"], tips: ["Puxe com cotovelos baixos"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/puxada-alta.webp" },
+  { id: "ex-demo-006", name: "Esteira", category: "cardio", muscles: ["legs"], tips: ["Comece em ritmo leve"], technique_default: "standard", high_impact: true, photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/esteira.webp" },
+  { id: "ex-demo-007", name: "Rosca Direta", category: "strength", muscles: ["biceps"], tips: ["Sem balançar o tronco"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-direta.webp" },
+  { id: "ex-demo-008", name: "Tríceps Corda", category: "strength", muscles: ["triceps"], tips: ["Cotovelos fixos, abra as pontas"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-corda.webp" },
+  { id: "ex-demo-009", name: "Leg Press 45°", category: "strength", muscles: ["legs"], tips: ["Lombar colada no banco"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/leg-press-45.webp" },
+  { id: "ex-demo-010", name: "Prancha Isométrica", category: "strength", muscles: ["core"], tips: ["Corpo reto, ative o core"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/prancha-isometrica.webp" },
 ] as any[];
 
 // ---------------------------------------------------------------------------
@@ -270,6 +270,14 @@ export const EXERCISE_PHOTO_OVERRIDES: Record<string, string> = {
   "lib-pk1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/voador-peck-deck.webp",
   "lib-cr1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/flexao-de-braco.webp",
   "lib-par1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/fundos-paralelas.webp",
+  "lib-ag2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/agachamento-livre.webp",
+  "lib-de1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/desenvolvimento-militar.webp",
+  "lib-pu1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/puxada-alta.webp",
+  "lib-es1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/esteira.webp",
+  "lib-ro1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-direta.webp",
+  "lib-tr3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-corda.webp",
+  "lib-lp1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/leg-press-45.webp",
+  "lib-ab4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/prancha-isometrica.webp",
 };
 
 export const demoLib: DemoCategory[] = [
