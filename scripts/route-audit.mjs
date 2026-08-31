@@ -4,7 +4,7 @@
  */
 import { existsSync } from "node:fs";
 
-const BASE = process.env.AUDIT_URL || "http://localhost:3000";
+const BASE = process.env.AUDIT_URL || "http://localhost:3002";
 const ROUTES = [
   { path: "/", label: "Início", expect: "Bom dia" },
   { path: "/login", label: "Login", expect: "Bem-vindo" },
@@ -17,6 +17,9 @@ const ROUTES = [
   { path: "/equipamento", label: "Equipamento", expect: "Equipamento" },
   { path: "/conquistas", label: "Conquistas", expect: "Conquistas" },
   { path: "/personals", label: "Personals", expect: "Personals" },
+  { path: "/configuracoes", label: "Configurações", expect: "Configurações" },
+  { path: "/metricas", label: "Métricas", expect: "Métricas" },
+  { path: "/treinos", label: "Treinos", expect: "Treinos" },
 ];
 
 async function checkRoute(r) {
