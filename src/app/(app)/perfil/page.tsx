@@ -2,11 +2,11 @@
 
 import dynamic from "next/dynamic";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, CalendarClock, ChevronRight, Scale, ListMusic, FileText } from "lucide-react";
-import { toast } from "sonner";
+import {
+  Settings, LogOut, CalendarClock, ChevronRight, Scale, ListMusic, FileText } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -19,6 +19,7 @@ import { sortedAchievements } from "~/lib/achievements";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import type { StudentSubscriptions } from "~/lib/types/models";
 import { BUILD_LABEL } from "~/lib/build";
+import { getProfileEdits } from "~/lib/profile-store";
 
 /**
  * Perfil DESTILADO: identidade, matrícula, peso, conquistas e ações.
@@ -63,12 +64,19 @@ export default function PerfilPage() {
     [user?.id, profile?.id, demo]
   );
 
-  const initials = useMemo(() => {
-    const parts = (profile?.name ?? "?").trim().split(/\s+/);
-    return ((parts[0]?.[0] ?? "?") + (parts[1]?.[0] ?? "")).toUpperCase();
-  }, [profile?.name]);
+  const [edits, setEdits] = useState<ReturnType<typeof getProfileEdits>>({});
+  useEffect(() => {
+    setEdits(getProfileEdits());
+  }, []);
+  const displayName = edits.name || profile?.name || "Atleta";
+  const displayBio = edits.bio || null;
 
-  const avatarUrl = demo ? "https://i.pravatar.cc/160?img=12" : profile?.avatar_url || null;
+  const initials = useMemo(() => {
+    const parts = displayName.trim().split(/\s+/);
+    return ((parts[0]?.[0] ?? "?") + (parts[1]?.[0] ?? "")).toUpperCase();
+  }, [displayName]);
+
+  const avatarUrl = edits.avatar_url || (demo ? "https://i.pravatar.cc/160?img=12" : profile?.avatar_url || null);
 
   const weightSeries = useMemo(
     () =>
@@ -121,21 +129,23 @@ export default function PerfilPage() {
                 <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-card bg-success" aria-label="Conta ativa" />
               </div>
               <div className="min-w-0">
-                <p className="truncate text-lg font-black leading-tight text-white">{profile?.name || "Atleta"}</p>
+                <p className="truncate text-lg font-black leading-tight text-white">{displayName}</p>
                 <p className="mt-0.5 truncate text-xs text-slate-400">{profile?.email}</p>
-                <div className="mt-2 flex gap-1.5">
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   <Badge variant="secondary">Aluno</Badge>
                   <Badge variant="success">Ativo</Badge>
+                  {edits.objetivo ? <Badge variant="outline">{edits.objetivo === "hipertrofia" ? "Hipertrofia" : edits.objetivo === "emagrecimento" ? "Emagrecimento" : edits.objetivo === "condicionamento" ? "Condicionamento" : "Saúde"}</Badge> : null}
                 </div>
+                {displayBio ? <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-slate-300">{displayBio}</p> : null}
               </div>
             </div>
 
             {!avatarUrl ? (
               <button
-                onClick={() => toast.info("Upload de foto em breve", { description: "Em produção você adiciona sua foto aqui." })}
+                onClick={() => router.push("/configuracoes")}
                 className="gf-touch mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border border-brand/40 bg-brand/15 py-2 text-[11px] font-bold text-brand"
               >
-                Adicionar foto
+                Editar perfil e foto
               </button>
             ) : null}
           </div>
@@ -219,6 +229,11 @@ export default function PerfilPage() {
 
         {/* Ações rápidas em lista única */}
         <div className="overflow-hidden rounded-[18px] border border-border">
+          <Link href="/configuracoes" className="tactile flex w-full items-center gap-3 border-b border-border bg-card/40 px-4 py-3.5 transition-colors hover:bg-card/70">
+            <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">Configurações</span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Link>
           <Link href="/playlist" className="tactile flex w-full items-center gap-3 border-b border-border bg-card/40 px-4 py-3.5 transition-colors hover:bg-card/70">
             <ListMusic className="h-4 w-4 shrink-0 text-[#1DB954]" />
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">Playlist da academia</span>

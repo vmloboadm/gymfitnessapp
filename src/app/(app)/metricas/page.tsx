@@ -1,7 +1,11 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+
 import { useMemo } from "react";
-import { Scale, Ruler, Percent, Activity, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  Camera,
+  CheckCircle2, Scale, Ruler, Percent, Activity, TrendingDown, TrendingUp } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const PesoLineChartD = dynamic(() => import("~/components/charts").then((m) => ({ default: m.PesoLineChart })), {
@@ -20,6 +24,8 @@ import { calcBmi, deltaPct } from "~/lib/utils/calculations";
 import { formatDate, formatNumber } from "~/lib/utils/format";
 import { isDemoMode, demoMetricsData } from "~/lib/demo-bridge";
 import type { BodyMetrics } from "~/lib/types/models";
+import { toast } from "sonner";
+import { addMetric, listMetrics, type SupervisedMetric } from "~/lib/profile-store";
 
 const BMI_RANGES = [
   { min: 0, max: 18.5, label: "Abaixo do peso", tone: "warning" },
@@ -120,7 +126,66 @@ export default function MetricasPage() {
       ? Math.max(0, Math.min(100, ((bmi - BMI_SCALE_MIN) / (BMI_SCALE_MAX - BMI_SCALE_MIN)) * 100))
       : null;
 
-  if (loading) {
+    // ---- registro supervisionado de peso ----
+  const [supMetrics, setSupMetrics] = useState<SupervisedMetric[]>([]);
+  const [pesoInput, setPesoInput] = useState("");
+  const [gorduraInput, setGorduraInput] = useState("");
+  const [fotoVisor, setFotoVisor] = useState<File | null>(null);
+  const [salvandoMedida, setSalvandoMedida] = useState(false);
+  const fileVisorRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setSupMetrics(listMetrics());
+  }, []);
+
+  const comprimir = async (file: File): Promise<Blob> => {
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 360 / Math.max(bitmap.width, bitmap.height));
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("falha"))), "image/webp", 0.72));
+  };
+
+  const salvarMedida = async () => {
+    const peso = Number(pesoInput.replace(",", "."));
+    if (!peso || peso < 25 || peso > 350) {
+      toast.error("Informe um peso válido (25–350 kg)");
+      return;
+    }
+    if (!fotoVisor) {
+      toast.error("Anexe a foto do visor da balança", { description: "É a comprovação que valida a medida pro ranking." });
+      return;
+    }
+    setSalvandoMedida(true);
+    try {
+      let photoUrl: string | null = null;
+      const blob = await comprimir(fotoVisor);
+      const SUP = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+      const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+      const path = `visor-${Date.now()}.webp`;
+      const up = await fetch(`${SUP}/storage/v1/object/avatars/${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "image/webp", apikey: KEY, Authorization: `Bearer ${KEY}` },
+        body: blob,
+      });
+      if (up.ok) photoUrl = `${SUP}/storage/v1/object/public/avatars/${path}`;
+      addMetric({ peso_kg: peso, gordura_pct: Number(gorduraInput.replace(",", ".")) || null, photo_url: photoUrl, fonte: "foto-visor" });
+      setSupMetrics(listMetrics());
+      setPesoInput("");
+      setGorduraInput("");
+      setFotoVisor(null);
+      toast.success("Medida registrada como pendente", { description: "O personal vai validar — comprovada, ela conta pro ranking." });
+    } catch (e) {
+      toast.error("Falha ao salvar a medida", { description: String(e).slice(0, 80) });
+    } finally {
+      setSalvandoMedida(false);
+    }
+  };
+
+
+if (loading) {
     return (
       <>
         <TopBar title="Métricas" subtitle="Corpo e composição" />
@@ -186,6 +251,88 @@ export default function MetricasPage() {
             delta={bfDelta}
             icon={Percent}
           />
+        </div>
+
+        {/* Registro supervisionado de peso */}
+        <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "120ms" }}>
+          <p className="gf-section flex items-center gap-1.5">
+            <Scale className="h-3.5 w-3.5 text-brand" /> Nova medida supervisionada
+          </p>
+          <p className="gf-card-text mb-3">
+            Peso entra no ranking só quando <span className="font-bold text-foreground">comprovada</span>: anexe a foto do visor e o personal valida.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Peso (kg)</span>
+              <input
+                type="tel"
+                inputMode="decimal"
+                value={pesoInput}
+                onChange={(e) => setPesoInput(e.target.value)}
+                placeholder="87.2"
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-bold text-foreground outline-none focus:border-brand"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Gordura (%) opcional</span>
+              <input
+                type="tel"
+                inputMode="decimal"
+                value={gorduraInput}
+                onChange={(e) => setGorduraInput(e.target.value)}
+                placeholder="22.5"
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-bold text-foreground outline-none focus:border-brand"
+              />
+            </label>
+          </div>
+          <input
+            ref={fileVisorRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) setFotoVisor(f);
+              e.target.value = "";
+            }}
+          />
+          <button
+            onClick={() => fileVisorRef.current?.click()}
+            className="gf-touch mt-2 flex w-full items-center gap-2 rounded-xl border border-dashed border-border bg-card/30 px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground"
+          >
+            <Camera className="h-4 w-4 shrink-0" />
+            {fotoVisor ? <span className="truncate text-foreground">{fotoVisor.name} ✓</span> : "Anexar foto do visor da balança"}
+          </button>
+          <button
+            onClick={salvarMedida}
+            disabled={salvandoMedida}
+            className="gf-touch mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-60"
+          >
+            {salvandoMedida ? "Enviando…" : "Registrar medida (pendente de validação)"}
+          </button>
+
+          {supMetrics.length > 0 ? (
+            <div className="mt-3 space-y-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Minhas medições</p>
+              {supMetrics.slice(0, 5).map((m) => (
+                <div key={m.id} className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2">
+                  <span className="text-sm font-semibold text-foreground">
+                    {m.peso_kg} kg{m.gordura_pct ? ` · ${m.gordura_pct}% BF` : ""}
+                  </span>
+                  <span
+                    className={
+                      m.status === "comprovada"
+                        ? "inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-bold text-success"
+                        : "inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-bold text-warning"
+                    }
+                  >
+                    {m.status === "comprovada" ? <CheckCircle2 className="h-3 w-3" /> : null}
+                    {m.status === "comprovada" ? "Comprovada" : "Pendente"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {/* Evolução do peso, tendência real das medições */}
