@@ -22,8 +22,8 @@ import { useAuth } from "~/hooks/useAuth";
 
 export function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@gymfitness.com");
-  const [password, setPassword] = useState("gymfitness123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
   const [testRole, setTestRole] = useState<"student" | "trainer" | "manager">("student");
@@ -36,8 +36,13 @@ export function LoginForm() {
     e.preventDefault();
     setLoading(true);
 
-    // Modo teste/demo: credencial interna entra direto no painel do papel escolhido.
+    // Modo teste/demo: senha interna única; e-mail livre (sugestão: admin@gymfitness.com).
     if (isDemo) {
+      if (password !== "gf123") {
+        toast.error("Senha de teste incorreta", { description: "Use gf123 para entrar em modo teste." });
+        setLoading(false);
+        return;
+      }
       switchDemoRole(testRole);
       router.push(ROLE_HOME[testRole]);
       router.refresh();
@@ -136,7 +141,7 @@ export function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="voce@exemplo.com"
+            placeholder="admin@gymfitness.com"
             className="h-11 border-white/10 bg-white/[0.06] text-white placeholder:text-white/40 focus-visible:border-brand/50 focus-visible:ring-brand/30"
           />
         </div>
