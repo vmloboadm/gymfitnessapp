@@ -94,9 +94,10 @@ export async function middleware(request: NextRequest) {
   const response = NextResponse.next({ request });
 
   // Modo demo (NEXT_PUBLIC_DEMO_MODE=1): pula auth e deixa testar todas as telas.
-  // Exceção: a raiz SEMPRE abre na tela de login (entrada oficial do app).
+  // A raiz abre no LOGIN; após entrar pelo login de teste (cookie gf_test),
+  // a raiz vira o DASHBOARD normal do papel.
   if (process.env.NEXT_PUBLIC_DEMO_MODE === "1") {
-    if (request.nextUrl.pathname === "/") {
+    if (request.nextUrl.pathname === "/" && !request.cookies.get("gf_test")) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
     return response;

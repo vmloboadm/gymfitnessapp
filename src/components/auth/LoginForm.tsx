@@ -44,7 +44,10 @@ export function LoginForm() {
         return;
       }
       switchDemoRole(testRole);
-      router.push(ROLE_HOME[testRole]);
+      // cookie de sessão: libera o dashboard na raiz; sem ele a raiz abre o login
+      document.cookie = "gf_test=1; path=/; SameSite=Lax";
+      // aluno vai pro DASHBOARD normal (/); personal e gestor têm homes próprias
+      router.push(testRole === "student" ? "/" : ROLE_HOME[testRole]);
       router.refresh();
       return;
     }
@@ -123,6 +126,9 @@ export function LoginForm() {
           <h1 className="font-display text-2xl font-black tracking-tight text-white">
             Bem-vindo de volta
           </h1>
+          <span className="mx-auto mt-2 inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-warning">
+            <span className="h-1.5 w-1.5 rounded-full bg-warning" /> modo teste
+          </span>
           <p className="mt-1 text-sm text-white/60">
             Entre para continuar sua evolução
           </p>
