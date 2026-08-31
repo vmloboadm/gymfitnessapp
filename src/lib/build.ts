@@ -3,7 +3,7 @@
  * evidências à versão exata que está rodando.
  * Atualizar BUILD_TAG a cada release (commit de versão).
  */
-export const BUILD_TAG = "v33";
+export const BUILD_TAG = "v34";
 export const BUILD_DATE = "31/08";
 
 export const BUILD_LABEL = `GymFitness · build ${BUILD_TAG} · ${BUILD_DATE}`;

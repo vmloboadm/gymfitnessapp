@@ -22,21 +22,21 @@ export const EVK_MAP = {
   // Costas
   "puxada-alta": "0096", "puxada-alta-fechada": "0096", "pulldown-supinado": "0095",
   "puxada-triangulo": "0093", "barra-fixa": "0087", "barra-fixa-pronada": "0087",
-  "barra-fixa-supinada": "0087", "remada-curvada": "0026", "remada-baixa": "0025",
+  "barra-fixa-supinada": "0087", "remada-curvada": "0026", "remada-unilateral": "0024", "remada-cavalinho": "0029", "remada-baixa": "0025",
   "remada-na-polia": "0025", "shrugg": "0030",
   // Ombro
-  "desenvolvimento-militar": "0004", "desenvolvimento-com-halteres": "0031",
-  "desenvolvimento-arnold": "0038", "elevacao-lateral": "0018", "elevacao-frontal": "0033",
+  "desenvolvimento-militar": "0004", "desenvolvimento-com-halteres": "0031", "desenvolvimento-na-maquina": "0078",
+  "desenvolvimento-arnold": "0038", "elevacao-lateral": "0018", "elevacao-frontal": "0033", "elevacao-lateral-polia": "0017",
   // Bíceps
   "rosca-direta": "0211", "rosca-alternada": "0223", "rosca-scott": "0239",
   "rosca-concentrada": "0220", "rosca-martelo": "0213", "rosca-na-polia-baixa": "0212",
-  "rosca-inversa": "0257",
+  "rosca-inversa": "0257", "rosca-21": "0211",
   // Tríceps
   "triceps-pulley": "0205", "triceps-testa": "0179", "triceps-corda": "0206",
   "triceps-frances": "0193", "triceps-maquina": "0210", "mergulho-paralelas": "0172",
   // Pernas
   "agachamento-smith": "0124", "agachamento-livre": "0122", "agachamento-frontal": "0138",
-  "agachamento-sumo": "0152", "leg-press-45": "0127", "leg-press-pes-altos": "0127",
+  "agachamento-sumo": "0152", "agachamento-bulgaro": "0132", "leg-press-45": "0127", "leg-press-pes-altos": "0127",
   "leg-press-unilateral": "0127", "cadeira-extensora": "0142", "extensao-tradicional": "0142",
   "afundo": "0114", "mesa-flexora": "0117", "cadeira-flexora": "0119", "stiff": "0118",
   "bom-dia": "0101", "hiperextensao-lombar": "0103", "cadeira-abdutora": "0156",

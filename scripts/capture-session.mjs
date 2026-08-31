@@ -1,7 +1,7 @@
 import puppeteer from "puppeteer-core";
 import { existsSync } from "node:fs";
 
-const BASE = process.env.AUDIT_URL || "http://localhost:3000";
+const BASE = process.env.AUDIT_URL || "http://localhost:3002";
 const CHROME_CANDIDATES = [
   process.env.PUPPETEER_EXECUTABLE,
   "/root/.cache/puppeteer/chrome/linux-152.0.7977.54/chrome-linux64/chrome",
@@ -22,7 +22,7 @@ async function main() {
   await page.setCacheEnabled(false);
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
 
-  await page.goto(BASE + "/treino", { waitUntil: "networkidle2", timeout: 30000 });
+  await page.goto(BASE + "/treino", { waitUntil: "networkidle2", timeout: 45000 });
   await new Promise((r) => setTimeout(r, 2500));
 
   const clicked = await page.evaluate(() => {
@@ -44,14 +44,14 @@ async function main() {
 
   // marca séries 1 e 2 pelos aria-labels
   for (const n of [1, 2]) {
-    const ok = await page.evaluate((idx) => {
-      const btn = document.querySelector(`button[aria-label*="série ${idx}"][aria-label*="Marcar" i], button[aria-label*="Marcar série ${idx}" i]`);
+    const ok = await page.evaluate(() => {
+      const btn = document.querySelector('[aria-label*="toque para marcar" i]');
       if (btn) {
         btn.click();
         return true;
       }
       return false;
-    }, n);
+    });
     console.log(`marcou série ${n}:`, ok);
     await new Promise((r) => setTimeout(r, 400));
   }

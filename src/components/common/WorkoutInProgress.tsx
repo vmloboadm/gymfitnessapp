@@ -11,6 +11,7 @@ import { ExerciseVideoModal } from "~/components/common/ExerciseVideoModal";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
 import { readSessionProgress, saveSessionProgress, clearSessionProgress } from "~/lib/workout-session";
+import { ImageLightbox } from "~/components/common/ImageLightbox";
 
 export type WExercise = {
   id: string;
@@ -58,6 +59,7 @@ export default function WorkoutInProgress({
   const [videoEx, setVideoEx] = useState<{ name: string; poster?: string | null; url: string } | null>(null);
   const [showFinish, setShowFinish] = useState(false);
   const [restLeft, setRestLeft] = useState<number | null>(null);
+  const [zoomOpen, setZoomOpen] = useState(false);
   const restInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // imersão: topo da página + esconde BottomNav global
@@ -295,9 +297,13 @@ export default function WorkoutInProgress({
               {/* Hero do exercício */}
               <div className="mb-5 flex items-center gap-4">
                 {photo ? (
-                  <span className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-2xl border border-white/[0.08]">
+                  <button
+                    onClick={() => setZoomOpen(true)}
+                    aria-label="Ampliar ilustração do exercício"
+                    className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-white"
+                  >
                     <Image src={photo} alt="" fill sizes="72px" className="object-cover" />
-                  </span>
+                  </button>
                 ) : (
                   <FitnessIcon glyph={fitnessForName(current.name)} size={72} className="rounded-2xl" />
                 )}
@@ -336,52 +342,52 @@ export default function WorkoutInProgress({
                 </div>
               </div>
 
-              {/* Cabeçalho da tabela de séries */}
-              <div className="mb-1.5 grid grid-cols-[48px_1fr_56px_48px] items-center gap-2 px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
-                <span>Série</span>
-                <span>Reps</span>
-                <span className="text-right">Feita</span>
-                <span />
-              </div>
-
-              {/* Séries */}
-              <div className="space-y-1.5">
+              {/* Séries — linha inteira tapável, sem tabela técnica */}
+              <div className="space-y-2">
                 {currentProgress?.sets.map((s, i) => (
                   <div
                     key={i}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => toggleSet(i)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleSet(i);
+                      }
+                    }}
+                    aria-pressed={s.done}
+                    aria-label={`Série ${i + 1}: toque para ${s.done ? "desmarcar" : "marcar como feita"}`}
                     className={cn(
-                      "grid grid-cols-[48px_1fr_56px_48px] items-center gap-2 rounded-xl border py-2 pl-3 pr-2 transition-colors",
-                      s.done ? "border-success/35 bg-success/[0.07]" : "border-border bg-card/40"
+                      "flex h-16 cursor-pointer select-none items-center gap-3.5 rounded-2xl border px-4 transition-all active:scale-[0.99]",
+                      s.done ? "border-success/45 bg-success/[0.09]" : "border-border bg-card/40"
                     )}
                   >
-                    <span className={cn("text-sm font-black", s.done ? "text-success" : "text-foreground")}>
-                      {i + 1}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        value={s.reps}
-                        onChange={(e) => setReps(i, e.target.value)}
-                        aria-label={`Reps da série ${i + 1}`}
-                        className="h-10 w-14 rounded-lg border border-border bg-background text-center text-[15px] font-black text-foreground outline-none focus:border-brand"
-                      />
-                      <span className="text-[11px] font-semibold text-muted-foreground">reps</span>
-                    </div>
-                    <span className={cn("text-right text-xs font-bold tabular-nums", s.done ? "text-success" : "text-muted-foreground/50")}>
-                      {s.done ? "✓" : `${current.reps}×`}
-                    </span>
-                    <button
-                      onClick={() => toggleSet(i)}
-                      aria-label={s.done ? `Desmarcar série ${i + 1}` : `Marcar série ${i + 1} como feita`}
-                      aria-pressed={s.done}
+                    <span
                       className={cn(
-                        "flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all active:scale-90",
-                        s.done ? "border-success bg-success text-black" : "border-border text-muted-foreground/60"
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base font-black",
+                        s.done ? "bg-success text-black" : "bg-muted text-muted-foreground"
                       )}
                     >
-                      <Check className={cn("h-5 w-5", s.done && "stroke-[3]")} />
-                    </button>
+                      {s.done ? <Check className="h-5 w-5 stroke-[3]" /> : i + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className={cn("block text-[15px] font-black", s.done ? "text-success" : "text-foreground")}>
+                        Série {i + 1}
+                      </span>
+                      <span className="block text-[11px] font-semibold text-muted-foreground">
+                        {s.done ? "Feita! Descansa e parte pra próxima" : `${current.reps} repetições`}
+                      </span>
+                    </span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={s.reps}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setReps(i, e.target.value)}
+                      aria-label={`Reps da série ${i + 1}`}
+                      className="h-11 w-14 shrink-0 rounded-xl border border-border bg-background text-center text-lg font-black tabular-nums text-foreground outline-none focus:border-brand"
+                    />
                   </div>
                 ))}
               </div>
@@ -502,6 +508,7 @@ export default function WorkoutInProgress({
           </div>
         ) : null}
       </BottomSheet>
+      <ImageLightbox src={photo} alt={current?.name} open={zoomOpen} onClose={() => setZoomOpen(false)} />
     </div>
   );
 }

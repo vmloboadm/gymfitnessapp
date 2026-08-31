@@ -324,7 +324,12 @@ export const EXERCISE_PHOTO_OVERRIDES: Record<string, string> = {
   "lib-tr5": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-maquina.webp?v=2",
   "lib-tr1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-pulley.webp?v=2",
   "lib-tr2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-testa.webp?v=2",
-  "lib-pk1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/voador-peck-deck.webp?v=2",
+  "lib-pk1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/voador-peck-deck.webp?v=2",  "lib-re3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/remada-unilateral.webp?v=2",
+  "lib-re4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/remada-cavalinho.webp?v=2",
+  "lib-ro7": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-21.webp?v=2",
+  "lib-ag5": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/agachamento-bulgaro.webp?v=2",
+  "lib-de4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/desenvolvimento-na-maquina.webp?v=2",
+  "lib-el3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/elevacao-lateral-polia.webp?v=2",
 };
 
 export const demoLib: DemoCategory[] = [

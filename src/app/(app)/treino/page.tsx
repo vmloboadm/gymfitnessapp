@@ -27,6 +27,7 @@ import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncS
 import { Badge } from "~/components/ui/badge";
 import WorkoutInProgress from "~/components/common/WorkoutInProgress";
 import BodyMap from "~/components/body-map";
+import { ImageLightbox } from "~/components/common/ImageLightbox";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
@@ -130,6 +131,7 @@ export default function TreinoHomePage() {
   const [session, setSession] = useState<typeof DEFAULT_DEMO_EX | null>(null);
   const [hasSavedProgress, setHasSavedProgress] = useState(false);
   const [libCat, setLibCat] = useState<string | null>(null);
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
 
   useEffect(() => {
     setHasSavedProgress(!!readSessionProgress());
@@ -681,9 +683,16 @@ export default function TreinoHomePage() {
                   className="gf-touch flex w-full items-center gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left"
                 >
                   {e.imageUrl ? (
-                    <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-white/[0.06]">
+                    <button
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        setZoomSrc(e.imageUrl ?? null);
+                      }}
+                      aria-label={`Ampliar ilustração de ${e.name}`}
+                      className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-white/[0.06] bg-white"
+                    >
                       <Image src={e.imageUrl} alt="" fill sizes="40px" className="object-cover" />
-                    </span>
+                    </button>
                   ) : (
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
                       <Dumbbell className="h-4 w-4 text-muted-foreground" />
@@ -699,6 +708,7 @@ export default function TreinoHomePage() {
           </div>
         ) : null}
       </BottomSheet>
+      <ImageLightbox src={zoomSrc} alt="Exercício" open={!!zoomSrc} onClose={() => setZoomSrc(null)} />
       <AiCoach />
     </>
   );

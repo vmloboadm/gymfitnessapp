@@ -146,7 +146,7 @@ async function main() {
 
     // 4) Sessão ativa — aparece o primeiro exercício com botões de série
     await page.waitForFunction(
-      () => document.querySelectorAll('button[aria-label^="Marcar série" i]').length > 0,
+      () => document.querySelectorAll('[aria-label*="toque para marcar" i]').length > 0,
       { timeout: 20000 }
     );
     report("treino: sessão ativa iniciada", true);
@@ -155,7 +155,7 @@ async function main() {
     let completed = 0;
     for (let i = 0; i < 10; i++) {
       const ok = await page.evaluate(() => {
-        const btns = [...document.querySelectorAll('button[aria-label^="Marcar série" i]')];
+        const btns = [...document.querySelectorAll('[aria-label*="toque para marcar" i]')];
         if (btns.length === 0) return false;
         (btns[0]).click();
         return true;
@@ -192,7 +192,7 @@ async function main() {
     report("treino: confirmação de finalização", confirmClicked);
 
     await page.waitForFunction(
-      () => document.querySelectorAll('button[aria-label^="Marcar série" i]').length === 0,
+      () => document.querySelectorAll('[aria-label*="toque para marcar" i]').length === 0,
       { timeout: 20000 }
     );
     report("treino: check-out concluído (sessão encerrada)", true);

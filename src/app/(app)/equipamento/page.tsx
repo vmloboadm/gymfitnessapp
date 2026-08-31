@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { ImageLightbox } from "~/components/common/ImageLightbox";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -307,6 +308,7 @@ function ExerciseRow({
   inToday: boolean;
   eqStatus: (id: string) => string | undefined;
 }) {
+  const [zoom, setZoom] = useState(false);
   const status = e.machineId ? eqStatus(e.machineId) : undefined;
   const maintenance = status === "maintenance";
   const active = status && status !== "maintenance";
@@ -314,14 +316,22 @@ function ExerciseRow({
   return (
     <div className={cn("flex items-center gap-3 rounded-xl border p-3 transition-colors", inToday ? "border-brand/45 bg-brand-soft/20" : "border-border bg-card/40")}>
       {e.imageUrl ? (
-        <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-white/[0.06]">
+        <button
+          onClick={(ev) => {
+            ev.stopPropagation();
+            setZoom(true);
+          }}
+          aria-label={`Ampliar ilustração de ${e.name}`}
+          className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-white/[0.06] bg-white"
+        >
           <Image src={e.imageUrl} alt="" fill sizes="44px" className="object-cover" />
-        </span>
+        </button>
       ) : (
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">
           <FitnessIcon glyph={fitnessForName(e.name)} size={24} />
         </span>
       )}
+      <ImageLightbox src={zoom ? e.imageUrl ?? null : null} alt={e.name} open={zoom} onClose={() => setZoom(false)} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-semibold text-foreground">
           {e.name}
