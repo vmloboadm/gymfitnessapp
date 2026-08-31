@@ -232,8 +232,8 @@ export type DemoExercise = {
   imageUrl?: string | null;
   videoUrl?: string;
   thumbUrl?: string | null;
-  videoUrlMale?: string;
-  videoUrlFemale?: string;
+  videoUrlMale?: string | null;
+  videoUrlFemale?: string | null;
 };
 
 export type DemoSubCategory = {
@@ -331,6 +331,8 @@ export const EXERCISE_PHOTO_OVERRIDES: Record<string, string> = {
   "lib-de4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/desenvolvimento-na-maquina.webp?v=2",
   "lib-el3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/elevacao-lateral-polia.webp?v=2",
 };
+
+import { applyExpandedLibrary } from "./demo-library-expanded";
 
 export const demoLib: DemoCategory[] = [
   {
@@ -525,6 +527,9 @@ for (const cat of demoLib) {
     }
   }
 }
+
+// biblioteca expandida: acervo Everkinetic completo (anexa subs por categoria)
+applyExpandedLibrary(demoLib);
 
 export function demoLibCategory(catId: string): DemoCategory | undefined {
   return demoLib.find((c) => c.id === catId);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
@@ -427,23 +428,35 @@ export default function HomePage() {
           )}
         </motion.div>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 px-4">
-        {/* LINHA 1, Saudação (nome editável em Configurações) */}
-        <motion.div variants={item} className="flex items-end justify-between gap-3 px-2">
-          <div className="min-w-0">
+        {/* LINHA 1, Logo + relógio/data; LINHA 2, saudação */}
+        <motion.div variants={item} className="px-2">
+          <div className="flex items-center justify-between gap-3">
+            <Image
+              src="/images/logo-academia.png"
+              alt="GymFitness"
+              width={128}
+              height={40}
+              priority
+              unoptimized
+              className="h-8 w-auto shrink-0 object-contain"
+              style={{ filter: "drop-shadow(0 0 16px rgba(255,111,22,0.45))" }}
+            />
+            <div className="shrink-0 text-right">
+              <p className="pm-mono text-[12px] font-medium tracking-[0.08em] text-[#F4F6FB]">
+                <LiveClock />
+              </p>
+              <p className="pm-mono mt-0.5 text-[#7E8AA0]">
+                {weekdayShort} · {dayNum} {monthShort}
+              </p>
+            </div>
+          </div>
+          <div className="mt-4">
             <p className="pm-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8B95A9]">
               {greeting}
             </p>
             <h1 className="mt-1 truncate bg-gradient-to-r from-[#F4F6FB] to-[#B8C4D8] bg-clip-text font-display text-[30px] font-black leading-none tracking-tight text-transparent">
               {name}
             </h1>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="pm-mono text-[13px] font-medium tracking-[0.08em] text-[#F4F6FB]">
-              <LiveClock />
-            </p>
-            <p className="pm-mono mt-1 text-[#7E8AA0]">
-              {weekdayShort} · {dayNum} {monthShort}
-            </p>
           </div>
         </motion.div>
 
@@ -507,13 +520,17 @@ export default function HomePage() {
               </motion.div>
             </div>
 
-            {/* Ocupação ao vivo: só exibe quando há dado real de sensores (demo sem sensores não inventa número) */}
-            {!demo && online > 0 ? (
-              <p className="mt-3 flex items-center justify-center gap-1.5 text-[10px] font-semibold text-[#7E8AA0]">
-                <span className="hero-live-dot" style={{ transform: "scale(0.7)" }} />
-                {online} pessoas treinando agora na academia
+            {/* Ocupação ao vivo + mensagem motivadora */}
+            <div className="mt-4 flex items-center justify-center gap-2 rounded-[14px] border border-white/[0.06] bg-white/[0.03] px-4 py-2.5">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#4ADE80] opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#4ADE80]" />
+              </span>
+              <p className="text-[11px] font-semibold text-[#B8C4D8]">
+                <span className="font-black text-[#F4F6FB]">{online} pessoas</span> treinando agora —{" "}
+                <span className="text-[#FF9A5C]">bora somar com a galera!</span>
               </p>
-            ) : null}
+            </div>
 
             {/* Título do mês consolidado como linha secundária da liga (#7) */}
             <p className="mt-4 text-center text-[11px] leading-snug text-[#7E8AA0]">
