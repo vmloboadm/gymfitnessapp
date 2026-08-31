@@ -56,13 +56,13 @@ export function ExerciseInfoSheet({
           </div>
 
           <div className="relative h-44 w-full overflow-hidden rounded-2xl border border-white/[0.06]">
-            <Image
-              src={ex.imageUrl ?? "/workout/workout-strength.jpg"}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={ex.imageUrl ?? "/group-images/peito.webp"}
               alt={`Execução de ${ex.name}`}
-              fill
-              sizes="(max-width: 640px) 100vw, 448px"
-              className="object-cover"
-              unoptimized
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-contain bg-white"
             />
             <span className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent" aria-hidden />
           </div>

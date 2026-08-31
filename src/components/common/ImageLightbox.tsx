@@ -60,7 +60,8 @@ export function ImageLightbox({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="relative aspect-square overflow-hidden rounded-2xl bg-white shadow-2xl">
-              <Image src={src} alt={alt ?? "Ilustração do exercício"} fill sizes="448px" className="object-contain p-3" unoptimized />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt={alt ?? "Ilustração do exercício"} className="absolute inset-0 h-full w-full object-contain p-3" />
             </div>
             {alt ? (
               <p className="mt-3 text-center text-sm font-bold text-white/90">{alt}</p>

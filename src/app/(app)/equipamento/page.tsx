@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-import { ImageLightbox } from "~/components/common/ImageLightbox";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -31,8 +29,9 @@ import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Badge } from "~/components/ui/badge";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
+import { ImageLightbox } from "~/components/common/ImageLightbox";
 import { cn } from "~/lib/utils";
-import { FitnessIcon, fitnessForName, FITNESS_GROUP_MAP } from "~/components/common/FitnessIcon";
+import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import { isDemoMode, demoLib, demoEquipment, demoTreinoData } from "~/lib/demo-bridge";
 import type { Equipment } from "~/lib/types/models";
 import type { LucideIcon } from "lucide-react";
@@ -252,12 +251,6 @@ function CategoryAccordion({
   open: string[];
   onOpenChange: (v: string[]) => void;
 }) {
-  const iconFor = (catId: string): LucideIcon | null => {
-    if (catId === "pesos") return Dumbbell;
-    const m = [...CANON].find((c) => c.cats.includes(catId) || c.id === catId);
-    return m?.icon ?? null;
-  };
-
   return (
     <Accordion.Root type="multiple" value={open} onValueChange={onOpenChange} className="space-y-2">
       {cats.map((cat) => {
@@ -266,7 +259,8 @@ function CategoryAccordion({
             <Accordion.Header>
               <Accordion.Trigger className="gf-touch flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none [&[data-state=open]>svg]:rotate-180">
                 <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0B1426]">
-                  <Image src={`/group-images/${cat.id}.webp`} alt="" fill sizes="40px" className="object-cover" unoptimized />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/group-images/${cat.id}.webp`} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                 </span>
                 <span className="gf-card-title flex-1">{cat.name}</span>
                 <span className="gf-hero-num flex h-6 min-w-6 items-center justify-center rounded-full bg-card px-1.5 text-[11px]">
@@ -323,7 +317,8 @@ function ExerciseRow({
           aria-label={`Ampliar ilustração de ${e.name}`}
           className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-white/[0.06] bg-white"
         >
-          <Image src={e.imageUrl} alt="" fill sizes="44px" className="object-cover" unoptimized />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={e.imageUrl ?? ""} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
         </button>
       ) : (
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">
@@ -376,7 +371,10 @@ function ExerciseRow({
 }
 
 function InfoSheet({ ex, onClose }: { ex: DemoExercise; onClose: () => void }) {
+  const [zoom, setZoom] = useState(false);
   return (
+    <>
+    <ImageLightbox src={zoom ? ex.imageUrl ?? null : null} alt={ex.name} open={zoom} onClose={() => setZoom(false)} />
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-6" onClick={onClose}>
       <div className="w-full max-w-md rounded-t-2xl border border-border bg-background p-5 pb-8 md:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
@@ -432,5 +430,6 @@ function InfoSheet({ ex, onClose }: { ex: DemoExercise; onClose: () => void }) {
         )}
       </div>
     </div>
+    </>
   );
 }

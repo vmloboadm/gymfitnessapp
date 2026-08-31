@@ -536,11 +536,13 @@ const GROUP_IMAGE: Record<string, string> = {
   peito: "/group-images/peito.webp",
   costas: "/group-images/costas.webp",
   ombro: "/group-images/ombro.webp",
-  biceps: "/group-images/braco.webp",
+  biceps: "/group-images/biceps.webp",
   triceps: "/group-images/triceps.webp",
   antebraco: "/group-images/antebraco.webp",
   abdomen: "/group-images/abdomen.webp",
-  inferiores: "/group-images/perna.webp",
+  inferiores: "/group-images/inferiores.webp",
+  cardio: "/group-images/cardio.webp",
+  alongamento: "/group-images/alongamento.webp",
 };
 for (const cat of demoLib) {
   const gi = GROUP_IMAGE[cat.id];
