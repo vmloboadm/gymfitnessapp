@@ -4,10 +4,8 @@ import Link from "next/link";
 import { Bell, CloudOff } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { OnlineCounter } from "~/components/layout/OnlineCounter";
-import { DemoRoleSwitcher } from "~/components/layout/DemoRoleSwitcher";
 import { GymLogo } from "~/components/layout/GymLogo";
 import { cn } from "~/lib/utils";
-import { isDemoMode } from "~/lib/demo-bridge";
 
 /**
  * TopBar: logo + título + contador online + sino + badge offline.
@@ -40,7 +38,6 @@ export function TopBar({
         </div>
 
         <div className="flex items-center gap-2">
-          {isDemoMode() && <DemoRoleSwitcher />}
           <OnlineCounter gymId={profile?.gym_id} className="hidden sm:flex" />
           <Link
             href="/notificacoes"

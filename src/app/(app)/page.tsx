@@ -509,11 +509,13 @@ export default function HomePage() {
               </motion.div>
             </div>
 
-            {/* Ocupação ao vivo, discreta (distill: saiu da seção própria) */}
-            <p className="mt-3 flex items-center justify-center gap-1.5 text-[10px] font-semibold text-[#7E8AA0]">
-              <span className="hero-live-dot" style={{ transform: "scale(0.7)" }} />
-              {online} pessoas treinando agora na academia
-            </p>
+            {/* Ocupação ao vivo: só exibe quando há dado real de sensores (demo sem sensores não inventa número) */}
+            {!demo && online > 0 ? (
+              <p className="mt-3 flex items-center justify-center gap-1.5 text-[10px] font-semibold text-[#7E8AA0]">
+                <span className="hero-live-dot" style={{ transform: "scale(0.7)" }} />
+                {online} pessoas treinando agora na academia
+              </p>
+            ) : null}
 
             {/* Título do mês consolidado como linha secundária da liga (#7) */}
             <p className="mt-4 text-center text-[11px] leading-snug text-[#7E8AA0]">

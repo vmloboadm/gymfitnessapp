@@ -17,17 +17,33 @@ import {
 } from "~/components/ui/card";
 import { toast } from "sonner";
 import { BUILD_LABEL } from "~/lib/build";
+import { cn } from "~/lib/utils";
+import { useAuth } from "~/hooks/useAuth";
 
 export function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("admin@gymfitness.com");
+  const [password, setPassword] = useState("gymfitness123");
   const [loading, setLoading] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
+  const [testRole, setTestRole] = useState<"student" | "trainer" | "manager">("student");
+  const { switchDemoRole } = useAuth();
+  const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
+  const ROLE_HOME: Record<string, string> = { student: "/treino", trainer: "/alunos", manager: "/dashboard" };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Modo teste/demo: credencial interna entra direto no painel do papel escolhido.
+    if (isDemo) {
+      switchDemoRole(testRole);
+      router.push(ROLE_HOME[testRole]);
+      router.refresh();
+      return;
+    }
+
     const supabase = supabaseBrowser();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -183,6 +199,25 @@ export function LoginForm() {
           Cadastre-se
         </Link>
       </p>
+
+      {isDemo ? (
+        <div className="flex items-center justify-center gap-2 pt-1 text-[11px] text-white/35">
+          <span>Acesso teste:</span>
+          {([["student", "Aluno"], ["trainer", "Personal"], ["manager", "Gestor"]] as const).map(([r, label]) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setTestRole(r)}
+              className={cn(
+                "rounded-full px-2 py-0.5 font-semibold transition-colors",
+                testRole === r ? "bg-brand/20 text-brand" : "text-white/40 hover:text-white/70"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <p className="pt-2 text-center text-[10px] font-semibold tracking-wide text-white/30">{BUILD_LABEL}</p>
     </div>
