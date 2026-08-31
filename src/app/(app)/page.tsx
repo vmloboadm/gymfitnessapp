@@ -41,6 +41,7 @@ import {
   nextWorkoutFromLogs,
 } from "~/components/dashboard/mocks";
 import type { WorkoutLogs, Leaderboard } from "~/lib/types/models";
+import { BUILD_LABEL } from "~/lib/build";
 
 const META_SEMANAL = 7; // mock: virá do onboarding (frequência escolhida pelo aluno)
 const ME_ID = "00000000-0000-0000-0000-000000000099";
@@ -736,9 +737,7 @@ export default function HomePage() {
         <PartnerCarousel />
 
         {/* Marcador de build, confirma visualmente que o app está atualizado */}
-        <p className="text-center text-[10px] text-[#4A5568]">
-          GymFitness · build 27/08 v27
-        </p>
+        <p className="text-center text-[10px] text-[#4A5568]">{BUILD_LABEL}</p>
           </>
         ) : null}
       </motion.div>

@@ -13,7 +13,7 @@ export function RewardModal({
   icon,
   name,
   points,
-  videoUrl = "https://www.youtube.com/results?search_query=fitness+victory+celebration",
+  videoUrl = "",
   shareText,
 }: {
   open: boolean;
@@ -50,18 +50,35 @@ export function RewardModal({
             />
           ))}
 
-          <motion.video
-            src={videoUrl}
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-            className="relative z-10 h-44 w-44 rounded-full border-4 border-brand object-cover shadow-[0_0_40px_rgba(244,113,30,0.5)]"
-            initial={{ scale: 0.6, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 220, damping: 16 }}
-          />
+          {videoUrl ? (
+            <motion.video
+              src={videoUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="metadata"
+              className="relative z-10 h-44 w-44 rounded-full border-4 border-brand object-cover shadow-[0_0_40px_rgba(244,113,30,0.5)]"
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 220, damping: 16 }}
+            />
+          ) : (
+            <motion.div
+              className="relative z-10 flex h-44 w-44 items-center justify-center rounded-full border-4 border-brand bg-gradient-to-b from-warning/25 to-warning/5 shadow-[0_0_40px_rgba(244,113,30,0.5)]"
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 220, damping: 16 }}
+            >
+              <motion.span
+                className="text-[80px] leading-none"
+                animate={{ rotate: [0, -8, 8, 0], scale: [1, 1.08, 1] }}
+                transition={{ duration: 1.4, delay: 0.3, repeat: Infinity, repeatDelay: 1.6 }}
+              >
+                {icon || "🏆"}
+              </motion.span>
+            </motion.div>
+          )}
 
           <p className="relative z-10 text-[11px] font-black uppercase tracking-[0.25em] text-warning">
             Conquista Desbloqueada!

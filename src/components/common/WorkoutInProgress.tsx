@@ -8,6 +8,7 @@ import { type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { ExerciseVideoModal } from "~/components/common/ExerciseVideoModal";
+import { toast } from "sonner";
 import { cn } from "~/lib/utils";
 import { readSessionProgress, saveSessionProgress, clearSessionProgress } from "~/lib/workout-session";
 
@@ -179,9 +180,14 @@ export default function WorkoutInProgress({
   const advanceOrFinish = () => {
     if (isLast) {
       setShowFinish(true);
-    } else {
-      goNext();
+      return;
     }
+    if (!currentAllDone && currentProgress?.sets.some((s) => s.done)) {
+      toast("Exercício pulado — o que marcou continua valendo");
+    } else if (!currentAllDone) {
+      toast("Exercício pulado");
+    }
+    goNext();
   };
 
   const handleFinish = () => {
@@ -420,14 +426,9 @@ export default function WorkoutInProgress({
           </div>
           <button
             onClick={advanceOrFinish}
-            className={cn(
-              "flex-1 rounded-xl py-3.5 text-sm font-black shadow-lg transition-transform active:scale-[0.98]",
-              currentAllDone
-                ? "bg-brand text-brand-foreground shadow-brand/25"
-                : "bg-muted text-muted-foreground shadow-none"
-            )}
+            className="flex-1 rounded-xl bg-brand py-3.5 text-sm font-black text-brand-foreground shadow-lg shadow-brand/25 transition-transform active:scale-[0.98]"
           >
-            {isLast ? "Finalizar treino" : currentAllDone ? "Próximo exercício →" : `${currentProgress?.sets.filter((s) => !s.done).length ?? 0} séries restantes`}
+            {isLast ? "Finalizar treino" : currentAllDone ? "Próximo exercício →" : "Pular exercício →"}
           </button>
         </div>
       </footer>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Camera, CheckCircle2, Copy, MessageCircle, Timer, Dumbbell , Trophy} from "lucide-react";
 import { TopBar } from "~/components/layout/TopBar";
@@ -15,6 +15,37 @@ import { RewardModal } from "~/components/common/RewardModal";
  * cronômetro parado + estatísticas + conquista desbloqueada animada
  * + RPE rápido + compartilhar no Instagram/WhatsApp.
  */
+/** Confete leve (framer-motion, sem dependência nova) — dispara no monte. */
+function ConfettiBurst({ count = 18 }: { count?: number }) {
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        delay: Math.random() * 0.5,
+        dur: 1.6 + Math.random() * 1.2,
+        size: 5 + Math.random() * 6,
+        color: ["#F4711E", "#FBBF24", "#4ADE80", "#60A5FA", "#F472B6"][i % 5],
+        rot: Math.random() * 360,
+      })),
+    [count]
+  );
+  return (
+    <span className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+      {pieces.map((c) => (
+        <motion.span
+          key={c.id}
+          className="absolute rounded-[2px]"
+          style={{ left: `${c.x}%`, top: -12, width: c.size, height: c.size * 1.6, background: c.color }}
+          initial={{ y: -20, opacity: 1, rotate: c.rot }}
+          animate={{ y: 240, opacity: [1, 1, 0], rotate: c.rot + 320 }}
+          transition={{ duration: c.dur, delay: c.delay, ease: "easeIn" }}
+        />
+      ))}
+    </span>
+  );
+}
+
 export default function WorkoutSummary({
   seconds,
   done,
@@ -66,7 +97,7 @@ export default function WorkoutSummary({
       <RewardModal
         open={!!achievement && rewardOpen}
         onClose={() => setRewardOpen(false)}
-        icon=""
+        icon={achievement?.icon ?? "🏆"}
         name={achievement?.name ?? ""}
         points={achievement?.points ?? 0}
         shareText={shareText}
@@ -96,6 +127,35 @@ export default function WorkoutSummary({
           </div>
         </motion.div>
 
+        {/* celebração SEMPRE: conquista desbloqueada OU missão cumprida */}
+        {!achievement ? (
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0, rotate: -2 }}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 220, damping: 15, delay: 0.15 }}
+            className="relative overflow-hidden rounded-[22px] border border-warning/40 bg-gradient-to-b from-warning/15 via-card to-card p-6 text-center"
+          >
+            <ConfettiBurst />
+            <span
+              className="pointer-events-none absolute inset-x-0 top-0 h-24"
+              style={{ background: "radial-gradient(60% 80% at 50% 0%, rgba(255,194,77,0.35), transparent)", filter: "blur(8px)" }}
+              aria-hidden
+            />
+            <motion.span
+              className="relative mx-auto mt-3 flex h-20 w-20 items-center justify-center rounded-full bg-warning/15"
+              animate={{ rotate: [0, -10, 10, 0], scale: [1, 1.12, 1] }}
+              transition={{ duration: 1.2, delay: 0.35 }}
+            >
+              <Trophy className="h-10 w-10 text-[#FBBF24]" strokeWidth={1.8} fill="rgba(251, 191, 36, 0.25)" aria-hidden />
+            </motion.span>
+            <h2 className="relative mt-3 font-display text-xl font-black text-foreground">Missão cumprida! 🏆</h2>
+            <p className="relative mt-1 gf-card-text">Treino concluído com determinação. A constância tá construindo você.</p>
+            <p className="relative mt-2 inline-flex rounded-full bg-brand/15 px-3 py-1 text-[11px] font-black text-brand">
+              +{done * 5} pts · próxima conquista a caminho
+            </p>
+          </motion.div>
+        ) : null}
+
         {/* conquista desbloqueada */}
         {achievement ? (
           <motion.div
@@ -107,6 +167,7 @@ export default function WorkoutSummary({
               unlocked ? "border-warning/50 bg-gradient-to-b from-warning/20 via-card to-card" : "border-border bg-card/40"
             )}
           >
+            <ConfettiBurst />
             <span
               className="pointer-events-none absolute inset-x-0 top-0 h-24"
               style={{ background: "radial-gradient(60% 80% at 50% 0%, rgba(255,194,77,0.35), transparent)", filter: "blur(8px)" }}
