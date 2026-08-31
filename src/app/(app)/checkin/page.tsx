@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ScanLine, Check, X, LogIn, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
@@ -12,7 +12,8 @@ import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { toast } from "sonner";
 import type { Equipment, EquipmentSessions } from "~/lib/types/models";
 import { useSessionTimeout } from "~/hooks/useSessionTimeout";
-import { useWorkoutSession, endWorkoutSession } from "~/lib/workout-session";
+import { useWorkoutSession, endWorkoutSession, readSessionProgress, formatMMSS, elapsedSeconds } from "~/lib/workout-session";
+import { getTodayWorkout } from "~/lib/today-workout";
 import { WorkoutLogModal } from "~/components/workout-log-modal";
 import {
   isDemoMode,
@@ -41,6 +42,29 @@ export default function CheckinPage() {
   const [autoOpened, setAutoOpened] = useState(false);
   const [mockValidating, setMockValidating] = useState(false);
   const demo = isDemoMode();
+
+  // ---- métricas "Sua sessão hoje" ----
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (!daySession) return;
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [daySession]);
+  const sessionMetrics = useMemo(() => {
+    const logs = getTodayWorkout().logs as Array<{ date: string }>;
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const diasSemana = new Set(logs.filter((l) => l.date?.slice(0, 10) >= weekAgo).map((l) => l.date.slice(0, 10)));
+    const hoje = new Date().toISOString().slice(0, 10);
+    const treinouHoje = diasSemana.has(hoje);
+    const progresso = readSessionProgress();
+    const entrada = daySession ? new Date(daySession.startedAt) : null;
+    return {
+      entradaHora: entrada ? entrada.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null,
+      tempoNa: daySession ? formatMMSS(elapsedSeconds(daySession.startedAt, nowTick)) : null,
+      treinoHoje: progresso ? "Em andamento" : treinouHoje ? "Concluído" : "Não iniciado",
+      semana: diasSemana.size,
+    };
+  }, [daySession, nowTick]);
 
   const { data, loading, error, refetch } = useAsyncQuery<{
     equipment: Equipment[];
@@ -511,6 +535,31 @@ endWorkoutSession();
               Treino em andamento, ao sair, o treino inteiro é finalizado.
             </div>
           )}
+        </div>
+
+        {/* Métricas da sessão de hoje */}
+        <div className="rounded-2xl border border-border bg-card/50 p-4">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sua sessão hoje</p>
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
+            <div className="rounded-xl border border-border bg-card/40 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Entrada</p>
+              <p className="pm-num mt-1 text-xl font-black text-foreground">{sessionMetrics.entradaHora ?? "—"}</p>
+            </div>
+            <div className="rounded-xl border border-border bg-card/40 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Tempo na academia</p>
+              <p className="pm-num mt-1 text-xl font-black tabular-nums text-brand">{sessionMetrics.tempoNa ?? "—"}</p>
+            </div>
+            <div className="rounded-xl border border-border bg-card/40 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Treino de hoje</p>
+              <p className={cn("mt-1 text-sm font-black", sessionMetrics.treinoHoje === "Em andamento" ? "text-warning" : sessionMetrics.treinoHoje === "Concluído" ? "text-success" : "text-muted-foreground")}>
+                {sessionMetrics.treinoHoje}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-card/40 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Treinos na semana</p>
+              <p className="pm-num mt-1 text-xl font-black text-foreground">{sessionMetrics.semana}<span className="text-xs text-muted-foreground">/7</span></p>
+            </div>
+          </div>
         </div>
       </div>
 
