@@ -398,6 +398,19 @@ function InfoSheet({ ex, onClose }: { ex: DemoExercise; onClose: () => void }) {
           </button>
         </div>
 
+        {/* ilustração do exercício, clicável pra ampliar */}
+        {ex.imageUrl ? (
+          <button
+            onClick={() => setZoom(true)}
+            aria-label={`Ampliar ilustração de ${ex.name}`}
+            className="gf-touch relative mt-4 block h-48 w-full cursor-zoom-in overflow-hidden rounded-2xl border border-white/[0.06] bg-white"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={ex.imageUrl} alt={`Execução de ${ex.name}`} loading="lazy" decoding="async" className="h-full w-full object-contain" />
+            <span className="absolute bottom-2 right-2 rounded-full bg-black/50 px-2 py-0.5 text-[9px] font-bold text-white">ampliar 🔍</span>
+          </button>
+        ) : null}
+
         <div className="mt-4 flex flex-wrap gap-1.5">
           {ex.tags.map((t) => (
             <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>
