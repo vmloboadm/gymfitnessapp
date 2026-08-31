@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLine } from "lucide-react";
@@ -42,6 +41,7 @@ import {
 } from "~/components/dashboard/mocks";
 import type { WorkoutLogs, Leaderboard } from "~/lib/types/models";
 import { BUILD_LABEL } from "~/lib/build";
+import { getProfileEdits } from "~/lib/profile-store";
 
 const META_SEMANAL = 7; // mock: virá do onboarding (frequência escolhida pelo aluno)
 const ME_ID = "00000000-0000-0000-0000-000000000099";
@@ -327,7 +327,10 @@ export default function HomePage() {
 
   const hour = today.getHours();
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
-  const name = profile?.name?.split(" ")[0] ?? "Atleta";
+  const [edits] = useState(() => ({ name: "" }));
+  void edits;
+  const profileEdits = typeof window !== "undefined" ? getProfileEdits() : { name: "" };
+  const name = (profileEdits.name || profile?.name || "Atleta").split(" ")[0];
 
   const myLeague = leagueFor(data?.points ?? 0);
   const myRank = data?.rank ?? 0;
@@ -424,27 +427,18 @@ export default function HomePage() {
           )}
         </motion.div>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 px-4">
-        {/* LINHA 1, Logo + Saudação */}
-        <motion.div variants={item} className="flex items-center justify-between gap-3 px-2">
-          <div className="flex min-w-0 items-center gap-3">
-            <Image
-              src="/images/logo-academia.png"
-              alt="GymFitness"
-              width={128}
-              height={40}
-              priority
-              unoptimized
-              className="h-9 w-auto shrink-0 object-contain"
-              style={{ filter: "drop-shadow(0 0 14px rgba(255,111,22,0.35))" }}
-            />
-            <div className="min-w-0">
-              <h1 className="break-words font-display text-[24px] font-extrabold leading-[1.15] tracking-tight text-[#F4F6FB] md:text-[28px]">
-                {greeting}, {name}
-              </h1>
-            </div>
+        {/* LINHA 1, Saudação (nome editável em Configurações) */}
+        <motion.div variants={item} className="flex items-end justify-between gap-3 px-2">
+          <div className="min-w-0">
+            <p className="pm-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8B95A9]">
+              {greeting}
+            </p>
+            <h1 className="mt-1 truncate bg-gradient-to-r from-[#F4F6FB] to-[#B8C4D8] bg-clip-text font-display text-[30px] font-black leading-none tracking-tight text-transparent">
+              {name}
+            </h1>
           </div>
           <div className="shrink-0 text-right">
-            <p className="pm-mono text-[12px] font-medium tracking-[0.08em] text-[#F4F6FB]">
+            <p className="pm-mono text-[13px] font-medium tracking-[0.08em] text-[#F4F6FB]">
               <LiveClock />
             </p>
             <p className="pm-mono mt-1 text-[#7E8AA0]">
@@ -483,23 +477,27 @@ export default function HomePage() {
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.94 }}
-                className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[18px] border border-white/[0.06] bg-white/[0.02] px-3 py-5 after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
+                className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[20px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] px-3 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_30px_-18px_rgba(0,0,0,0.8)] after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
                 style={{ animationDelay: "80ms" }}
               >
                 {showConfetti ? <ConfettiBurst /> : null}
-                <StreakFlame streak={streak} size={30} />
-                <p className="pm-num mt-1 text-[26px] text-[#F4F6FB]"><CountUp value={streakCount} /></p>
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-[#F4711E]/15 to-transparent">
+                  <StreakFlame streak={streak} size={28} />
+                </span>
+                <p className="pm-num mt-1 text-[30px] text-[#F4F6FB]"><CountUp value={streakCount} /></p>
                 <p className="text-[12px] font-medium text-[#7E8AA0]">dias seguidos</p>
                 <FlameStageHint streak={streak} />
               </motion.div>
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.94 }}
-                className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[18px] border border-white/[0.06] bg-white/[0.02] px-3 py-5 after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
+                className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[20px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] px-3 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_30px_-18px_rgba(0,0,0,0.8)] after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
                 style={{ animationDelay: "160ms" }}
               >
-                <LeagueGlyphMotion id={myLeague.id} />
-                <p className="pm-num mt-1 text-[26px] text-[#F4F6FB]">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-[#FBBF24]/15 to-transparent">
+                  <LeagueGlyphMotion id={myLeague.id} />
+                </span>
+                <p className="pm-num mt-1 text-[30px] text-[#F4F6FB]">
                   {myRank > 0 ? <CountUp value={rankCount} suffix="º" /> : "-"}
                 </p>
                 <p className="text-[12px] font-medium text-[#7E8AA0]">{myLeague.label}</p>
