@@ -176,7 +176,7 @@ export default function MetricasPage() {
       setPesoInput("");
       setGorduraInput("");
       setFotoVisor(null);
-      toast.success("Medida registrada como pendente", { description: "O personal vai validar — comprovada, ela conta pro ranking." });
+      toast.success("Medida registrada como pendente", { description: "O personal vai validar · comprovada, ela conta pro ranking." });
     } catch (e) {
       toast.error("Falha ao salvar a medida", { description: String(e).slice(0, 80) });
     } finally {

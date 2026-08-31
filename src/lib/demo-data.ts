@@ -258,7 +258,7 @@ const UNSPLASH = (id: string) => `https://images.unsplash.com/${id}?w=300&h=300&
 const ex = (id: string, name: string, picto: string, info: string, equipment: string | null = null, tags: string[] = [], machineId?: string): DemoExercise =>
   ({ id, name, picto, info, equipment, tags, machineId, imageUrl: null, thumbUrl: null, videoUrl: YT(name), videoUrlMale: YT(name), videoUrlFemale: YT(name) });
 
-/* Imagens reais por exercício — Storage do projeto (WebP 400px, sem hotlink).
+/* Imagens reais por exercício · Storage do projeto (WebP 400px, sem hotlink).
    Pipeline: scripts/fetch-exercise-images.mjs + upload (ver docs do lote). */
 export const EXERCISE_PHOTO_OVERRIDES: Record<string, string> = {
   "lib-af1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/afundo.webp?v=2",

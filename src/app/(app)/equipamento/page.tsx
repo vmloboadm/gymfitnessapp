@@ -32,7 +32,7 @@ import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncS
 import { Badge } from "~/components/ui/badge";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
-import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
+import { FitnessIcon, fitnessForName, FITNESS_GROUP_MAP } from "~/components/common/FitnessIcon";
 import { isDemoMode, demoLib, demoEquipment, demoTreinoData } from "~/lib/demo-bridge";
 import type { Equipment } from "~/lib/types/models";
 import type { LucideIcon } from "lucide-react";
@@ -261,14 +261,11 @@ function CategoryAccordion({
   return (
     <Accordion.Root type="multiple" value={open} onValueChange={onOpenChange} className="space-y-2">
       {cats.map((cat) => {
-        const Icon = iconFor(cat.id);
         return (
           <Accordion.Item key={cat.id} value={cat.id} className="gf-card gf-glass overflow-hidden !p-0">
             <Accordion.Header>
               <Accordion.Trigger className="gf-touch flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none [&[data-state=open]>svg]:rotate-180">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card text-brand">
-                  {Icon ? <Icon className="h-5 w-5" /> : null}
-                </span>
+                <FitnessIcon glyph={FITNESS_GROUP_MAP[cat.id] ?? "dumbbell"} size={40} />
                 <span className="gf-card-title flex-1">{cat.name}</span>
                 <span className="gf-hero-num flex h-6 min-w-6 items-center justify-center rounded-full bg-card px-1.5 text-[11px]">
                   {cat.subs.reduce((s, sub) => s + sub.exercises.length, 0)}
@@ -324,7 +321,7 @@ function ExerciseRow({
           aria-label={`Ampliar ilustração de ${e.name}`}
           className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-white/[0.06] bg-white"
         >
-          <Image src={e.imageUrl} alt="" fill sizes="44px" className="object-cover" />
+          <Image src={e.imageUrl} alt="" fill sizes="44px" className="object-cover" unoptimized />
         </button>
       ) : (
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">

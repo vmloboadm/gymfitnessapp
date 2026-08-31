@@ -194,7 +194,7 @@ export default function ConfiguracoesPage() {
           </button>
         </section>
 
-        {/* PESO SUPERVISIONADO — atalho */}
+        {/* PESO SUPERVISIONADO · atalho */}
         <section className="rounded-2xl border border-border bg-card/50 p-4">
           <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
             <Scale className="h-3.5 w-3.5" /> Peso & métricas

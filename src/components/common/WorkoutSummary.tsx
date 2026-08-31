@@ -15,7 +15,7 @@ import { RewardModal } from "~/components/common/RewardModal";
  * cronômetro parado + estatísticas + conquista desbloqueada animada
  * + RPE rápido + compartilhar no Instagram/WhatsApp.
  */
-/** Confete leve (framer-motion, sem dependência nova) — dispara no monte. */
+/** Confete leve (framer-motion, sem dependência nova) · dispara no monte. */
 function ConfettiBurst({ count = 18 }: { count?: number }) {
   const pieces = useMemo(
     () =>

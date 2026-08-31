@@ -38,7 +38,7 @@ function fmt(seconds: number): string {
 }
 
 /**
- * Sessão de treino ativa — padrão Strong/Hevy.
+ * Sessão de treino ativa · padrão Strong/Hevy.
  *
  * Header fixo enxuto, foto real do exercício, linhas de série compactas
  * com reps editáveis, descanso automático e CTA único de progressão.
@@ -93,7 +93,7 @@ export default function WorkoutInProgress({
     });
   }, [exercises]);
 
-  // persiste a cada mudança — navegar pelo app não perde séries
+  // persiste a cada mudança · navegar pelo app não perde séries
   useEffect(() => {
     if (!exercises.length || !Object.keys(progress).length) return;
     saveSessionProgress({ exercises, progress, currentIdx });
@@ -185,7 +185,7 @@ export default function WorkoutInProgress({
       return;
     }
     if (!currentAllDone && currentProgress?.sets.some((s) => s.done)) {
-      toast("Exercício pulado — o que marcou continua valendo");
+      toast("Exercício pulado · o que marcou continua valendo");
     } else if (!currentAllDone) {
       toast("Exercício pulado");
     }
@@ -240,7 +240,7 @@ export default function WorkoutInProgress({
             <button
               onClick={onMinimize}
               aria-label="Minimizar treino (continua em segundo plano)"
-              title="Minimizar — o treino continua rodando"
+              title="Minimizar · o treino continua rodando"
               className="gf-touch flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
             >
               <ChevronDown className="h-5 w-5" />
@@ -342,7 +342,7 @@ export default function WorkoutInProgress({
                 </div>
               </div>
 
-              {/* Séries — linha inteira tapável, sem tabela técnica */}
+              {/* Séries · linha inteira tapável, sem tabela técnica */}
               <div className="space-y-2">
                 {currentProgress?.sets.map((s, i) => (
                   <div

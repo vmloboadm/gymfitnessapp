@@ -40,7 +40,7 @@ export function ExerciseInfoSheet({
     ? [
         ex.tips?.[0] ?? "Posição inicial estável, coluna neutra.",
         "Execução com cadência controlada (2s descendo, 1s subindo).",
-        "Registre a carga e a sensação — evolua na próxima sessão.",
+        "Registre a carga e a sensação e evolua na próxima sessão.",
       ]
     : [];
 

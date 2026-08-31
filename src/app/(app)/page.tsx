@@ -527,7 +527,7 @@ export default function HomePage() {
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[#4ADE80]" />
               </span>
               <p className="text-[11px] font-semibold text-[#B8C4D8]">
-                <span className="font-black text-[#F4F6FB]">{online} pessoas</span> treinando agora —{" "}
+                <span className="font-black text-[#F4F6FB]">{online} pessoas</span> treinando agora, 
                 <span className="text-[#FF9A5C]">bora somar com a galera!</span>
               </p>
             </div>

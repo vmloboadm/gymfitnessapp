@@ -6,7 +6,7 @@ import { X } from "lucide-react";
 import Image from "next/image";
 
 /**
- * Lightbox — amplia a ilustração do exercício em tela cheia.
+ * Lightbox · amplia a ilustração do exercício em tela cheia.
  * Fundo claro (ilustrações line-art são pretas no branco) + fecha com X,
  * clique fora ou ESC.
  */

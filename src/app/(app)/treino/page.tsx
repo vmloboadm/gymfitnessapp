@@ -691,7 +691,7 @@ export default function TreinoHomePage() {
                       aria-label={`Ampliar ilustração de ${e.name}`}
                       className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-white/[0.06] bg-white"
                     >
-                      <Image src={e.imageUrl} alt="" fill sizes="40px" className="object-cover" />
+                      <Image src={e.imageUrl} alt="" fill sizes="40px" className="object-cover" unoptimized />
                     </button>
                   ) : (
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
