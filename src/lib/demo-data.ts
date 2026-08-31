@@ -531,6 +531,30 @@ for (const cat of demoLib) {
 // biblioteca expandida: acervo Everkinetic completo (anexa subs por categoria)
 applyExpandedLibrary(demoLib);
 
+// exercícios sem ilustração própria recebem a imagem do GRUPO muscular (webp)
+const GROUP_IMAGE: Record<string, string> = {
+  peito: "/group-images/peito.webp",
+  costas: "/group-images/costas.webp",
+  ombro: "/group-images/ombro.webp",
+  biceps: "/group-images/braco.webp",
+  triceps: "/group-images/triceps.webp",
+  antebraco: "/group-images/antebraco.webp",
+  abdomen: "/group-images/abdomen.webp",
+  inferiores: "/group-images/perna.webp",
+};
+for (const cat of demoLib) {
+  const gi = GROUP_IMAGE[cat.id];
+  if (!gi) continue;
+  for (const sub of cat.subs) {
+    for (const ex of sub.exercises) {
+      if (!ex.imageUrl) {
+        ex.imageUrl = gi;
+        ex.thumbUrl = gi;
+      }
+    }
+  }
+}
+
 export function demoLibCategory(catId: string): DemoCategory | undefined {
   return demoLib.find((c) => c.id === catId);
 }

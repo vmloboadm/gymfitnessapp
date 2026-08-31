@@ -265,7 +265,9 @@ function CategoryAccordion({
           <Accordion.Item key={cat.id} value={cat.id} className="gf-card gf-glass overflow-hidden !p-0">
             <Accordion.Header>
               <Accordion.Trigger className="gf-touch flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none [&[data-state=open]>svg]:rotate-180">
-                <FitnessIcon glyph={FITNESS_GROUP_MAP[cat.id] ?? "dumbbell"} size={40} />
+                <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0B1426]">
+                  <Image src={`/group-images/${cat.id}.webp`} alt="" fill sizes="40px" className="object-cover" />
+                </span>
                 <span className="gf-card-title flex-1">{cat.name}</span>
                 <span className="gf-hero-num flex h-6 min-w-6 items-center justify-center rounded-full bg-card px-1.5 text-[11px]">
                   {cat.subs.reduce((s, sub) => s + sub.exercises.length, 0)}
@@ -330,7 +332,7 @@ function ExerciseRow({
       )}
       <ImageLightbox src={zoom ? e.imageUrl ?? null : null} alt={e.name} open={zoom} onClose={() => setZoom(false)} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-semibold text-foreground">
+        <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-foreground">
           {e.name}
           {inToday ? (
             <Badge variant="success" className="ml-1.5 gap-1 !px-1.5 !py-0 !text-[9px]">

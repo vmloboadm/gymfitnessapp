@@ -103,8 +103,14 @@ export const EXPANDED_SUBS: Array<{ catId: string; sub: DemoCategory["subs"][num
       name: "Acervo completo",
       exercises: [
         evkEx("0091", "Barra Fixa Pegada Aberta Supinada", null, "Foco em costas. Execução controlada, descida em 2 a 3 segundos."),
-      ],
-    },
+      
+        evkEx("0045", "Pullover (Dorsal)", "Barra", "Foco em costas · Barra. Braços quase estendidos, foque no dorsal."),
+        evkEx("0092", "Pulldown Braços Estendidos", "Máquina", "Foco em costas · Máquina. Braços estendidos, puxe com o dorsal."),
+        evkEx("0099", "Levantamento Terra com Barra", "Barra", "Foco em costas · Barra. Coluna neutra, suba com os quadris e as pernas."),
+        evkEx("0105", "Superman (Costas)", "Peso corporal", "Foco em costas · Peso corporal. Isometria de 2 a 3 segundos no topo."),
+        evkEx("0086", "Remada Invertida", "Peso corporal", "Foco em costas · Peso corporal. Corpo alinhado, puxe o peito até a barra."),
+        evkEx("0014", "Remada Alta com Barra", "Barra", "Foco em costas · Barra. Cotovelos altos, barra junto ao corpo."),
+],    },
   },
   {
     catId: "inferiores",
