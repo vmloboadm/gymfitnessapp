@@ -302,7 +302,7 @@ export default function WorkoutInProgress({
                     aria-label="Ampliar ilustração do exercício"
                     className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-white"
                   >
-                    <Image src={photo} alt="" fill sizes="72px" className="object-cover" />
+                    <Image src={photo} alt="" fill sizes="72px" className="object-cover" unoptimized />
                   </button>
                 ) : (
                   <FitnessIcon glyph={fitnessForName(current.name)} size={72} className="rounded-2xl" />

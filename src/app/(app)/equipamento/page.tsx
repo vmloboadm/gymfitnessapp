@@ -266,7 +266,7 @@ function CategoryAccordion({
             <Accordion.Header>
               <Accordion.Trigger className="gf-touch flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none [&[data-state=open]>svg]:rotate-180">
                 <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0B1426]">
-                  <Image src={`/group-images/${cat.id}.webp`} alt="" fill sizes="40px" className="object-cover" />
+                  <Image src={`/group-images/${cat.id}.webp`} alt="" fill sizes="40px" className="object-cover" unoptimized />
                 </span>
                 <span className="gf-card-title flex-1">{cat.name}</span>
                 <span className="gf-hero-num flex h-6 min-w-6 items-center justify-center rounded-full bg-card px-1.5 text-[11px]">

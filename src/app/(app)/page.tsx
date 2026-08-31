@@ -521,7 +521,7 @@ export default function HomePage() {
             </div>
 
             {/* Ocupação ao vivo + mensagem motivadora */}
-            <div className="mt-4 flex items-center justify-center gap-2 rounded-[14px] border border-white/[0.06] bg-white/[0.03] px-4 py-2.5">
+            <div className="mt-4 flex items-center justify-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-2">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#4ADE80] opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[#4ADE80]" />

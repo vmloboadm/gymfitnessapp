@@ -488,7 +488,7 @@ export default function TreinoHomePage() {
       {sessionBar}
       <div className="space-y-8 p-4">
         {/* 1. STATUS ATUAL, linha compacta sem card pesado */}
-        <div className="flex items-center gap-2 rounded-full border border-border bg-card/40 px-3 py-1.5">
+        <div className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 backdrop-blur">
           <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">Como está?</span>
           <div className="flex flex-1 justify-end gap-1.5">
             {[

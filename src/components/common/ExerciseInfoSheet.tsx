@@ -62,6 +62,7 @@ export function ExerciseInfoSheet({
               fill
               sizes="(max-width: 640px) 100vw, 448px"
               className="object-cover"
+              unoptimized
             />
             <span className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent" aria-hidden />
           </div>
