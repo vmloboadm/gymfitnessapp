@@ -54,7 +54,7 @@ async function main() {
 
   // chips de grupo: Pernas
   const chip = await page.evaluate(() => {
-    const btn = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Peito");
+    const btn = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Pernas");
     if (btn) {
       btn.click();
       return true;

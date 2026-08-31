@@ -82,16 +82,16 @@ export const demoVariations: Record<string, any[]> = {
 // ---------------------------------------------------------------------------
 
 export const demoExercises = [
-  { id: "ex-demo-001", name: "Supino Reto", category: "strength", muscles: ["chest"], tips: ["Mantenha escápulas retraídas"], technique_default: "standard", high_impact: false, photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-reto.webp" },
-  { id: "ex-demo-002", name: "Agachamento", category: "strength", muscles: ["legs"], tips: ["Joelhos acompanham os pés"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/agachamento-livre.webp" },
-  { id: "ex-demo-003", name: "Crucifixo com Halteres", category: "strength", muscles: ["chest"], tips: ["Abra até a linha do peito"], technique_default: "standard", high_impact: false, photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crucifixo-com-halteres.webp" },
-  { id: "ex-demo-004", name: "Desenvolvimento Militar", category: "strength", muscles: ["shoulders"], tips: ["Core firme, sem arco lombar"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/desenvolvimento-militar.webp" },
-  { id: "ex-demo-005", name: "Puxada Alta", category: "strength", muscles: ["back"], tips: ["Puxe com cotovelos baixos"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/puxada-alta.webp" },
-  { id: "ex-demo-006", name: "Esteira", category: "cardio", muscles: ["legs"], tips: ["Comece em ritmo leve"], technique_default: "standard", high_impact: true, photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/esteira.webp" },
-  { id: "ex-demo-007", name: "Rosca Direta", category: "strength", muscles: ["biceps"], tips: ["Sem balançar o tronco"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-direta.webp" },
-  { id: "ex-demo-008", name: "Tríceps Corda", category: "strength", muscles: ["triceps"], tips: ["Cotovelos fixos, abra as pontas"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-corda.webp" },
-  { id: "ex-demo-009", name: "Leg Press 45°", category: "strength", muscles: ["legs"], tips: ["Lombar colada no banco"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/leg-press-45.webp" },
-  { id: "ex-demo-010", name: "Prancha Isométrica", category: "strength", muscles: ["core"], tips: ["Corpo reto, ative o core"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/prancha-isometrica.webp" },
+  { id: "ex-demo-001", name: "Supino Reto", category: "strength", muscles: ["chest"], tips: ["Mantenha escápulas retraídas"], technique_default: "standard", high_impact: false, photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-reto.webp?v=2" },
+  { id: "ex-demo-002", name: "Agachamento", category: "strength", muscles: ["legs"], tips: ["Joelhos acompanham os pés"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/agachamento-livre.webp?v=2" },
+  { id: "ex-demo-003", name: "Crucifixo com Halteres", category: "strength", muscles: ["chest"], tips: ["Abra até a linha do peito"], technique_default: "standard", high_impact: false, photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crucifixo-com-halteres.webp?v=2" },
+  { id: "ex-demo-004", name: "Desenvolvimento Militar", category: "strength", muscles: ["shoulders"], tips: ["Core firme, sem arco lombar"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/desenvolvimento-militar.webp?v=2" },
+  { id: "ex-demo-005", name: "Puxada Alta", category: "strength", muscles: ["back"], tips: ["Puxe com cotovelos baixos"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/puxada-alta.webp?v=2" },
+  { id: "ex-demo-006", name: "Esteira", category: "cardio", muscles: ["legs"], tips: ["Comece em ritmo leve"], technique_default: "standard", high_impact: true, photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/esteira.webp?v=2" },
+  { id: "ex-demo-007", name: "Rosca Direta", category: "strength", muscles: ["biceps"], tips: ["Sem balançar o tronco"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-direta.webp?v=2" },
+  { id: "ex-demo-008", name: "Tríceps Corda", category: "strength", muscles: ["triceps"], tips: ["Cotovelos fixos, abra as pontas"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-corda.webp?v=2" },
+  { id: "ex-demo-009", name: "Leg Press 45°", category: "strength", muscles: ["legs"], tips: ["Lombar colada no banco"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/leg-press-45.webp?v=2" },
+  { id: "ex-demo-010", name: "Prancha Isométrica", category: "strength", muscles: ["core"], tips: ["Corpo reto, ative o core"], technique_default: "standard", high_impact: false , photo_url: "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/prancha-isometrica.webp?v=2" },
 ] as any[];
 
 // ---------------------------------------------------------------------------
@@ -229,9 +229,9 @@ export type DemoExercise = {
   tags: string[];
   info: string;
   machineId?: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   videoUrl?: string;
-  thumbUrl?: string;
+  thumbUrl?: string | null;
   videoUrlMale?: string;
   videoUrlFemale?: string;
 };
@@ -255,29 +255,76 @@ const UNSPLASH = (id: string) => `https://images.unsplash.com/${id}?w=300&h=300&
 // const VID_M = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"; // REPLACED WITH YOUTUBE SEARCH
 // const VID_F = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"; // REPLACED WITH YOUTUBE SEARCH
 
-const ex = (id: string, name: string, picto: string, info: string, equipment: string | null = null, tags: string[] = [], machineId?: string, thumbId = "photo-1517836357463-d25dfeac3438"): DemoExercise =>
-  ({ id, name, picto, info, equipment, tags, machineId, imageUrl: UNSPLASH(thumbId), thumbUrl: UNSPLASH(thumbId), videoUrl: YT(name), videoUrlMale: YT(name), videoUrlFemale: YT(name) });
+const ex = (id: string, name: string, picto: string, info: string, equipment: string | null = null, tags: string[] = [], machineId?: string): DemoExercise =>
+  ({ id, name, picto, info, equipment, tags, machineId, imageUrl: null, thumbUrl: null, videoUrl: YT(name), videoUrlMale: YT(name), videoUrlFemale: YT(name) });
 
 /* Imagens reais por exercício — Storage do projeto (WebP 400px, sem hotlink).
    Pipeline: scripts/fetch-exercise-images.mjs + upload (ver docs do lote). */
 export const EXERCISE_PHOTO_OVERRIDES: Record<string, string> = {
-  "lib-su1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-reto.webp",
-  "lib-su2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-inclinado.webp",
-  "lib-su3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-declinado.webp",
-  "lib-su4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-com-halteres.webp",
-  "lib-fl1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crucifixo-com-halteres.webp",
-  "lib-fl2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crucifixo-polia.webp",
-  "lib-pk1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/voador-peck-deck.webp",
-  "lib-cr1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/flexao-de-braco.webp",
-  "lib-par1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/fundos-paralelas.webp",
-  "lib-ag2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/agachamento-livre.webp",
-  "lib-de1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/desenvolvimento-militar.webp",
-  "lib-pu1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/puxada-alta.webp",
-  "lib-es1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/esteira.webp",
-  "lib-ro1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-direta.webp",
-  "lib-tr3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-corda.webp",
-  "lib-lp1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/leg-press-45.webp",
-  "lib-ab4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/prancha-isometrica.webp",
+  "lib-af1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/afundo.webp?v=2",
+  "lib-ag3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/agachamento-frontal.webp?v=2",
+  "lib-ag2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/agachamento-livre.webp?v=2",
+  "lib-ag1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/agachamento-smith.webp?v=2",
+  "lib-ag4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/agachamento-sumo.webp?v=2",
+  "lib-bf1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/barra-fixa.webp?v=2",
+  "lib-bf2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/barra-fixa-pronada.webp?v=2",
+  "lib-bf3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/barra-fixa-supinada.webp?v=2",
+  "lib-bd1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/bom-dia.webp?v=2",
+  "lib-gl1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/cadeira-abdutora.webp?v=2",
+  "lib-ce1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/cadeira-extensora.webp?v=2",
+  "lib-mf2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/cadeira-flexora.webp?v=2",
+  "lib-fl1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crucifixo-com-halteres.webp?v=2",
+  "lib-fl2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crucifixo-polia.webp?v=2",
+  "lib-ab3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crunch-polia-alta.webp?v=2",
+  "lib-ab2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/crunch-solo.webp?v=2",
+  "lib-de3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/desenvolvimento-arnold.webp?v=2",
+  "lib-de2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/desenvolvimento-com-halteres.webp?v=2",
+  "lib-de1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/desenvolvimento-militar.webp?v=2",
+  "lib-ab6": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/elevacao-de-perna-infra.webp?v=2",
+  "lib-el2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/elevacao-frontal.webp?v=2",
+  "lib-el1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/elevacao-lateral.webp?v=2",
+  "lib-gl2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/elevacao-pelvica.webp?v=2",
+  "lib-cr1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/flexao-de-braco.webp?v=2",
+  "lib-par1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/fundos-paralelas.webp?v=2",
+  "lib-gl3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/hip-thrust.webp?v=2",
+  "lib-hd1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/hiperextensao-lombar.webp?v=2",
+  "lib-gl5": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/kickback.webp?v=2",
+  "lib-lp1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/leg-press-45.webp?v=2",
+  "lib-lp2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/leg-press-pes-altos.webp?v=2",
+  "lib-lp3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/leg-press-unilateral.webp?v=2",
+  "lib-tr6": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/mergulho-paralelas.webp?v=2",
+  "lib-mf1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/mesa-flexora.webp?v=2",
+  "lib-pa1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/panturrilha-em-pe.webp?v=2",
+  "lib-pa2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/panturrilha-no-leg-press.webp?v=2",
+  "lib-pa3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/panturrilha-sentado.webp?v=2",
+  "lib-gl4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/passada.webp?v=2",
+  "lib-ab7": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/prancha-lateral.webp?v=2",
+  "lib-pu3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/pulldown-supinado.webp?v=2",
+  "lib-pu1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/puxada-alta.webp?v=2",
+  "lib-pu2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/puxada-alta-fechada.webp?v=2",
+  "lib-pu4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/puxada-triangulo.webp?v=2",
+  "lib-re2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/remada-baixa.webp?v=2",
+  "lib-re1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/remada-curvada.webp?v=2",
+  "lib-re5": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/remada-na-polia.webp?v=2",
+  "lib-ro2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-alternada.webp?v=2",
+  "lib-ro4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-concentrada.webp?v=2",
+  "lib-ro1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-direta.webp?v=2",
+  "lib-ro9": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-inversa.webp?v=2",
+  "lib-ro5": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-martelo.webp?v=2",
+  "lib-ro6": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-na-polia-baixa.webp?v=2",
+  "lib-ro3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/rosca-scott.webp?v=2",
+  "lib-sh1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/shrugg.webp?v=2",
+  "lib-st1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/stiff.webp?v=2",
+  "lib-su4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-com-halteres.webp?v=2",
+  "lib-su3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-declinado.webp?v=2",
+  "lib-su2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-inclinado.webp?v=2",
+  "lib-su1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/supino-reto.webp?v=2",
+  "lib-tr3": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-corda.webp?v=2",
+  "lib-tr4": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-frances.webp?v=2",
+  "lib-tr5": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-maquina.webp?v=2",
+  "lib-tr1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-pulley.webp?v=2",
+  "lib-tr2": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/triceps-testa.webp?v=2",
+  "lib-pk1": "https://jeixbpucnxrhizqpapyv.supabase.co/storage/v1/object/public/exercise-images/voador-peck-deck.webp?v=2",
 };
 
 export const demoLib: DemoCategory[] = [
