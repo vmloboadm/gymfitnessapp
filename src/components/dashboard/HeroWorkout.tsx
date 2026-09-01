@@ -57,8 +57,8 @@ export function HeroWorkout({
           <div className="flex items-center justify-between">
             <p className="font-display text-[12px] font-bold uppercase tracking-[0.16em] text-[#FF9A5C]">{sessionLabel}</p>
             {ready ? (
-              <span className="flex items-center gap-2 rounded-full border border-[#4ADE80]/40 bg-[#4ADE80]/10 px-2.5 py-1 text-[11px] font-semibold text-[#4ADE80]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#4ADE80]" />
+              <span className="flex items-center gap-1.5 rounded-full border border-[#4ADE80]/40 bg-[#4ADE80]/10 px-2.5 py-1 text-[11px] font-semibold text-[#4ADE80]">
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                 Pronto
               </span>
             ) : null}

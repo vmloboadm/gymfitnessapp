@@ -19,10 +19,10 @@ import { cn } from "~/lib/utils";
 const NAV_ITEMS = [
   { href: "/", label: "Início", icon: Home },
   { href: "/treino", label: "Treino", icon: Dumbbell },
+  { href: "/feed", label: "Feed", icon: Newspaper },
   { href: "/checkin", label: "Check-in", icon: ScanLine },
   { href: "/progresso", label: "Progresso", icon: TrendingUp },
   { href: "/ranking", label: "Ranking", icon: Trophy },
-  { href: "/feed", label: "Feed", icon: Newspaper },
   { href: "/perfil", label: "Perfil", icon: User },
 ];
 

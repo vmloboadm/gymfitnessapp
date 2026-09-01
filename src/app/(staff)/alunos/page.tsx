@@ -10,6 +10,9 @@ import { TopBar } from "~/components/layout/TopBar";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import { isDemoMode, demoAlunosPersonal } from "~/lib/demo-bridge";
+import { listMetrics, approveMetric, type SupervisedMetric } from "~/lib/profile-store";
+import { useEffect } from "react";
+import { CheckCircle2, Clock } from "lucide-react";
 import type { Profiles, StudentTrainers } from "~/lib/types/models";
 
 type AlunoRow = Profiles & { trainer: StudentTrainers | null; activePrograms: number };
@@ -19,6 +22,23 @@ type AlunoRow = Profiles & { trainer: StudentTrainers | null; activePrograms: nu
  * student_trainers + os demais alunos do gym (para atribuição futura).
  */
 export default function AlunosPage() {
+  // ---- validação de métricas do aluno (fluxo personal, sincronizado em demo local) ----
+  const [pendentes, setPendentes] = useState<SupervisedMetric[]>([]);
+  useEffect(() => {
+    const load = () => setPendentes(listMetrics().filter((m) => m.status === "pendente"));
+    load();
+    window.addEventListener("gymfit-profile-store", load);
+    window.addEventListener("storage", load);
+    return () => {
+      window.removeEventListener("gymfit-profile-store", load);
+      window.removeEventListener("storage", load);
+    };
+  }, []);
+  const validar = (id: string) => {
+    approveMetric(id);
+    setPendentes(listMetrics().filter((m) => m.status === "pendente"));
+  };
+
   const { user, profile } = useAuth();
   const [q, setQ] = useState("");
   const demo = isDemoMode();
@@ -95,15 +115,41 @@ export default function AlunosPage() {
     <>
       <TopBar title="Alunos" subtitle={`${data?.filter((s) => s.trainer).length ?? 0} ativos sob sua responsabilidade`} />
       <div className="space-y-4 p-4">
+        {/* Métricas pendentes de validação do personal */}
+        {pendentes.length > 0 ? (
+          <div className="mb-5 rounded-2xl border border-warning/30 bg-warning/[0.06] p-4">
+            <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-warning">
+              <Clock className="h-3.5 w-3.5" /> {pendentes.length} {pendentes.length === 1 ? "medida aguardando" : "medidas aguardando"} sua validação
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">Comprovada, a medida passa a contar no ranking do aluno.</p>
+            <div className="mt-3 space-y-2">
+              {pendentes.map((m) => (
+                <div key={m.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5">
+                  <span className="min-w-0 text-sm font-semibold text-foreground">
+                    {m.peso_kg} kg{m.gordura_pct ? ` · ${m.gordura_pct}% BF` : ""}
+                    {m.photo_url ? <span className="ml-1.5 text-[10px] font-medium text-muted-foreground">com foto do visor</span> : null}
+                  </span>
+                  <button
+                    onClick={() => validar(m.id)}
+                    className="gf-touch flex shrink-0 items-center gap-1 rounded-lg bg-success px-3 py-1.5 text-[11px] font-black text-black"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Validar
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar aluno por nome ou e-mail..."
-            className="w-full rounded-lg border border-input bg-card/60 py-2.5 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </div>
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar aluno por nome ou e-mail..."
+              className="w-full rounded-lg border border-input bg-card/60 py-2.5 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
 
         {loading ? (
           <SkeletonList rows={6} />

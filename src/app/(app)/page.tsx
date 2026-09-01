@@ -19,7 +19,7 @@ import { leagueFor } from "~/lib/utils/leagues";
 import { useWorkoutSession } from "~/lib/workout-session";
 import { getTodayWorkout } from "~/lib/today-workout";
 import { SessionClock } from "~/components/common/SessionClock";
-import { GYM_HIGHLIGHTS, TIPS_STRUCTURED } from "~/components/dashboard/mocks";
+import { TIPS_STRUCTURED } from "~/components/dashboard/mocks";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import PersonalHome from "~/components/personal/PersonalHome";
 import { StreakFlame, FlameStageHint } from "~/components/dashboard/StreakFlame";
@@ -545,7 +545,7 @@ export default function HomePage() {
         </motion.section>
 
         {/* TREINO DE HOJE, ação principal; recebe o scroll quando check-in feito */}
-        <motion.div variants={item} ref={heroRef}>
+        <motion.div variants={item} ref={heroRef} className="pt-2">
           <HeroWorkout
             image={FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? "/workout/workout-hero.jpg"}
             title={todayLabel}
@@ -706,19 +706,10 @@ export default function HomePage() {
           </div>
         </motion.section>
 
-        {/* HOJE NA ACADEMIA — um só carrossel, zero duplicação */}
+        {/* HOJE NA ACADEMIA — só conteúdo com fonte real (feed da comunidade, dica, personais) */}
         <motion.section variants={item}>
           <p className="gf-section mb-2 px-1">Hoje na academia</p>
           <div className="scrollbar-hide -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
-            {GYM_HIGHLIGHTS.map((h) => (
-              <div key={h.title} className="w-[72%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4">
-                <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-brand">
-                  {h.tag}
-                </p>
-                <p className="mt-1.5 text-[14px] font-bold text-[#F4F6FB]">{h.title}</p>
-                <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{h.body}</p>
-              </div>
-            ))}
             {destaque ? (
               <div className="w-[72%] shrink-0 snap-start rounded-[18px] border border-success/30 bg-success/[0.06] p-4">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-success">Destaque da galera</p>
