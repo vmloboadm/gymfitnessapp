@@ -45,6 +45,8 @@ export type Profiles = {
   onboarding_step: number;
   lgpd_consent_at: string | null;
   daily_intake: string | null;
+  /** Consentimento LGPD para contato via WhatsApp (onboarding, campo novo) */
+  whatsapp_consent?: boolean | null;
 };
 
 export type StudentSubscriptions = {

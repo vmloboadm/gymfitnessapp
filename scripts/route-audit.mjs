@@ -19,7 +19,10 @@ const ROUTES = [
   { path: "/personals", label: "Personals", expect: "Personals" },
   { path: "/configuracoes", label: "Configurações", expect: "Configurações" },
   { path: "/metricas", label: "Métricas", expect: "Métricas" },
-  { path: "/treinos", label: "Treinos", expect: "Treinos" },
+  { path: "/personal/dashboard", label: "Cockpit do Personal", expect: "Radar" },
+  { path: "/personal/alunos", label: "Alunos do Personal", expect: "Alunos" },
+  { path: "/personal/treinos", label: "Co-Pilot de Treino", expect: "Co-Pilot" },
+  { path: "/personal/exercicios", label: "Exercícios do Personal", expect: "Exercícios" },
 ];
 
 async function checkRoute(r) {

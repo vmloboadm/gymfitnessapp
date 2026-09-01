@@ -49,15 +49,19 @@ const MANAGER_ONLY_PATHS = [
 ];
 
 /** Compartilhadas entre trainer e manager. */
-const STAFF_SHARED_PATHS = [
-  "/alunos",
-  "/equipamentos",
-  "/treinos",
-];
+/** Rotas legadas da área do personal: todos caem no novo endereço. */
+const LEGACY_REDIRECTS: Record<string, string> = {
+  "/alunos": "/personal/alunos",
+  "/treinos": "/personal/treinos",
+  "/biblioteca": "/personal/exercicios",
+  "/ia": "/personal/treinos",
+};
+
+const STAFF_SHARED_PATHS = ["/personal"];
 
 const HOME_BY_ROLE: Record<string, string> = {
   student: STUDENT_PATHS[0],
-  trainer: "/alunos",
+  trainer: "/personal/dashboard",
   manager: "/dashboard",
 };
 
@@ -66,6 +70,10 @@ function pathAllowed(role: string | undefined, pathname: string): string | null 
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return null;
   }
+
+  // Rotas antigas do personal viram redirect permanente pro novo endereço
+  const legacy = LEGACY_REDIRECTS[pathname];
+  if (legacy) return legacy;
 
   // Raiz: aluno fica, staff cai na home da própria área (nunca na home do aluno)
   if (pathname === "/") {

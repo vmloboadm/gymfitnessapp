@@ -29,6 +29,7 @@ import WorkoutInProgress from "~/components/common/WorkoutInProgress";
 import BodyMap from "~/components/body-map";
 import { ImageLightbox } from "~/components/common/ImageLightbox";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
+import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
@@ -520,6 +521,9 @@ export default function TreinoHomePage() {
             <p className="-mt-3 pl-3 text-[10px] text-brand">Anotado! O Personal Digital ajusta amanhã.</p>
           ) : null}
         </div>
+
+        {/* 1.5 TREINOS ENVIADOS PELO PERSONAL (Co-Pilot) */}
+        <PersonalWorkouts />
 
         {/* 2. TREINO DE HOJE, programa ativo + início direto da sessão */}
         <div>

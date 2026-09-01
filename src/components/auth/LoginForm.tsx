@@ -31,7 +31,7 @@ export function LoginForm() {
   const { switchDemoRole } = useAuth();
   const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
 
-  const ROLE_HOME: Record<string, string> = { student: "/treino", trainer: "/alunos", manager: "/dashboard" };
+  const ROLE_HOME: Record<string, string> = { student: "/treino", trainer: "/personal/dashboard", manager: "/dashboard" };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();

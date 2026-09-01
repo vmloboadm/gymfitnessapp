@@ -21,7 +21,6 @@ import { getTodayWorkout } from "~/lib/today-workout";
 import { SessionClock } from "~/components/common/SessionClock";
 import { TIPS_STRUCTURED } from "~/components/dashboard/mocks";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
-import PersonalHome from "~/components/personal/PersonalHome";
 import { StreakFlame, FlameStageHint } from "~/components/dashboard/StreakFlame";
 import { PerformanceRing } from "~/components/dashboard/PerformanceRing";
 import { HeroWorkout } from "~/components/dashboard/HeroWorkout";
@@ -382,11 +381,6 @@ export default function HomePage() {
         <SkeletonList rows={6} />
       </div>
     );
-  }
-
-  // Dashboard específico do Personal (mobile-first, sem anel/streak de aluno)
-  if (profile?.role === "trainer") {
-    return <PersonalHome />;
   }
 
   return (

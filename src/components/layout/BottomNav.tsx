@@ -32,20 +32,20 @@ const STUDENT_NAV = [
 
 /** Nav do personal (feed e ranking compartilhados com o aluno) */
 const TRAINER_NAV = [
-  { href: "/alunos", label: "Alunos", icon: Users },
+  { href: "/personal/dashboard", label: "Início", icon: LayoutDashboard },
+  { href: "/personal/alunos", label: "Alunos", icon: Users },
+  { href: "/personal/treinos", label: "Treinos", icon: ClipboardList },
   { href: "/feed", label: "Feed", icon: Newspaper },
   { href: "/ranking", label: "Ranking", icon: Trophy },
-  { href: "/treinos", label: "Treinos", icon: ClipboardList },
-  { href: "/biblioteca", label: "Exercícios", icon: Dumbbell },
 ];
 
 /** Nav do gestor */
 const MANAGER_NAV = [
   { href: "/dashboard", label: "Início", icon: LayoutDashboard },
-  { href: "/alunos", label: "Alunos", icon: Users },
+  { href: "/personal/alunos", label: "Alunos", icon: Users },
+  { href: "/personal/treinos", label: "Treinos", icon: ClipboardList },
   { href: "/feed", label: "Feed", icon: Newspaper },
-  { href: "/ranking", label: "Ranking", icon: Trophy },
-  { href: "/treinos", label: "Treinos", icon: ClipboardList },
+  { href: "/personais", label: "Personais", icon: Users },
 ];
 
 export function BottomNav() {
