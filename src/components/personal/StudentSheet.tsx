@@ -161,7 +161,7 @@ export function StudentSheet({
               {assigned.length > 0 ? (
                 <div className="rounded-2xl border border-brand/30 bg-brand/[0.08] p-3">
                   <p className="text-[9.5px] font-bold uppercase tracking-wider text-brand">
-                    Do seu Co-Pilot
+                    Do seu Personal
                   </p>
                   <p className="mt-1 text-[13px] font-bold text-foreground">
                     {assigned[0].name} · {assigned[0].exercises.length} exercícios
@@ -213,7 +213,7 @@ export function StudentSheet({
               </div>
               <div className="rounded-2xl border border-brand/25 bg-brand/[0.08] p-3">
                 <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-brand">
-                  <Sparkles className="h-3 w-3" /> Insight IA
+                  <Sparkles className="h-3 w-3" /> Leitura do assistente
                 </p>
                 <p className="mt-1 text-[11.5px] leading-snug text-foreground/90">
                   {insightOffline({

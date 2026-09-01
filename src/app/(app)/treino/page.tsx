@@ -429,7 +429,7 @@ export default function TreinoHomePage() {
               <p className="mt-2 text-[11px] text-brand">RPE {rpe} salvo, entra no cálculo de progresso do seu plano.</p>
             ) : (
               <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                RPE é a nota de 0 a 10 de como o treino pesou pra você. Ajuda o Personal Digital a calibrar a carga de amanhã.
+                RPE é a nota de 0 a 10 de como o treino pesou pra você. Ajuda o Assistente de Treino a calibrar a carga de amanhã.
               </p>
             )}
           </div>
@@ -518,11 +518,11 @@ export default function TreinoHomePage() {
             })}
           </div>
           {feeling ? (
-            <p className="-mt-3 pl-3 text-[10px] text-brand">Anotado! O Personal Digital ajusta amanhã.</p>
+            <p className="-mt-3 pl-3 text-[10px] text-brand">Anotado! O Assistente de Treino ajusta amanhã.</p>
           ) : null}
         </div>
 
-        {/* 1.5 TREINOS ENVIADOS PELO PERSONAL (Co-Pilot) */}
+        {/* 1.5 TREINOS ENVIADOS PELO PERSONAL */}
         <PersonalWorkouts />
 
         {/* 2. TREINO DE HOJE, programa ativo + início direto da sessão */}

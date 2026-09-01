@@ -23,7 +23,7 @@ const item: Variants = {
 
 /**
  * Seção "Do seu Personal" no treino do aluno: treinos enviados pelo
- * Co-Pilot (demo via trainer-store; produção via workout_programs).
+ * do personal (demo via trainer-store; produção via workout_programs).
  * Treino novo gera toast + badge NOVO (notificação única).
  */
 export function PersonalWorkouts({ studentId }: { studentId?: string }) {

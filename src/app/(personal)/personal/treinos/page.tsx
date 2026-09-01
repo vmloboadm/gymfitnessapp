@@ -27,8 +27,8 @@ import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { generate, isAiConfigured } from "~/lib/ai/omniroute";
-import { buildWorkoutPrompt, WORKOUT_PLAN_SYSTEM } from "~/lib/ai/prompts";
+
+import { buildWorkoutPrompt } from "~/lib/ai/prompts";
 import {
   generatePlanOffline,
   parsePlanFromLLM,
@@ -80,17 +80,16 @@ function templateToPlan(t: WorkoutTemplate): WorkoutPlan {
 }
 
 /**
- * Motor de treino do Personal (operador): seleção de aluno, prompt com
- * contexto completo, plano multi-dias da IA (LLM via OmniRoute quando
- * configurado; motor offline de bolso quando não) e revisão editável
- * com drag antes de atribuir.
+ * Montar Treino Automático: seleção de aluno, pedido em linguagem natural
+ * com contexto completo, plano multi-dias gerado pelo modelo real
+ * (via /api/assistente; sem modelo, o gerador local do app assume) e
+ * revisão editável com drag antes de atribuir.
  */
 export default function PersonalTreinosPage() {
   const router = useRouter();
   const params = useSearchParams();
   const students = useMemo(() => demoPersonalStudents(), []);
   const templates = useMemo(() => demoTemplates(), []);
-  const aiReady = isAiConfigured();
 
   const targetId = params.get("aluno") ?? "";
   const editId = params.get("edit") ?? "";
@@ -154,32 +153,41 @@ export default function PersonalTreinosPage() {
     if (!prompt.trim() || loading || !target) return;
     setLoading(true);
     const fallback = generatePlanOffline(prompt.trim(), target.name);
-    if (!aiReady) {
-      await new Promise((r) => setTimeout(r, 800));
-      setPlan(fallback);
-      setNotes("");
-      setActiveDay(0);
+    try {
+      const res = await fetch("/api/assistente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: buildWorkoutPrompt({
+            studentName: target.name,
+            goal: target.activeWorkout,
+            level: fallback.nivel,
+            frequency: fallback.frequencia,
+            restrictions: fallback.observacao_geral,
+            equipment: equipmentSample,
+            request: prompt.trim(),
+          }),
+          context: "personal",
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; text?: string; error?: string };
       setLoading(false);
-      return;
+      if (data.ok && data.text) {
+        setPlan(parsePlanFromLLM(data.text, fallback));
+      } else {
+        // modelo offline: aviso amigável + gerador local mantém a ferramenta viva
+        toast.error(data.error ?? "O Assistente está offline no momento. Tente novamente.");
+        toast.info("Montei com o gerador local do app. Revise antes de enviar.");
+        setPlan(fallback);
+      }
+      setActiveDay(0);
+      setNotes("");
+    } catch {
+      setLoading(false);
+      toast.error("O Assistente está offline no momento. Tente novamente.");
+      setPlan(fallback);
+      setActiveDay(0);
     }
-    const out = await generate({
-      purpose: "generate_workout",
-      system: WORKOUT_PLAN_SYSTEM,
-      prompt: buildWorkoutPrompt({
-        studentName: target.name,
-        goal: target.activeWorkout,
-        level: fallback.nivel,
-        frequency: fallback.frequencia,
-        restrictions: fallback.observacao_geral,
-        equipment: equipmentSample,
-        request: prompt.trim(),
-      }),
-    });
-    setLoading(false);
-    setPlan(out.ok ? parsePlanFromLLM(out.text, fallback) : fallback);
-    setActiveDay(0);
-    setNotes("");
-    if (!out.ok) toast.info("Gateway indisponível, usei o motor local do app");
   };
 
   const updateDay = (dayIdx: number, patch: Partial<WorkoutPlan["dias"][number]>) => {
@@ -298,7 +306,7 @@ export default function PersonalTreinosPage() {
               <Sparkles className="h-3.5 w-3.5 text-brand" />
             </span>
             <p className="text-[13px] font-semibold text-foreground">
-              {aiReady ? "IA real (OmniRoute)" : "Motor local de bolso"} · plano completo e periodizado
+              Montar Treino Automático · plano completo e periodizado
             </p>
           </div>
           <textarea
@@ -312,12 +320,12 @@ export default function PersonalTreinosPage() {
             }}
             rows={3}
             placeholder={`Ex.: Plano de glúteos para ${target.name.split(" ")[0]}, 4x semana, intermediária, sem impacto no joelho`}
-            aria-label="Pedido de plano para a IA"
+            aria-label="Pedido de plano"
             className="w-full resize-none rounded-2xl border border-white/[0.06] bg-white/[0.05] p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
           />
           <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
             <p className="mr-auto text-[9.5px] text-muted-foreground">
-              A IA recebe objetivo, nível, frequência, restrições e aparelhos.
+              O gerador recebe objetivo, nível, frequência, restrições e aparelhos.
             </p>
             <Button onClick={run} disabled={!prompt.trim() || loading} size="sm" className="rounded-xl">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
@@ -548,9 +556,9 @@ export default function PersonalTreinosPage() {
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-lg font-bold text-foreground">Treinos</h1>
+        <h1 className="text-lg font-bold text-foreground">Montar Treino Automático</h1>
         <p className="text-[11px] text-muted-foreground">
-          {aiReady ? "IA real (OmniRoute)" : "Motor local de bolso"} · {assigned.length} atribuídos
+          {assigned.length} plano{assigned.length === 1 ? "" : "s"} atribuído{assigned.length === 1 ? "" : "s"}
         </p>
       </header>
 
@@ -564,7 +572,7 @@ export default function PersonalTreinosPage() {
         <div className="flex-1">
           <p className="text-sm font-bold text-foreground">Novo Plano de Treino</p>
           <p className="text-[11px] text-muted-foreground">
-            Selecionar aluno e gerar plano completo com IA
+            Selecionar aluno e gerar o plano completo
           </p>
         </div>
         <UserRoundPlus className="h-4.5 w-4.5 text-brand" />

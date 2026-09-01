@@ -341,7 +341,7 @@ export default function ProgressoPage() {
             },
             {
               term: "RPE",
-              text: "Nota de 0 a 10 de como o treino pesou pra você. É o que ajuda o Personal Digital a calibrar a carga dos próximos dias.",
+              text: "Nota de 0 a 10 de como o treino pesou pra você. É o que ajuda o Assistente de Treino a calibrar a carga dos próximos dias.",
             },
           ]}
         />

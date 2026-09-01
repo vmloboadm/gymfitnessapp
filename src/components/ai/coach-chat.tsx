@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dumbbell, Send, X, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 
 /**
- * Personal Digital, bolha de chat flutuante presente nas telas principais do
- * aluno (plano §IA). Conversa livre em texto com streaming simulado
- * (resposta aparece progressivamente). Escuta o evento `gf-ask-ai`
- * para abrir com contexto pré-preenchido ("Perguntar à IA" por exercício).
+ * Assistente de Treino: bolha de chat flutuante nas telas principais do
+ * aluno. Resposta real do modelo fluindo token a token (proxy SSE da
+ * /api/assistente); sem conexão com o modelo, mostra aviso amigável.
+ * Escuta o evento `gf-ask-ai` para abrir com contexto pré-preenchido
+ * (botão "Perguntar" por exercício).
  */
 
 type Bubble = { id: number; role: "user" | "ai"; text: string; done?: boolean };
@@ -25,26 +27,6 @@ function concise(s: string): string {
 const parts = s.split(/(?<=[.!?])\s+/);
 return parts.slice(0, 3).join(" ");
 }
-function answerFor(q: string): string {
-  const s = q.toLowerCase();
-  if (s.includes("perna") || s.includes("quadri") || s.includes("joelho")) {
-    return concise("Dá sim! Treinar perna em dias seguidos só atrapalha se bater 100% de intensidade nas duas sessões. Regra prática: alterna intensidade, se ontem foi pesado e hoje ainda está dolorido, faça o treino em 70–80% da carga e reduza o volume. Articulações gostam de movimento, músculo precisa de descanso para crescer.");
-  }
-  if (s.includes("supino") || s.includes("peito") || s.includes("ombro") || s.includes("dor no ombro")) {
-    return concise("Dor de ombro no supino quase sempre é amplitude + retração. 1) Retraia as escápulas antes de deitar (empurre o peito pra cima). 2) Não afunde a barra na altura dos ombros, desça até a linha do mamilo. 3) Se doer mesmo assim, reduza a carga e feche a pegada 2 dedos. Quer que eu sugira um aquecimento de 2 minutos para o ombro?");
-  }
-  if (s.includes("cansad") || s.includes("foga") || s.includes("fadiga") || s.includes("dificil") || s.includes("desist")) {
-    return concise("Sentir queda na última série é normal (é a falência chegando). Se isso virou rotina, não é preguiça, pode ser volume alto demais. Duas correções: (1) deixa 1–2 repetições sempre em reserva nas primeiras séries e (2) revisa o descanso, 90s a 120s aumenta bastante a sua recuperação entre séries.");
-  }
-  if (s.includes("peso") || s.includes("carga") || s.includes("aumentar") || s.includes("progress") || s.includes("evolu")) {
-    return concise("Regra de progressão simples e segura: quando você concluir todas as séries com 2 repetições de sobra na última, suba a carga. Ex.: 4×12 com folga → 4×8 com o peso novo, subindo 1–2 reps por semana até voltar a 12. Carga sobe de pouco em pouco; o real segredo é a consistência.");
-  }
-  if (s.includes("crucifixo") || s.includes("aparelho ocupado") || s.includes("substitu") || s.includes("trocar")) {
-    return concise("Ótima escolha. Trocar o aparelho ocupado por um exercício de músculo igual mantém o estímulo do dia. Ex.: supino reto → crucifixo com halteres (mesma dorsoflexão), agachamento → leg press (mesma cadeia). Só não troque puxado por empurrado, o estímulo muda de grupo.");
-  }
-  return concise("Boa pergunta! Sou seu coach de treino. Sobre isso: o ideal é respeitar a sua recuperação e manter consistência, aliás, esse ponto já é coberto pelo seu plano. Me conte mais do contexto (qual exercício, qual dor, qual intensidade) que eu trago uma resposta mais específica. E lembre: qualquer ponto de dúvida vale você anotar aqui que a gente conversa em tempo real.");
-}
-
 // openAiCoach mudou para ~/components/ai/coach-bus (evita puxar o chat no bundle)
 
 export default function AiCoach() {
@@ -75,33 +57,72 @@ export default function AiCoach() {
       setPending(null);
       setInput("");
       setBubbles((prev) => [...prev, { id: idRef.current++, role: "user", text: query }]);
-      setThinking(true);
-      void askCoach(query).then((response) => {
-        setThinking(false);
-        setBubbles((prev) => [...prev, { id: idRef.current++, role: "ai", text: response, done: false }]);
-      });
+      const bubbleId = idRef.current++;
+      setBubbles((prev) => [...prev, { id: bubbleId, role: "ai", text: "", done: false }]);
+      void askStreaming(query, bubbleId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, open]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [bubbles, thinking, open]);
 
-  /** Pergunta à IA real (/api/coach). Sem chave configurada ou se o provedor
-   *  falhar, cai no cérebro local — nunca fica sem responder. */
-  async function askCoach(q: string): Promise<string> {
+  const OFFLINE = "O Assistente está offline no momento. Tente novamente.";
+
+  /** Pergunta ao modelo via /api/assistente com streaming real: os tokens
+   *  chegam e aparecem na bolha na hora. Sem modelo → aviso amigável. */
+  async function askStreaming(q: string, bubbleId: number): Promise<void> {
+    const history = bubbles
+      .slice(-8)
+      .map((b) => ({ role: b.role === "user" ? "user" : "assistant", content: b.text }));
     try {
-      const res = await fetch("/api/coach", {
+      const res = await fetch("/api/assistente", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: q }),
+        body: JSON.stringify({ message: q, context: "aluno", history, stream: true }),
       });
-      const data = (await res.json()) as { ok?: boolean; reply?: string };
-      if (data.ok && data.reply) return data.reply;
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setBubbles((prev) =>
+          prev.map((b) => (b.id === bubbleId ? { ...b, text: data.error ?? OFFLINE, done: true } : b))
+        );
+        toast.error(data.error ?? OFFLINE);
+        return;
+      }
+
+      const ct = res.headers.get("Content-Type") ?? "";
+      if (ct.includes("application/json")) {
+        // roteador não streamou: resposta única animada pelo StreamingText
+        const data = (await res.json()) as { ok?: boolean; text?: string };
+        const text = data.ok && data.text ? concise(data.text) : OFFLINE;
+        setBubbles((prev) => prev.map((b) => (b.id === bubbleId ? { ...b, text, done: false } : b)));
+        if (!data.ok) toast.error(OFFLINE);
+        return;
+      }
+
+      // SSE/texto fluindo: adiciona cada token direto na bolha
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("sem corpo");
+      const dec = new TextDecoder();
+      let received = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = dec.decode(value, { stream: true });
+        if (!chunk) continue;
+        received += chunk.length;
+        setBubbles((prev) =>
+          prev.map((b) => (b.id === bubbleId ? { ...b, text: b.text + chunk, done: false } : b))
+        );
+      }
+      if (received === 0) throw new Error("stream vazio");
+      setBubbles((prev) => prev.map((b) => (b.id === bubbleId ? { ...b, done: true } : b)));
     } catch {
-      // offline → fallback
+      setBubbles((prev) => prev.map((b) => (b.id === bubbleId ? { ...b, text: OFFLINE, done: true } : b)));
+      toast.error(OFFLINE);
     }
-    return concise(answerFor(q));
   }
 
   const send = (text: string) => {
@@ -109,11 +130,10 @@ export default function AiCoach() {
     if (!q || thinking) return;
     setInput("");
     setBubbles((prev) => [...prev, { id: idRef.current++, role: "user", text: q }]);
-    setThinking(true);
-    void askCoach(q).then((reply) => {
-      setThinking(false);
-      setBubbles((prev) => [...prev, { id: idRef.current++, role: "ai", text: reply, done: false }]);
-    });
+    const bubbleId = idRef.current++;
+    setBubbles((prev) => [...prev, { id: bubbleId, role: "ai", text: "", done: false }]);
+    setThinking(false);
+    void askStreaming(q, bubbleId);
   };
 
   return (
@@ -122,7 +142,7 @@ export default function AiCoach() {
         onClick={() => setOpen((v) => !v)}
         className="gf-touch fixed bottom-[88px] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-[0_12px_28px_-8px_rgba(244,113,30,0.55)]"
         whileTap={{ scale: 0.9 }}
-        aria-label={open ? "Fechar Personal Digital" : "Abrir Personal Digital"}
+        aria-label={open ? "Fechar Assistente de Treino" : "Abrir Assistente de Treino"}
       >
         {open ? <X className="h-6 w-6" /> : <Dumbbell className="h-6 w-6" />}
         {!open && <span className="hero-live-dot absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-success" />}
@@ -143,7 +163,7 @@ export default function AiCoach() {
                   <Sparkles className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-foreground">Personal GF</p>
+                  <p className="text-sm font-bold text-foreground">Assistente de Treino</p>
                   <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
                     <span className="h-1.5 w-1.5 rounded-full bg-success" /> online · responde em tempo real
                   </p>
@@ -155,7 +175,7 @@ export default function AiCoach() {
               {bubbles.length === 0 && !thinking && (
                 <div className="space-y-2">
                   <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[13px] leading-relaxed text-foreground">
-                    Oi! Eu sou seu coach de treino. Pergunta qualquer coisa sobre o seu dia, exercício, carga ou dor, respostas pensadas a partir dos seus dados.
+                    Oi! Sou seu assistente de treino. Pergunta qualquer coisa sobre o seu dia, exercício, carga ou dor, respondo a partir dos seus dados.
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {QUICK.map((q) => (
@@ -214,7 +234,7 @@ export default function AiCoach() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Pergunte ao coach..."
+                placeholder="Pergunte sobre seu treino..."
                 className="flex-1 rounded-xl border border-white/10 bg-white/[0.05] px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-gray-400 focus:border-brand/60"
               />
               <button

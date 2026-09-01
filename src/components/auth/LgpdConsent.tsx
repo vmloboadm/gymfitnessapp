@@ -26,7 +26,7 @@ export function LgpdConsent({
           Ao criar sua conta você concorda que a GymFitness colete seus dados de
           treino, medidas corporais e histórico de frequência para melhorar sua
           experiência e interações. Seus dados são tratados conforme a LGPD e
-          podem ser usados por o Personal Digital do GymFitness para recomendação de treinos,
+          podem ser usados pelo Assistente de Treino do GymFitness para recomendação de treinos,
           sempre com registro de auditoria.
         </Label>
       </div>
