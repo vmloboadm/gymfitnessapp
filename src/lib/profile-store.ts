@@ -88,3 +88,31 @@ export function approveMetric(id: string): void {
 export function rankingMetricsPoints(): number {
   return listMetrics().filter((m) => m.status === "comprovada").length * 15;
 }
+
+/* ---------- onboarding do aluno ---------- */
+
+const KEY_ONBOARDING = "gymfit_onboarding_v1";
+
+export type OnboardingState = {
+  name?: string;
+  email?: string;
+  birth_date?: string | null;
+  phone?: string | null;
+  goal?: string | null;
+  daily_intake?: string | null;
+  medical_risk?: string | null;
+  weight_kg?: number | null;
+  height_m?: number | null;
+  onboarding_step?: number;
+  onboarding_completed?: boolean;
+};
+
+export function readOnboarding(): OnboardingState {
+  return read<OnboardingState>(KEY_ONBOARDING) ?? {};
+}
+
+export function saveOnboarding(patch: Partial<OnboardingState>): OnboardingState {
+  const next = { ...readOnboarding(), ...patch };
+  write(KEY_ONBOARDING, next);
+  return next;
+}

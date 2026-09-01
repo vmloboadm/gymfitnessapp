@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { saveOnboarding } from "~/lib/profile-store";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, UserPlus } from "lucide-react";
@@ -34,6 +35,14 @@ export function RegisterForm() {
     }
     setLgpdError("");
     setLoading(true);
+
+    // Modo teste/demo: sem Supabase Auth — salva os dados e vai direto pro onboarding
+    if (process.env.NEXT_PUBLIC_DEMO_MODE === "1") {
+      saveOnboarding({ name, email, onboarding_step: 1, onboarding_completed: false });
+      toast.success("Conta de teste criada!");
+      router.push("/onboarding");
+      return;
+    }
 
     const supabase = supabaseBrowser();
     const { data, error } = await supabase.auth.signUp({

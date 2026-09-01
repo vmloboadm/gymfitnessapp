@@ -11,6 +11,7 @@ import { IntentInput } from "~/components/onboarding/BodyMetricsInput";
 import { MedicalRestrictionForm } from "~/components/onboarding/MedicalRestrictionForm";
 import { OnboardingReview } from "~/components/onboarding/OnboardingReview";
 import { AuthSkeleton } from "~/components/common/AuthSkeleton";
+import { readOnboarding, saveOnboarding } from "~/lib/profile-store";
 import type { Profiles } from "~/lib/types/models";
 
 /**
@@ -43,7 +44,35 @@ function OnboardingFlow() {
   const [profile, setProfile] = useState<Profiles | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
   const loadProfile = useCallback(async () => {
+    // Modo teste: onboarding local (mesma forma de dados; produção usa profiles no Supabase)
+    if (isDemo) {
+      const saved = readOnboarding();
+      const p = {
+        id: "demo-onboarding",
+        gym_id: "00000000-0000-0000-0000-000000000001",
+        role: "student" as const,
+        status: "active" as const,
+        name: saved.name ?? "",
+        email: saved.email ?? "admin@gymfitness.com",
+        onboarding_step: saved.onboarding_step ?? 1,
+        onboarding_completed: saved.onboarding_completed ?? false,
+        lgpd_consent_at: new Date().toISOString(),
+        birth_date: saved.birth_date ?? null,
+        phone: saved.phone ?? null,
+        goal: saved.goal ?? null,
+        daily_intake: saved.daily_intake ?? null,
+        medical_risk: saved.medical_risk ?? null,
+      } as unknown as Profiles;
+      setProfile(p);
+      setMaxReached(Math.max(requested, saved.onboarding_step ?? requested));
+      setStep(saved.onboarding_step ? Math.min(requested, saved.onboarding_step) || requested : requested);
+      setLoading(false);
+      return;
+    }
+
     const supabase = supabaseBrowser();
     const {
       data: { user },
@@ -90,7 +119,7 @@ function OnboardingFlow() {
     setMaxReached(p?.onboarding_step ?? requested);
     setStep(Math.min(requested, p?.onboarding_step ?? requested) || requested);
     setLoading(false);
-  }, [requested, router]);
+  }, [requested, router, isDemo]);
 
   useEffect(() => {
     loadProfile();
@@ -99,6 +128,14 @@ function OnboardingFlow() {
   /** Cada step chama esta função para salvar e avançar (incremental). */
   const saveAndGo = useCallback(
     async (patch: Partial<Profiles>, nextStep: number) => {
+      // Modo teste: salva local e avança
+      if (isDemo) {
+        const merged = saveOnboarding({ ...(patch as Record<string, unknown>), onboarding_step: nextStep });
+        setProfile((prev) => (prev ? { ...prev, ...merged } as Profiles : prev));
+        setMaxReached((m) => Math.max(m, nextStep));
+        router.replace(`/onboarding?step=${nextStep}`);
+        return;
+      }
       if (!profile) return;
       const supabase = supabaseBrowser();
       const { error } = await supabase
@@ -111,10 +148,17 @@ function OnboardingFlow() {
         router.replace(`/onboarding?step=${nextStep}`);
       }
     },
-    [profile, router]
+    [profile, router, isDemo]
   );
 
   const finish = useCallback(async () => {
+    // Modo teste: marca completo e vai pro dashboard
+    if (isDemo) {
+      saveOnboarding({ onboarding_completed: true, onboarding_step: 5 });
+      document.cookie = "gf_test=1; path=/; SameSite=Lax";
+      router.replace("/");
+      return;
+    }
     if (!profile) return;
     const supabase = supabaseBrowser();
     await supabase

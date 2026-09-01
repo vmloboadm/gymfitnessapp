@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { BUILD_LABEL } from "~/lib/build";
 import { cn } from "~/lib/utils";
 import { useAuth } from "~/hooks/useAuth";
+import { readOnboarding } from "~/lib/profile-store";
 
 export function LoginForm() {
   const router = useRouter();
@@ -46,6 +47,11 @@ export function LoginForm() {
       switchDemoRole(testRole);
       // cookie de sessão: libera o dashboard na raiz; sem ele a raiz abre o login
       document.cookie = "gf_test=1; path=/; SameSite=Lax";
+      // aluno no primeiro acesso: onboarding antes do dashboard
+      if (testRole === "student" && !readOnboarding().onboarding_completed) {
+        router.push("/onboarding");
+        return;
+      }
       // aluno vai pro DASHBOARD normal (/); personal e gestor têm homes próprias
       router.push(testRole === "student" ? "/" : ROLE_HOME[testRole]);
       router.refresh();
