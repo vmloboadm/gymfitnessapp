@@ -182,8 +182,10 @@ export function demoFeedData() {
   };
 }
 
+/** Determinístico por hora: evita mismatch de hidratação entre SSR e cliente. */
 export function demoOnlineAgora(): number {
-  return 8 + Math.floor(Math.random() * 6);
+  const h = new Date().getHours();
+  return 8 + ((h * 7) % 12);
 }
 
 // ---------------------------------------------------------------------------

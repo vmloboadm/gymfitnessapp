@@ -7,6 +7,8 @@
  * adjustments, approvals) com o mesmo formato de dados.
  */
 
+import type { WorkoutPlan } from "~/lib/ai/local-gen";
+
 export type AssignedExercise = {
   name: string;
   sets: number;
@@ -23,6 +25,8 @@ export type AssignedWorkout = {
   frequency: string;
   level: string;
   exercises: AssignedExercise[];
+  /** Plano completo multi-dias (Co-Pilot IA). Treinos antigos têm só exercises. */
+  plan?: WorkoutPlan;
   source: "ia" | "template" | "manual";
   created_at: string;
 };

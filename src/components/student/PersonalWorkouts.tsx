@@ -83,21 +83,51 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
               </div>
             </div>
 
-            <ul className="mt-2 divide-y divide-white/[0.05] rounded-xl border border-white/[0.06] bg-white/[0.02]">
-              {w.exercises.slice(0, 4).map((e, i) => (
-                <li key={i} className="flex items-center justify-between gap-2 px-3 py-1.5">
-                  <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">{e.name}</p>
-                  <p className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                    {e.sets}x {e.reps}
+            {w.plan && w.plan.dias.length > 0 ? (
+              <div className="mt-2 space-y-1.5">
+                {w.plan.dias.map((d, di) => (
+                  <div key={di} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-2.5">
+                    <p className="text-[11px] font-bold text-brand">{d.nome}</p>
+                    <p className="text-[9.5px] text-muted-foreground">{d.foco}</p>
+                    <ul className="mt-1 divide-y divide-white/[0.05]">
+                      {d.exercicios.slice(0, 3).map((e, i) => (
+                        <li key={i} className="flex items-center justify-between gap-2 py-1">
+                          <p className="min-w-0 flex-1 truncate text-[10.5px] font-medium text-foreground">
+                            {i + 1}. {e.exercicio}
+                          </p>
+                          <p className="shrink-0 text-[9.5px] tabular-nums text-muted-foreground">
+                            {e.series}x {e.reps} · RPE {e.rpe}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                    {d.exercicios.length > 3 ? (
+                      <p className="mt-0.5 text-[9px] text-muted-foreground">
+                        + {d.exercicios.length - 3} exercícios neste dia
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                <ul className="mt-2 divide-y divide-white/[0.05] rounded-xl border border-white/[0.06] bg-white/[0.02]">
+                  {w.exercises.slice(0, 4).map((e, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 px-3 py-1.5">
+                      <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">{e.name}</p>
+                      <p className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                        {e.sets}x {e.reps}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+                {w.exercises.length > 4 ? (
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    + {w.exercises.length - 4} exercícios na ficha completa
                   </p>
-                </li>
-              ))}
-            </ul>
-            {w.exercises.length > 4 ? (
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                + {w.exercises.length - 4} exercícios na ficha completa
-              </p>
-            ) : null}
+                ) : null}
+              </>
+            )}
 
             {w.notes ? (
               <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-brand/25 bg-brand/[0.08] p-2.5 text-[11px] leading-snug text-brand">

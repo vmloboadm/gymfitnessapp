@@ -19,18 +19,25 @@ import {
   UserRoundPlus,
   Pencil,
   History,
+  Flame,
+  Clock,
+  Target,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { useAuth } from "~/hooks/useAuth";
 import { generate, isAiConfigured } from "~/lib/ai/omniroute";
+import { buildWorkoutPrompt, WORKOUT_PLAN_SYSTEM } from "~/lib/ai/prompts";
+import {
+  generatePlanOffline,
+  parsePlanFromLLM,
+  type WorkoutPlan,
+} from "~/lib/ai/local-gen";
 import { demoLib } from "~/lib/demo-bridge";
 import {
   demoPersonalStudents,
   demoTemplates,
-  type PersonalStudent,
   type WorkoutTemplate,
 } from "~/lib/personal-data";
 import {
@@ -38,129 +45,53 @@ import {
   listAssignedWorkouts,
   saveAssignedWorkout,
   updateAssignedWorkout,
-  type AssignedExercise,
 } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
-
-const FLAT_LIB = () =>
-  demoLib.flatMap((c) =>
-    c.subs.flatMap((sub) => sub.exercises.map((e) => ({ ...e, group: c.name })))
-  );
-
-type Draft = {
-  name: string;
-  frequency: string;
-  level: string;
-  exercises: AssignedExercise[];
-  source: "ia" | "template" | "manual";
-};
-
-/** Gerador local determinístico (demo, sem chave de IA): interpreta o pedido. */
-function localDraft(prompt: string): Draft {
-  const p = prompt.toLowerCase();
-  const all = FLAT_LIB();
-  const score = (e: { name: string; group: string }) => {
-    let s = 0;
-    if (/gl[úu]teo/.test(p) && /gl[úu]teo|quadril|pélvica|abdutor|stiff|coice/i.test(e.name + e.group)) s += 3;
-    if (/perna|inferior/.test(p) && /perna/i.test(e.group)) s += 2;
-    if (/peito/.test(p) && /peito/i.test(e.group)) s += 2;
-    if (/costa|dorsal/.test(p) && /costa/i.test(e.group)) s += 2;
-    if (/ombro/.test(p) && /ombro/i.test(e.group)) s += 2;
-    if (/bra[çc]o|bíceps|tr[íi]ceps/.test(p) && /bra[çc]o|b[íi]ceps|tr[íi]ceps|antebra/i.test(e.group + e.name)) s += 2;
-    if (/abd|core/.test(p) && /abd/i.test(e.group + e.name)) s += 2;
-    if (/sem impacto|baixo impacto|articula/.test(p) && /polia|m[áa]quina|p[ée]lvica|abdutor/i.test(e.name)) s += 1;
-    return s;
-  };
-  const picked = [...all]
-    .map((e) => ({ e, s: score(e) }))
-    .filter((x) => x.s > 0)
-    .sort((a, b) => b.s - a.s)
-    .slice(0, 6)
-    .map((x) => x.e);
-
-  const beginner = /iniciante|leve|come[çc]ando/.test(p);
-  const freq = p.match(/(\d)\s?x/) ?? null;
-  const fallback = [
-    { name: "Elevação Pélvica", sets: 4, reps: "10-12", rest: "90s" },
-    { name: "Puxada Alta", sets: 3, reps: "12", rest: "60s" },
-    { name: "Supino Reto", sets: 3, reps: "10", rest: "60s" },
-    { name: "Leg Press 45°", sets: 4, reps: "12", rest: "75s" },
-    { name: "Prancha", sets: 3, reps: "30s", rest: "30s" },
-  ];
-  const exercises: AssignedExercise[] =
-    picked.length >= 4
-      ? picked.map((e, i) => ({
-          name: e.name,
-          sets: beginner ? 3 : 4,
-          reps: beginner ? "12" : i % 2 === 0 ? "8-10" : "12",
-          rest: beginner ? "60s" : "90s",
-        }))
-      : fallback;
-
-  return {
-    name: /gl[úu]teo/.test(p)
-      ? "Glúteos Foco"
-      : /perna/.test(p)
-        ? "Pernas Completo"
-        : /peito/.test(p)
-          ? "Peito & Tríceps"
-          : /costa/.test(p)
-            ? "Costas & Bíceps"
-            : "Treino Personalizado",
-    frequency: freq ? `${freq[1]}x semana` : "3x semana",
-    level: beginner ? "Iniciante" : "Intermediário",
-    exercises,
-    source: "ia",
-  };
-}
-
-function parseAiDraft(text: string, fallback: Draft): Draft {
-  try {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return fallback;
-    const raw = JSON.parse(match[0]) as {
-      nome?: string;
-      frequencia?: string;
-      nivel?: string;
-      exercicios?: Array<{ exercicio?: string; nome?: string; series?: number; reps?: string; repeticoes?: string; descanso?: string }>;
-    };
-    const exercises = (raw.exercicios ?? [])
-      .map((e) => ({
-        name: e.exercicio ?? e.nome ?? "",
-        sets: Number(e.series ?? 3),
-        reps: e.reps ?? e.repeticoes ?? "12",
-        rest: e.descanso ?? "60s",
-      }))
-      .filter((e) => e.name);
-    if (exercises.length < 3) return fallback;
-    return {
-      name: raw.nome ?? fallback.name,
-      frequency: raw.frequencia ?? fallback.frequency,
-      level: raw.nivel ?? fallback.level,
-      exercises,
-      source: "ia",
-    };
-  } catch {
-    return fallback;
-  }
-}
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 
+/** Converte um template simples no formato de plano (1 dia). */
+function templateToPlan(t: WorkoutTemplate): WorkoutPlan {
+  return {
+    nome: t.name,
+    frequencia: `${t.days}x semana`,
+    nivel: t.level,
+    objetivo: "Hipertrofia",
+    observacao_geral: t.description,
+    dias: [
+      {
+        nome: "A · Principal",
+        foco: t.name,
+        aquecimento: ["5 min de esteira em ritmo leve", "Mobilidade articular, 3 min"],
+        exercicios: t.exercises.map((e) => ({
+          exercicio: e.name,
+          series: e.sets,
+          reps: e.reps,
+          descanso: e.rest,
+          rpe: t.level === "Iniciante" ? 6 : 8,
+          dica: "Execução controlada, sem roubar a fase excêntrica.",
+        })),
+        finalizador: "Prancha 3x30s, descanso 20s",
+      },
+    ],
+    cardio: "10 a 15 min de cardio leve ao final de 2 treinos.",
+  };
+}
+
 /**
- * Motor de treino do Personal (operador): fluxo completo
- * selecionar aluno → prompt IA → rascunho editável com drag → aprovar e atribuir.
+ * Motor de treino do Personal (operador): seleção de aluno, prompt com
+ * contexto completo, plano multi-dias da IA (LLM via OmniRoute quando
+ * configurado; motor offline de bolso quando não) e revisão editável
+ * com drag antes de atribuir.
  */
 export default function PersonalTreinosPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const { profile } = useAuth();
   const students = useMemo(() => demoPersonalStudents(), []);
   const templates = useMemo(() => demoTemplates(), []);
   const aiReady = isAiConfigured();
 
-  // aluno-alvo: via query (?aluno=) ou modal de seleção
   const targetId = params.get("aluno") ?? "";
   const editId = params.get("edit") ?? "";
   const target = students.find((s) => s.id === targetId) ?? null;
@@ -169,7 +100,8 @@ export default function PersonalTreinosPage() {
   const [pickerQuery, setPickerQuery] = useState("");
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [plan, setPlan] = useState<WorkoutPlan | null>(null);
+  const [activeDay, setActiveDay] = useState(0);
   const [notes, setNotes] = useState("");
   const [assigned, setAssigned] = useState<Awaited<ReturnType<typeof listAssignedWorkouts>>>([]);
   const [massTemplate, setMassTemplate] = useState<WorkoutTemplate | null>(null);
@@ -178,70 +110,121 @@ export default function PersonalTreinosPage() {
   const refresh = () => setAssigned(listAssignedWorkouts());
   useEffect(refresh, []);
 
-  // modo edição: carrega o treino no rascunho
+  // modo edição: carrega o plano (ou sintetiza 1 dia de treinos antigos)
   useEffect(() => {
     if (!editId) return;
     const w = listAssignedWorkouts().find((x) => x.id === editId);
     if (w) {
-      setDraft({ name: w.name, frequency: w.frequency, level: w.level, exercises: w.exercises, source: w.source });
+      const synthesized: WorkoutPlan = {
+          nome: w.name,
+          frequencia: w.frequency,
+          nivel: w.level,
+          objetivo: "Hipertrofia",
+          observacao_geral: w.notes ?? "",
+          dias: [
+            {
+              nome: "A · Principal",
+              foco: w.name,
+              aquecimento: [],
+              exercicios: w.exercises.map((e) => ({
+                exercicio: e.name,
+                series: e.sets,
+                reps: e.reps,
+                descanso: e.rest,
+                rpe: 7,
+                dica: "",
+              })),
+              finalizador: "Prancha 3x30s",
+            },
+          ],
+          cardio: "",
+      };
+      setPlan(w.plan ?? synthesized);
       setNotes(w.notes ?? "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId]);
 
+  const equipmentSample = useMemo(
+    () => demoLib.flatMap((c) => c.name).slice(0, 10),
+    []
+  );
+
   const run = async () => {
-    if (!prompt.trim() || loading) return;
+    if (!prompt.trim() || loading || !target) return;
     setLoading(true);
-    const fallback = localDraft(prompt.trim());
+    const fallback = generatePlanOffline(prompt.trim(), target.name);
     if (!aiReady) {
-      await new Promise((r) => setTimeout(r, 750));
-      setDraft(fallback);
+      await new Promise((r) => setTimeout(r, 800));
+      setPlan(fallback);
       setNotes("");
+      setActiveDay(0);
       setLoading(false);
       return;
     }
     const out = await generate({
       purpose: "generate_workout",
-      system:
-        'Você é um personal trainer brasileiro. Responda APENAS JSON no formato {"nome": string, "frequencia": string, "nivel": string, "exercicios": [{"exercicio": string, "series": number, "reps": string, "descanso": string}]}.',
-      prompt: prompt.trim(),
+      system: WORKOUT_PLAN_SYSTEM,
+      prompt: buildWorkoutPrompt({
+        studentName: target.name,
+        goal: target.activeWorkout,
+        level: fallback.nivel,
+        frequency: fallback.frequencia,
+        restrictions: fallback.observacao_geral,
+        equipment: equipmentSample,
+        request: prompt.trim(),
+      }),
     });
     setLoading(false);
-    setDraft(out.ok ? parseAiDraft(out.text, fallback) : fallback);
+    setPlan(out.ok ? parsePlanFromLLM(out.text, fallback) : fallback);
+    setActiveDay(0);
     setNotes("");
-    if (!out.ok) toast.info("IA indisponível, usei o gerador local do app");
+    if (!out.ok) toast.info("Gateway indisponível, usei o motor local do app");
+  };
+
+  const updateDay = (dayIdx: number, patch: Partial<WorkoutPlan["dias"][number]>) => {
+    if (!plan) return;
+    setPlan({
+      ...plan,
+      dias: plan.dias.map((d, i) => (i === dayIdx ? { ...d, ...patch } : d)),
+    });
   };
 
   // ===== PASSO 5: aprovar e atribuir (ou salvar edição) =====
   const approve = async () => {
-    if (!draft || !target) return;
+    if (!plan || !target) return;
+    const flat = plan.dias.flatMap((d) =>
+      d.exercicios.map((e) => ({ name: e.exercicio, sets: e.series, reps: e.reps, rest: e.descanso }))
+    );
     if (editId) {
       updateAssignedWorkout(editId, {
-        name: draft.name,
+        name: plan.nome,
         notes: notes.trim() || null,
-        frequency: draft.frequency,
-        level: draft.level,
-        exercises: draft.exercises,
+        frequency: plan.frequencia,
+        level: plan.nivel,
+        exercises: flat,
+        plan,
       });
-      toast.success("Treino atualizado com sucesso!", {
-        description: `${target.name} recebeu a nova versão na aba Treino.`,
+      toast.success("Plano atualizado com sucesso!", {
+        description: `${target.name} recebeu a nova versão com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
       });
     } else {
       saveAssignedWorkout({
         studentId: target.id,
         studentName: target.name,
-        name: draft.name,
+        name: plan.nome,
         notes: notes.trim() || null,
-        frequency: draft.frequency,
-        level: draft.level,
-        exercises: draft.exercises,
-        source: draft.source,
+        frequency: plan.frequencia,
+        level: plan.nivel,
+        exercises: flat,
+        plan,
+        source: "ia",
       });
-      toast.success("Treino enviado com sucesso!", {
-        description: `${target.name} recebeu "${draft.name}" na aba Treino.`,
+      toast.success("Plano enviado com sucesso!", {
+        description: `${target.name} recebeu "${plan.nome}" com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
       });
     }
-    setDraft(null);
+    setPlan(null);
     setPrompt("");
     setNotes("");
     refresh();
@@ -253,18 +236,25 @@ export default function PersonalTreinosPage() {
     for (const sid of massSelected) {
       const student = students.find((s) => s.id === sid);
       if (!student) continue;
+      const p = templateToPlan(massTemplate);
       saveAssignedWorkout({
         studentId: student.id,
         studentName: student.name,
-        name: massTemplate.name,
+        name: p.nome,
         notes: null,
-        frequency: `${massTemplate.days}x semana`,
-        level: massTemplate.level,
-        exercises: massTemplate.exercises,
+        frequency: p.frequencia,
+        level: p.nivel,
+        exercises: p.dias[0].exercicios.map((e) => ({
+          name: e.exercicio,
+          sets: e.series,
+          reps: e.reps,
+          rest: e.descanso,
+        })),
+        plan: p,
         source: "template",
       });
     }
-    toast.success("Treino enviado com sucesso!", {
+    toast.success("Plano enviado com sucesso!", {
       description: `Template aplicado para ${massSelected.size} alunos.`,
     });
     setMassTemplate(null);
@@ -272,8 +262,9 @@ export default function PersonalTreinosPage() {
     refresh();
   };
 
-  // ===== MODO ATRIBUIÇÃO: aluno fixo no topo =====
+  // ===== MODO ATRIBUIÇÃO =====
   if (target) {
+    const day = plan?.dias[Math.min(activeDay, (plan?.dias.length ?? 1) - 1)];
     return (
       <div className="space-y-5">
         {/* Passo 2: aluno fixo */}
@@ -286,7 +277,7 @@ export default function PersonalTreinosPage() {
           </Avatar>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-widest text-brand">
-              {editId ? "Editando treino de" : "Montando treino para:"}
+              {editId ? "Editando plano de" : "Montando plano para:"}
             </p>
             <p className="truncate text-base font-bold text-foreground">{target.name}</p>
           </div>
@@ -300,14 +291,14 @@ export default function PersonalTreinosPage() {
           </Button>
         </header>
 
-        {/* Passo 3: prompt para a IA */}
+        {/* Passo 3: prompt */}
         <section className="gf-card gf-glass !p-4">
           <div className="mb-2 flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
               <Sparkles className="h-3.5 w-3.5 text-brand" />
             </span>
             <p className="text-[13px] font-semibold text-foreground">
-              O que esse aluno precisa hoje?
+              {aiReady ? "IA real (OmniRoute)" : "Motor local de bolso"} · plano completo e periodizado
             </p>
           </div>
           <textarea
@@ -320,14 +311,17 @@ export default function PersonalTreinosPage() {
               }
             }}
             rows={3}
-            placeholder={`Ex.: Treino de glúteos para ${target.name.split(" ")[0]}, 3x semana, sem impacto`}
-            aria-label="Pedido de treino para a IA"
+            placeholder={`Ex.: Plano de glúteos para ${target.name.split(" ")[0]}, 4x semana, intermediária, sem impacto no joelho`}
+            aria-label="Pedido de plano para a IA"
             className="w-full resize-none rounded-2xl border border-white/[0.06] bg-white/[0.05] p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
           />
-          <div className="mt-2.5 flex justify-end">
+          <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
+            <p className="mr-auto text-[9.5px] text-muted-foreground">
+              A IA recebe objetivo, nível, frequência, restrições e aparelhos.
+            </p>
             <Button onClick={run} disabled={!prompt.trim() || loading} size="sm" className="rounded-xl">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              Gerar rascunho
+              Gerar plano completo
             </Button>
           </div>
         </section>
@@ -345,7 +339,7 @@ export default function PersonalTreinosPage() {
             >
               <p className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
                 <Sparkles className="h-4 w-4 animate-pulse text-brand" />
-                Montando o rascunho para {target.name.split(" ")[0]}...
+                Periodizando o plano de {target.name.split(" ")[0]}...
               </p>
               {[0, 1, 2, 3].map((i) => (
                 <div key={i} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
@@ -357,94 +351,175 @@ export default function PersonalTreinosPage() {
           ) : null}
         </AnimatePresence>
 
-        {/* Passo 4: rascunho editável com drag */}
+        {/* Passo 4: plano editável multi-dias */}
         <AnimatePresence mode="wait">
-          {draft ? (
+          {plan && day ? (
             <motion.section
-              key={draft.name + draft.exercises.length}
+              key={plan.nome + plan.dias.length}
               initial={{ opacity: 0, y: 24, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }}
               className="gf-card gf-glass space-y-3 !p-4"
-              aria-label="Rascunho de treino editável"
+              aria-label="Plano de treino editável"
             >
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
                   <Sparkles className="h-4 w-4 text-brand" />
                 </span>
                 <input
-                  value={draft.name}
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  aria-label="Nome do treino"
+                  value={plan.nome}
+                  onChange={(e) => setPlan({ ...plan, nome: e.target.value })}
+                  aria-label="Nome do plano"
                   className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent text-sm font-bold text-foreground hover:border-white/[0.08] focus-visible:border-brand/40 focus-visible:outline-none"
                 />
                 <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand">
-                  {draft.frequency}
+                  {plan.frequencia}
                 </span>
               </div>
 
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Arraste para reordenar · toque para editar séries e reps
+              {/* resumo do plano */}
+              <div className="flex flex-wrap gap-1.5 text-[9.5px]">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 py-0.5 font-semibold text-muted-foreground">
+                  <Target className="h-3 w-3 text-brand" /> {plan.objetivo}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 py-0.5 font-semibold text-muted-foreground">
+                  <Flame className="h-3 w-3 text-[#FFC24D]" /> {plan.nivel}
+                </span>
+                {plan.cardio ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 py-0.5 font-semibold text-muted-foreground">
+                    <Clock className="h-3 w-3 text-[#4ADE80]" /> cardio semanal
+                  </span>
+                ) : null}
+              </div>
+              <p className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-2.5 text-[11px] leading-snug text-muted-foreground">
+                {plan.observacao_geral}
               </p>
 
-              {/* Reorder com drag real (framer-motion) */}
-              <Reorder.Group
-                axis="y"
-                values={draft.exercises}
-                onReorder={(next) => setDraft({ ...draft, exercises: next as AssignedExercise[] })}
-                className="space-y-2"
-              >
-                {draft.exercises.map((e, i) => (
-                  <Reorder.Item
-                    key={e.name + i}
-                    value={e}
-                    className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5"
-                  >
-                    <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing" />
-                    <p className="min-w-0 flex-1 truncate text-[12px] font-semibold text-foreground">
-                      {i + 1}. {e.name}
-                    </p>
-                    <input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={e.sets}
-                      onChange={(ev) => {
-                        const sets = Math.max(1, Math.min(10, Number(ev.target.value) || 1));
-                        setDraft({
-                          ...draft,
-                          exercises: draft.exercises.map((x, xi) => (xi === i ? { ...x, sets } : x)),
-                        });
-                      }}
-                      aria-label={`Séries de ${e.name}`}
-                      className="h-8 w-11 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[11px] tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
-                    />
-                    <span className="text-[10px] text-muted-foreground">x</span>
-                    <input
-                      value={e.reps}
-                      onChange={(ev) => {
-                        const reps = ev.target.value;
-                        setDraft({
-                          ...draft,
-                          exercises: draft.exercises.map((x, xi) => (xi === i ? { ...x, reps } : x)),
-                        });
-                      }}
-                      aria-label={`Repetições de ${e.name}`}
-                      className="h-8 w-14 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[11px] text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
-                    />
+              {/* tabs de dias */}
+              {plan.dias.length > 1 ? (
+                <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Dias do plano">
+                  {plan.dias.map((d, i) => (
                     <button
-                      onClick={() => setDraft({ ...draft, exercises: draft.exercises.filter((_, xi) => xi !== i) })}
-                      aria-label={`Remover ${e.name}`}
-                      className="tactile flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-[#F87171]"
+                      key={d.nome + i}
+                      role="tab"
+                      aria-selected={activeDay === i}
+                      onClick={() => setActiveDay(i)}
+                      className={cn(
+                        "shrink-0 rounded-full border px-3 py-1 text-[10.5px] font-bold transition-colors",
+                        activeDay === i
+                          ? "border-brand bg-brand text-brand-foreground"
+                          : "border-white/[0.06] bg-white/[0.03] text-muted-foreground"
+                      )}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      {d.nome}
                     </button>
-                  </Reorder.Item>
-                ))}
-              </Reorder.Group>
+                  ))}
+                </div>
+              ) : null}
 
-              {/* Observação do personal */}
+              {/* dia ativo */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <input
+                    value={day.nome}
+                    onChange={(e) => updateDay(activeDay, { nome: e.target.value })}
+                    aria-label="Nome do dia"
+                    className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent text-[12px] font-bold text-brand hover:border-white/[0.08] focus-visible:border-brand/40 focus-visible:outline-none"
+                  />
+                  <span className="shrink-0 text-[10px] text-muted-foreground">{day.foco}</span>
+                </div>
+
+                {day.aquecimento.length ? (
+                  <p className="rounded-xl border border-[#4ADE80]/20 bg-[#4ADE80]/[0.06] p-2.5 text-[10.5px] leading-snug text-[#4ADE80]">
+                    Aquecimento: {day.aquecimento.join(" · ")}
+                  </p>
+                ) : null}
+
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Arraste para reordenar · edite séries e reps direto no card
+                </p>
+
+                <Reorder.Group
+                  axis="y"
+                  values={day.exercicios}
+                  onReorder={(next) => updateDay(activeDay, { exercicios: next })}
+                  className="space-y-2"
+                >
+                  {day.exercicios.map((e, i) => (
+                    <Reorder.Item
+                      key={e.exercicio + i}
+                      value={e}
+                      className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5"
+                    >
+                      <div className="flex items-center gap-2">
+                        <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-semibold text-foreground">
+                            {i + 1}. {e.exercicio}
+                          </p>
+                          <p className="text-[9.5px] text-muted-foreground">RPE {e.rpe} · {e.dica}</p>
+                        </div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={e.series}
+                          onChange={(ev) =>
+                            updateDay(activeDay, {
+                              exercicios: day.exercicios.map((x, xi) =>
+                                xi === i ? { ...x, series: Math.max(1, Math.min(10, Number(ev.target.value) || 1)) } : x
+                              ),
+                            })
+                          }
+                          aria-label={`Séries de ${e.exercicio}`}
+                          className="h-8 w-11 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[11px] tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
+                        />
+                        <span className="text-[10px] text-muted-foreground">x</span>
+                        <input
+                          value={e.reps}
+                          onChange={(ev) =>
+                            updateDay(activeDay, {
+                              exercicios: day.exercicios.map((x, xi) =>
+                                xi === i ? { ...x, reps: ev.target.value } : x
+                              ),
+                            })
+                          }
+                          aria-label={`Repetições de ${e.exercicio}`}
+                          className="h-8 w-14 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[11px] text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
+                        />
+                        <button
+                          onClick={() =>
+                            updateDay(activeDay, {
+                              exercicios: day.exercicios.filter((_, xi) => xi !== i),
+                            })
+                          }
+                          aria-label={`Remover ${e.exercicio}`}
+                          className="tactile flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-[#F87171]"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </Reorder.Item>
+                  ))}
+                </Reorder.Group>
+
+                {day.finalizador ? (
+                  <p className="rounded-xl border border-brand/20 bg-brand/[0.06] p-2.5 text-[10.5px] leading-snug text-brand">
+                    Finalizador: {day.finalizador}
+                  </p>
+                ) : null}
+                {activeDay < plan.dias.length - 1 ? (
+                  <button
+                    onClick={() => setActiveDay(activeDay + 1)}
+                    className="tactile w-full rounded-xl border border-white/[0.06] bg-white/[0.03] py-2 text-[11px] font-bold text-muted-foreground transition-colors hover:text-brand"
+                  >
+                    Revisar próximo dia: {plan.dias[activeDay + 1].nome}
+                  </button>
+                ) : null}
+              </div>
+
+              {/* observação do personal */}
               <div>
                 <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   <MessageSquareText className="h-3.5 w-3.5" /> Observação do Personal
@@ -453,7 +528,7 @@ export default function PersonalTreinosPage() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
-                  placeholder="Ex.: Foco em execução lenta, carga RPE 7, sem travar joelhos"
+                  placeholder="Ex.: Semana 1 mais leve, subir carga na semana 2 se o RPE ficar em 7"
                   className="w-full resize-none rounded-xl border border-white/[0.06] bg-white/[0.05] p-2.5 text-[12px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
                 />
               </div>
@@ -469,19 +544,16 @@ export default function PersonalTreinosPage() {
     );
   }
 
-  // ===== VISÃO GERAL: novo treino, templates e atribuídos =====
-  const pending = assigned.length;
-
+  // ===== VISÃO GERAL =====
   return (
     <div className="space-y-5">
       <header>
         <h1 className="text-lg font-bold text-foreground">Treinos</h1>
         <p className="text-[11px] text-muted-foreground">
-          {aiReady ? "Co-Pilot IA" : "Gerador local"} · {pending} atribuídos
+          {aiReady ? "IA real (OmniRoute)" : "Motor local de bolso"} · {assigned.length} atribuídos
         </p>
       </header>
 
-      {/* Passo 1: novo treino → seleção de aluno */}
       <button
         onClick={() => setPickerOpen(true)}
         className="gf-card gf-glass flex w-full items-center gap-3 !rounded-2xl !p-4 text-left transition-transform active:scale-[0.985]"
@@ -490,15 +562,14 @@ export default function PersonalTreinosPage() {
           <Plus className="h-5 w-5 text-brand-foreground" strokeWidth={2.5} />
         </span>
         <div className="flex-1">
-          <p className="text-sm font-bold text-foreground">Novo Treino</p>
+          <p className="text-sm font-bold text-foreground">Novo Plano de Treino</p>
           <p className="text-[11px] text-muted-foreground">
-            Selecionar aluno e montar com IA
+            Selecionar aluno e gerar plano completo com IA
           </p>
         </div>
         <UserRoundPlus className="h-4.5 w-4.5 text-brand" />
       </button>
 
-      {/* Templates em massa */}
       <section aria-labelledby="tpl-title">
         <h2 id="tpl-title" className="mb-2 flex items-center gap-2 text-sm font-bold text-foreground">
           <Layers className="h-4 w-4 text-brand" />
@@ -531,7 +602,6 @@ export default function PersonalTreinosPage() {
         </div>
       </section>
 
-      {/* Treinos atribuídos */}
       {assigned.length > 0 ? (
         <section aria-labelledby="assigned-title">
           <h2 id="assigned-title" className="mb-2 flex items-center gap-2 text-sm font-bold text-foreground">
@@ -550,7 +620,9 @@ export default function PersonalTreinosPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-bold text-foreground">{w.name}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {w.studentName.split(" ")[0]} · {w.exercises.length} exercícios · {fmtDate(w.created_at)}
+                    {w.studentName.split(" ")[0]} ·{" "}
+                    {w.plan ? `${w.plan.dias.length} dia${w.plan.dias.length === 1 ? "" : "s"} · ` : ""}
+                    {w.exercises.length} exercícios · {fmtDate(w.created_at)}
                   </p>
                 </div>
                 <button
@@ -577,11 +649,11 @@ export default function PersonalTreinosPage() {
         </section>
       ) : null}
 
-      {/* Modal: seleção de aluno com busca dinâmica */}
+      {/* seleção de aluno */}
       <BottomSheet open={pickerOpen} onClose={() => setPickerOpen(false)}>
         <div className="space-y-3">
           <div>
-            <p className="text-base font-bold text-foreground">Para quem é o treino?</p>
+            <p className="text-base font-bold text-foreground">Para quem é o plano?</p>
             <p className="text-[11px] text-muted-foreground">Selecione um aluno da sua lista</p>
           </div>
           <div className="relative">
@@ -617,7 +689,9 @@ export default function PersonalTreinosPage() {
                       <p className="truncate text-[13px] font-semibold text-foreground">{s.name}</p>
                       <p className="text-[10px] text-muted-foreground">{s.activeWorkout ?? "Sem treino"}</p>
                     </div>
-                    <ChevronRightSmall />
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0 text-muted-foreground" aria-hidden>
+                      <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </button>
                 </li>
               ))}
@@ -625,7 +699,7 @@ export default function PersonalTreinosPage() {
         </div>
       </BottomSheet>
 
-      {/* Aplicar em massa */}
+      {/* aplicar em massa */}
       <BottomSheet open={!!massTemplate} onClose={() => setMassTemplate(null)}>
         {massTemplate ? (
           <div className="space-y-4">
@@ -689,13 +763,5 @@ export default function PersonalTreinosPage() {
         ) : null}
       </BottomSheet>
     </div>
-  );
-}
-
-function ChevronRightSmall() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0 text-muted-foreground" aria-hidden>
-      <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }

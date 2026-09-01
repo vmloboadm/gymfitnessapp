@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, ClipboardList, Flame, Dumbbell, Plus, Activity } from "lucide-react";
+import { MessageCircle, ClipboardList, Flame, Dumbbell, Plus, Activity, Sparkles } from "lucide-react";
+import { insightOffline } from "~/lib/ai/local-gen";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { Button } from "~/components/ui/button";
@@ -209,6 +210,21 @@ export function StudentSheet({
                 <div className="mt-2">
                   <Sparkline points={weights} height={56} />
                 </div>
+              </div>
+              <div className="rounded-2xl border border-brand/25 bg-brand/[0.08] p-3">
+                <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-brand">
+                  <Sparkles className="h-3 w-3" /> Insight IA
+                </p>
+                <p className="mt-1 text-[11.5px] leading-snug text-foreground/90">
+                  {insightOffline({
+                    name: student.name,
+                    streak: effectiveStreak,
+                    lastTrainingDaysAgo: student.lastTrainingDaysAgo,
+                    lastRpe: student.lastRpe,
+                    weights,
+                    activeWorkout: student.activeWorkout,
+                  })}
+                </p>
               </div>
               <p className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-[10.5px] leading-snug text-muted-foreground">
                 Em produção esta aba lê as medições comprovadas (foto do visor) da tabela metrics.

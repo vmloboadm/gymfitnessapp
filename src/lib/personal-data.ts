@@ -37,6 +37,8 @@ export type PersonalStudent = {
   activeWorkout: string | null;
   /** Último exercício registrado pelo aluno (para dar contexto na lista) */
   lastWorkout: string | null;
+  /** Frequência semanal pactuada (agenda de hoje) */
+  freq: number;
   /** Último RPE registrado, quando houver */
   lastRpe?: number;
 };
@@ -52,59 +54,111 @@ export type WorkoutTemplate = {
 
 const AV = (n: number) => `https://i.pravatar.cc/80?img=${n}`;
 
-export function demoRadarAlerts(): RadarAlert[] {
-  return [
-    {
-      id: "radar-1",
-      severity: "red",
-      studentId: "st-joao",
-      studentName: "João Silva",
-      avatar: AV(33),
-      message: "João Silva não treina há 4 dias",
-      detail: "Último treino sexta passada. Risco de evasão alto.",
-      whatsapp: {
-        phone: "5511999990001",
-        consent: true,
-        text: "Oi João! Sentimos sua falta na academia. Que tal voltarmos hoje com um treino leve? Seu Personal está de olho!",
-      },
-    },
-    {
-      id: "radar-2",
-      severity: "yellow",
-      studentId: "st-anaj",
-      studentName: "Ana Júlia",
-      avatar: AV(44),
-      message: "Ana Júlia registrou RPE 10 ontem",
-      detail: "Esforço no limite. Vale reduzir carga ou trocar o foco do dia.",
-      action: { label: "Ajustar Treino", href: "/personal/treinos" },
-    },
-    {
-      id: "radar-3",
-      severity: "green",
-      studentId: "st-carlos",
-      studentName: "Carlos",
-      avatar: AV(52),
-      message: "Carlos bateu RP no Supino",
-      detail: "120 kg x 3, superando a marca anterior em 5 kg.",
-      whatsapp: {
-        phone: "5511999990003",
-        consent: true,
-        text: "Parabéns Carlos! RP no Supino com execução limpa é outro nível. Rumo aos 130 kg!",
-        label: "Dar Parabéns",
-      },
-    },
-  ];
+/**
+ * Radar de retenção DINÂMICO: deriva os alertas do estado real
+ * (dados dos alunos + treinos atribuídos hoje + penalidades). Em produção
+ * vira queries sobre workout_logs, checkins e rpe com as mesmas regras.
+ * Reage às ações do personal: atribuir treino, zerar streak, aprovar.
+ */
+export function computeRadar(
+  students: PersonalStudent[],
+  assignedToday: Array<{ studentId: string; createdAtIso: string }>,
+): RadarAlert[] {
+  const todayKey = new Date().toDateString();
+  const assignedIds = new Set(
+    assignedToday
+      .filter((a) => new Date(a.createdAtIso).toDateString() === todayKey)
+      .map((a) => a.studentId)
+  );
+
+  const alerts: RadarAlert[] = [];
+  for (const st of students) {
+    const first = st.name.split(" ")[0];
+    // VERDE 1: plano novo atribuído hoje, aguardando execução
+    if (assignedIds.has(st.id)) {
+      alerts.push({
+        id: `radar-new-${st.id}`,
+        severity: "green",
+        studentId: st.id,
+        studentName: st.name,
+        avatar: st.avatar,
+        message: `${first} recebeu um plano novo hoje`,
+        detail: "Aguardando o primeiro check-in do plano. Vale cobrir a execução.",
+        whatsapp: st.whatsapp_consent && st.phone ? {
+          phone: st.phone,
+          consent: true,
+          text: `Oi ${first}! Seu plano novo já está no app. Bora estrear hoje?`,
+          label: "Cobrar execução",
+        } : undefined,
+      });
+      continue;
+    }
+    // VERMELHO: sumido
+    if (st.lastTrainingDaysAgo >= 3) {
+      alerts.push({
+        id: `radar-red-${st.id}`,
+        severity: "red",
+        studentId: st.id,
+        studentName: st.name,
+        avatar: st.avatar,
+        message: `${first} não treina há ${st.lastTrainingDaysAgo} dias`,
+        detail: `Última sessão registrada há ${st.lastTrainingDaysAgo} dias. Risco de evasão alto.`,
+        whatsapp: st.whatsapp_consent && st.phone ? {
+          phone: st.phone,
+          consent: true,
+          text: `Oi ${first}! Sentimos sua falta na academia. Que tal voltarmos hoje com um treino leve? Seu Personal está de olho!`,
+        } : undefined,
+        action: { label: "Ajustar Treino", href: `/personal/treinos?aluno=${st.id}` },
+      });
+      continue;
+    }
+    // AMARELO: fadiga
+    if ((st.lastRpe ?? 0) >= 9) {
+      alerts.push({
+        id: `radar-yellow-${st.id}`,
+        severity: "yellow",
+        studentId: st.id,
+        studentName: st.name,
+        avatar: st.avatar,
+        message: `${first} registrou RPE ${st.lastRpe} no último treino`,
+        detail: "Esforço no limite. Vale reduzir carga ou trocar o foco do dia.",
+        action: { label: "Ajustar Treino", href: `/personal/treinos?aluno=${st.id}` },
+      });
+      continue;
+    }
+    // VERDE 2: consistência alta
+    if (st.streak >= 5 && st.lastTrainingDaysAgo === 0) {
+      alerts.push({
+        id: `radar-green-${st.id}`,
+        severity: "green",
+        studentId: st.id,
+        studentName: st.name,
+        avatar: st.avatar,
+        message: `${first} está com ${st.streak} dias de consistência`,
+        detail: "Momento ideal pra reconhecer e puxar o próximo degrau de carga.",
+        whatsapp: st.whatsapp_consent && st.phone ? {
+          phone: st.phone,
+          consent: true,
+          text: `Parabéns ${first}! ${st.streak} dias de consistência é disciplina de verdade. Rumo ao próximo degrau!`,
+          label: "Dar Parabéns",
+        } : undefined,
+      });
+    }
+  }
+
+  const order = { red: 0, yellow: 1, green: 2 } as const;
+  return alerts.sort((a, b) => order[a.severity] - order[b.severity]).slice(0, 7);
 }
 
 export function demoPersonalStudents(): PersonalStudent[] {
   return [
-    { id: "st-carlos", profile_id: "u5", name: "Carlos Mendes", avatar: AV(52), phone: "5511999990003", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 8, activeWorkout: "Hipertrofia ABC", lastWorkout: "Supino Reto" },
-    { id: "st-marina", profile_id: "u2", name: "Marina Costa", avatar: AV(45), phone: "5511999990002", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 6, activeWorkout: "Glúteos 3x Semana", lastWorkout: "Elevação Pélvica" },
-    { id: "st-pedro", profile_id: "u3", name: "Pedro Rocha", avatar: AV(15), phone: "5511999990004", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 3, activeWorkout: "Full Body Iniciante", lastWorkout: "Leg Press 45°" },
-    { id: "st-anaj", profile_id: "u6", name: "Ana Júlia", avatar: AV(44), phone: "5511999990005", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 5, activeWorkout: "Cutting Definição", lastWorkout: "Agachamento Smith", lastRpe: 10 },
-    { id: "st-ana", profile_id: "u4", name: "Ana Souza", avatar: AV(47), phone: "5511999990006", whatsapp_consent: false, lastTrainingDaysAgo: 1, streak: 4, activeWorkout: "Condicionamento", lastWorkout: "Puxada Alta" },
-    { id: "st-lucas", profile_id: "u1", name: "Lucas Andrade", avatar: AV(12), phone: "5511999990007", whatsapp_consent: true, lastTrainingDaysAgo: 2, streak: 2, activeWorkout: "Força Base", lastWorkout: "Terra Romeno" },
-    { id: "st-joao", profile_id: "u7", name: "João Silva", avatar: AV(33), phone: "5511999990001", whatsapp_consent: true, lastTrainingDaysAgo: 4, streak: 0, activeWorkout: "Hipertrofia ABC", lastWorkout: null },
+    { id: "st-carlos", profile_id: "u5", name: "Carlos Mendes", avatar: AV(52), phone: "5511999990003", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 8, activeWorkout: "Hipertrofia ABC", lastWorkout: "Supino Reto" , freq: 4 },
+    { id: "st-marina", profile_id: "u2", name: "Marina Costa", avatar: AV(45), phone: "5511999990002", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 6, activeWorkout: "Glúteos 3x Semana", lastWorkout: "Elevação Pélvica" , freq: 3 },
+    { id: "st-pedro", profile_id: "u3", name: "Pedro Rocha", avatar: AV(15), phone: "5511999990004", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 3, activeWorkout: "Full Body Iniciante", lastWorkout: "Leg Press 45°" , freq: 3 },
+    { id: "st-anaj", profile_id: "u6", name: "Ana Júlia", avatar: AV(44), phone: "5511999990005", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 5, activeWorkout: "Cutting Definição", lastWorkout: "Agachamento Smith", lastRpe: 10 , freq: 4 },
+    { id: "st-ana", profile_id: "u4", name: "Ana Souza", avatar: AV(47), phone: "5511999990006", whatsapp_consent: false, lastTrainingDaysAgo: 1, streak: 4, activeWorkout: "Condicionamento", lastWorkout: "Puxada Alta" , freq: 5 },
+    { id: "st-lucas", profile_id: "u1", name: "Lucas Andrade", avatar: AV(12), phone: "5511999990007", whatsapp_consent: true, lastTrainingDaysAgo: 2, streak: 2, activeWorkout: "Força Base", lastWorkout: "Terra Romeno" , freq: 3 },
+    { id: "st-joao", profile_id: "u7", name: "João Silva", avatar: AV(33), phone: "5511999990001", whatsapp_consent: true, lastTrainingDaysAgo: 4, streak: 0, activeWorkout: "Hipertrofia ABC", lastWorkout: null , freq: 4 },
   ];
 }
 
