@@ -33,6 +33,8 @@ export type PersonalStudent = {
   lastTrainingDaysAgo: number;
   streak: number;
   activeWorkout: string | null;
+  /** Último exercício registrado pelo aluno (para dar contexto na lista) */
+  lastWorkout: string | null;
   /** Último RPE registrado, quando houver */
   lastRpe?: number;
 };
@@ -94,13 +96,13 @@ export function demoRadarAlerts(): RadarAlert[] {
 
 export function demoPersonalStudents(): PersonalStudent[] {
   return [
-    { id: "st-carlos", name: "Carlos Mendes", avatar: AV(52), phone: "5511999990003", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 8, activeWorkout: "Hipertrofia ABC" },
-    { id: "st-marina", name: "Marina Costa", avatar: AV(45), phone: "5511999990002", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 6, activeWorkout: "Glúteos 3x Semana" },
-    { id: "st-pedro", name: "Pedro Rocha", avatar: AV(15), phone: "5511999990004", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 3, activeWorkout: "Full Body Iniciante" },
-    { id: "st-anaj", name: "Ana Júlia", avatar: AV(44), phone: "5511999990005", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 5, activeWorkout: "Cutting Definição", lastRpe: 10 },
-    { id: "st-ana", name: "Ana Souza", avatar: AV(47), phone: "5511999990006", whatsapp_consent: false, lastTrainingDaysAgo: 1, streak: 4, activeWorkout: "Condicionamento" },
-    { id: "st-lucas", name: "Lucas Andrade", avatar: AV(12), phone: "5511999990007", whatsapp_consent: true, lastTrainingDaysAgo: 2, streak: 2, activeWorkout: "Força Base" },
-    { id: "st-joao", name: "João Silva", avatar: AV(33), phone: "5511999990001", whatsapp_consent: true, lastTrainingDaysAgo: 4, streak: 0, activeWorkout: "Hipertrofia ABC" },
+    { id: "st-carlos", name: "Carlos Mendes", avatar: AV(52), phone: "5511999990003", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 8, activeWorkout: "Hipertrofia ABC", lastWorkout: "Supino Reto" },
+    { id: "st-marina", name: "Marina Costa", avatar: AV(45), phone: "5511999990002", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 6, activeWorkout: "Glúteos 3x Semana", lastWorkout: "Elevação Pélvica" },
+    { id: "st-pedro", name: "Pedro Rocha", avatar: AV(15), phone: "5511999990004", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 3, activeWorkout: "Full Body Iniciante", lastWorkout: "Leg Press 45°" },
+    { id: "st-anaj", name: "Ana Júlia", avatar: AV(44), phone: "5511999990005", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 5, activeWorkout: "Cutting Definição", lastWorkout: "Agachamento Smith", lastRpe: 10 },
+    { id: "st-ana", name: "Ana Souza", avatar: AV(47), phone: "5511999990006", whatsapp_consent: false, lastTrainingDaysAgo: 1, streak: 4, activeWorkout: "Condicionamento", lastWorkout: "Puxada Alta" },
+    { id: "st-lucas", name: "Lucas Andrade", avatar: AV(12), phone: "5511999990007", whatsapp_consent: true, lastTrainingDaysAgo: 2, streak: 2, activeWorkout: "Força Base", lastWorkout: "Terra Romeno" },
+    { id: "st-joao", name: "João Silva", avatar: AV(33), phone: "5511999990001", whatsapp_consent: true, lastTrainingDaysAgo: 4, streak: 0, activeWorkout: "Hipertrofia ABC", lastWorkout: null },
   ];
 }
 

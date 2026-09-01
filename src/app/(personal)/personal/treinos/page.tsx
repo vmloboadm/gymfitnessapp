@@ -164,7 +164,8 @@ export default function PersonalTreinosPage() {
     setLoading(true);
     const fallback = localDraft(prompt.trim());
     if (!aiReady) {
-      // demo sem chave: gerador local estruturado
+      // demo sem chave: gerador local estruturado, com latência real de IA
+      await new Promise((r) => setTimeout(r, 750));
       setDraft(fallback);
       setNotes("");
       setLoading(false);
@@ -196,8 +197,8 @@ export default function PersonalTreinosPage() {
       exercises: draft.exercises,
       source: draft.source,
     });
-    toast.success(`Treino enviado para ${student.name.split(" ")[0]}`, {
-      description: "O aluno vê o treino novo na área dele agora.",
+    toast.success("Treino enviado com sucesso!", {
+      description: `${student.name} recebeu "${draft.name}" na aba Treino.`,
     });
     setDraft(null);
     setPrompt("");
@@ -252,6 +253,12 @@ export default function PersonalTreinosPage() {
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              run();
+            }
+          }}
           rows={3}
           placeholder="Ex.: Montar treino de glúteos para Maria, 3x semana, sem impacto"
           aria-label="Pedido de treino para a IA"
@@ -264,6 +271,31 @@ export default function PersonalTreinosPage() {
           </Button>
         </div>
       </motion.section>
+
+      {/* Estado de geração: a IA está montando o rascunho */}
+      <AnimatePresence>
+        {loading ? (
+          <motion.section
+            key="thinking"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="gf-card gf-glass space-y-2.5 !p-4"
+            aria-live="polite"
+          >
+            <p className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
+              <Sparkles className="h-4 w-4 animate-pulse text-brand" />
+              Montando o rascunho com base no seu pedido...
+            </p>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
+                <span className="h-2.5 w-1/2 animate-pulse rounded-full bg-white/[0.07]" />
+                <span className="h-2.5 w-14 animate-pulse rounded-full bg-white/[0.07]" />
+              </div>
+            ))}
+          </motion.section>
+        ) : null}
+      </AnimatePresence>
 
       {/* Rascunho IA + revisão obrigatória */}
       <AnimatePresence mode="wait">

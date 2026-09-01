@@ -49,7 +49,7 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
         aria-label="Navegação do staff"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[#081020]/95 backdrop-blur supports-[backdrop-filter]:bg-[#081020]/85"
       >
-        <div className="flex">
+        <div className="mx-auto flex max-w-md">
           {items.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
@@ -58,17 +58,17 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[10px] font-medium transition-colors active:scale-[0.94]",
+                  "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-px py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] text-[9px] font-medium transition-colors active:scale-[0.94]",
                   active ? "text-brand" : "text-muted-foreground"
                 )}
               >
                 <span
                   className={cn(
-                    "relative flex h-7 w-9 items-center justify-center rounded-xl",
+                    "relative flex h-6 w-8 items-center justify-center rounded-lg",
                     active && "bg-brand/12"
                   )}
                 >
-                  <Icon className="h-5 w-5" strokeWidth={active ? 2.4 : 1.8} />
+                  <Icon className="h-[17px] w-[17px]" strokeWidth={active ? 2.3 : 1.8} />
                 </span>
                 <span className="max-w-full truncate px-0.5">{label}</span>
               </Link>
