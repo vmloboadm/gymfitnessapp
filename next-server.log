@@ -1,7 +1,9 @@
+
+> gymtemp_app@0.1.0 start
+> next start -p 3002
+
   ▲ Next.js 14.2.35
-  - Local:        http://localhost:3000
+  - Local:        http://localhost:3002
 
  ✓ Starting...
- ✓ Ready in 373ms
- ⚠ For production Image Optimization with Next.js, the optional 'sharp' package is strongly recommended. Run 'npm i sharp', and Next.js will use it automatically for Image Optimization.
-Read more: https://nextjs.org/docs/messages/sharp-missing-in-production
+ ✓ Ready in 410ms

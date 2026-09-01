@@ -11,29 +11,26 @@ import {
   Dumbbell,
   ClipboardList,
   Wallet,
-  BarChart3,
-  ScanLine,
-  ShieldAlert,
+  Newspaper,
+  Trophy,
 } from "lucide-react";
 
 const TRAINER_NAV = [
-  { href: "/", label: "Dashboard", icon: Users },
   { href: "/alunos", label: "Alunos", icon: Users },
-  { href: "/biblioteca", label: "Biblioteca de exercícios", icon: Dumbbell },
   { href: "/treinos", label: "Treinos", icon: ClipboardList },
-  { href: "/equipamentos", label: "Equipamentos", icon: Dumbbell },
+  { href: "/biblioteca", label: "Exercícios", icon: Dumbbell },
+  { href: "/feed", label: "Feed", icon: Newspaper },
+  { href: "/ranking", label: "Ranking", icon: Trophy },
 ];
 
 const MANAGER_NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/alunos", label: "Alunos", icon: Users },
+  { href: "/feed", label: "Feed", icon: Newspaper },
+  { href: "/ranking", label: "Ranking", icon: Trophy },
+  { href: "/treinos", label: "Treinos", icon: ClipboardList },
   { href: "/personais", label: "Personais", icon: Users },
-  { href: "/equipamentos", label: "Equipamentos", icon: Dumbbell },
-  { href: "/matriculas", label: "Matrículas", icon: ClipboardList },
-  { href: "/checkin", label: "Check-in", icon: ScanLine },
   { href: "/financeiro", label: "Financeiro", icon: Wallet },
-  { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
-  { href: "/day-pass", label: "Day-pass", icon: ShieldAlert },
 ];
 
 /**
@@ -60,8 +57,8 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
       {/* bottom nav mobile-first (igual ao app do aluno/gestor) */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[#081020]/95 backdrop-blur supports-[backdrop-filter]:bg-[#081020]/85 lg:hidden">
-        <div className="scrollbar-hide flex overflow-x-auto">
-          {items.map(({ href, label, icon: Icon }) => {
+        <div className="flex">
+          {items.slice(0, 6).map(({ href, label, icon: Icon }) => {
             const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
             return (
               <Link
@@ -69,14 +66,14 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex min-w-[4.5rem] shrink-0 snap-start flex-col items-center justify-center gap-1 px-2 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[10px] transition-colors active:scale-[0.94]",
+                  "relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[9px] font-medium transition-colors active:scale-[0.94]",
                   active ? "text-brand" : "text-muted-foreground"
                 )}
               >
-                <span className={cn("relative flex h-7 w-11 items-center justify-center rounded-xl", active && "bg-brand/12")}>
-                  <Icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.4 : 1.8} />
+                <span className={cn("relative flex h-7 w-9 items-center justify-center rounded-xl", active && "bg-brand/12")}>
+                  <Icon className="h-5 w-5" strokeWidth={active ? 2.4 : 1.8} />
                 </span>
-                <span className="whitespace-nowrap font-medium">{label}</span>
+                <span className="max-w-full truncate px-0.5">{label}</span>
               </Link>
             );
           })}

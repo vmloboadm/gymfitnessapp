@@ -45,7 +45,7 @@ const MANAGER_ONLY_PATHS = [
   "/matriculas",
   "/financeiro",
   "/relatorios",
-  "/feed/moderacao",
+  "/feed-moderacao",
 ];
 
 /** Compartilhadas entre trainer e manager. */
@@ -67,8 +67,19 @@ function pathAllowed(role: string | undefined, pathname: string): string | null 
     return null;
   }
 
+  // Raiz: aluno fica, staff cai na home da própria área (nunca na home do aluno)
+  if (pathname === "/") {
+    if (!role || role === "student") return null;
+    return HOME_BY_ROLE[role] ?? "/";
+  }
+
   const onBoarding = pathname.startsWith("/onboarding");
   if (onBoarding) return null;
+
+  // Conteúdo compartilhado entre aluno, personal e gestor (mesmo feed e ranking nas 3 áreas)
+  if (pathname === "/feed" || pathname.startsWith("/feed/") || pathname === "/ranking") {
+    return null;
+  }
 
   if (STUDENT_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return role === "student" ? null : HOME_BY_ROLE[role ?? "student"] ?? "/login";
@@ -96,9 +107,18 @@ export async function middleware(request: NextRequest) {
   // Modo demo (NEXT_PUBLIC_DEMO_MODE=1): pula auth e deixa testar todas as telas.
   // A raiz abre no LOGIN; após entrar pelo login de teste (cookie gf_test),
   // a raiz vira o DASHBOARD normal do papel.
+  // ISOLAMENTO: o papel vem do cookie gf_role (setado no login de teste) e o
+  // mesmo pathAllowed de produção é aplicado — aluno NÃO acessa área do personal.
   if (process.env.NEXT_PUBLIC_DEMO_MODE === "1") {
     if (request.nextUrl.pathname === "/" && !request.cookies.get("gf_test")) {
       return NextResponse.redirect(new URL("/login", request.url));
+    }
+    if (request.cookies.get("gf_test")) {
+      const demoRole = request.cookies.get("gf_role")?.value ?? "student";
+      const redirectTo = pathAllowed(demoRole, request.nextUrl.pathname);
+      if (redirectTo) {
+        return NextResponse.redirect(new URL(redirectTo, request.url));
+      }
     }
     return response;
   }

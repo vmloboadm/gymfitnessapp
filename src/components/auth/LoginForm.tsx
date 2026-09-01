@@ -45,8 +45,9 @@ export function LoginForm() {
         return;
       }
       switchDemoRole(testRole);
-      // cookie de sessão: libera o dashboard na raiz; sem ele a raiz abre o login
+      // cookies de sessão: gf_test libera o app, gf_role alimenta o isolamento de rotas
       document.cookie = "gf_test=1; path=/; SameSite=Lax";
+      document.cookie = `gf_role=${testRole}; path=/; SameSite=Lax`;
       // aluno no primeiro acesso: onboarding antes do dashboard
       if (testRole === "student" && !readOnboarding().onboarding_completed) {
         router.push("/onboarding");

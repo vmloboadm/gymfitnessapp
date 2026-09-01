@@ -10,13 +10,17 @@ import {
   ScanLine,
   Trophy,
   Newspaper,
+  Users,
+  ClipboardList,
+  LayoutDashboard,
 } from "lucide-react";
+import { useAuth } from "~/hooks/useAuth";
 import { cn } from "~/lib/utils";
 
 /* Navegação completa (7 destinos) em barra com scroll horizontal -
    padrão consagrado de tabs com overflow (mesmo comportamento de apps
    com muitas seções). Equipamentos fica dentro de Check-in/Treino. */
-const NAV_ITEMS = [
+const STUDENT_NAV = [
   { href: "/", label: "Início", icon: Home },
   { href: "/treino", label: "Treino", icon: Dumbbell },
   { href: "/feed", label: "Feed", icon: Newspaper },
@@ -26,8 +30,30 @@ const NAV_ITEMS = [
   { href: "/perfil", label: "Perfil", icon: User },
 ];
 
+/** Nav do personal (feed e ranking compartilhados com o aluno) */
+const TRAINER_NAV = [
+  { href: "/alunos", label: "Alunos", icon: Users },
+  { href: "/feed", label: "Feed", icon: Newspaper },
+  { href: "/ranking", label: "Ranking", icon: Trophy },
+  { href: "/treinos", label: "Treinos", icon: ClipboardList },
+  { href: "/biblioteca", label: "Exercícios", icon: Dumbbell },
+];
+
+/** Nav do gestor */
+const MANAGER_NAV = [
+  { href: "/dashboard", label: "Início", icon: LayoutDashboard },
+  { href: "/alunos", label: "Alunos", icon: Users },
+  { href: "/feed", label: "Feed", icon: Newspaper },
+  { href: "/ranking", label: "Ranking", icon: Trophy },
+  { href: "/treinos", label: "Treinos", icon: ClipboardList },
+];
+
 export function BottomNav() {
   const pathname = usePathname();
+  const { profile } = useAuth();
+  const role = profile?.role;
+  const NAV_ITEMS =
+    role === "trainer" ? TRAINER_NAV : role === "manager" || role === "admin" ? MANAGER_NAV : STUDENT_NAV;
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -49,7 +75,7 @@ export function BottomNav() {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex min-w-[4.5rem] shrink-0 snap-start flex-col items-center justify-center gap-1 px-2 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[10px] transition-colors active:scale-[0.94]",
+                  "relative flex min-w-0 flex-1 shrink-0 snap-start flex-col items-center justify-center gap-1 px-2 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[10px] transition-colors active:scale-[0.94]",
                   active ? "text-brand" : "text-muted-foreground hover:text-foreground"
                 )}
               >

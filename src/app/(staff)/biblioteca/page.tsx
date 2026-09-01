@@ -10,7 +10,9 @@ import { TopBar } from "~/components/layout/TopBar";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
 import { EXERCISE_CATEGORY } from "~/lib/types/enums";
-import { isDemoMode, demoBiblioteca } from "~/lib/demo-bridge";
+import { isDemoMode, demoLib } from "~/lib/demo-bridge";
+import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
+import { ImageLightbox } from "~/components/common/ImageLightbox";
 import type { Exercises } from "~/lib/types/models";
 
 /**
@@ -21,12 +23,15 @@ export default function BibliotecaPage() {
   const { profile } = useAuth();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("all");
+  const [zoom, setZoom] = useState<{ src: string | null; name: string } | null>(null);
   const demo = isDemoMode();
 
   const { data, loading, error, refetch } = useAsyncQuery<Exercises[]>(
     async () => {
       if (demo) {
-        return { data: demoBiblioteca() as unknown as Exercises[], error: null };
+        // mesma biblioteca expandida do aluno: 289 exercícios com ilustração
+        const all = demoLib.flatMap((c) => c.subs.flatMap((sub) => sub.exercises.map((e) => ({ ...e, category: c.id }))));
+        return { data: all as unknown as Exercises[], error: null };
       }
 
       const supabase = supabaseBrowser();
@@ -63,10 +68,10 @@ export default function BibliotecaPage() {
           />
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
           <FilterChip active={cat === "all"} onClick={() => setCat("all")} label="Todos" />
-          {EXERCISE_CATEGORY.map((c) => (
-            <FilterChip key={c} active={cat === c} onClick={() => setCat(c)} label={c} />
+          {[...demoLib].sort((a, b) => a.name.localeCompare(b.name)).map((c) => (
+            <FilterChip key={c.id} active={cat === c.id} onClick={() => setCat(c.id)} label={c.name} />
           ))}
         </div>
 
@@ -81,31 +86,49 @@ export default function BibliotecaPage() {
             icon={Library}
           />
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {filtered.map((e) => (
-              <div key={e.id} className="rounded-xl border border-border bg-card/40 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground">{e.name}</p>
-                  <Badge variant="outline" className="shrink-0 capitalize">{e.category}</Badge>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {e.muscles.map((m) => (
-                    <span key={m} className="rounded-full bg-secondary/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {m}
+          <div className="space-y-2">
+            {filtered.map((e) => {
+              const img = (e as any).imageUrl ?? null;
+              const grupo = demoLib.find((c) => c.id === e.category)?.name ?? e.category;
+              return (
+                <div key={e.id} className="flex items-center gap-3 rounded-xl border border-border bg-card/40 p-3">
+                  {img ? (
+                    <button
+                      onClick={() => setZoom({ src: img, name: e.name })}
+                      aria-label={`Ampliar ilustração de ${e.name}`}
+                      className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/[0.06] bg-white"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                    </button>
+                  ) : (
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-muted">
+                      <FitnessIcon glyph={fitnessForName(e.name)} size={26} />
                     </span>
-                  ))}
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-foreground">{e.name}</p>
+                      <Badge variant="outline" className="shrink-0 text-[10px] capitalize">{grupo}</Badge>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {(e.muscles ?? []).slice(0, 3).map((m) => (
+                        <span key={m} className="rounded-full bg-secondary/60 px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">
+                          {m}
+                        </span>
+                      ))}
+                    </div>
+                    {e.tips?.length ? (
+                      <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">{e.tips[0]}</p>
+                    ) : null}
+                  </div>
                 </div>
-                {e.tips?.length ? (
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{e.tips[0]}</p>
-                ) : null}
-                {e.high_impact ? (
-                  <p className="mt-2 text-[11px] font-medium text-warning">Alto impacto, atenção a restrições.</p>
-                ) : null}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
+      <ImageLightbox src={zoom?.src ?? null} alt={zoom?.name} open={!!zoom} onClose={() => setZoom(null)} />
     </>
   );
 }

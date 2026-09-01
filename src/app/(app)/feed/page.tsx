@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, ThumbsUp, MessageSquare, Send, GraduationCap, Pin } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -14,6 +14,15 @@ import { cn } from "~/lib/utils";
 import { formatRelative } from "~/lib/utils/format";
 import { toast } from "sonner";
 import { isDemoMode, demoFeedData, demoFallback } from "~/lib/demo-bridge";
+import {
+  type FeedCommentLocal,
+  type FeedPostLocal,
+  feedLocalAddComment,
+  feedLocalAddPost,
+  feedLocalSnapshot,
+  feedLocalToggleLike,
+  FEED_LOCAL_EVENT,
+} from "~/lib/feed-store";
 import type { FeedComments, FeedLikes, FeedPosts, Profiles } from "~/lib/types/models";
 
 const POST_TYPE_LABEL: Record<FeedPosts["type"], string> = {
@@ -44,11 +53,29 @@ export default function FeedPage() {
   const [commentDraft, setCommentDraft] = useState("");
   const [postType, setPostType] = useState<"geral" | "conquista" | "desafio">("geral");
 
-  // estado otimista do modo demo (sem backend)
+  // estado otimista do modo demo (sem backend), persistido no localStorage
+  // (mesmo storage para aluno, personal e gestor: o feed atravessa as 3 áreas)
   const [demoLikes, setDemoLikes] = useState<Record<string, boolean>>({});
   const [demoComments, setDemoComments] = useState<Record<string, CommentRow[]>>({});
   const [demoPosts, setDemoPosts] = useState<PostRow[]>([]);
   const demo = isDemoMode();
+
+  useEffect(() => {
+    if (!demo) return;
+    const hydrate = () => {
+      const snap = feedLocalSnapshot();
+      setDemoPosts(snap.posts as PostRow[]);
+      setDemoLikes(snap.likes);
+      setDemoComments(snap.comments as Record<string, CommentRow[]>);
+    };
+    hydrate();
+    window.addEventListener(FEED_LOCAL_EVENT, hydrate);
+    window.addEventListener("storage", hydrate);
+    return () => {
+      window.removeEventListener(FEED_LOCAL_EVENT, hydrate);
+      window.removeEventListener("storage", hydrate);
+    };
+  }, [demo]);
 
   const { data, loading, error, refetch } = useAsyncQuery<PostRow[]>(
     async () => {
@@ -148,11 +175,12 @@ export default function FeedPage() {
         created_at: new Date().toISOString(),
         expires_at: "",
         is_pinned: false,
-        author: { id: user?.id ?? ME_DEMO, name: profile?.name ?? "Você", role: "student" } as Profiles,
+        author: { id: user?.id ?? ME_DEMO, name: profile?.name ?? "Você", role: (profile?.role ?? "student") as Profiles["role"] } as Profiles,
         likesCount: 0,
         likedByMe: false,
         comments: [],
       };
+      feedLocalAddPost(newPost as FeedPostLocal);
       setDemoPosts((prev) => [newPost, ...prev]);
       setBody("");
       setPostType("geral");
@@ -185,6 +213,7 @@ export default function FeedPage() {
   const toggleLike = async (post: PostRow) => {
     navigator.vibrate?.(20);
     if (demo) {
+      feedLocalToggleLike(post.id);
       setDemoLikes((prev) => ({ ...prev, [post.id]: !prev[post.id] }));
       return;
     }
@@ -208,8 +237,9 @@ export default function FeedPage() {
         user_id: user?.id ?? ME_DEMO,
         body: commentDraft.trim(),
         created_at: new Date().toISOString(),
-        user: { id: user?.id ?? ME_DEMO, name: profile?.name ?? "Você", role: "student" } as Profiles,
+        user: { id: user?.id ?? ME_DEMO, name: profile?.name ?? "Você", role: (profile?.role ?? "student") as Profiles["role"] } as Profiles,
       };
+      feedLocalAddComment(postId, c as FeedCommentLocal);
       setDemoComments((prev) => ({ ...prev, [postId]: [...(prev[postId] ?? []), c] }));
       setCommentDraft("");
       setCommentingId(null);

@@ -191,40 +191,12 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Manutenção recorrente */}
-      <div className="rounded-2xl border border-border bg-card/50 p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            <Wrench className="h-3.5 w-3.5 text-brand" /> Manutenção recorrente
-          </p>
-          <Link href="/equipamentos" className="flex items-center gap-0.5 text-[11px] font-semibold text-brand">
-            Ver todos <ChevronRight className="h-3 w-3" />
-          </Link>
-        </div>
-        <div className="space-y-1.5">
-          {manut.map((m) => (
-            <Link
-              key={m.id}
-              href="/equipamentos"
-              className="tactile flex items-center gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5"
-            >
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-warning/15 text-warning text-lg">🛠️</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">{m.name}</p>
-                <p className="text-[11px] text-muted-foreground">{m.abertos} abertos · {m.resolvidos} resolvidos · {m.ultimo}</p>
-              </div>
-              <Badge variant="warning" className="text-[10px]">reincidente</Badge>
-            </Link>
-          ))}
-        </div>
-      </div>
-
       {/* Ações rápidas */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {[
           { href: "/matriculas", label: "Nova matrícula", emoji: "📋" },
           { href: "/personais", label: "Adicionar personal", emoji: "🧑‍🏫" },
-          { href: "/equipamentos", label: "Marcar manutenção", emoji: "🛠️" },
+          { href: "/biblioteca", label: "Biblioteca de exercícios", emoji: "📚" },
           { href: "/relatorios", label: "Relatórios", emoji: "📊" },
         ].map((a) => (
           <Link
