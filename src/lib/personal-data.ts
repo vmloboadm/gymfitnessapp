@@ -24,6 +24,8 @@ export type RadarAlert = {
 
 export type PersonalStudent = {
   id: string;
+  /** id na tabela profiles/leaderboard (liga o ranking aos alunos do personal) */
+  profile_id?: string;
   name: string;
   avatar: string;
   phone: string | null;
@@ -96,13 +98,13 @@ export function demoRadarAlerts(): RadarAlert[] {
 
 export function demoPersonalStudents(): PersonalStudent[] {
   return [
-    { id: "st-carlos", name: "Carlos Mendes", avatar: AV(52), phone: "5511999990003", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 8, activeWorkout: "Hipertrofia ABC", lastWorkout: "Supino Reto" },
-    { id: "st-marina", name: "Marina Costa", avatar: AV(45), phone: "5511999990002", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 6, activeWorkout: "Glúteos 3x Semana", lastWorkout: "Elevação Pélvica" },
-    { id: "st-pedro", name: "Pedro Rocha", avatar: AV(15), phone: "5511999990004", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 3, activeWorkout: "Full Body Iniciante", lastWorkout: "Leg Press 45°" },
-    { id: "st-anaj", name: "Ana Júlia", avatar: AV(44), phone: "5511999990005", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 5, activeWorkout: "Cutting Definição", lastWorkout: "Agachamento Smith", lastRpe: 10 },
-    { id: "st-ana", name: "Ana Souza", avatar: AV(47), phone: "5511999990006", whatsapp_consent: false, lastTrainingDaysAgo: 1, streak: 4, activeWorkout: "Condicionamento", lastWorkout: "Puxada Alta" },
-    { id: "st-lucas", name: "Lucas Andrade", avatar: AV(12), phone: "5511999990007", whatsapp_consent: true, lastTrainingDaysAgo: 2, streak: 2, activeWorkout: "Força Base", lastWorkout: "Terra Romeno" },
-    { id: "st-joao", name: "João Silva", avatar: AV(33), phone: "5511999990001", whatsapp_consent: true, lastTrainingDaysAgo: 4, streak: 0, activeWorkout: "Hipertrofia ABC", lastWorkout: null },
+    { id: "st-carlos", profile_id: "u5", name: "Carlos Mendes", avatar: AV(52), phone: "5511999990003", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 8, activeWorkout: "Hipertrofia ABC", lastWorkout: "Supino Reto" },
+    { id: "st-marina", profile_id: "u2", name: "Marina Costa", avatar: AV(45), phone: "5511999990002", whatsapp_consent: true, lastTrainingDaysAgo: 0, streak: 6, activeWorkout: "Glúteos 3x Semana", lastWorkout: "Elevação Pélvica" },
+    { id: "st-pedro", profile_id: "u3", name: "Pedro Rocha", avatar: AV(15), phone: "5511999990004", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 3, activeWorkout: "Full Body Iniciante", lastWorkout: "Leg Press 45°" },
+    { id: "st-anaj", profile_id: "u6", name: "Ana Júlia", avatar: AV(44), phone: "5511999990005", whatsapp_consent: true, lastTrainingDaysAgo: 1, streak: 5, activeWorkout: "Cutting Definição", lastWorkout: "Agachamento Smith", lastRpe: 10 },
+    { id: "st-ana", profile_id: "u4", name: "Ana Souza", avatar: AV(47), phone: "5511999990006", whatsapp_consent: false, lastTrainingDaysAgo: 1, streak: 4, activeWorkout: "Condicionamento", lastWorkout: "Puxada Alta" },
+    { id: "st-lucas", profile_id: "u1", name: "Lucas Andrade", avatar: AV(12), phone: "5511999990007", whatsapp_consent: true, lastTrainingDaysAgo: 2, streak: 2, activeWorkout: "Força Base", lastWorkout: "Terra Romeno" },
+    { id: "st-joao", profile_id: "u7", name: "João Silva", avatar: AV(33), phone: "5511999990001", whatsapp_consent: true, lastTrainingDaysAgo: 4, streak: 0, activeWorkout: "Hipertrofia ABC", lastWorkout: null },
   ];
 }
 
@@ -169,4 +171,48 @@ export function demoTemplates(): WorkoutTemplate[] {
       ],
     },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Séries determinísticas por aluno (histórico de treinos e evolução de peso)
+// ---------------------------------------------------------------------------
+
+function hashSeed(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 997;
+  return h;
+}
+
+/** Histórico de treinos com data e volume (kg movidos). */
+export function mockWorkoutHistory(student: PersonalStudent): Array<{
+  date: string;
+  name: string;
+  volume: number;
+  sets: number;
+}> {
+  const seed = hashSeed(student.id);
+  const out: Array<{ date: string; name: string; volume: number; sets: number }> = [];
+  const names = student.activeWorkout ? [student.activeWorkout, "Acessórios", "Cardio"] : ["Adaptativo"];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - (i * 2 + (student.lastTrainingDaysAgo || 1)));
+    out.push({
+      date: d.toISOString(),
+      name: names[i % names.length],
+      volume: 4200 + ((seed * (i + 3)) % 2600),
+      sets: 16 + ((seed + i * 7) % 10),
+    });
+  }
+  return out;
+}
+
+/** Série de evolução de peso (kg), última medição mais recente. */
+export function mockWeightSeries(student: PersonalStudent): number[] {
+  const seed = hashSeed(student.id);
+  const base = 62 + (seed % 28); // 62–89 kg
+  const drift = ((seed % 5) - 2) * 0.8; // -1.6 a +3.2 kg de tendência
+  return Array.from({ length: 6 }, (_, i) => {
+    const wiggle = ((seed * (i + 1)) % 7) / 10 - 0.3;
+    return Math.round((base + (drift * i) / 5 + wiggle) * 10) / 10;
+  });
 }

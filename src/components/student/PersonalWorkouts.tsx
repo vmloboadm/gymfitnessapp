@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { motion, type Variants } from "framer-motion";
 import { MessageSquareText, Dumbbell, UserRoundCheck } from "lucide-react";
+import { toast } from "sonner";
 import {
   listAssignedWorkouts,
+  markAllSeen,
+  unseenCount,
   TRAINER_WORKOUTS_EVENT,
   type AssignedWorkout,
 } from "~/lib/trainer-store";
@@ -20,9 +23,10 @@ const item: Variants = {
 
 /**
  * Seção "Do seu Personal" no treino do aluno: treinos enviados pelo
- * Co-Pilot do personal (demo via trainer-store; produção via workout_programs).
+ * Co-Pilot (demo via trainer-store; produção via workout_programs).
+ * Treino novo gera toast + badge NOVO (notificação única).
  */
-export function PersonalWorkouts() {
+export function PersonalWorkouts({ studentId }: { studentId?: string }) {
   const [workouts, setWorkouts] = useState<AssignedWorkout[]>([]);
 
   useEffect(() => {
@@ -36,6 +40,18 @@ export function PersonalWorkouts() {
     };
   }, []);
 
+  // notificação única por treino novo
+  useEffect(() => {
+    const n = unseenCount();
+    if (n > 0) {
+      toast.success(
+        n === 1 ? "Novo treino do seu Personal!" : `${n} novos treinos do seu Personal!`,
+        { description: "Confira a seção Do seu Personal." }
+      );
+      markAllSeen();
+    }
+  }, [workouts.length]);
+
   if (workouts.length === 0) return null;
 
   return (
@@ -48,8 +64,13 @@ export function PersonalWorkouts() {
         Do seu Personal
       </h2>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-2.5">
-        {workouts.map((w) => (
+        {workouts.map((w, idx) => (
           <motion.article key={w.id} variants={item} className="gf-card gf-glass !p-4">
+            {idx === 0 ? (
+              <span className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-brand-foreground">
+                Novo
+              </span>
+            ) : null}
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="flex items-center gap-1.5 text-[13px] font-bold text-foreground">
@@ -84,9 +105,45 @@ export function PersonalWorkouts() {
                 {w.notes}
               </p>
             ) : null}
+
+            <LoadRequestButton workoutName={w.name} />
           </motion.article>
         ))}
       </motion.div>
     </section>
+  );
+}
+
+/** Pedido de ajuste de carga: cai na caixa de aprovações do personal. */
+function LoadRequestButton({ workoutName }: { workoutName: string }) {
+  const [sent, setSent] = useState(false);
+
+  // createApproval via import dinâmico pesado; import estático direto
+  const request = async () => {
+    const { createApproval } = await import("~/lib/trainer-store");
+    createApproval({
+      studentId: "student-self",
+      studentName: "Você",
+      type: "carga",
+      message: `Pedido de ajuste de carga no treino "${workoutName}". A última sessão pesou mais que o normal.`,
+    });
+    setSent(true);
+    toast.success("Pedido enviado ao seu Personal");
+  };
+
+  if (sent) {
+    return (
+      <p className="mt-2 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-center text-[10px] font-semibold text-muted-foreground">
+        Pedido de ajuste enviado, aguarde a resposta do Personal.
+      </p>
+    );
+  }
+  return (
+    <button
+      onClick={request}
+      className="tactile mt-2 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] py-2 text-[11px] font-bold text-muted-foreground transition-colors hover:text-brand"
+    >
+      Pedir ajuste de carga
+    </button>
   );
 }

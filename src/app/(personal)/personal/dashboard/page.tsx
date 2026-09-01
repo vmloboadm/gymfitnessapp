@@ -6,14 +6,16 @@ import { motion, type Variants } from "framer-motion";
 import {
   MessageCircle,
   Flame,
-  Trophy,
   CircleAlert,
   ChevronRight,
   Bell,
   Activity,
   Users,
   ClipboardList,
-  ScanLine,
+  UserRoundX,
+  Trophy,
+  Newspaper,
+  Dumbbell,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { useAuth } from "~/hooks/useAuth";
@@ -82,7 +84,7 @@ export default function PersonalDashboardPage() {
       activeStudents: students.filter((s) => s.lastTrainingDaysAgo <= 2).length,
       totalStudents: students.length,
       prescribedToday,
-      checkinsToday: Math.max(online, 12),
+      missesWeek: students.filter((s) => s.lastTrainingDaysAgo >= 3).length,
     };
   }, [students, online]);
 
@@ -131,7 +133,7 @@ export default function PersonalDashboardPage() {
             <span className="text-[11px] font-bold text-muted-foreground">/{stats.totalStudents}</span>
           </p>
           <p className="mt-1 text-[9.5px] font-semibold leading-tight text-muted-foreground">
-            Alunos ativos
+            Ativos hoje
           </p>
         </Link>
         <div className="gf-card gf-glass !rounded-2xl !p-3">
@@ -146,14 +148,14 @@ export default function PersonalDashboardPage() {
           </p>
         </div>
         <div className="gf-card gf-glass !rounded-2xl !p-3">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#FFC24D]/25 bg-[#FFC24D]/10">
-            <ScanLine className="h-3.5 w-3.5 text-[#FFC24D]" />
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#F87171]/25 bg-[#F87171]/10">
+            <UserRoundX className="h-3.5 w-3.5 text-[#F87171]" />
           </span>
           <p className="mt-2 font-display text-xl font-black leading-none text-foreground">
-            <CountUp value={stats.checkinsToday} />
+            <CountUp value={stats.missesWeek} />
           </p>
           <p className="mt-1 text-[9.5px] font-semibold leading-tight text-muted-foreground">
-            Check-ins de hoje
+            Faltas da semana
           </p>
         </div>
       </motion.div>
@@ -183,6 +185,28 @@ export default function PersonalDashboardPage() {
             }} />
           ))}
         </motion.div>
+      </motion.section>
+
+      {/* Ações rápidas: ranking com poderes, feed e biblioteca */}
+      <motion.section variants={item} initial="hidden" animate="show" aria-labelledby="quick-title">
+        <h2 id="quick-title" className="mb-2 text-sm font-bold text-foreground">Ferramentas</h2>
+        <div className="grid grid-cols-3 gap-2">
+          <Link href="/personal/ranking" className="gf-card gf-glass !rounded-2xl !p-3 text-center transition-transform active:scale-[0.96]">
+            <Trophy className="mx-auto h-4.5 w-4.5 text-[#FFC24D]" />
+            <p className="mt-1.5 text-[10px] font-bold text-foreground">Ranking</p>
+            <p className="text-[8.5px] text-muted-foreground">validar pontos</p>
+          </Link>
+          <Link href="/feed" className="gf-card gf-glass !rounded-2xl !p-3 text-center transition-transform active:scale-[0.96]">
+            <Newspaper className="mx-auto h-4.5 w-4.5 text-brand" />
+            <p className="mt-1.5 text-[10px] font-bold text-foreground">Feed</p>
+            <p className="text-[8.5px] text-muted-foreground">comunidade</p>
+          </Link>
+          <Link href="/personal/exercicios" className="gf-card gf-glass !rounded-2xl !p-3 text-center transition-transform active:scale-[0.96]">
+            <Dumbbell className="mx-auto h-4.5 w-4.5 text-[#4ADE80]" />
+            <p className="mt-1.5 text-[10px] font-bold text-foreground">Exercícios</p>
+            <p className="text-[8.5px] text-muted-foreground">289 na base</p>
+          </Link>
+        </div>
       </motion.section>
 
       <StudentSheet student={sheetStudent} onClose={() => setSheetStudent(null)} />

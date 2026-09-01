@@ -732,6 +732,7 @@ export default function HomePage() {
               <p className="mt-1.5 line-clamp-2 text-[13px] font-semibold leading-snug text-[#F4F6FB]">Acelere com acompanhamento premium</p>
               <p className="mt-2 text-[11px] font-semibold text-brand">Ver personais →</p>
             </Link>
+            <PremiumRequestCard />
           </div>
         </motion.section>
 
@@ -765,5 +766,42 @@ export default function HomePage() {
       </AnimatePresence>
       <AiCoach />
     </div>
+  );
+}
+
+/** Pedido de desbloqueio Premium: cai na caixa de aprovações do personal. */
+function PremiumRequestCard() {
+  const [sent, setSent] = useState(false);
+  if (sent) {
+    return (
+      <div className="w-[72%] shrink-0 snap-start rounded-[18px] border border-white/[0.06] bg-card/60 p-4">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[#FFC24D]">Pedido enviado</p>
+        <p className="mt-1.5 text-[12px] font-semibold leading-snug text-[#F4F6FB]">
+          Seu Personal vai analisar o desbloqueio do Premium.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <button
+      onClick={async () => {
+        const { createApproval } = await import("~/lib/trainer-store");
+        createApproval({
+          studentId: "student-self",
+          studentName: "Você",
+          type: "premium",
+          message: "Quero desbloquear o Plano Premium com acompanhamento do Personal.",
+        });
+        setSent(true);
+        toast.success("Pedido enviado ao seu Personal");
+      }}
+      className="w-[72%] shrink-0 snap-start rounded-[18px] border border-[#FFC24D]/35 bg-gradient-to-br from-[#FFC24D]/15 via-card to-card p-4 text-left transition-transform active:scale-[0.98]"
+    >
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[#FFC24D]">Plano Premium</p>
+      <p className="mt-1.5 text-[13px] font-semibold leading-snug text-[#F4F6FB]">
+        Treino adaptativo, relatórios e mais
+      </p>
+      <p className="mt-2 text-[11px] font-semibold text-[#FFC24D]">Solicitar desbloqueio →</p>
+    </button>
   );
 }
