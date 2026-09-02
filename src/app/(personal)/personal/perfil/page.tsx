@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound } from "lucide-react";
+import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2 } from "lucide-react";
+import { Button } from "~/components/ui/button";
+import { supabaseBrowser } from "~/lib/supabase/client";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { useAuth } from "~/hooks/useAuth";
@@ -25,10 +27,17 @@ export default function PersonalPerfilPage() {
   const { profile } = useAuth();
   const students = useMemo(() => demoPersonalStudents(), []);
   const [tab, setTab] = useState<TabId>("alunos");
+  const [demoAvatar, setDemoAvatar] = useState<string | null>(null);
   const [bio, setBio] = useState(
     "C Parish treinando há 8 anos. Especialista em hipertrofia e recomposição corporal. Acredito em execução limpa antes de carga."
   );
   const [editingBio, setEditingBio] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pw1, setPw1] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [savingPw, setSavingPw] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [assigned, setAssigned] = useState<Awaited<ReturnType<typeof listAssignedWorkouts>>>([]);
 
   useEffect(() => {
@@ -37,6 +46,71 @@ export default function PersonalPerfilPage() {
     window.addEventListener("gymfit-trainer-workouts", bump);
     return () => window.removeEventListener("gymfit-trainer-workouts", bump);
   }, []);
+
+  const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
+  /** Foto: /api/avatar faz o smart crop (rosto centrado) e salva no perfil. */
+  const onPickPhoto = async (file: File | null) => {
+    if (!file || uploading) return;
+    setUploading(true);
+    try {
+      if (isDemo) {
+        // demo sem Supabase: preview local
+        const url = URL.createObjectURL(file);
+        toast.success("Foto carregada (modo teste, não salva no servidor)");
+        setDemoAvatar(url);
+      } else {
+        const { data: sess } = await supabaseBrowser().auth.getSession();
+        const token = sess.session?.access_token;
+        if (!token) throw new Error("Faça login para trocar a foto.");
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/avatar", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        const data = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+        if (!data.ok || !data.url) throw new Error(data.error ?? "Falha no upload");
+        await supabaseBrowser().auth.updateUser({ data: { avatar_url: data.url } });
+        toast.success("Foto atualizada com o rosto no centro!");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha no upload");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const changePassword = async () => {
+    if (savingPw) return;
+    if (pw1.length < 6) {
+      toast.error("A senha precisa de pelo menos 6 caracteres.");
+      return;
+    }
+    if (pw1 !== pw2) {
+      toast.error("As senhas não conferem.");
+      return;
+    }
+    if (isDemo) {
+      toast.info("Troca de senha disponível no login real da academia.");
+      return;
+    }
+    setSavingPw(true);
+    try {
+      const { error } = await supabaseBrowser().auth.updateUser({ password: pw1 });
+      if (error) throw error;
+      toast.success("Senha alterada com sucesso!");
+      setPwOpen(false);
+      setPw1("");
+      setPw2("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não deu trocar a senha agora.");
+    } finally {
+      setSavingPw(false);
+    }
+  };
 
   const monthKey = new Date().getMonth();
   const monthWorkouts = assigned.filter((w) => new Date(w.created_at).getMonth() === monthKey).length;
@@ -57,14 +131,28 @@ export default function PersonalPerfilPage() {
         className="gf-card gf-glass !p-5"
       >
         <div className="flex items-center gap-4">
-          <span className="relative shrink-0 rounded-full bg-brand p-[2px] shadow-[0_0_18px_rgba(244,113,30,0.35)]">
+          <button
+            onClick={() => fileRef.current?.click()}
+            aria-label="Trocar foto de perfil"
+            className="group relative shrink-0 rounded-full bg-brand p-[2px] shadow-[0_0_18px_rgba(244,113,30,0.35)] transition-transform active:scale-[0.96]"
+          >
             <Avatar className="h-16 w-16 border-2 border-background">
-              <AvatarImage src={profile?.avatar_url ?? undefined} alt={profile?.name ?? "Personal"} />
+              <AvatarImage src={demoAvatar ?? profile?.avatar_url ?? undefined} alt={profile?.name ?? "Personal"} />
               <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-lg font-black text-brand-foreground">
                 {(profile?.name?.[0] ?? "P").toUpperCase()}
               </AvatarFallback>
             </Avatar>
-          </span>
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-card text-muted-foreground group-hover:text-brand">
+              {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
+            </span>
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
+          />
           <div className="min-w-0 flex-1">
             <p className="truncate text-lg font-bold text-foreground">{profile?.name ?? "Personal"}</p>
             <p className="text-[11px] font-bold uppercase tracking-widest text-brand">
@@ -115,6 +203,51 @@ export default function PersonalPerfilPage() {
           )}
         </div>
       </motion.header>
+
+      {/* Segurança: alterar senha */}
+      <section className="gf-card gf-glass !p-4" aria-labelledby="seg-title">
+        <div className="flex items-center justify-between gap-2">
+          <p id="seg-title" className="flex items-center gap-1.5 text-[12px] font-bold text-foreground">
+            <KeyRound className="h-4 w-4 text-brand" />
+            Segurança
+          </p>
+          <button
+            onClick={() => setPwOpen((v) => !v)}
+            className="tactile rounded-lg border border-white/[0.06] bg-white/[0.04] px-3 py-1.5 text-[10.5px] font-bold text-muted-foreground transition-colors hover:text-brand"
+          >
+            {pwOpen ? "Cancelar" : "Alterar senha"}
+          </button>
+        </div>
+        {pwOpen ? (
+          <div className="mt-3 space-y-2">
+            <input
+              type="password"
+              value={pw1}
+              onChange={(e) => setPw1(e.target.value)}
+              placeholder="Nova senha (mínimo 6 caracteres)"
+              aria-label="Nova senha"
+              className="h-11 w-full rounded-xl border border-white/[0.08] bg-white/[0.05] px-3 text-[13px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+            />
+            <input
+              type="password"
+              value={pw2}
+              onChange={(e) => setPw2(e.target.value)}
+              placeholder="Confirmar nova senha"
+              aria-label="Confirmar nova senha"
+              className="h-11 w-full rounded-xl border border-white/[0.08] bg-white/[0.05] px-3 text-[13px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+            />
+            <Button
+              onClick={changePassword}
+              disabled={savingPw || !pw1 || !pw2}
+              size="sm"
+              className="h-10 w-full rounded-xl text-[12px] font-bold"
+            >
+              {savingPw ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              Salvar nova senha
+            </Button>
+          </div>
+        ) : null}
+      </section>
 
       {/* abas */}
       <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-white/[0.03] p-1" role="tablist">

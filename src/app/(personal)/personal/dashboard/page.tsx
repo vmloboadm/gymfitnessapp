@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion, type Variants } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import {
   MessageCircle,
   Flame,
@@ -18,23 +18,21 @@ import {
   Newspaper,
   Dumbbell,
   CalendarCheck,
-  Sparkles,
-  RefreshCw,
-  Inbox,
+  ListChecks,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { useAuth } from "~/hooks/useAuth";
 import { demoOnlineAgora } from "~/lib/demo-bridge";
 import { LivePulse } from "~/components/dashboard/LivePulse";
 import { CountUp } from "~/components/common/CountUp";
 import { StudentSheet } from "~/components/personal/StudentSheet";
 import {
-  computeRadar,
   demoPersonalStudents,
-  type RadarAlert,
   type PersonalStudent,
 } from "~/lib/personal-data";
 import { briefingOffline } from "~/lib/ai/local-gen";
+import { computeQueue, type QueueItem } from "~/lib/personal-queue";
 import {
   listAssignedWorkouts,
   pendingApprovalCount,
@@ -53,30 +51,23 @@ const item: Variants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.2, 0.8, 0.2, 1] } },
 };
 
-const SEVERITY = {
+const TONE = {
   red: {
     ring: "border-[#F87171]/25 bg-[#F87171]/[0.07]",
     icon: "border-[#F87171]/25 bg-[#F87171]/10 text-[#F87171]",
-    Icon: CircleAlert,
   },
-  yellow: {
+  amber: {
     ring: "border-[#FFC24D]/25 bg-[#FFC24D]/[0.07]",
     icon: "border-[#FFC24D]/25 bg-[#FFC24D]/10 text-[#FFC24D]",
-    Icon: Flame,
   },
   green: {
     ring: "border-[#4ADE80]/25 bg-[#4ADE80]/[0.07]",
     icon: "border-[#4ADE80]/25 bg-[#4ADE80]/10 text-[#4ADE80]",
-    Icon: Trophy,
   },
 } as const;
 
-function waHref(phone: string, text: string) {
-  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-}
-
 const WEEKDAY_PATTERN: Record<number, number[]> = {
-  1: [1, 3, 5], // segunda
+  1: [1, 3, 5],
   2: [2, 4, 6],
   3: [1, 3, 5],
   4: [2, 4, 6],
@@ -85,15 +76,21 @@ const WEEKDAY_PATTERN: Record<number, number[]> = {
   0: [0],
 };
 
+function waHref(phone: string, text: string) {
+  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+}
+
 /**
- * Cockpit de gestão do Personal: briefing IA do dia, métricas com count-up,
- * pulso da academia, agenda de hoje e radar de retenção que reage às ações.
+ * Cockpit de gestão do Personal: Fila de Hoje (ações acionáveis derivadas
+ * do estado real, espelhadas no sino), métricas com count-up, pulso da
+ * academia e agenda do dia.
  */
 export default function PersonalDashboardPage() {
   const { profile } = useAuth();
   const students = useMemo(() => demoPersonalStudents(), []);
   const online = useMemo(() => demoOnlineAgora(), []);
   const [sheetStudent, setSheetStudent] = useState<PersonalStudent | null>(null);
+  const [queueOpen, setQueueOpen] = useState(false);
   const [tick, setTick] = useState(0);
 
   // reage a TODAS as ações do personal (atribuir treino, aprovar, penalizar)
@@ -127,18 +124,19 @@ export default function PersonalDashboardPage() {
     };
   }, [students, assigned, tick]);
 
-  // Radar dinâmico: deriva do estado real
-  const alerts = useMemo(
-    () =>
-      computeRadar(
-        students,
-        assigned.map((w) => ({ studentId: w.studentId, createdAtIso: w.created_at }))
-      ),
-    [students, assigned, tick]
-  );
+  // Fila de Hoje: ações acionáveis derivadas do estado real
+  const queue = useMemo(() => {
+    const todayKey = new Date().toDateString();
+    const assignedToday = new Set(
+      assigned
+        .filter((w) => new Date(w.created_at).toDateString() === todayKey)
+        .map((w) => w.studentId)
+    );
+    return computeQueue(students, pendingApprovals, assignedToday);
+  }, [students, pendingApprovals, assigned, tick]);
 
-  // Briefing IA do dia (LLM quando configurado; motor local de bolso sempre)
-  const briefing = useMemo(
+  // linha resumida do estado do dia (rodapé do card da fila)
+  const briefingLine = useMemo(
     () =>
       briefingOffline({
         activeToday: stats.activeStudents,
@@ -147,7 +145,9 @@ export default function PersonalDashboardPage() {
         prescribedToday: stats.prescribedToday,
         pendingApprovals,
         worstStudent:
-          students.filter((s) => s.lastTrainingDaysAgo >= 3).sort((a, b) => b.lastTrainingDaysAgo - a.lastTrainingDaysAgo)[0]?.name ?? null,
+          students
+            .filter((s) => s.lastTrainingDaysAgo >= 3)
+            .sort((a, b) => b.lastTrainingDaysAgo - a.lastTrainingDaysAgo)[0]?.name ?? null,
         worstDays: Math.max(0, ...students.map((s) => s.lastTrainingDaysAgo)),
         topStudent: students.find((s) => s.lastTrainingDaysAgo === 0)?.name ?? null,
       }),
@@ -163,15 +163,14 @@ export default function PersonalDashboardPage() {
     }).slice(0, 4);
   }, [students, tick]);
 
-  const counts = {
-    red: alerts.filter((a) => a.severity === "red").length,
-    yellow: alerts.filter((a) => a.severity === "yellow").length,
-    green: alerts.filter((a) => a.severity === "green").length,
+  const openStudent = (studentId: string) => {
+    const s = students.find((x) => x.id === studentId);
+    if (s) setSheetStudent(s);
   };
 
   return (
     <div className="space-y-5">
-      {/* Header: identidade do personal */}
+      {/* Header: identidade do personal + sino com badge da fila */}
       <motion.header variants={item} initial="hidden" animate="show" className="flex items-center gap-3">
         <span className="relative shrink-0 rounded-full bg-brand p-[2px] shadow-[0_0_18px_rgba(244,113,30,0.35)]">
           <Avatar className="h-12 w-12 border-2 border-background">
@@ -190,45 +189,56 @@ export default function PersonalDashboardPage() {
           </p>
         </div>
         <button
-          aria-label="Notificações"
-          className="tactile flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03] text-muted-foreground transition-colors hover:text-foreground"
+          onClick={() => setQueueOpen(true)}
+          aria-label={`Fila de hoje, ${queue.length} itens`}
+          className="tactile relative flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03] text-muted-foreground transition-colors hover:text-foreground"
         >
           <Bell className="h-4 w-4" />
+          {queue.length > 0 ? (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-black text-brand-foreground">
+              {queue.length}
+            </span>
+          ) : null}
         </button>
       </motion.header>
 
-      {/* Briefing IA do dia */}
-      <motion.section variants={item} initial="hidden" animate="show" aria-labelledby="briefing-title">
+      {/* Fila de Hoje: card principal */}
+      <motion.section variants={item} initial="hidden" animate="show" aria-labelledby="queue-title">
         <div className="mb-2 flex items-center justify-between">
-          <h2 id="briefing-title" className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <Sparkles className="h-4 w-4 text-brand" />
-            Briefing do dia
+          <h2 id="queue-title" className="flex items-center gap-2 text-sm font-bold text-foreground">
+            <ListChecks className="h-4 w-4 text-brand" />
+            Fila de hoje
           </h2>
-          <button
-            onClick={() => setTick((t) => t + 1)}
-            aria-label="Atualizar briefing"
-            className="tactile flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.03] text-muted-foreground transition-colors hover:text-brand"
-          >
-            <RefreshCw className="h-3 w-3" />
-          </button>
+          <p className="text-[10px] font-medium text-muted-foreground">
+            {queue.length} pendência{queue.length === 1 ? "" : "s"}
+          </p>
         </div>
-        <div className="gf-card gf-glass !p-4">
-          <p className="text-[12.5px] leading-relaxed text-foreground/90">{briefing}</p>
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            {pendingApprovals > 0 ? (
-              <Link
-                href="/personal/aprovacoes"
-                className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2.5 py-1 text-[10px] font-bold text-brand ring-1 ring-brand/30"
-              >
-                <Inbox className="h-3 w-3" />
-                {pendingApprovals} aprovaç{pendingApprovals === 1 ? "ão" : "ões"} pendente{pendingApprovals === 1 ? "" : "s"}
-              </Link>
-            ) : null}
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2.5 py-1 text-[9.5px] font-semibold text-muted-foreground">
-              {stats.missesWeek} falta{stats.missesWeek === 1 ? "" : "s"} na semana
-            </span>
+
+        {queue.length === 0 ? (
+          <div className="rounded-2xl border border-[#4ADE80]/25 bg-[#4ADE80]/[0.06] p-5 text-center">
+            <TrophyIcon className="mx-auto mb-1.5 h-5 w-5 text-[#4ADE80]" />
+            <p className="text-[12px] font-bold text-foreground">Tudo em dia, turma resolvida</p>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-2">
+            {queue.slice(0, 4).map((q) => (
+              <QueueRow key={q.id} item={q} onOpenStudent={openStudent} compact />
+            ))}
+            {queue.length > 4 ? (
+              <button
+                onClick={() => setQueueOpen(true)}
+                className="tactile w-full rounded-xl border border-white/[0.06] bg-white/[0.03] py-2.5 text-[11px] font-bold text-muted-foreground transition-colors hover:text-brand"
+              >
+                Ver as outras {queue.length - 4} no sino
+              </button>
+            ) : null}
+          </div>
+        )}
+
+        {/* resumo do dia no rodapé do card */}
+        <p className="mt-2.5 rounded-xl border border-white/[0.05] bg-white/[0.02] p-2.5 text-[10.5px] leading-snug text-muted-foreground">
+          {briefingLine}
+        </p>
       </motion.section>
 
       {/* Métricas de gestão (count-up) */}
@@ -315,38 +325,6 @@ export default function PersonalDashboardPage() {
         </motion.section>
       ) : null}
 
-      {/* Radar de Retenção (dinâmico) */}
-      <motion.section variants={item} initial="hidden" animate="show" aria-labelledby="radar-title">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 id="radar-title" className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <Activity className="h-4 w-4 text-brand" />
-            Radar de Retenção
-          </h2>
-          <p className="text-[10px] font-medium text-muted-foreground">
-            {counts.red} críticos · {counts.yellow} atenção · {counts.green} positivos
-          </p>
-        </div>
-
-        {alerts.length === 0 ? (
-          <div className="rounded-2xl border border-[#4ADE80]/25 bg-[#4ADE80]/[0.06] p-5 text-center">
-            <TrophyIcon className="mx-auto mb-1.5 h-5 w-5 text-[#4ADE80]" />
-            <p className="text-[12px] font-bold text-foreground">Nenhum alerta, turma em dia</p>
-            <p className="mt-0.5 text-[10.5px] text-muted-foreground">
-              O radar atualiza sozinho quando alguém some, registra RPE alto ou recebe plano novo.
-            </p>
-          </div>
-        ) : (
-          <motion.div variants={container} initial="hidden" animate="show" className="space-y-2.5">
-            {alerts.map((a) => (
-              <RadarCard key={a.id} alert={a} onOpenStudent={() => {
-                const s = students.find((x) => x.id === a.studentId);
-                if (s) setSheetStudent(s);
-              }} />
-            ))}
-          </motion.div>
-        )}
-      </motion.section>
-
       {/* Ações rápidas */}
       <motion.section variants={item} initial="hidden" animate="show" aria-labelledby="quick-title">
         <h2 id="quick-title" className="mb-2 text-sm font-bold text-foreground">Ferramentas</h2>
@@ -369,58 +347,96 @@ export default function PersonalDashboardPage() {
         </div>
       </motion.section>
 
+      {/* Sino: fila completa no bottom sheet */}
+      <BottomSheet open={queueOpen} onClose={() => setQueueOpen(false)}>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-5 w-5 text-brand" />
+            <p className="text-base font-bold text-foreground">Fila de hoje</p>
+            <span className="ml-auto rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold text-brand">
+              {queue.length}
+            </span>
+          </div>
+          {queue.map((q) => (
+            <QueueRow key={q.id} item={q} onOpenStudent={(id) => { setQueueOpen(false); openStudent(id); }} />
+          ))}
+        </div>
+      </BottomSheet>
+
       <StudentSheet student={sheetStudent} onClose={() => setSheetStudent(null)} />
     </div>
   );
 }
 
-function RadarCard({ alert, onOpenStudent }: { alert: RadarAlert; onOpenStudent: () => void }) {
-  const sev = SEVERITY[alert.severity];
-  const { Icon } = sev;
-  const wa = alert.whatsapp;
+const rowItem: Variants = {
+  hidden: { opacity: 0, y: 14 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] } },
+};
+
+function QueueRow({
+  item: queueItem,
+  onOpenStudent,
+  compact = false,
+}: {
+  item: QueueItem;
+  onOpenStudent: (studentId: string) => void;
+  compact?: boolean;
+}) {
+  const tone = TONE[queueItem.tone];
+  const Icon =
+    queueItem.tone === "red" ? CircleAlert : queueItem.tone === "amber" ? Flame : Trophy;
+
+  const runAction = () => {
+    if (queueItem.action.kind === "student") onOpenStudent(queueItem.action.studentId);
+  };
 
   return (
-    <motion.article variants={item} className={cn("gf-card gf-glass !p-4 transition-transform active:scale-[0.985]")}>
-      <button onClick={onOpenStudent} className="flex w-full items-start gap-3 text-left">
-        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border", sev.icon)}>
+    <motion.article
+      variants={rowItem}
+      initial="hidden"
+      animate="show"
+      className={cn("gf-card gf-glass !p-3.5", tone.ring)}
+    >
+      <button
+        onClick={runAction}
+        className={cn("flex w-full items-start gap-3 text-left", queueItem.action.kind === "student" && "transition-transform active:scale-[0.985]")}
+      >
+        <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border", tone.icon)}>
           <Icon className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-bold leading-snug text-foreground">{alert.message}</p>
-          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{alert.detail}</p>
-          <p className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-brand/80">
-            Ver ficha do aluno <ChevronRight className="h-3 w-3" />
-          </p>
+          <p className="text-[12.5px] font-bold leading-snug text-foreground">{queueItem.text}</p>
+          {!compact ? (
+            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{queueItem.detail}</p>
+          ) : null}
         </div>
       </button>
 
-      <div className="mt-3 flex items-center gap-2">
-        {wa && wa.consent ? (
+      <div className="mt-2.5">
+        {queueItem.action.kind === "whatsapp" ? (
           <a
-            href={waHref(wa.phone, wa.text)}
+            href={waHref(queueItem.action.phone, queueItem.action.text)}
             target="_blank"
             rel="noreferrer"
-            className="tactile inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#25D366]/15 px-3 text-[11px] font-bold text-[#4ADE80] ring-1 ring-[#25D366]/30 transition-transform active:scale-[0.96]"
+            className="tactile inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#25D366]/15 px-3 text-[10.5px] font-bold text-[#4ADE80] ring-1 ring-[#25D366]/30 transition-transform active:scale-[0.96]"
           >
-            <MessageCircle className="h-3.5 w-3.5" />
-            {wa.label ?? "WhatsApp"}
+            <MessageCircle className="h-3 w-3" />
+            {queueItem.action.label}
           </a>
-        ) : wa && !wa.consent ? (
-          <span className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white/[0.04] px-3 text-[11px] font-medium text-muted-foreground ring-1 ring-white/[0.06]">
-            <MessageCircle className="h-3.5 w-3.5" />
-            Sem consentimento
-          </span>
-        ) : null}
-
-        {alert.action ? (
+        ) : queueItem.action.kind === "link" ? (
           <Link
-            href={alert.action.href}
-            className="tactile inline-flex h-9 items-center gap-1.5 rounded-xl bg-brand/15 px-3 text-[11px] font-bold text-brand ring-1 ring-brand/30 transition-transform active:scale-[0.96]"
+            href={queueItem.action.href}
+            className="tactile inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand/15 px-3 text-[10.5px] font-bold text-brand ring-1 ring-brand/30 transition-transform active:scale-[0.96]"
           >
-            {alert.action.label}
-            <ChevronRight className="h-3.5 w-3.5" />
+            {queueItem.action.label}
+            <ChevronRight className="h-3 w-3" />
           </Link>
-        ) : null}
+        ) : (
+          <span className="tactile inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/[0.05] px-3 text-[10.5px] font-bold text-foreground ring-1 ring-white/[0.08]">
+            {queueItem.action.label}
+            <ChevronRight className="h-3 w-3" />
+          </span>
+        )}
       </div>
     </motion.article>
   );
