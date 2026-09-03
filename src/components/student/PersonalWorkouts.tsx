@@ -1,16 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, type Variants } from "framer-motion";
 import { MessageSquareText, Dumbbell, UserRoundCheck } from "lucide-react";
 import { toast } from "sonner";
-import {
-  listAssignedWorkouts,
-  markAllSeen,
-  unseenCount,
-  TRAINER_WORKOUTS_EVENT,
-  type AssignedWorkout,
-} from "~/lib/trainer-store";
+import { TRAINER_WORKOUTS_EVENT, type AssignedWorkout } from "~/lib/trainer-store";
+import { useAuth } from "~/hooks/useAuth";
+import { fetchMyAssignedPlans, submitRequest } from "~/lib/gym-api";
 
 const container: Variants = {
   hidden: {},
@@ -27,30 +23,40 @@ const item: Variants = {
  * Treino novo gera toast + badge NOVO (notificação única).
  */
 export function PersonalWorkouts({ studentId }: { studentId?: string }) {
+  const { user, profile } = useAuth();
+  const gymId = profile?.gym_id ?? "";
+  const uid = user?.id ?? studentId ?? "student-self";
   const [workouts, setWorkouts] = useState<AssignedWorkout[]>([]);
 
   useEffect(() => {
-    const hydrate = () => setWorkouts(listAssignedWorkouts().slice(0, 5));
+    if (!gymId) return;
+    let alive = true;
+    const hydrate = () =>
+      fetchMyAssignedPlans(uid, gymId)
+        .then((rows) => { if (alive) setWorkouts(rows.slice(0, 5)); })
+        .catch(() => {});
     hydrate();
+    const t = setInterval(hydrate, 20000); // produção: plano novo aparece sozinho
     window.addEventListener(TRAINER_WORKOUTS_EVENT, hydrate);
-    window.addEventListener("storage", hydrate);
     return () => {
+      alive = false;
+      clearInterval(t);
       window.removeEventListener(TRAINER_WORKOUTS_EVENT, hydrate);
-      window.removeEventListener("storage", hydrate);
     };
-  }, []);
+  }, [gymId, uid]);
 
-  // notificação única por treino novo
+  // notificação quando um plano chega (demo usa contador; produção usa evento + interval)
+  const seen = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const n = unseenCount();
-    if (n > 0) {
+    const novos = workouts.filter((w) => !seen.current.has(w.id));
+    if (novos.length > 0 && seen.current.size > 0) {
       toast.success(
-        n === 1 ? "Novo treino do seu Personal!" : `${n} novos treinos do seu Personal!`,
+        novos.length === 1 ? "Novo treino do seu Personal!" : `${novos.length} novos treinos do seu Personal!`,
         { description: "Confira a seção Do seu Personal." }
       );
-      markAllSeen();
     }
-  }, [workouts.length]);
+    for (const w of novos) seen.current.add(w.id);
+  }, [workouts]);
 
   if (workouts.length === 0) return null;
 
@@ -136,7 +142,7 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
               </p>
             ) : null}
 
-            <LoadRequestButton workoutName={w.name} />
+            <LoadRequestButton workoutName={w.name} studentId={studentId} />
           </motion.article>
         ))}
       </motion.div>
@@ -145,20 +151,25 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
 }
 
 /** Pedido de ajuste de carga: cai na caixa de aprovações do personal. */
-function LoadRequestButton({ workoutName }: { workoutName: string }) {
+function LoadRequestButton({ workoutName, studentId }: { workoutName: string; studentId?: string }) {
   const [sent, setSent] = useState(false);
+  const { user, profile } = useAuth();
+  const uid = user?.id ?? studentId ?? "student-self";
 
-  // createApproval via import dinâmico pesado; import estático direto
   const request = async () => {
-    const { createApproval } = await import("~/lib/trainer-store");
-    createApproval({
-      studentId: "student-self",
-      studentName: "Você",
-      type: "carga",
-      message: `Pedido de ajuste de carga no treino "${workoutName}". A última sessão pesou mais que o normal.`,
-    });
-    setSent(true);
-    toast.success("Pedido enviado ao seu Personal");
+    try {
+      await submitRequest({
+        gymId: profile?.gym_id ?? "",
+        userId: uid,
+        userName: "Você",
+        type: "carga",
+        message: `Pedido de ajuste de carga no treino "${workoutName}". A última sessão pesou mais que o normal.`,
+      });
+      setSent(true);
+      toast.success("Pedido enviado ao seu Personal");
+    } catch {
+      toast.error("Não deu enviar agora. Tente de novo.");
+    }
   };
 
   if (sent) {

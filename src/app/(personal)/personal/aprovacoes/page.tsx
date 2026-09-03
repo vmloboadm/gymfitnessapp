@@ -5,15 +5,14 @@ import { motion, type Variants } from "framer-motion";
 import { Inbox, Crown, Dumbbell, Check, X, Inbox as InboxIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { useAuth } from "~/hooks/useAuth";
 import { demoPersonalStudents } from "~/lib/personal-data";
+import { useAuth } from "~/hooks/useAuth";
 import {
-  listApprovals,
   pendingApprovalCount,
-  resolveApproval,
   TRAINER_APPROVALS_EVENT,
   type ApprovalRequest,
 } from "~/lib/trainer-store";
+import { decideRequest, getRequests } from "~/lib/gym-api";
 import { cn } from "~/lib/utils";
 
 const container: Variants = {
@@ -33,27 +32,36 @@ const fmt = (iso: string) =>
  * carga) com decisão do personal. Estado persistido via trainer-store.
  */
 export default function PersonalAprovacoesPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const students = useMemo(() => demoPersonalStudents(), []);
   const [items, setItems] = useState<ApprovalRequest[]>([]);
 
   useEffect(() => {
-    const hydrate = () => setItems(listApprovals());
+    if (!profile?.gym_id) return;
+    let alive = true;
+    const hydrate = () =>
+      getRequests(profile.gym_id)
+        .then((rows) => { if (alive) setItems(rows); })
+        .catch(() => {});
     hydrate();
     window.addEventListener(TRAINER_APPROVALS_EVENT, hydrate);
     window.addEventListener("storage", hydrate);
+    const t = setInterval(hydrate, 15000); // produção: fila atualiza sozinha
     return () => {
+      alive = false;
       window.removeEventListener(TRAINER_APPROVALS_EVENT, hydrate);
       window.removeEventListener("storage", hydrate);
+      clearInterval(t);
     };
-  }, []);
+  }, [profile?.gym_id]);
 
   const pending = items.filter((a) => a.status === "pendente");
+  const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
   const resolved = items.filter((a) => a.status !== "pendente");
 
-  const decide = (id: string, status: "aprovado" | "recusado") => {
-    resolveApproval(id, status);
-    setItems(listApprovals());
+  const decide = async (id: string, status: "aprovado" | "recusado") => {
+    await decideRequest(id, status, user?.id ?? "");
+    setItems(await getRequests(profile?.gym_id ?? "").catch(() => items));
     toast.success(
       status === "aprovado" ? "Solicitação aprovada" : "Solicitação recusada",
       { description: "O aluno vê a resposta na área dele." }

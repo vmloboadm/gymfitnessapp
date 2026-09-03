@@ -172,7 +172,7 @@ export default function TreinoHomePage() {
       let details: TreinoDay[] = [];
       if (days.length > 0) {
         const dayIds = days.map((d) => d.id);
-        const weRes = await supabase.from("workout_exercises").select("*").in("day_id", dayIds).order("order", { ascending: true });
+        const weRes = await supabase.from("workout_exercises").select("*").in("day_id", dayIds).order("ord", { ascending: true });
         if (weRes.error) return errorResult(weRes.error.message);
         const we = (weRes.data ?? []) as WorkoutExercises[];
         const exIds = [...new Set(we.map((w) => w.exercise_id))];

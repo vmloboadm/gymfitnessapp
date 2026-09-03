@@ -1,218 +1,126 @@
 /**
- * Smoke E2E (MVP) — fluxo crítico em modo demo:
- *   cadastro/entrada → iniciar treino → NFC/QR portaria (simulado)
- *   → concluir 1 exercício → finalizar treino (check-out).
+ * Smoke E2E — fluxo de PRODUÇÃO:
+ *   servidor → login real do personal (Supabase Auth) → profile trainer
+ *   → telas do staff renderizam → sem erros de JS.
  *
  * Uso:
- *   node scripts/smoke.mjs                 # sobe `next dev -p 3111` sozinho
- *   SMOKE_URL=http://localhost:3000 node scripts/smoke.mjs
+ *   SMOKE_URL=http://localhost:3002 node scripts/smoke.mjs
  *
- * Requisitos: NEXT_PUBLIC_DEMO_MODE=1 no ambiente do servidor alvo.
+ * Requisito: NEXT_PUBLIC_DEMO_MODE=0 no servidor alvo e profiles reais.
  * Sai com código 0 em sucesso, 1 em qualquer falha.
  */
-import { spawn } from "node:child_process";
 import puppeteer from "puppeteer-core";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
-const URL_BASE = process.env.SMOKE_URL ?? "";
-const PORT = 3111;
+// .env.local do projeto (um script node puro não carrega Next env)
+const env = {};
+try {
+  for (const line of readFileSync(new URL("../.env.local", import.meta.url), "utf8").split("\n")) {
+    const m = line.match(/^([A-Z_]+)=(.*)$/);
+    if (m) env[m[1]] = m[2].trim();
+  }
+} catch { /* segue com process.env */ }
+
+const URL_BASE = process.env.SMOKE_URL ?? "http://localhost:3002";
 const CHROME_CANDIDATES = [
   process.env.PUPPETEER_EXECUTABLE,
   "/root/.cache/puppeteer/chrome/linux-152.0.7977.54/chrome-linux64/chrome",
   "/root/.cache/puppeteer/chrome/linux-152.0.7977.42/chrome-linux64/chrome",
 ].filter(Boolean);
 
-function findChrome() {
-  return CHROME_CANDIDATES.find((p) => existsSync(p));
-}
+const findChrome = () => CHROME_CANDIDATES.find((p) => existsSync(p));
 
-async function waitForServer(url, tries = 60) {
-  for (let i = 0; i < tries; i++) {
-    try {
-      const res = await fetch(url);
-      if (res.ok || res.status === 307 || res.status === 308) return true;
-    } catch {
-      /* ainda não subiu */
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  return false;
-}
-
-const results = [];
-function report(step, ok, detail = "") {
-  results.push({ step, ok });
-  console.log(`${ok ? "PASS" : "FAIL"}  ${step}${detail ? ` — ${detail}` : ""}`);
-}
-
-async function clickByText(page, selector, pattern) {
-  const handles = await page.$$(selector);
-  for (const h of handles) {
-    const text = await h.evaluate((el) => el.textContent ?? "");
-    if (pattern.test(text.trim())) {
-      await h.click();
-      return true;
-    }
-  }
-  return false;
-}
+const SUPA = env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const EMAIL = process.env.SMOKE_EMAIL ?? "gffitness2024@gmail.com";
+const PASSWORD = process.env.SMOKE_PASSWORD ?? "academiagf2026";
 
 async function main() {
-  let child;
-  if (!URL_BASE) {
-    console.log("SMOKE_URL ausente — subindo next dev na porta", PORT);
-    child = spawn("npx", ["next", "dev", "-p", String(PORT)], {
-      stdio: "pipe",
-      env: { ...process.env, NEXT_PUBLIC_DEMO_MODE: "1" },
-    });
-    child.stderr.on("data", () => {});
-  }
-
-  const base = URL_BASE || `http://localhost:${PORT}`;
-  const up = await waitForServer(base);
-  if (!up) {
-    report("servidor respondeu", false, `${base} não ficou pronto`);
-    process.exit(1);
-  }
-  report("servidor respondeu", true, base);
-
-  const chrome = findChrome();
-  if (!chrome) {
-    report("chrome disponível", false, "defina PUPPETEER_EXECUTABLE");
-    process.exit(1);
-  }
+  const steps = [];
+  const step = (name, ok, detail = "") => {
+    steps.push({ ok });
+    console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? " — " + detail : ""}`);
+  };
 
   const browser = await puppeteer.launch({
-    executablePath: chrome,
-    headless: "shell",
+    executablePath: findChrome(),
+    headless: true,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
   const page = await browser.newPage();
-  await page.setCacheEnabled(false);
-  await page.setViewport({ width: 390, height: 844 }); // iPhone-ish
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
 
-  /** espera hidratação REAL na página atual (sem navegar). */
-  const waitHydrated = async () => {
-    await page.waitForFunction(
-      () => {
-        const b = document.querySelector("button");
-        return !!b && Object.keys(b).some((k) => k.startsWith("__reactFiber"));
-      },
-      { timeout: 120000 }
-    );
-    await new Promise((r) => setTimeout(r, 800));
-  };
-
-  /** goto + espera hidratação REAL (fibra React anexada ao primeiro botão). */
-  const open = async (path) => {
-    await page.goto(`${base}${path}`, { waitUntil: "domcontentloaded", timeout: 120000 });
-    await waitHydrated();
-  };
-
-  const pageErrors = [];
-  page.on("pageerror", (e) => pageErrors.push(String(e)));
+  const jsErrors = [];
+  page.on("pageerror", (e) => jsErrors.push(e.message));
 
   try {
-    // 1) Treino carrega BLOQUEADO
-    await open("/treino");
-    report("treino: estado bloqueado carregado", true);
+    // 1. servidor no ar
+    const res = await fetch(`${URL_BASE}/login`);
+    step("produção: servidor responde", res.ok, `HTTP ${res.status}`);
 
-    // 2) Vai ao scanner de portaria; no demo simula a leitura
-    await page.goto(`${base}/checkin?scan=1&from=/treino`, { waitUntil: "domcontentloaded", timeout: 120000 });
-    await waitHydrated();
-    const simulated = await clickByText(page, "button", /Simular leitura/i);
-    report("check-in: leitura simulada validada", simulated);
-
-    // aguarda validação (~1s no demo) e redirecionamento de volta ao treino
+    // 2. login real do personal (Supabase Auth)
+    let jwt = "";
     try {
-      await page.waitForFunction(
-        () => /\/treino/.test(location.pathname),
-        { timeout: 10000 }
-      );
-    } catch (e) {
-      const url = await page.evaluate(() => location.href);
-      report("check-in: redirecionamento de volta", false, `ainda em ${url}`);
-      throw e;
-    }
-    await waitHydrated();
-
-    // 3) Treino liberado → Iniciar
-    let hasStart = await clickByText(page, "a, button", /^Iniciar/i);
-    if (!hasStart) {
-      await open("/treino");
-      hasStart = await clickByText(page, "a, button", /^Iniciar/i);
-    }
-    report("treino: botão Iniciar visível e clicado", hasStart);
-
-    // 4) Sessão ativa — aparece o primeiro exercício com botões de série
-    await page.waitForFunction(
-      () => document.querySelectorAll('[aria-label*="toque para marcar" i]').length > 0,
-      { timeout: 20000 }
-    );
-    report("treino: sessão ativa iniciada", true);
-
-    // 5) Marca séries do exercício atual (botões por aria-label)
-    let completed = 0;
-    for (let i = 0; i < 10; i++) {
-      const ok = await page.evaluate(() => {
-        const btns = [...document.querySelectorAll('[aria-label*="toque para marcar" i]')];
-        if (btns.length === 0) return false;
-        (btns[0]).click();
-        return true;
+      const loginRes = await fetch(`${SUPA}/auth/v1/token?grant_type=password`, {
+        method: "POST",
+        headers: { apikey: ANON, "Content-Type": "application/json" },
+        body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
       });
-      if (!ok) break;
-      completed++;
-      await new Promise((r) => setTimeout(r, 500));
+      const data = await loginRes.json();
+      jwt = data.access_token ?? "";
+    } catch {
+      /* tratado abaixo */
     }
-    report(`treino: séries concluídas (${completed})`, completed > 0);
+    step("produção: login do personal", !!jwt);
 
-    // 6) Check-out: botão Finalizar do header → modal → confirmar
-    const finishClicked = await page.evaluate(() => {
-      const btns = [...document.querySelectorAll("button")];
-      const b = btns.find((e) => (e.textContent ?? "").trim() === "Finalizar");
-      if (b) {
-        b.click();
-        return true;
-      }
-      return false;
+    // 3. profile trainer legível (RLS)
+    let role = "";
+    if (jwt) {
+      const profRes = await fetch(`${SUPA}/rest/v1/profiles?select=name,role`, {
+        headers: { apikey: ANON, Authorization: `Bearer ${jwt}` },
+      });
+      role = (await profRes.json())?.[0]?.role ?? "";
+    }
+    step("produção: profile trainer legível", role === "trainer", `role=${role}`);
+
+    // 4. login pelo formulário do app (fluxo real)
+    await page.goto(`${URL_BASE}/login`, { waitUntil: "networkidle2", timeout: 45000 });
+    await new Promise((r2) => setTimeout(r2, 1800));
+    await page.type("#email", EMAIL);
+    await page.type("#password", PASSWORD);
+    await page.evaluate(() => {
+      const f = document.querySelector("form");
+      if (f) f.requestSubmit();
     });
-    report("treino: botão Finalizar acionado", finishClicked);
+    await new Promise((r2) => setTimeout(r2, 6000));
+    step("produção: formulário autentica", page.url().includes("/personal/"), page.url());
 
-    // confirmação de finalização (modal)
-    await new Promise((r) => setTimeout(r, 800));
-    const confirmClicked = await page.evaluate(() => {
-      const btns = [...document.querySelectorAll("button")].filter((e) => (e.textContent ?? "").trim() === "Finalizar");
-      const b = btns[btns.length - 1];
-      if (b) {
-        b.click();
-        return true;
+    // 5-6. telas do staff renderizam logado
+    for (const r of ["/personal/dashboard", "/personal/alunos", "/personal/exercicios"]) {
+      await page.goto(`${URL_BASE}${r}`, { waitUntil: "networkidle2", timeout: 45000 });
+      // espera o conteúdo crescer (queries com RLS no primeiro load)
+      let text = 0;
+      for (let i = 0; i < 12; i++) {
+        await new Promise((r2) => setTimeout(r2, 800));
+        text = await page.evaluate(() => document.body.innerText.length);
+        if (text > 100) break;
       }
-      return false;
-    });
-    report("treino: confirmação de finalização", confirmClicked);
+      step(`staff ${r} renderiza`, text > 100, `${text} chars`);
+    }
 
-    await page.waitForFunction(
-      () => document.querySelectorAll('[aria-label*="toque para marcar" i]').length === 0,
-      { timeout: 20000 }
-    );
-    report("treino: check-out concluído (sessão encerrada)", true);
+    // 7. sem erros JS não tratados
+    await page.goto(`${URL_BASE}/feed`, { waitUntil: "networkidle2", timeout: 45000 });
+    await new Promise((r) => setTimeout(r, 2500));
+    step("sem erros JS não tratados", jsErrors.length === 0);
   } catch (err) {
-    report("fluxo executou até o fim", false, String(err).slice(0, 200));
+    step("fluxo executou até o fim", false, err.message);
+  } finally {
+    await browser.close();
   }
 
-  const realErrors = pageErrors.filter((e) => !e.includes("ResizeObserver"));
-  report(
-    "sem erros JS não tratados",
-    realErrors.length === 0,
-    realErrors.slice(0, 2).join(" | ")
-  );
-
-  await browser.close();
-  if (child) child.kill("SIGTERM");
-
-  const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} etapas OK`);
-  process.exit(failed.length === 0 ? 0 : 1);
+  const passed = steps.filter((s) => s.ok).length;
+  console.log(`\n${passed}/${steps.length} etapas OK`);
+  process.exitCode = passed === steps.length ? 0 : 1;
 }
 
 main().catch((e) => {

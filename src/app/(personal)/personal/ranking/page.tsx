@@ -14,19 +14,10 @@ import {
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
-import { useAsyncQuery } from "~/hooks/useAsyncQuery";
-import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
-import {
-  adjustedPoints,
-  addPointAdjustment,
-  applyPenalty,
-  listPointAdjustments,
-  streakOverride,
-  TRAINER_POINTS_EVENT,
-  type PointAdjustment,
-} from "~/lib/trainer-store";
-import { demoPersonalStudents, studentStatus } from "~/lib/personal-data";
-import type { Leaderboard, Profiles } from "~/lib/types/models";
+import { useAuth } from "~/hooks/useAuth";
+import { getGymStudents, getRankingRows, saveAdjustment } from "~/lib/gym-api";
+import type { PersonalStudent } from "~/lib/personal-data";
+import type { PointAdjustment } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
 
 const container: Variants = {
@@ -40,118 +31,99 @@ const row: Variants = {
 
 const MEDALS = ["#FFC24D", "#C9D4E8", "#E0965A"];
 
-type RankRow = Leaderboard & { student: Profiles | null; final?: number };
+type RankRow = {
+  studentId: string;
+  name: string;
+  avatar: string | null;
+  basePoints: number;
+  adjustments: PointAdjustment[];
+  streakZeroed: boolean;
+};
 
 /**
- * Ranking com PODERES DE GESTÃO: o personal valida conquistas, dá bônus
- * e zera streak. O score ajustado cai no ranking do aluno em tempo real.
+ * Ranking com PODERES DE GESTÃO: valida conquistas, dá bônus e zera streak.
+ * Produção: leaderboard do banco + leaderboard_adjustments persistidos.
  */
 export default function PersonalRankingPage() {
-  const demo = isDemoMode();
-  const students = useMemo(() => demoPersonalStudents(), []);
+  const { profile, user } = useAuth();
+  const [students, setStudents] = useState<PersonalStudent[]>([]);
+  const [rows, setRows] = useState<RankRow[]>([]);
   const [menuFor, setMenuFor] = useState<RankRow | null>(null);
-  const [version, setVersion] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
+
+  const gymId = profile?.gym_id ?? "";
 
   useEffect(() => {
-    const bump = () => setVersion((v) => v + 1);
-    window.addEventListener(TRAINER_POINTS_EVENT, bump);
-    window.addEventListener("storage", bump);
+    if (!gymId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const st = await getGymStudents(gymId);
+        if (!alive) return;
+        setStudents(st);
+        const r = await getRankingRows(gymId, st);
+        if (!alive) return;
+        setRows(r);
+      } catch {
+        if (alive) setRows([]);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
     return () => {
-      window.removeEventListener(TRAINER_POINTS_EVENT, bump);
-      window.removeEventListener("storage", bump);
+      alive = false;
     };
-  }, []);
+  }, [gymId, tick]);
 
-  const { data, loading } = useAsyncQuery<{ rows: RankRow[] }>(
-    async () => {
-      void version;
-      if (demo) {
-        const ranks = [...(demoFallback("leaderboard") as Leaderboard[])];
-        const profiles = demoFallback("profiles") as Profiles[];
-        return {
-          data: {
-            rows: ranks.map((r) => ({
-              ...r,
-              student: profiles.find((p) => p.id === r.student_id) ?? null,
-            })),
-          },
-          error: null,
-        };
-      }
-      // produção: mesma query do ranking do aluno
-      const { supabaseBrowser } = await import("~/lib/supabase/client");
-      const supabase = supabaseBrowser();
-      const { data: rows, error } = await supabase
-        .from("leaderboard")
-        .select("*")
-        .eq("rank_type", "load")
-        .order("points", { ascending: false })
-        .limit(20);
-      if (error) return { data: null, error };
-      const list = (rows ?? []) as Leaderboard[];
-      const ids = [...new Set(list.map((r) => r.student_id))];
-      let studentsDb: Profiles[] = [];
-      if (ids.length) {
-        const sRes = await supabase.from("profiles").select("id, name, avatar_url").in("id", ids);
-        if (!sRes.error) studentsDb = (sRes.data ?? []) as Profiles[];
-      }
-      return {
-        data: {
-          rows: list.map((r) => ({ ...r, student: studentsDb.find((s) => s.id === r.student_id) ?? null })),
-        },
-        error: null,
-      };
-    },
-    [demo, version]
+  const totalAdjustments = useMemo(
+    () => rows.reduce((acc, r) => acc + r.adjustments.length, 0),
+    [rows]
   );
 
-  // nome mais confiável: perfil do leaderboard ou lista de alunos do personal
-  const nameFor = (r: RankRow) =>
-    r.student?.name ??
-    students.find((s) => s.id === r.student_id || s.profile_id === r.student_id)?.name ??
-    "Aluno";
-
-  /** unifica o id: ajustes e streak ficam na chave do aluno do personal (st-*) */
-  const studentIdFor = (r: RankRow) =>
-    students.find((s) => s.profile_id === r.student_id)?.id ?? r.student_id;
-
-  const sorted = useMemo(() => {
-    const rows: RankRow[] = (data?.rows ?? []).map((r) => {
-      const sid = studentIdFor(r);
-      return { ...r, student_id: sid, final: adjustedPoints(r.points, sid) };
-    });
-    return rows.sort((a, b) => (b.final ?? 0) - (a.final ?? 0));
-  }, [data, version]);
-
-  const act = (r: RankRow, action: "validacao" | "bonus" | "penalidade") => {
-    const name = nameFor(r);
-    const sid = studentIdFor(r);
-    if (action === "validacao") {
-      addPointAdjustment({
-        studentId: sid,
-        studentName: name,
-        type: "validacao",
-        points: 75,
-        reason: "Conquista validada pelo Personal",
-      });
-      toast.success(`Conquista validada: +75 pts para ${name.split(" ")[0]}`);
-    } else if (action === "bonus") {
-      addPointAdjustment({
-        studentId: sid,
-        studentName: name,
-        type: "bonus",
-        points: 50,
-        reason: "Bônus por esforço excepcional",
-      });
-      toast.success(`Bônus aplicado: +50 pts para ${name.split(" ")[0]}`);
-    } else {
-      applyPenalty(sid, name);
-      toast.success(`Streak de ${name.split(" ")[0]} zerado`);
+  const act = async (r: RankRow, action: "validacao" | "bonus" | "penalidade") => {
+    if (!profile || !user) return;
+    const student = students.find((s) => s.id === r.studentId);
+    if (!student) return;
+    const name = r.name.split(" ")[0];
+    try {
+      if (action === "validacao") {
+        await saveAdjustment({
+          gymId: profile.gym_id,
+          userId: user.id,
+          student,
+          type: "validacao",
+          points: 75,
+          reason: "Conquista validada pelo Personal",
+        });
+        toast.success(`Conquista validada: +75 pts para ${name}`);
+      } else if (action === "bonus") {
+        await saveAdjustment({
+          gymId: profile.gym_id,
+          userId: user.id,
+          student,
+          type: "bonus",
+          points: 50,
+          reason: "Bônus por esforço excepcional",
+        });
+        toast.success(`Bônus aplicado: +50 pts para ${name}`);
+      } else {
+        await saveAdjustment({
+          gymId: profile.gym_id,
+          userId: user.id,
+          student,
+          type: "penalidade",
+          points: 0,
+          reason: "Streak zerado pelo Personal (faltas)",
+        });
+        toast.success(`Streak de ${name} zerado`);
+      }
+      setMenuFor(null);
+      setTick((t) => t + 1);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao aplicar. Tente novamente.");
     }
-    setMenuFor(null);
   };
-
-  const totalAdjustments = listPointAdjustments().length;
 
   return (
     <div className="space-y-4">
@@ -162,7 +134,7 @@ export default function PersonalRankingPage() {
             Ranking
           </h1>
           <p className="text-[11px] text-muted-foreground">
-            {sorted.length} atletas · {totalAdjustments} ajustes seus aplicados
+            {rows.length} atletas · {totalAdjustments} ajustes seus aplicados
           </p>
         </div>
       </header>
@@ -173,15 +145,21 @@ export default function PersonalRankingPage() {
             <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/[0.04]" />
           ))}
         </div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-8 text-center">
+          <Trophy className="mx-auto mb-2 h-7 w-7 text-muted-foreground" />
+          <p className="text-sm font-semibold text-foreground">Nenhum atleta no ranking ainda</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Assim que os alunos treinarem e fizerem check-in, os pontos aparecem aqui.
+          </p>
+        </div>
       ) : (
         <motion.ul variants={container} initial="hidden" animate="show" className="space-y-2">
-          {sorted.map((r, i) => {
-            const name = nameFor(r);
-            const student = students.find((s) => s.id === r.student_id || s.profile_id === r.student_id);
-            const bonus = (r.final ?? r.points) - r.points;
-            const zeroed = student ? streakOverride(student.id) === 0 : false;
+          {rows.map((r, i) => {
+            const final = r.basePoints + r.adjustments.reduce((x, a) => x + a.points, 0);
+            const bonus = final - r.basePoints;
             return (
-              <motion.li key={r.id} variants={row}>
+              <motion.li key={r.studentId} variants={row}>
                 <div
                   className={cn(
                     "gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-3.5",
@@ -198,22 +176,20 @@ export default function PersonalRankingPage() {
                     )}
                   </span>
                   <Avatar className="h-10 w-10 border border-white/[0.08]">
-                    <AvatarImage src={student?.avatar ?? r.student?.avatar_url ?? undefined} alt="" />
+                    <AvatarImage src={r.avatar ?? undefined} alt="" />
                     <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-[11px] font-black text-brand-foreground">
-                      {name[0]}
+                      {r.name[0]}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-bold text-foreground">{name}</p>
+                    <p className="truncate text-[13px] font-bold text-foreground">{r.name}</p>
                     <p className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
-                      {zeroed ? (
+                      {r.streakZeroed ? (
                         <span className="inline-flex items-center gap-1 font-bold text-[#F87171]">
                           <Flame className="h-3 w-3" /> streak zerado
                         </span>
-                      ) : student ? (
-                        <span>{studentStatus(student).label}</span>
                       ) : (
-                        <span>{r.sessions} sessões</span>
+                        <span>{r.basePoints} pts base</span>
                       )}
                       {bonus !== 0 ? (
                         <span
@@ -231,7 +207,7 @@ export default function PersonalRankingPage() {
                   </div>
                   <p className="shrink-0 text-right">
                     <span className="font-display text-base font-black tabular-nums text-foreground">
-                      {r.final}
+                      {final}
                     </span>
                     <span className="block text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
                       pts
@@ -239,7 +215,7 @@ export default function PersonalRankingPage() {
                   </p>
                   <button
                     onClick={() => setMenuFor(r)}
-                    aria-label={`Ações de gestão para ${name}`}
+                    aria-label={`Ações de gestão para ${r.name}`}
                     className="tactile flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] text-muted-foreground transition-colors hover:text-brand"
                   >
                     <MoreVertical className="h-4 w-4" />
@@ -256,9 +232,10 @@ export default function PersonalRankingPage() {
         {menuFor ? (
           <div className="space-y-3">
             <div>
-              <p className="text-base font-bold text-foreground">{nameFor(menuFor)}</p>
+              <p className="text-base font-bold text-foreground">{menuFor.name}</p>
               <p className="text-[11px] text-muted-foreground">
-                {menuFor.final ?? menuFor.points} pts · base {menuFor.points} · poderes de gestão
+                {menuFor.basePoints + menuFor.adjustments.reduce((x, a) => x + a.points, 0)} pts ·
+                base {menuFor.basePoints} · poderes de gestão
               </p>
             </div>
             <div className="space-y-2">

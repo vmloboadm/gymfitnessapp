@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, type Variants } from "framer-motion";
 import {
@@ -15,11 +15,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { Button } from "~/components/ui/button";
 import { StudentSheet } from "~/components/personal/StudentSheet";
-import {
-  demoPersonalStudents,
-  studentStatus,
-  type PersonalStudent,
-} from "~/lib/personal-data";
+import { useAuth } from "~/hooks/useAuth";
+import { studentStatus, type PersonalStudent } from "~/lib/personal-data";
+import { getGymStudents } from "~/lib/gym-api";
 import { cn } from "~/lib/utils";
 
 const container: Variants = {
@@ -42,7 +40,16 @@ const TONE = {
  * de detalhes com ações rápidas. Padrão visual idêntico ao app do aluno.
  */
 export default function PersonalAlunosPage() {
-  const students = useMemo(() => demoPersonalStudents(), []);
+  const { profile } = useAuth();
+  const [students, setStudents] = useState<PersonalStudent[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!profile?.gym_id) return;
+    getGymStudents(profile.gym_id)
+      .then(setStudents)
+      .catch(() => setStudents([]))
+      .finally(() => setLoading(false));
+  }, [profile?.gym_id]);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PersonalStudent | null>(null);
 
@@ -74,6 +81,13 @@ export default function PersonalAlunosPage() {
       </div>
 
       {/* Lista com stagger */}
+      {loading ? (
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/[0.04]" />
+          ))}
+        </div>
+      ) : (
       <motion.ul variants={container} initial="hidden" animate="show" className="space-y-2">
         {filtered.map((s) => {
           const status = studentStatus(s);
@@ -116,10 +130,13 @@ export default function PersonalAlunosPage() {
         })}
         {filtered.length === 0 ? (
           <li className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 text-center text-xs text-muted-foreground">
-            Nenhum aluno encontrado para &quot;{q}&quot;.
+            {students.length === 0
+              ? "Nenhum aluno matriculado na academia ainda."
+              : `Nenhum aluno encontrado para &quot;{q}&quot;.`}
           </li>
         ) : null}
       </motion.ul>
+      )}
 
       {/* Bottom Sheet de detalhes */}
       <StudentSheet student={selected} onClose={() => setSelected(null)} />

@@ -27,10 +27,8 @@ import { demoOnlineAgora } from "~/lib/demo-bridge";
 import { LivePulse } from "~/components/dashboard/LivePulse";
 import { CountUp } from "~/components/common/CountUp";
 import { StudentSheet } from "~/components/personal/StudentSheet";
-import {
-  demoPersonalStudents,
-  type PersonalStudent,
-} from "~/lib/personal-data";
+import type { PersonalStudent } from "~/lib/personal-data";
+import { getGymStudents } from "~/lib/gym-api";
 import { briefingOffline } from "~/lib/ai/local-gen";
 import { computeQueue, type QueueItem } from "~/lib/personal-queue";
 import {
@@ -87,7 +85,8 @@ function waHref(phone: string, text: string) {
  */
 export default function PersonalDashboardPage() {
   const { profile } = useAuth();
-  const students = useMemo(() => demoPersonalStudents(), []);
+  const gymId = profile?.gym_id ?? "";
+  const [students, setStudents] = useState<PersonalStudent[]>([]);
   const online = useMemo(() => demoOnlineAgora(), []);
   const [sheetStudent, setSheetStudent] = useState<PersonalStudent | null>(null);
   const [queueOpen, setQueueOpen] = useState(false);
@@ -107,6 +106,11 @@ export default function PersonalDashboardPage() {
       window.removeEventListener("storage", bump);
     };
   }, []);
+
+  useEffect(() => {
+    if (!gymId) return;
+    getGymStudents(gymId).then(setStudents).catch(() => setStudents([]));
+  }, [gymId, tick]);
 
   const assigned = useMemo(() => listAssignedWorkouts(), [tick]);
   const pendingApprovals = useMemo(() => pendingApprovalCount(), [tick]);

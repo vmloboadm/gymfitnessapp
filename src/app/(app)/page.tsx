@@ -785,10 +785,14 @@ function PremiumRequestCard() {
   return (
     <button
       onClick={async () => {
-        const { createApproval } = await import("~/lib/trainer-store");
-        createApproval({
-          studentId: "student-self",
-          studentName: "Você",
+        const { submitRequest } = await import("~/lib/gym-api");
+        const { supabaseBrowser } = await import("~/lib/supabase/client");
+        const { data: sess } = await supabaseBrowser().auth.getSession();
+        const uid = sess.session?.user?.id ?? "student-self";
+        await submitRequest({
+          gymId: "00000000-0000-0000-0000-000000000001",
+          userId: uid,
+          userName: "Você",
           type: "premium",
           message: "Quero desbloquear o Plano Premium com acompanhamento do Personal.",
         });

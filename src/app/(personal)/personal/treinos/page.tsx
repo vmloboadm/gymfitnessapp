@@ -38,14 +38,17 @@ import { demoLib } from "~/lib/demo-bridge";
 import {
   demoPersonalStudents,
   demoTemplates,
+  type PersonalStudent,
   type WorkoutTemplate,
 } from "~/lib/personal-data";
+import { useAuth } from "~/hooks/useAuth";
 import {
+  approvePlan,
   deleteAssignedWorkout,
+  getGymStudents,
   listAssignedWorkouts,
-  saveAssignedWorkout,
   updateAssignedWorkout,
-} from "~/lib/trainer-store";
+} from "~/lib/gym-api";
 import { cn } from "~/lib/utils";
 
 const fmtDate = (iso: string) =>
@@ -88,8 +91,10 @@ function templateToPlan(t: WorkoutTemplate): WorkoutPlan {
 export default function PersonalTreinosPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const students = useMemo(() => demoPersonalStudents(), []);
+  const { profile, user } = useAuth();
+  const [students, setStudents] = useState<PersonalStudent[]>(demoPersonalStudents());
   const templates = useMemo(() => demoTemplates(), []);
+  const gymId = profile?.gym_id ?? "";
 
   const targetId = params.get("aluno") ?? "";
   const editId = params.get("edit") ?? "";
@@ -108,6 +113,10 @@ export default function PersonalTreinosPage() {
 
   const refresh = () => setAssigned(listAssignedWorkouts());
   useEffect(refresh, []);
+  useEffect(() => {
+    if (!gymId) return;
+    getGymStudents(gymId).then(setStudents).catch(() => setStudents([]));
+  }, [gymId]);
 
   // modo edição: carrega o plano (ou sintetiza 1 dia de treinos antigos)
   useEffect(() => {
@@ -200,7 +209,7 @@ export default function PersonalTreinosPage() {
 
   // ===== PASSO 5: aprovar e atribuir (ou salvar edição) =====
   const approve = async () => {
-    if (!plan || !target) return;
+    if (!plan || !target || !profile || !user) return;
     const flat = plan.dias.flatMap((d) =>
       d.exercicios.map((e) => ({ name: e.exercicio, sets: e.series, reps: e.reps, rest: e.descanso }))
     );
@@ -217,17 +226,18 @@ export default function PersonalTreinosPage() {
         description: `${target.name} recebeu a nova versão com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
       });
     } else {
-      saveAssignedWorkout({
-        studentId: target.id,
-        studentName: target.name,
-        name: plan.nome,
-        notes: notes.trim() || null,
-        frequency: plan.frequencia,
-        level: plan.nivel,
-        exercises: flat,
-        plan,
-        source: "ia",
-      });
+      try {
+        await approvePlan({
+          gymId: profile.gym_id,
+          trainerId: user.id,
+          student: target,
+          plan,
+          notes: notes.trim() || null,
+        });
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Não deu salvar o plano. Tente novamente.");
+        return;
+      }
       toast.success("Plano enviado com sucesso!", {
         description: `${target.name} recebeu "${plan.nome}" com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
       });
@@ -239,28 +249,23 @@ export default function PersonalTreinosPage() {
     router.replace("/personal/treinos");
   };
 
-  const applyMass = () => {
-    if (!massTemplate || massSelected.size === 0) return;
+  const applyMass = async () => {
+    if (!massTemplate || massSelected.size === 0 || !profile || !user) return;
     for (const sid of massSelected) {
       const student = students.find((s) => s.id === sid);
       if (!student) continue;
       const p = templateToPlan(massTemplate);
-      saveAssignedWorkout({
-        studentId: student.id,
-        studentName: student.name,
-        name: p.nome,
-        notes: null,
-        frequency: p.frequencia,
-        level: p.nivel,
-        exercises: p.dias[0].exercicios.map((e) => ({
-          name: e.exercicio,
-          sets: e.series,
-          reps: e.reps,
-          rest: e.descanso,
-        })),
-        plan: p,
-        source: "template",
-      });
+      try {
+        await approvePlan({
+          gymId: profile.gym_id,
+          trainerId: user.id,
+          student,
+          plan: p,
+          notes: null,
+        });
+      } catch {
+        toast.error(`Falha ao enviar para ${student.name.split(" ")[0]}`);
+      }
     }
     toast.success("Plano enviado com sucesso!", {
       description: `Template aplicado para ${massSelected.size} alunos.`,
