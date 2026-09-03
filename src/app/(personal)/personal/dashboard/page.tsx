@@ -117,13 +117,18 @@ export default function PersonalDashboardPage() {
 
   const stats = useMemo(() => {
     const todayKey = new Date().toDateString();
+    const yesterdayKey = new Date(Date.now() - 864e5).toDateString();
     const prescribedToday = assigned.filter(
       (w) => new Date(w.created_at).toDateString() === todayKey
+    ).length;
+    const prescribedYesterday = assigned.filter(
+      (w) => new Date(w.created_at).toDateString() === yesterdayKey
     ).length;
     return {
       activeStudents: students.filter((s) => s.lastTrainingDaysAgo <= 2).length,
       totalStudents: students.length,
       prescribedToday,
+      prescribedYesterday,
       missesWeek: students.filter((s) => s.lastTrainingDaysAgo >= 3).length,
     };
   }, [students, assigned, tick]);
@@ -206,6 +211,20 @@ export default function PersonalDashboardPage() {
         </button>
       </motion.header>
 
+      {/* Skeleton do primeiro load (imita o layout real) */}
+      {students.length === 0 ? (
+        <div className="space-y-3" aria-hidden>
+          {[0, 1].map((i) => (
+            <div key={i} className="h-[104px] animate-pulse rounded-[20px] bg-white/[0.04]" />
+          ))}
+          <div className="grid grid-cols-3 gap-2">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-[92px] animate-pulse rounded-2xl bg-white/[0.04]" />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {/* Fila de Hoje: card principal */}
       <motion.section variants={item} initial="hidden" animate="show" aria-labelledby="queue-title">
         <div className="mb-2 flex items-center justify-between">
@@ -258,6 +277,14 @@ export default function PersonalDashboardPage() {
           <p className="mt-1 text-[9.5px] font-semibold leading-tight text-muted-foreground">
             Ativos hoje
           </p>
+          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className="h-full origin-left rounded-full bg-brand transition-transform duration-700"
+              style={{
+                transform: `scaleX(${stats.totalStudents ? stats.activeStudents / stats.totalStudents : 0})`,
+              }}
+            />
+          </div>
         </Link>
         <div className="gf-card gf-glass !rounded-2xl !p-3">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#4ADE80]/25 bg-[#4ADE80]/10">
@@ -267,8 +294,19 @@ export default function PersonalDashboardPage() {
             <CountUp value={stats.prescribedToday} />
           </p>
           <p className="mt-1 text-[9.5px] font-semibold leading-tight text-muted-foreground">
-            Treinos prescritos hoje
+            Prescritos hoje
           </p>
+          {stats.prescribedYesterday > 0 ? (
+            <p
+              className={cn(
+                "mt-0.5 text-[9px] font-bold",
+                stats.prescribedToday >= stats.prescribedYesterday ? "text-[#4ADE80]" : "text-[#FFC24D]"
+              )}
+            >
+              {stats.prescribedToday >= stats.prescribedYesterday ? "▲" : "▼"} ontem:{" "}
+              {stats.prescribedYesterday}
+            </p>
+          ) : null}
         </div>
         <div className="gf-card gf-glass !rounded-2xl !p-3">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#F87171]/25 bg-[#F87171]/10">
@@ -280,6 +318,11 @@ export default function PersonalDashboardPage() {
           <p className="mt-1 text-[9.5px] font-semibold leading-tight text-muted-foreground">
             Faltas da semana
           </p>
+          {stats.missesWeek > 0 ? (
+            <p className="mt-0.5 text-[9px] font-bold text-[#F87171]">
+              {Math.round((stats.missesWeek / Math.max(1, stats.totalStudents)) * 100)}% da turma
+            </p>
+          ) : null}
         </div>
       </motion.div>
 

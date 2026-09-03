@@ -346,6 +346,21 @@ export async function submitRequest(opts: {
   } as never);
 }
 
+/** Contagem de aprovações pendentes do gym (produção lê o banco). */
+export async function countPendingRequests(gymId: string): Promise<number> {
+  if (isDemoMode()) {
+    const { pendingApprovalCount } = await import("~/lib/trainer-store");
+    return pendingApprovalCount();
+  }
+  const sb = supabaseBrowser();
+  const { count } = await sb
+    .from("premium_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("gym_id", gymId)
+    .eq("status", "pending");
+  return count ?? 0;
+}
+
 export async function decideRequest(id: string, status: "aprovado" | "recusado", reviewerId: string): Promise<void> {
   if (isDemoMode()) {
     resolveApproval(id, status);

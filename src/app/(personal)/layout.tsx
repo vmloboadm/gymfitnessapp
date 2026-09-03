@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
-import { pendingApprovalCount, TRAINER_APPROVALS_EVENT } from "~/lib/trainer-store";
+import { TRAINER_APPROVALS_EVENT } from "~/lib/trainer-store";
+import { countPendingRequests } from "~/lib/gym-api";
+import { isDemoMode } from "~/lib/demo-bridge";
 import { cn } from "~/lib/utils";
 import {
   LayoutDashboard,
@@ -45,15 +47,23 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
   const [pendingApprovals, setPendingApprovals] = useState(0);
 
   useEffect(() => {
-    const hydrate = () => setPendingApprovals(pendingApprovalCount());
+    if (!profile?.gym_id) return;
+    let alive = true;
+    const hydrate = () =>
+      countPendingRequests(profile.gym_id)
+        .then((n) => { if (alive) setPendingApprovals(n); })
+        .catch(() => {});
     hydrate();
+    const t = setInterval(hydrate, 20000); // produção: fila atualiza sozinha
     window.addEventListener(TRAINER_APPROVALS_EVENT, hydrate);
     window.addEventListener("storage", hydrate);
     return () => {
+      alive = false;
+      clearInterval(t);
       window.removeEventListener(TRAINER_APPROVALS_EVENT, hydrate);
       window.removeEventListener("storage", hydrate);
     };
-  }, []);
+  }, [profile?.gym_id]);
 
   return (
     <div className="min-h-[100dvh] bg-background">
