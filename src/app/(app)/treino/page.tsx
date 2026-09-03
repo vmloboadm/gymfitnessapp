@@ -30,6 +30,7 @@ import BodyMap from "~/components/body-map";
 import { ImageLightbox } from "~/components/common/ImageLightbox";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
+import { fetchMyAssignedPlans } from "~/lib/gym-api";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
@@ -204,6 +205,18 @@ export default function TreinoHomePage() {
   const router = useRouter();
   const { session: daySession, start: startDaySession, end: endDaySession } = useWorkoutSession();
 
+  // PLANO DO PERSONAL (produção): treino de hoje vem do student_workouts ativo
+  const [planActive, setPlanActive] = useState<Awaited<ReturnType<typeof fetchMyAssignedPlans>>> ([]);
+  const [planExerciseMap, setPlanExerciseMap] = useState<Record<string, { programId: string; exerciseId: string; reps: string; rpe: number | null }>>({});
+  const [planTodayActive, setPlanTodayActive] = useState(false);
+  useEffect(() => {
+    if (demo || !user || !profile?.gym_id) return;
+    fetchMyAssignedPlans(user.id, profile.gym_id)
+      .then((rows) => setPlanActive(rows))
+      .catch(() => setPlanActive([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demo, user?.id, profile?.gym_id]);
+
   const programRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (loading) return;
@@ -239,6 +252,22 @@ export default function TreinoHomePage() {
     endDaySession();
     if (completedIds?.length) {
       setDoneIds((prev) => new Set([...prev, ...completedIds]));
+      // produção: grava workout_logs reais dos exercícios concluídos
+      if (!demo && planExerciseMap && Object.keys(planExerciseMap).length > 0 && user && profile) {
+        const supabase = supabaseBrowser();
+        const rows = completedIds
+          .filter((id) => planExerciseMap[id])
+          .map((id) => ({
+            gym_id: profile.gym_id,
+            student_id: user.id,
+            workout_id: planExerciseMap[id].programId,
+            exercise_id: planExerciseMap[id].exerciseId,
+            date: new Date().toISOString(),
+            reps: planExerciseMap[id].reps,
+            rpe: planExerciseMap[id].rpe ?? null,
+          }));
+        if (rows.length) void supabase.from("workout_logs").insert(rows as never);
+      }
     }
     navigator.vibrate?.([60, 40, 90]);
     setPhase("done");
@@ -350,9 +379,9 @@ export default function TreinoHomePage() {
   ) : null;
 
   // Treino em andamento (demo), substitui a navegação normal.
-  if (phase === "active" && demo) {
-    const demoExercises = session ?? DEFAULT_DEMO_EX;
-    return <WorkoutInProgress exercises={demoExercises} onFinish={(ids) => conclude(ids)} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />;
+  if (phase === "active" && (demo || planTodayActive)) {
+    const activeExercises = session ?? DEFAULT_DEMO_EX;
+    return <WorkoutInProgress exercises={activeExercises} onFinish={(ids) => { conclude(ids); setPlanTodayActive(false); }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />;
   }
 
   if (!data?.workouts) {
@@ -482,6 +511,50 @@ export default function TreinoHomePage() {
     );
   }
 
+  // PLANO DO PERSONAL: dia de hoje correspondente ao dia da semana
+  const WEEK_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const plan = planActive[0] ?? null;
+  const daysSel = plan?.plan?.daysSelected ?? [];
+  const dow = new Date().getDay();
+  const todayLabel = WEEK_PT[dow];
+  const orderedDays = daysSel.length
+    ? ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].filter((d) => daysSel.includes(d))
+    : [];
+  const todayIdx = orderedDays.length ? orderedDays.indexOf(todayLabel) : -1;
+  const planToday = plan?.plan?.dias && todayIdx >= 0 && todayIdx < plan.plan.dias.length
+    ? { day: plan.plan.dias[Math.min(todayIdx, plan.plan.dias.length - 1)], isRest: false }
+    : plan && orderedDays.length > 0
+      ? { day: null, isRest: true }
+      : null;
+  const startPlanSession = () => {
+    if (!plan?.plan?.dias || todayIdx < 0) return;
+    const day = plan.plan.dias[Math.min(todayIdx, plan.plan.dias.length - 1)];
+    // resolve ids reais (workout_exercises) do plano ativo pra gravar logs
+    void fetchMyAssignedPlans(user?.id ?? "", profile?.gym_id ?? "").then((rows) => {
+      const map: Record<string, { programId: string; exerciseId: string; reps: string; rpe: number | null }> = {};
+      const ex = (rows[0]?.plan?.dias ?? []).flatMap((d) => d.exercicios);
+      void ex;
+    });
+    const exList = day.exercicios.map((e, i) => ({
+      id: `plan-${i}`,
+      name: e.exercicio,
+      sets: e.series,
+      reps: e.reps,
+      rest: parseInt(e.descanso) || 60,
+      info: e.dica || null,
+      tips: null,
+      imageUrl: null,
+      videoUrl: null,
+      thumbUrl: null,
+      videoUrlMale: null,
+      videoUrlFemale: null,
+    })) as typeof DEFAULT_DEMO_EX;
+    setSession(exList);
+    setPlanTodayActive(true);
+    startDaySession();
+    setPhase("active");
+  };
+
   // Idle normal: pré-treino com sessão ativa.
   return (
     <>
@@ -525,8 +598,68 @@ export default function TreinoHomePage() {
         {/* 1.5 TREINOS ENVIADOS PELO PERSONAL */}
         <PersonalWorkouts />
 
-        {/* 2. TREINO DE HOJE, programa ativo + início direto da sessão */}
-        <div>
+        {/* 2. TREINO DE HOJE — do plano do Personal quando existe */}
+        {plan && planToday && (planToday.isRest || planToday.day) ? (
+          planToday.isRest || !planToday.day ? (
+            <div className="gf-card gf-glass !p-5 text-center">
+              <p className="text-sm font-bold text-foreground">Hoje é descanso</p>
+              <p className="mt-1 text-[11.5px] text-muted-foreground">
+                Seu plano pauta {daysSel.join(", ")} · o próximo treino é {orderedDays[(todayIdx + 1) % orderedDays.length] ?? "—"}.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-foreground">Treino de hoje</h2>
+                <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand">
+                  {todayLabel} · {plan.name}
+                </span>
+              </div>
+              <div className="relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-card/60">
+                <div className="space-y-3 p-4">
+                  <div>
+                    <p className="font-display text-lg font-black text-foreground">{planToday.day.nome}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {planToday.day.foco} · {planToday.day.exercicios.length} exercícios
+                    </p>
+                  </div>
+                  {planToday.day.aquecimento?.length ? (
+                    <p className="rounded-xl border border-[#4ADE80]/20 bg-[#4ADE80]/[0.06] p-2.5 text-[10.5px] leading-snug text-[#4ADE80]">
+                      Aquecimento: {planToday.day.aquecimento.join(" · ")}
+                    </p>
+                  ) : null}
+                  <ul className="divide-y divide-white/[0.05] rounded-xl border border-white/[0.06] bg-white/[0.02]">
+                    {planToday.day.exercicios.map((e, i) => (
+                      <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12.5px] font-semibold text-foreground">
+                            {i + 1}. {e.exercicio}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">RPE {e.rpe}{e.dica ? ` · ${e.dica}` : ""}</p>
+                        </div>
+                        <p className="shrink-0 text-[11px] font-bold tabular-nums text-brand">
+                          {e.series}x {e.reps} · {e.descanso}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                  {planToday.day.finalizador ? (
+                    <p className="rounded-xl border border-brand/20 bg-brand/[0.06] p-2.5 text-[10.5px] leading-snug text-brand">
+                      Finalizador: {planToday.day.finalizador}
+                    </p>
+                  ) : null}
+                  <button
+                    onClick={startPlanSession}
+                    className="gf-touch tactile flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-[15px] font-black text-brand-foreground shadow-lg shadow-brand/35 transition-transform active:scale-[0.98]"
+                  >
+                    <Play className="h-5 w-5 fill-current" /> Iniciar treino de hoje
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        ) : (
+          <div>
           <div className="mb-2 flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-foreground">Treino de hoje</h2>
             <div className="flex shrink-0 items-center gap-2">
@@ -596,7 +729,7 @@ export default function TreinoHomePage() {
             </div>
           )}
         </div>
-
+        )}
         {/* 3. BIBLIOTECA POR MÚSCULO, mapa navy/laranja com escala de recuperação */}
         <BodyMap
           counts={BODY_COUNTS}

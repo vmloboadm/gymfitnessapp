@@ -136,10 +136,12 @@ async function assignReal(
 
   const programId = (prog as { id: string }).id;
 
-  // resolve ids reais dos exercícios pelo nome (biblioteca do gym)
-  const allNames = plan.dias.flatMap((d) => d.exercicios.map((e) => e.exercicio));
-  const { data: exRows } = await sb.from("exercises").select("id, name").eq("gym_id", gymId);
-  const byName = new Map<string, string>((exRows ?? []).map((e) => [e.name.toLowerCase(), e.id]));
+  // resolve ids reais dos exercícios pelo nome (biblioteca global + do gym)
+  const { data: exRows } = await sb.from("exercises").select("id, name").or(`gym_id.is.null,gym_id.eq.${gymId}`);
+  const exList = (exRows ?? []) as Array<{ id: string; name: string }>;
+  const byName = new Map<string, string>(exList.map((e) => [e.name.toLowerCase(), e.id]));
+  // fallback: tabela pode estar vazia — usa um exercício existente como placeholder (nome real fica no notes)
+  const placeholder = exList[0]?.id ?? null;
 
   for (let di = 0; di < plan.dias.length; di++) {
     const day = plan.dias[di];
@@ -154,7 +156,7 @@ async function assignReal(
     const rows = day.exercicios.map((e, i) => ({
       gym_id: gymId,
       day_id: dayId,
-      exercise_id: byName.get(e.exercicio.toLowerCase()) ?? null,
+      exercise_id: byName.get(e.exercicio.toLowerCase()) ?? byName.get(e.exercicio.toLowerCase().split(" ")[0]) ?? placeholder,
       sets: e.series,
       reps: e.reps,
       rest_seconds: parseInt(e.descanso) || 60,
@@ -162,7 +164,10 @@ async function assignReal(
       notes: `${e.exercicio}${e.dica ? `. ${e.dica}` : ""}`,
       ord: i + 1,
     }));
-    if (rows.length) await sb.from("workout_exercises").insert(rows as never);
+    if (rows.length) {
+      const { error: wexErr } = await sb.from("workout_exercises").insert(rows as never);
+      if (wexErr) throw new Error("exercicios do plano: " + wexErr.message);
+    }
   }
 
   const { error: swErr } = await sb.from("student_workouts").insert(({
@@ -213,7 +218,7 @@ export async function fetchMyAssignedPlans(
     .select(`
       id, status, assigned_at,
       workout_programs (
-        id, name, objective, created_at,
+        id, name, objective, ai_draft, created_at,
         workout_days ( id, name, day_order,
           workout_exercises ( exercise_id, sets, reps, rest_seconds, rpe, notes, ord )
         )
@@ -230,6 +235,7 @@ export async function fetchMyAssignedPlans(
     workout_programs: {
       name: string;
       objective: string;
+      ai_draft: string | null;
       workout_days: Array<{
         name: string;
         day_order: number;
@@ -244,6 +250,16 @@ export async function fetchMyAssignedPlans(
     .map((r) => {
       const prog = r.workout_programs!;
       const days = [...(prog.workout_days ?? [])].sort((a, b) => a.day_order - b.day_order);
+      let daysSelected: string[] | undefined;
+      try {
+        const draft = prog.ai_draft ? (JSON.parse(prog.ai_draft) as { daysSelected?: string[] }) : null;
+        daysSelected = draft?.daysSelected;
+      } catch {
+        daysSelected = undefined;
+      }
+      if (!daysSelected?.length) {
+        daysSelected = ["Seg", "Ter", "Qua", "Qui", "Sex"].slice(0, Math.min(days.length, 5));
+      }
       return {
         id: r.id,
         studentId: userId,
@@ -259,6 +275,7 @@ export async function fetchMyAssignedPlans(
           nivel: prog.objective ?? "Treino",
           objetivo: prog.objective ?? "Treino",
           observacao_geral: "",
+          daysSelected,
           dias: days.map((d) => ({
             nome: d.name,
             foco: d.name,

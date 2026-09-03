@@ -286,7 +286,7 @@ export default function PersonalDashboardPage() {
             />
           </div>
         </Link>
-        <div className="gf-card gf-glass !rounded-2xl !p-3">
+        <Link href="/personal/treinos" className="gf-card gf-glass !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#4ADE80]/25 bg-[#4ADE80]/10">
             <ClipboardList className="h-3.5 w-3.5 text-[#4ADE80]" />
           </span>
@@ -307,8 +307,8 @@ export default function PersonalDashboardPage() {
               {stats.prescribedYesterday}
             </p>
           ) : null}
-        </div>
-        <div className="gf-card gf-glass !rounded-2xl !p-3">
+        </Link>
+        <Link href="/personal/alunos" className="gf-card gf-glass !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#F87171]/25 bg-[#F87171]/10">
             <UserRoundX className="h-3.5 w-3.5 text-[#F87171]" />
           </span>
@@ -323,7 +323,7 @@ export default function PersonalDashboardPage() {
               {Math.round((stats.missesWeek / Math.max(1, stats.totalStudents)) * 100)}% da turma
             </p>
           ) : null}
-        </div>
+        </Link>
       </motion.div>
 
       {/* Pulso da academia (mesmo componente do aluno) */}

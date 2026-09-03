@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2 } from "lucide-react";
+import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2, LogOut } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { toast } from "sonner";
@@ -203,6 +203,24 @@ export default function PersonalPerfilPage() {
           )}
         </div>
       </motion.header>
+
+      {/* Sair da conta */}
+      <button
+        onClick={async () => {
+          const { error } = await supabaseBrowser().auth.signOut();
+          if (error) {
+            toast.error("Não deu sair agora. Tente novamente.");
+            return;
+          }
+          try { localStorage.clear(); } catch {}
+          toast.success("Você saiu da conta.");
+          window.location.href = "/login";
+        }}
+        className="tactile flex w-full items-center justify-center gap-2 rounded-2xl border border-[#F87171]/25 bg-[#F87171]/[0.06] py-3.5 text-[13px] font-bold text-[#F87171] transition-transform active:scale-[0.98]"
+      >
+        <LogOut className="h-4 w-4" />
+        Sair da conta
+      </button>
 
       {/* Segurança: alterar senha */}
       <section className="gf-card gf-glass !p-4" aria-labelledby="seg-title">

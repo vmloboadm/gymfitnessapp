@@ -28,6 +28,7 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
   const [testRole, setTestRole] = useState<"student" | "trainer" | "manager">("student");
+  const [keepSigned, setKeepSigned] = useState(true);
   const { switchDemoRole } = useAuth();
   const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
 
@@ -66,6 +67,19 @@ export function LoginForm() {
       toast.error("Não foi possível entrar", { description: error.message });
       setLoading(false);
       return;
+    }
+
+    // "Manter conectado": desmarcado → o cookie de sessão morre ao fechar o navegador
+    if (!keepSigned) {
+      setTimeout(() => {
+        document.cookie.split(";").forEach((c) => {
+          const name = c.split("=")[0].trim();
+          if (name.startsWith("sb-") && name.includes("auth-token")) {
+            const raw = c.slice(name.length + 1);
+            document.cookie = `${name}=${raw}; path=/`;
+          }
+        });
+      }, 600); // depois que o client ssr gravar os cookies da sessão
     }
 
     // Middleware redireciona para a home da role
@@ -117,7 +131,7 @@ export function LoginForm() {
       {/* linha de acento superior + brilho interno */}
       <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" aria-hidden />
       <span className="pointer-events-none absolute -top-16 left-1/2 h-32 w-[120%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(244,113,30,0.18),transparent_70%)] blur-2xl" aria-hidden />
-      <div className="relative flex flex-col items-center gap-3 text-center">
+      <div className="relative flex flex-col items-center gap-4 text-center">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white/60">
           <span className="h-1.5 w-1.5 rounded-full bg-[#F4711E] shadow-[0_0_8px_rgba(244,113,30,0.7)]" />
           Acesso exclusivo · GymFitness
@@ -125,18 +139,24 @@ export function LoginForm() {
         <img
           src="/images/logo-academia.png"
           alt="GymFitness"
-          width={160}
-          height={48}
-          className="h-10 w-auto object-contain drop-shadow-[0_0_16px_rgba(244,113,30,0.35)]"
+          width={280}
+          height={84}
+          className="h-20 w-auto object-contain drop-shadow-[0_0_28px_rgba(244,113,30,0.45)] sm:h-24"
         />
         <div>
-          <h1 className="font-display text-2xl font-black tracking-tight text-white">
-            Bem-vindo de volta
+          <h1 className="font-display text-[26px] font-black leading-tight tracking-tight text-white">
+            {isDemo ? (
+              <>
+                Bem-vindo de volta
+                <span className="mx-auto mt-2 flex items-center justify-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-warning">
+                  <span className="h-1.5 w-1.5 rounded-full bg-warning" /> modo teste
+                </span>
+              </>
+            ) : (
+              "Sua evolução começa aqui"
+            )}
           </h1>
-          <span className="mx-auto mt-2 inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-warning">
-            <span className="h-1.5 w-1.5 rounded-full bg-warning" /> modo teste
-          </span>
-          <p className="mt-1 text-sm text-white/60">
+          <p className="mt-1.5 text-sm text-white/60">
             Entre para continuar sua evolução
           </p>
         </div>
@@ -181,6 +201,16 @@ export function LoginForm() {
             className="h-11 border-white/10 bg-white/[0.06] text-white placeholder:text-white/40 focus-visible:border-brand/50 focus-visible:ring-brand/30"
           />
         </div>
+
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-white/70">
+          <input
+            type="checkbox"
+            checked={keepSigned}
+            onChange={(e) => setKeepSigned(e.target.checked)}
+            className="h-4 w-4 rounded border-white/20 bg-white/10 accent-[#F4711E]"
+          />
+          Manter conectado neste dispositivo
+        </label>
 
         <Button
           type="submit"

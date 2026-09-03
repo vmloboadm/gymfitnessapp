@@ -107,6 +107,7 @@ export default function PersonalTreinosPage() {
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [activeDay, setActiveDay] = useState(0);
   const [notes, setNotes] = useState("");
+  const [daysSelected, setDaysSelected] = useState<Set<string>>(new Set());
   const [assigned, setAssigned] = useState<Awaited<ReturnType<typeof listAssignedWorkouts>>>([]);
   const [massTemplate, setMassTemplate] = useState<WorkoutTemplate | null>(null);
   const [massSelected, setMassSelected] = useState<Set<string>>(new Set());
@@ -231,7 +232,7 @@ export default function PersonalTreinosPage() {
           gymId: profile.gym_id,
           trainerId: user.id,
           student: target,
-          plan,
+          plan: { ...plan, daysSelected: [...daysSelected] },
           notes: notes.trim() || null,
         });
       } catch (e) {
@@ -328,9 +329,42 @@ export default function PersonalTreinosPage() {
             aria-label="Pedido de plano"
             className="w-full resize-none rounded-2xl border border-white/[0.06] bg-white/[0.05] p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
           />
+          {/* dias da semana */}
+          <div>
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Dias da semana do aluno
+            </p>
+            <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1">
+              {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((d) => {
+                const on = daysSelected.has(d);
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() =>
+                      setDaysSelected((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(d)) next.delete(d);
+                        else next.add(d);
+                        return next;
+                      })
+                    }
+                    aria-pressed={on}
+                    className={cn(
+                      "shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors",
+                      on ? "border-brand bg-brand text-brand-foreground" : "border-white/[0.08] bg-white/[0.04] text-muted-foreground"
+                    )}
+                  >
+                    {d}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
             <p className="mr-auto text-[9.5px] text-muted-foreground">
-              O gerador recebe objetivo, nível, frequência, restrições e aparelhos.
+              O gerador recebe objetivo, nível, dias, restrições e aparelhos.
             </p>
             <Button onClick={run} disabled={!prompt.trim() || loading} size="sm" className="rounded-xl">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5" />}

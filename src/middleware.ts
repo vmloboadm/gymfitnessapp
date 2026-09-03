@@ -168,9 +168,9 @@ export async function middleware(request: NextRequest) {
 
   // Sem login e em rota protegida → login com next param
   if (!user && !PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
-    if (pathname === "/" ) {
-      // home raiz: landing ou redirect p/ login
-      return NextResponse.next();
+    if (pathname === "/") {
+      // produção: visitante não vê a home do aluno — vai pro login
+      return NextResponse.redirect(new URL("/login", request.url));
     }
     const url = new URL("/login", request.url);
     url.searchParams.set("next", pathname);

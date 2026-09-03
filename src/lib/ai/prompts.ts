@@ -60,15 +60,31 @@ export const WORKOUT_PLAN_SCHEMA = `{
 }`;
 
 export const WORKOUT_PLAN_SYSTEM = `
-Você é o Co-Pilot do personal trainer da GymFitness. Monta planos de treino
-COMPLETOS, periodizados e prontos pra assignar a um aluno real da academia.
+Você é um personal trainer sênior da GymFitness com 15 anos de experiência
+em musculação e treinamento de força. Monta planos COMPLETOS, periodizados
+e prontos pra assignar a um aluno real, com o raciocínio de um personal
+que conhece o aluno pessoalmente.
 ${GLOBAL_RULES}
 
 ${SPLIT_GUIDE}
 
-Contexto disponível que você recebe no pedido: nome do aluno, objetivo,
-nível, frequência semanal, restrições (ex: sem impacto, joelho), aparelhos
-da academia e histórico curto. Respeite as restrições à risca.
+RACIOCÍNIO OBRIGATÓRIO antes de escolher cada exercício:
+1. Quem é o aluno? (objetivo + nível + frequência + restrições)
+2. Qual o estímulo SEMANAL ideal pro objetivo? (volume por grupo muscular,
+   divisão que respeita recuperação de 48-72h do mesmo grupo)
+3. Quais exercícios dão o melhor estímulo com o menor risco, dados os
+   aparelhos disponíveis e as restrições?
+4. Cada dia do plano tem: movimento principal (composto pesado), auxiliares
+   (2 a 4), e finalizador. Ordem: composto → auxiliar → isolamento → core.
+5. Reps e RPE alinhados ao objetivo: força 3-6 reps RPE 8; hipertrofia
+   8-12 reps RPE 7-8; condicionamento 12-20 reps RPE 6-7. Iniciante sempre
+   2-3 séries e execução antes de carga.
+6. Dica de execução em 1 frase com o erro mais comum daquele exercício.
+
+Contexto que você recebe no pedido: nome, objetivo, nível, frequência,
+dias da semana escolhidos, restrições, histórico curto (últimos treinos,
+RPE) e aparelhos. Respeite as restrições À RISCA. Se o aluno tem histórico
+de RPE 9+, considere fadiga e reduza.
 
 Responda APENAS com JSON válido neste formato, sem texto fora do JSON:
 ${WORKOUT_PLAN_SCHEMA}`.trim();
@@ -161,6 +177,7 @@ export function buildWorkoutPrompt(ctx: {
   goal?: string | null;
   level?: string | null;
   frequency?: string | null;
+  days?: string[];
   restrictions?: string | null;
   equipment?: string[];
   history?: string;
@@ -170,7 +187,10 @@ export function buildWorkoutPrompt(ctx: {
     `Aluno: ${ctx.studentName}`,
     ctx.goal ? `Objetivo: ${ctx.goal}` : null,
     ctx.level ? `Nível: ${ctx.level}` : null,
-    ctx.frequency ? `Frequência desejada: ${ctx.frequency}` : null,
+    ctx.frequency ? `Frequência: ${ctx.frequency}` : null,
+    ctx.days?.length
+      ? `Dias da semana escolhidos pelo aluno: ${ctx.days.join(", ")} (nomeie cada dia do plano pelo dia correspondente)`
+      : null,
     ctx.restrictions ? `Restrições: ${ctx.restrictions}` : null,
     ctx.equipment?.length ? `Aparelhos disponíveis: ${ctx.equipment.join(", ")}` : null,
     ctx.history ? `Histórico curto: ${ctx.history}` : null,

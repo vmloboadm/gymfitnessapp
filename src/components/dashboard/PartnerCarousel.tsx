@@ -5,7 +5,9 @@ import Autoplay from "embla-carousel-autoplay";
 import Image from "next/image";
 import { ExternalLink, BadgePercent } from "lucide-react";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
 import { isDemoMode, demoPatrocinadores, codeResgate, type Patrocinador } from "~/lib/demo-bridge";
+import { supabaseBrowser } from "~/lib/supabase/client";
 
 /** Monograma premium, primeira letra em display pesado sobre a cor da marca.
     Quando o parceiro cadastra a logo (upload), ela substitui o monograma. */
@@ -49,7 +51,34 @@ function PartnerMark({ p, size = 44 }: { p: Patrocinador; size?: number }) {
 /** Carrossel universal de parceiros, snap central sedoso, autoplay lento, peek do próximo card.
     Sem corte abrupto na borda: o contéudo do card nunca é cortado feio. */
 export default function PartnerCarousel() {
-  const partners = isDemoMode() ? demoPatrocinadores() : [];
+  // produção: patrocinadores reais do gym (tabela partners)
+  const [partners, setPartners] = useState<Patrocinador[]>([]);
+  useEffect(() => {
+    if (isDemoMode()) {
+      setPartners(demoPatrocinadores());
+      return;
+    }
+    const sb = supabaseBrowser();
+    sb.from("partners")
+      .select("id, name, image_url, link, resgate")
+      .eq("gym_id", "00000000-0000-0000-0000-000000000001")
+      .eq("active", true)
+      .then(({ data }) => {
+        const rows = (data ?? []) as Array<{ id: string; name: string; image_url: string | null; link: string | null; resgate: string | null }>;
+        setPartners(
+          rows.map((p) => ({
+            id: p.id,
+            name: p.name,
+            msg: "",
+            discount: 0,
+            url: p.link ?? "",
+            brand: "#1B3A66",
+            logo: p.image_url ?? "",
+            code: p.resgate ?? "",
+          })) as unknown as Patrocinador[]
+        );
+      });
+  }, []);
   const [emblaRef] = useEmblaCarousel(
     {
       loop: partners.length > 1,

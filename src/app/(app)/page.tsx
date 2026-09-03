@@ -555,6 +555,9 @@ export default function HomePage() {
         {/* VER MAIS, densidade controlada (#9): o essencial fica visível,
             o resto (ritmo detalhado, comunidade, artigo, dica, parceiros)
             fica a um toque de distância sem obrigar a rolar tudo. */}
+        {/* Parceiros: sempre visíveis (cards de benefício da academia) */}
+        <PartnerCarousel />
+
         <motion.div variants={item}>
           <button
             onClick={() => {
@@ -736,8 +739,6 @@ export default function HomePage() {
           </div>
         </motion.section>
 
-        {/* Parceiros, agora dentro do "Ver mais" (antes poluía todas as telas) */}
-        <PartnerCarousel />
 
         {/* Marcador de build, confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">{BUILD_LABEL}</p>

@@ -31,6 +31,8 @@ export type PlanDay = {
 export type WorkoutPlan = {
   nome: string;
   frequencia: string;
+  /** Dias da semana escolhidos pelo aluno ("Seg", "Qua"...), na ordem semanal */
+  daysSelected?: string[];
   nivel: string;
   objetivo: string;
   observacao_geral: string;
