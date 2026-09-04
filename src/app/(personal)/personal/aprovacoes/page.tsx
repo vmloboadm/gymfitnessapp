@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { demoPersonalStudents } from "~/lib/personal-data";
 import { useAuth } from "~/hooks/useAuth";
+import { usePremiumRequestsRealtime } from "~/hooks/useRealtimeSubscriptions";
 import {
   TRAINER_APPROVALS_EVENT,
   type ApprovalRequest,
@@ -53,6 +54,12 @@ export default function PersonalAprovacoesPage() {
       clearInterval(t);
     };
   }, [profile?.gym_id]);
+
+  // Realtime: refetch when student submits or trainer decides
+  usePremiumRequestsRealtime(profile?.gym_id, () => {
+    if (!profile?.gym_id) return;
+    getRequests(profile.gym_id).then(setItems).catch(() => {});
+  });
 
   const pending = items.filter((a) => a.status === "pendente");
   const _isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";

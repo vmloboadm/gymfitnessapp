@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, ThumbsUp, MessageSquare, Send, GraduationCap, Pin } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { useFeedRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
@@ -153,6 +154,9 @@ export default function FeedPage() {
     },
     [user?.id, profile?.id, demo]
   );
+
+  // Realtime: refetch feed when posts, likes, or comments change
+  useFeedRealtime(profile?.gym_id, refetch);
 
   // fixados primeiro, depois mais recentes; posts publicados no demo entram no topo
   const sorted = useMemo(() => {

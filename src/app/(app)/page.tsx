@@ -9,6 +9,7 @@ import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLin
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { useWorkoutLogsRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { SkeletonList } from "~/components/common/AsyncStates";
 import { toast } from "sonner";
@@ -218,7 +219,7 @@ export default function HomePage() {
 
 
 
-  const { data, loading: dataLoading } = useAsyncQuery<{
+  const { data, loading: dataLoading, refetch: refetchLogs } = useAsyncQuery<{
     logs: WorkoutLogs[];
     detailCount: number;
     points: number;
@@ -254,6 +255,9 @@ export default function HomePage() {
     },
     [user?.id, profile?.id, demo]
   );
+
+  // Realtime: refetch workout_logs when any student in the gym logs a workout
+  useWorkoutLogsRealtime(profile?.gym_id, user?.id, refetchLogs);
 
   // FONTE ÚNICA: no demo, o MESMO objeto de logs da aba Treino (singleton).
   const twSingleton = demo ? getTodayWorkout() : null;

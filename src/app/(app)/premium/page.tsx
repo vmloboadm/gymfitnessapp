@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Crown, FileText, Send, Inbox } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { usePremiumRequestsRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
@@ -49,6 +50,9 @@ export default function PremiumPage() {
     },
     [user?.id]
   );
+
+  // Realtime: refetch when trainer approves/rejects
+  usePremiumRequestsRealtime(profile?.gym_id, refetch);
 
   const submit = async () => {
     if (!user || !profile) return;
