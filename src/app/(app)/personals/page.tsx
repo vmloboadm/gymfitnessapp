@@ -51,7 +51,7 @@ export default function PersonaisMarketplacePage() {
             >
               <div className="flex items-center gap-4 p-4">
                 <Avatar className="h-16 w-16 border-2 border-brand/40">
-                  <AvatarImage src={PHOTOS[i % PHOTOS.length]} alt={p.trainer.name} />
+                  <AvatarImage src={PHOTOS[i % PHOTOS.length] ?? undefined} alt={p.trainer.name} />
                   <AvatarFallback className="bg-secondary text-lg font-bold text-secondary-foreground">
                     {p.trainer.name[0]}
                   </AvatarFallback>
