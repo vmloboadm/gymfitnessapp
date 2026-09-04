@@ -31,7 +31,7 @@ const MANAGER_NAV = [
   { href: "/personal/alunos", label: "Alunos", icon: Users },
   { href: "/personal/treinos", label: "Treinos", icon: ClipboardList },
   { href: "/personal/aprovacoes", label: "Aprovações", icon: Inbox, badge: true },
-  { href: "/personais", label: "Personais", icon: Users },
+  { href: "/personal/perfil", label: "Perfil", icon: UserRound },
 ] as const;
 
 /**

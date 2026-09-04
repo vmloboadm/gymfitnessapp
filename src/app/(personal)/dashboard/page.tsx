@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { Users, Dumbbell, DollarSign, TrendingUp, AlarmClock, BarChart3 } from "lucide-react";
 import { OcupacaoBarChart, ReceitaLineChart } from "~/components/charts";
@@ -7,6 +8,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { StatCard } from "~/components/common/StatCard";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import { SkeletonList, ErrorState } from "~/components/common/AsyncStates";
 import { formatNumber } from "~/lib/utils/format";
@@ -61,13 +63,42 @@ export default function DashboardPage() {
   );
 
   const kpis = data;
-  const ocupacao = demo ? demoOcupacaoHorario() : [];
+
+  // Ocupação REAL: checkins de entrada de hoje agrupados por hora (6h–22h)
+  const { data: todayCheckins } = useAsyncQuery<string[]>(
+    async () => {
+      if (demo || !profile?.gym_id) return { data: [], error: null };
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const { data, error } = await supabaseBrowser()
+        .from("checkins")
+        .select("checked_at")
+        .eq("gym_id", profile.gym_id)
+        .eq("type", "entrada")
+        .gte("checked_at", start.toISOString());
+      if (error) return { data: [], error: null };
+      return { data: (data as { checked_at: string }[]).map((r) => r.checked_at), error: null };
+    },
+    [profile?.gym_id, demo]
+  );
+
+  const ocupacao = useMemo(() => {
+    if (demo) return demoOcupacaoHorario();
+    const counts = new Array(17).fill(0) as number[]; // 6h..22h
+    for (const iso of todayCheckins ?? []) {
+      const h = new Date(iso).getHours();
+      if (h >= 6 && h <= 22) counts[h - 6]++;
+    }
+    return counts.map((n, i) => ({ hora: `${i + 6}h`, alunos: n }));
+  }, [demo, todayCheckins]);
+
   const planos = demo ? demoCheckinPorPlano() : [];
   const _manut = demo ? demoManutencaoRecorrente() : [];
   const tendencia = demo ? demoTendenciaReceita() : [];
 
   const pico = ocupacao.reduce((a, b) => (b.alunos > a.alunos ? b : a), ocupacao[0] ?? { hora: "", alunos: 0 });
   const vazio = ocupacao.reduce((a, b) => (b.alunos < a.alunos ? b : a), ocupacao[0] ?? { hora: "", alunos: 0 });
+  const primeiroNome = (profile?.name ?? "Gestor").split(" ")[0];
 
   if (loading) {
     return (
@@ -87,15 +118,25 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 p-4">
-      {/* Header */}
+      {/* Header com avatar + saudação */}
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-black tracking-tight text-foreground">Dashboard</h1>
-          <p className="text-xs text-muted-foreground">Vista geral da academia</p>
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar className="h-11 w-11 shrink-0 border border-brand/40">
+            {profile?.avatar_url ? (
+              <AvatarImage src={profile.avatar_url} alt={profile.name ?? "Gestor"} />
+            ) : null}
+            <AvatarFallback className="bg-brand/15 text-sm font-black text-brand">
+              {primeiroNome.slice(0, 1).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-black tracking-tight text-foreground">{primeiroNome}</h1>
+            <p className="text-xs text-muted-foreground">Vista geral da academia</p>
+          </div>
         </div>
         <Link
           href="/matriculas"
-          className="flex items-center gap-1 rounded-xl border border-border bg-card/50 px-3 py-2 text-xs font-bold text-foreground hover:border-brand/40"
+          className="flex shrink-0 items-center gap-1 rounded-xl border border-border bg-card/50 px-3 py-2 text-xs font-bold text-foreground hover:border-brand/40"
         >
           <Users className="h-3.5 w-3.5 text-brand" /> Matrículas
         </Link>
@@ -130,34 +171,39 @@ export default function DashboardPage() {
         );
       })()}
 
-      {/* Ocupação por horário */}
-      <div className="rounded-2xl border border-border bg-card/50 p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            <AlarmClock className="h-3.5 w-3.5 text-brand" /> Ocupação por horário
-          </p>
-          <Badge variant="outline" className="text-[10px]">pico {pico.hora} · vazio {vazio.hora}</Badge>
+      {/* Ocupação por horário (REAL via checkins; demo usa mock) */}
+      {ocupacao.some((o) => o.alunos > 0) || demo ? (
+        <div className="rounded-2xl border border-border bg-card/50 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              <AlarmClock className="h-3.5 w-3.5 text-brand" /> Ocupação por horário
+            </p>
+            <Badge variant="outline" className="text-[10px]">pico {pico.hora} · vazio {vazio.hora}</Badge>
+          </div>
+          <div className="h-32">
+            <OcupacaoBarChart data={ocupacao} />
+          </div>
         </div>
-        <div className="h-32">
-          <OcupacaoBarChart data={ocupacao} />
-        </div>
-      </div>
+      ) : null}
 
-      {/* Tendência de receita */}
-      <div className="rounded-2xl border border-border bg-card/50 p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            <DollarSign className="h-3.5 w-3.5 text-brand" /> Tendência de receita
-          </p>
-          <Badge variant="success" className="text-[10px]">+12,4%</Badge>
+      {/* Tendência de receita — só quando há dados (demo/pagamentos) */}
+      {tendencia.length > 0 ? (
+        <div className="rounded-2xl border border-border bg-card/50 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              <DollarSign className="h-3.5 w-3.5 text-brand" /> Tendência de receita
+            </p>
+            <Badge variant="success" className="text-[10px]">+12,4%</Badge>
+          </div>
+          <div className="h-28">
+            <ReceitaLineChart data={tendencia} />
+          </div>
         </div>
-        <div className="h-28">
-          <ReceitaLineChart data={tendencia} />
-        </div>
-      </div>
+      ) : null}
 
-      {/* Check-in por tipo de matrícula, destaque Gympass/TotalPass */}
-      <div className="rounded-2xl border border-border bg-card/50 p-4">
+      {/* Check-in por tipo de matrícula — só quando há dados (demo/pagamentos) */}
+      {planos.length > 0 ? (
+        <div className="rounded-2xl border border-border bg-card/50 p-4">
         <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           <TrendingUp className="h-3.5 w-3.5 text-brand" /> Check-in por tipo de matrícula
         </p>
@@ -189,7 +235,8 @@ export default function DashboardPage() {
         <p className="mt-3 rounded-lg bg-warning/10 px-3 py-2 text-[11px] text-warning">
           Aluno de plataforma tem o menor vínculo com a unidade, use streaks e comunidade para fidelizar.
         </p>
-      </div>
+        </div>
+      ) : null}
 
       {/* Ações rápidas */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
