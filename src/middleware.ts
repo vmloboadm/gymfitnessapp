@@ -13,6 +13,7 @@ const PUBLIC_PATHS = [
   "/register",
   "/forgot-password",
   "/day-pass",
+  "/parceiros",
 ];
 
 /** Prefijos por área (paths de fato, sem duplicação de grupo). */

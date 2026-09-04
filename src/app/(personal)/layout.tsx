@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
 import { TRAINER_APPROVALS_EVENT } from "~/lib/trainer-store";
@@ -39,11 +40,18 @@ const MANAGER_NAV = [
  * herdando o design system do app do aluno.
  */
 export default function PersonalLayout({ children }: { children: React.ReactNode }) {
-  const { profile } = useAuth();
+  const { profile, user, loading } = useAuth();
+  const router = useRouter();
   const isManager = profile?.role === "manager" || profile?.role === "admin";
   const items = isManager ? MANAGER_NAV : TRAINER_NAV;
   const pathname = usePathname();
   const [pendingApprovals, setPendingApprovals] = useState(0);
+
+  // Guard client-side: cache hits do CDN passam sem middleware —
+  // sem sessão, volta pro login.
+  useEffect(() => {
+    if (!loading && !user) router.replace("/login");
+  }, [loading, user, router]);
 
   useEffect(() => {
     if (!profile?.gym_id) return;

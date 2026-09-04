@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { BottomNav } from "~/components/layout/BottomNav";
 import { LiveWorkoutBar } from "~/components/layout/LiveWorkoutBar";
 import { useOfflineQueue } from "~/hooks/useOfflineQueue";
+import { useAuth } from "~/hooks/useAuth";
 import { CloudOff } from "lucide-react";
 
 /**
@@ -15,7 +18,16 @@ export default function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const { isOnline, pendingCount } = useOfflineQueue();
+
+  // Guard client-side: em cache hits do CDN o middleware não roda
+  // (comportamento do Vercel) — sem sessão, volta pro login.
+  useEffect(() => {
+    if (!authLoading && !user) router.replace("/login");
+  }, [authLoading, user, router]);
+
   return (
     <div
       className="min-h-[100dvh] pb-24 md:mx-auto md:max-w-md"
