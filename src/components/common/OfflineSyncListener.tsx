@@ -26,7 +26,12 @@ const MAX_RETRIES = 5;
  */
 export function OfflineSyncListener() {
   useEffect(() => {
+    // Single-flight: nunca dois POSTs simultâneos (interval + online + SW message)
+    let running = false;
+    const BATCH_LIMIT = 50;
+
     const runSync = async () => {
+      if (running) return;
       let queue: QueueAction[] = [];
       try {
         const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -35,6 +40,11 @@ export function OfflineSyncListener() {
         return;
       }
       if (queue.length === 0) return;
+
+      // Lote limitado; o resto vai no próximo ciclo
+      const batch = queue.slice(0, BATCH_LIMIT);
+      const batchIds = new Set(batch.map((a) => a.id));
+      running = true;
 
       try {
         const supabase = getSupabaseBrowser();
@@ -48,13 +58,24 @@ export function OfflineSyncListener() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ actions: queue }),
+          body: JSON.stringify({ actions: batch }),
         });
 
         if (res.ok) {
-          // 200: tudo sincronizado
-          window.localStorage.removeItem(STORAGE_KEY);
-          logger.info("sync.flush_ok", { count: queue.length });
+          // 200: tudo sincronizado — re-lê a fila atual e remove SÓ o lote
+          // enviado (ações enfileiradas durante o POST são preservadas)
+          let current: QueueAction[] = [];
+          try {
+            const raw = window.localStorage.getItem(STORAGE_KEY);
+            if (raw) current = JSON.parse(raw) as QueueAction[];
+          } catch { /* fila inválida: mantém vazio */ }
+          const remaining = current.filter((item) => !batchIds.has(item.id));
+          if (remaining.length > 0) {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
+          } else {
+            window.localStorage.removeItem(STORAGE_KEY);
+          }
+          logger.info("sync.flush_ok", { count: batch.length, pending: remaining.length });
           return;
         }
 
@@ -123,10 +144,12 @@ export function OfflineSyncListener() {
         }
 
         // Outro status: mantém fila para retry
-        logger.warn("sync.flush_rejected", { status: res.status, count: queue.length });
+        logger.warn("sync.flush_rejected", { status: res.status, count: batch.length });
       } catch (err) {
         // Offline de novo: mantém fila com backoff
-        logger.warn("sync.flush_offline", { count: queue.length, err });
+        logger.warn("sync.flush_offline", { count: batch.length, err });
+      } finally {
+        running = false;
       }
     };
 

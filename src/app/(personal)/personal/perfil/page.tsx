@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2, LogOut, Shield, Settings, Crown } from "lucide-react";
+import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2, LogOut, Shield, Settings, Crown, Sparkles } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { toast } from "sonner";
@@ -27,9 +27,23 @@ const TABS_MANAGER = [
 
 type TabId = (typeof TABS_BASE)[number]["id"] | "config" | "equipe";
 
+/** Frases prontas para o botão Regenerar (aparecem no badge da home dos alunos). */
+const MOTIVATION_PRESETS = [
+  "bora somar com a galera!",
+  "o clima tá ótimo, entra no ritmo!",
+  "energia no talo hoje!",
+  "foco, força e fé!",
+  "cada treino te deixa mais forte!",
+  "a evolução ama a constância!",
+  "quem chegou junto, sai mais forte!",
+  "vem que hoje é dia!",
+  "o suor de hoje é o resultado de amanhã!",
+  "nada vence quem não desiste!",
+];
+
 /** Perfil profissional do personal: apresentação, alunos e estatísticas. */
 export default function PersonalPerfilPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const students = useMemo(() => demoPersonalStudents(), []);
   const [tab, setTab] = useState<TabId>("alunos");
   const [demoAvatar, setDemoAvatar] = useState<string | null>(null);
@@ -55,6 +69,55 @@ export default function PersonalPerfilPage() {
   }, []);
 
   const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
+  // ---- Frase motivacional (badge da home dos alunos) ----
+  const [motivPhrase, setMotivPhrase] = useState("");
+  const [motivSaving, setMotivSaving] = useState(false);
+
+  useEffect(() => {
+    if (isDemo || !profile?.gym_id) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const { data } = await supabaseBrowser()
+          .from("gym_motivation")
+          .select("phrase")
+          .eq("gym_id", profile.gym_id)
+          .maybeSingle();
+        if (alive) setMotivPhrase((data as { phrase: string | null } | null)?.phrase ?? "");
+      } catch { /* segue com frase padrão */ }
+    })();
+    return () => { alive = false; };
+  }, [isDemo, profile?.gym_id]);
+
+  const saveMotivation = async (phrase: string) => {
+    const trimmed = phrase.trim();
+    if (!profile?.gym_id || !user || !trimmed) {
+      toast.error("Escreva uma frase antes de salvar");
+      return;
+    }
+    setMotivSaving(true);
+    try {
+      const { error } = await supabaseBrowser()
+        .from("gym_motivation")
+        .upsert({ gym_id: profile.gym_id, phrase: trimmed, updated_by: user.id, updated_at: new Date().toISOString() } as never);
+      if (error) throw error;
+      setMotivPhrase(trimmed);
+      toast.success("Frase atualizada! Todos os alunos já veem.");
+    } catch (e) {
+      toast.error("Falha ao salvar frase", { description: String(e).slice(0, 80) });
+    } finally {
+      setMotivSaving(false);
+    }
+  };
+
+  const regenerateMotivation = () => {
+    const current = motivPhrase.trim();
+    const pool = MOTIVATION_PRESETS.filter((p) => p !== current);
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    setMotivPhrase(pick);
+    void saveMotivation(pick);
+  };
 
   /** Foto: abre modal de corte antes de enviar ao servidor. */
   const onPickPhoto = (file: File | null) => {
@@ -379,6 +442,51 @@ export default function PersonalPerfilPage() {
         /* aba Configurações (gestor) */
         <div className="gf-card gf-glass !rounded-2xl !p-4 space-y-3">
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Configurações da academia</p>
+
+          {/* Frase motivacional — badge da home de todos os alunos */}
+          <div className="rounded-xl border border-brand/25 bg-brand/[0.06] p-3">
+            <p className="flex items-center gap-1.5 text-[12px] font-bold text-foreground">
+              <Sparkles className="h-3.5 w-3.5 text-brand" /> Frase motivacional
+            </p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground">
+              Aparece no badge de pessoas treinando agora, na home dos alunos · atualiza ao vivo
+            </p>
+            <textarea
+              value={motivPhrase}
+              onChange={(e) => setMotivPhrase(e.target.value)}
+              rows={2}
+              maxLength={80}
+              placeholder="Ex: bora somar com a galera!"
+              className="mt-2 w-full resize-none rounded-xl border border-border bg-card/60 px-3 py-2 text-[12px] text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            />
+            <div className="mt-2 flex items-center gap-2">
+              <Button
+                size="sm"
+                disabled={motivSaving || !motivPhrase.trim()}
+                onClick={() => void saveMotivation(motivPhrase)}
+                className="flex-1"
+              >
+                {motivSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                Salvar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={motivSaving}
+                onClick={regenerateMotivation}
+                className="flex-1"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Regenerar
+              </Button>
+            </div>
+            {motivPhrase ? (
+              <p className="mt-2 truncate text-[10px] text-muted-foreground">
+                Prévia: <span className="font-semibold text-[#FF9A5C]">{motivPhrase}</span>
+              </p>
+            ) : null}
+          </div>
+
           {[
             { label: "Gerenciar personais", icon: Users, desc: "Adicionar, remover ou alterar permissões" },
             { label: "Planos e preços", icon: ClipboardList, desc: "Configurar planos de matrícula" },

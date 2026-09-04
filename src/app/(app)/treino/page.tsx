@@ -204,7 +204,7 @@ export default function TreinoHomePage() {
 
   // PLANO DO PERSONAL (produção): treino de hoje vem do student_workouts ativo
   const [planActive, setPlanActive] = useState<Awaited<ReturnType<typeof fetchMyAssignedPlans>>> ([]);
-  const [planExerciseMap, _setPlanExerciseMap] = useState<Record<string, { programId: string; exerciseId: string; reps: string; rpe: number | null }>>({});
+  const [planExerciseMap, setPlanExerciseMap] = useState<Record<string, { workoutId: string; exerciseId: string; reps: string; rpe: number | null }>>({});
   const [planTodayActive, setPlanTodayActive] = useState(false);
   useEffect(() => {
     if (demo || !user || !profile?.gym_id) return;
@@ -250,18 +250,20 @@ export default function TreinoHomePage() {
     if (completedIds?.length) {
       setDoneIds((prev) => new Set([...prev, ...completedIds]));
       // produção: grava workout_logs reais dos exercícios concluídos
+      // (workout_id = student_workouts.id; só exercícios resolvidos na biblioteca)
       if (!demo && planExerciseMap && Object.keys(planExerciseMap).length > 0 && user && profile) {
         const supabase = supabaseBrowser();
         const rows = completedIds
-          .filter((id) => planExerciseMap[id])
-          .map((id) => ({
+          .map((id) => ({ id, m: planExerciseMap[id] }))
+          .filter(({ m }) => m && m.exerciseId && m.workoutId)
+          .map(({ m }) => ({
             gym_id: profile.gym_id,
             student_id: user.id,
-            workout_id: planExerciseMap[id].programId,
-            exercise_id: planExerciseMap[id].exerciseId,
+            workout_id: m.workoutId,
+            exercise_id: m.exerciseId,
             date: new Date().toISOString(),
-            reps: planExerciseMap[id].reps,
-            rpe: planExerciseMap[id].rpe ?? null,
+            reps: m.reps,
+            rpe: m.rpe ?? null,
           }));
         if (rows.length) {
           const { error: logErr } = await supabase.from("workout_logs").insert(rows as never);
@@ -471,6 +473,35 @@ export default function TreinoHomePage() {
       videoUrlMale: null,
       videoUrlFemale: null,
     })) as typeof DEFAULT_DEMO_EX;
+    // Resolve ids REAIS p/ gravar workout_logs ao concluir:
+    // workout_id = student_workouts.id; exercise_id casando nome na biblioteca.
+    if (!demo && user && profile?.gym_id && plan.id) {
+      void (async () => {
+        const supabase = supabaseBrowser();
+        const map: Record<string, { workoutId: string; exerciseId: string; reps: string; rpe: number | null }> = {};
+        for (let i = 0; i < day.exercicios.length; i++) {
+          const e = day.exercicios[i];
+          try {
+            const { data: ex } = await supabase
+              .from("exercises")
+              .select("id")
+              .ilike("name", `%${e.exercicio}%`)
+              .limit(1)
+              .maybeSingle();
+            const exerciseId = (ex as { id: string } | null)?.id;
+            if (exerciseId) {
+              map[`plan-${i}`] = {
+                workoutId: plan.id,
+                exerciseId,
+                reps: e.reps,
+                rpe: e.rpe ?? null,
+              };
+            }
+          } catch { /* sem log para este exercício */ }
+        }
+        setPlanExerciseMap(map);
+      })();
+    }
     setSession(exList);
     setPlanTodayActive(true);
     startDaySession();

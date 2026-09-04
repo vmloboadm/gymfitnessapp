@@ -9,6 +9,7 @@ import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 import { isDemoMode } from "~/lib/demo-bridge";
+import { useAuth } from "~/hooks/useAuth";
 
 interface WorkoutLogModalProps {
   open: boolean;
@@ -23,6 +24,7 @@ export function WorkoutLogModal({ open, onOpenChange, sessionId, equipmentName, 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const demo = isDemoMode();
+  const { user, profile } = useAuth();
 
   const validate = () => {
     const next: Record<string, string> = {};
@@ -40,15 +42,38 @@ export function WorkoutLogModal({ open, onOpenChange, sessionId, equipmentName, 
     setSubmitting(true);
     try {
       if (!demo) {
+        if (!user || !profile?.gym_id) throw new Error("Sessão indisponível");
         const supabase = supabaseBrowser();
+        // Resolve um exercise_id REAL: primeiro tenta casar com o nome do
+        // aparelho; senão cai no exercício genérico "Registro livre" (seed).
+        let exerciseId: string | null = null;
+        const byName = await supabase
+          .from("exercises")
+          .select("id")
+          .ilike("name", `%${equipmentName}%`)
+          .limit(1)
+          .maybeSingle();
+        exerciseId = (byName.data as { id: string } | null)?.id ?? null;
+        if (!exerciseId) {
+          const generic = await supabase
+            .from("exercises")
+            .select("id")
+            .eq("name", "Registro livre")
+            .limit(1)
+            .maybeSingle();
+          exerciseId = (generic.data as { id: string } | null)?.id ?? null;
+        }
+        if (!exerciseId) throw new Error("Biblioteca de exercícios indisponível");
         const { error } = await supabase.from("workout_logs").insert({
+          gym_id: profile.gym_id,
+          student_id: user.id,
           session_id: sessionId,
-          exercise_id: "demo-placeholder",
+          exercise_id: exerciseId,
           date: new Date().toISOString().split("T")[0],
           weight_kg: form.weightKg ? Number(form.weightKg) : 0,
           reps: Number(form.reps),
           rpe: form.rpe ? Number(form.rpe) : null,
-          technique: "standard",
+          technique: "normal",
         } as never);
         if (error) throw error;
       }

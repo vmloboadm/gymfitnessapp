@@ -87,9 +87,10 @@ export default function NotificacoesPage() {
   const [demoReads, setDemoReads] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    // SW já registrado no provider; aqui garantimos p/ push
+    // SW já registrado no provider; aqui garantimos p/ push (basePath-aware)
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+      navigator.serviceWorker.register(`${base}/sw.js`).catch(() => {});
     }
   }, []);
 

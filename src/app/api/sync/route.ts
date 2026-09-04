@@ -77,6 +77,14 @@ export async function POST(request: Request) {
       typeof a.data === "object"
   );
 
+  // Cap de trabalho por request: evita streaming de milhares de inserts
+  if (actions.length > 100) {
+    return NextResponse.json(
+      { ok: false, error: "Lote muito grande. Envie no máximo 100 ações por request.", synced: 0 },
+      { status: 413 }
+    );
+  }
+
   const invalid = actions.filter((a) => !ALLOWED_TABLES.includes(a.table));
   if (invalid.length > 0) {
     return NextResponse.json(

@@ -1,18 +1,23 @@
 /* GymFitness Service Worker — PWA-first (blueprint §10)
  * Offline shell + cache runtime com estrategia network-first p/ páginas,
  * stale-while-revalidate p/ assets, background sync e escuta de push.
+ * BASE-aware: deriva o prefixo (/app) do próprio scope do SW, funcionando
+ * tanto na raiz quanto sob basePath.
  */
-const CACHE_VERSION = "gymfitness-v43";
+const CACHE_VERSION = "gymfitness-v47";
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
+/** Prefixo do app (ex: "/app"). Derivado do scope do registro do SW. */
+const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, "");
+
 // App shell: o que o PWA precacheia para abrir offline (login + onboarding + treino)
 const SHELL_URLS = [
-  "/",
-  "/login",
-  "/register",
-  "/forgot-password",
-  "/onboarding",
+  `${BASE}/`,
+  `${BASE}/login`,
+  `${BASE}/register`,
+  `${BASE}/forgot-password`,
+  `${BASE}/onboarding`,
 ];
 
 self.addEventListener("install", (event) => {
@@ -49,18 +54,18 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   // API routes: network-only
-  if (url.pathname.startsWith("/api/")) {
+  if (url.pathname.startsWith(`${BASE}/api/`)) {
     event.respondWith(fetch(request).catch(() => new Response(null, { status: 503 })));
     return;
   }
 
   // Estáticos imutáveis (chunks JS/CSS/ícones/imagens locais): CACHE-FIRST abre instantâneo
   if (
-    url.pathname.startsWith("/_next/static") ||
-    url.pathname.startsWith("/icons") ||
-    url.pathname.startsWith("/workout") ||
-    url.pathname.startsWith("/images") ||
-    url.pathname === "/manifest.json"
+    url.pathname.startsWith(`${BASE}/_next/static`) ||
+    url.pathname.startsWith(`${BASE}/icons`) ||
+    url.pathname.startsWith(`${BASE}/workout`) ||
+    url.pathname.startsWith(`${BASE}/images`) ||
+    url.pathname === `${BASE}/manifest.json`
   ) {
     event.respondWith(
       caches.match(request).then(
@@ -92,7 +97,7 @@ self.addEventListener("fetch", (event) => {
           const cached = await caches.match(request);
           if (cached) return cached;
           if (request.mode === "navigate") {
-            return caches.match("/");
+            return caches.match(`${BASE}/`);
           }
           return new Response(null, { status: 404 });
         })
@@ -122,26 +127,26 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title ?? "GymFitness", {
       body: data.body ?? "",
-      icon: "/icons/icon-192x192.png",
-      badge: "/icons/icon-96x96.png",
-      data: { url: data.url ?? "/" },
+      icon: `${BASE}/icons/icon-192x192.png`,
+      badge: `${BASE}/icons/icon-96x96.png`,
+      data: { url: data.url ?? `${BASE}/` },
     })
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url ?? "/";
+  const target = event.notification.data?.url ?? `${BASE}/`;
   event.waitUntil(
     clients.matchAll({ type: "window" }).then((clientsList) => {
       for (const client of clientsList) {
         if ("focus" in client) {
           client.focus();
-          client.navigate(url);
+          client.navigate(target);
           return;
         }
       }
-      if (clients.openWindow) clients.openWindow(url);
+      if (clients.openWindow) clients.openWindow(target);
     })
   );
 });

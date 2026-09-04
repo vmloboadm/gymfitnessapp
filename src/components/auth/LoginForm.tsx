@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, Loader2 } from "lucide-react";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { Button } from "~/components/ui/button";
@@ -16,6 +16,7 @@ import { readOnboarding } from "~/lib/profile-store";
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -76,8 +77,10 @@ export function LoginForm() {
         }, 600); // depois que o client ssr gravar os cookies da sessão
       }
 
-      // Middleware redireciona para a home da role
-      router.push("/");
+      // Middleware redireciona para a home da role (ou ?next= de deep link)
+      const next = searchParams.get("next");
+      const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+      router.push(safeNext);
       router.refresh();
     } catch {
       toast.error("Falha ao conectar", { description: "Verifique sua internet e tente novamente." });

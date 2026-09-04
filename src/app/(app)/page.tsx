@@ -9,7 +9,7 @@ import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLin
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
-import { useWorkoutLogsRealtime } from "~/hooks/useRealtimeSubscriptions";
+import { useWorkoutLogsRealtime, useGymMotivationRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { SkeletonList } from "~/components/common/AsyncStates";
 import { toast } from "sonner";
@@ -258,6 +258,23 @@ export default function HomePage() {
 
   // Realtime: refetch workout_logs when any student in the gym logs a workout
   useWorkoutLogsRealtime(profile?.gym_id, user?.id, refetchLogs);
+
+  // Frase motivacional editada pelo staff, atualiza ao vivo para todos
+  const { data: motivation, refetch: refetchMotivation } = useAsyncQuery<{ phrase: string | null }>(
+    async () => {
+      if (demo || !profile?.gym_id) return { data: { phrase: null }, error: null };
+      const { data, error } = await supabaseBrowser()
+        .from("gym_motivation")
+        .select("phrase")
+        .eq("gym_id", profile.gym_id)
+        .maybeSingle();
+      if (error) return { data: null, error };
+      return { data: (data as { phrase: string | null } | null) ?? { phrase: null }, error: null };
+    },
+    [profile?.gym_id, demo]
+  );
+  useGymMotivationRealtime(profile?.gym_id, refetchMotivation);
+  const motivationPhrase = motivation?.phrase?.trim() || "bora somar com a galera!";
 
   // FONTE ÚNICA: no demo, o MESMO objeto de logs da aba Treino (singleton).
   const twSingleton = demo ? getTodayWorkout() : null;
@@ -532,7 +549,7 @@ export default function HomePage() {
               </span>
               <p className="text-[11px] font-semibold text-[#B8C4D8]">
                 <span className="font-black text-[#F4F6FB]">{online} pessoas</span> treinando agora, 
-                <span className="text-[#FF9A5C]">bora somar com a galera!</span>
+                <span className="text-[#FF9A5C]"> {motivationPhrase}</span>
               </p>
             </div>
 

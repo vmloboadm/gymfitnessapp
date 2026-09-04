@@ -109,6 +109,25 @@ function pathAllowed(role: string | undefined, pathname: string): string | null 
   return null;
 }
 
+/**
+ * Redirect basePath-safe: clona nextUrl e troca o pathname.
+ * new URL("/x", request.url) PERDE o basePath /app no deploy → 404.
+ * O clone preserva: Next re-adiciona o basePath ao serializar.
+ */
+function redirectTo(request: NextRequest, path: string): NextResponse {
+  const url = request.nextUrl.clone();
+  url.pathname = path;
+  return NextResponse.redirect(url);
+}
+
+function redirectToWithNext(request: NextRequest, path: string, next: string): NextResponse {
+  const url = request.nextUrl.clone();
+  url.pathname = path;
+  url.search = "";
+  url.searchParams.set("next", next);
+  return NextResponse.redirect(url);
+}
+
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({ request });
 
@@ -119,13 +138,13 @@ export async function middleware(request: NextRequest) {
   // mesmo pathAllowed de produção é aplicado — aluno NÃO acessa área do personal.
   if (process.env.NEXT_PUBLIC_DEMO_MODE === "1") {
     if (request.nextUrl.pathname === "/" && !request.cookies.get("gf_test")) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      return redirectTo(request, "/login");
     }
     if (request.cookies.get("gf_test")) {
       const demoRole = request.cookies.get("gf_role")?.value ?? "student";
-      const redirectTo = pathAllowed(demoRole, request.nextUrl.pathname);
-      if (redirectTo) {
-        return NextResponse.redirect(new URL(redirectTo, request.url));
+      const redirectToPath = pathAllowed(demoRole, request.nextUrl.pathname);
+      if (redirectToPath) {
+        return redirectTo(request, redirectToPath);
       }
     }
     return response;
@@ -162,22 +181,20 @@ export async function middleware(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!p) return NextResponse.redirect(new URL("/onboarding", request.url));
+    if (!p) return redirectTo(request, "/onboarding");
     if (p.role === "student" && !p.onboarding_completed) {
-      return NextResponse.redirect(new URL("/onboarding", request.url));
+      return redirectTo(request, "/onboarding");
     }
-    return NextResponse.redirect(new URL(HOME_BY_ROLE[p.role] ?? "/", request.url));
+    return redirectTo(request, HOME_BY_ROLE[p.role] ?? "/");
   }
 
   // Sem login e em rota protegida → login com next param
   if (!user && !PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     if (pathname === "/") {
       // produção: visitante não vê a home do aluno — vai pro login
-      return NextResponse.redirect(new URL("/login", request.url));
+      return redirectTo(request, "/login");
     }
-    const url = new URL("/login", request.url);
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+    return redirectToWithNext(request, "/login", pathname);
   }
 
   if (user) {
@@ -189,18 +206,18 @@ export async function middleware(request: NextRequest) {
 
     // Falta profile → force onboarding
     if (!p && !pathname.startsWith("/onboarding")) {
-      return NextResponse.redirect(new URL("/onboarding", request.url));
+      return redirectTo(request, "/onboarding");
     }
 
     // Aluno com onboarding incompleto → força onboarding
     if (p && p.role === "student" && !p.onboarding_completed && !pathname.startsWith("/onboarding")) {
-      return NextResponse.redirect(new URL("/onboarding", request.url));
+      return redirectTo(request, "/onboarding");
     }
 
     // Role check
-    const redirectTo = pathAllowed(p?.role, pathname);
-    if (redirectTo) {
-      return NextResponse.redirect(new URL(redirectTo, request.url));
+    const redirectToPath = pathAllowed(p?.role, pathname);
+    if (redirectToPath) {
+      return redirectTo(request, redirectToPath);
     }
   }
 

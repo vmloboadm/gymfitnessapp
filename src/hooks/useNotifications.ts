@@ -10,7 +10,9 @@ import type { Notifications } from "~/lib/types/models";
 export function registerServiceWorker() {
   if (typeof window === "undefined") return;
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
+    // basePath-aware: public/ é servido sob /app no deploy
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    navigator.serviceWorker.register(`${base}/sw.js`).catch(() => {
       // SW indisponível (dev/sem https), não quebra o app
     });
   }

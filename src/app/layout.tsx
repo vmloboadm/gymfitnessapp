@@ -27,6 +27,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "GymFitness",
   description: "App de academia com check-in NFC e métrica real",
+  manifest: "/app/manifest.json",
 };
 
 export const viewport = {

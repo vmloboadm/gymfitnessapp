@@ -50,8 +50,22 @@ export default function CheckinPage() {
     const t = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(t);
   }, [daySession]);
+  // Produção: logs REAIS dos últimos 7 dias (demo usa o singleton local)
+  const { data: weekLogs } = useAsyncQuery<Array<{ date: string }>>(
+    async () => {
+      if (demo || !user) return { data: [], error: null };
+      const { data, error } = await supabaseBrowser()
+        .from("workout_logs")
+        .select("date")
+        .eq("student_id", user.id)
+        .gte("date", new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10));
+      if (error) return { data: [], error: null };
+      return { data: (data ?? []) as Array<{ date: string }>, error: null };
+    },
+    [user?.id, demo, daySession?.startedAt]
+  );
   const sessionMetrics = useMemo(() => {
-    const logs = getTodayWorkout().logs as Array<{ date: string }>;
+    const logs = demo ? (getTodayWorkout().logs as Array<{ date: string }>) : (weekLogs ?? []);
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
     const diasSemana = new Set(logs.filter((l) => l.date?.slice(0, 10) >= weekAgo).map((l) => l.date.slice(0, 10)));
     const hoje = new Date().toISOString().slice(0, 10);
@@ -64,7 +78,7 @@ export default function CheckinPage() {
       treinoHoje: progresso ? "Em andamento" : treinouHoje ? "Concluído" : "Não iniciado",
       semana: diasSemana.size,
     };
-  }, [daySession, nowTick]);
+  }, [daySession, nowTick, weekLogs, demo]);
 
   const { data, loading, error, refetch } = useAsyncQuery<{
     equipment: Equipment[];
@@ -236,33 +250,42 @@ export default function CheckinPage() {
     refetch();
   };
 
+  // Decode-once: html5-qrcode dispara onDecode continuamente; sem guard,
+  // N inserts duplicados antes de setScannerActive(false) surtir efeito
+  const decodingRef = useRef(false);
   const scanSuccess = async (decodedText: string) => {
-    // Procura equipamento (demo ou real)
-    const code = decodedText.trim();
-    const eq = (data?.equipment ?? []).find(
-      (e) => e.qr_url === code || e.nfc_tag_url === code
-    );
-    if (eq) {
-      const variations = demoVariationsFor(eq.id);
-      if (variations.length > 0) {
-        setVariationPicker(eq.id);
+    if (decodingRef.current) return;
+    decodingRef.current = true;
+    try {
+      // Procura equipamento (demo ou real)
+      const code = decodedText.trim();
+      const eq = (data?.equipment ?? []).find(
+        (e) => e.qr_url === code || e.nfc_tag_url === code
+      );
+      if (eq) {
+        const variations = demoVariationsFor(eq.id);
+        if (variations.length > 0) {
+          setVariationPicker(eq.id);
+          setScannerActive(false);
+          return;
+        }
+        await startSession(eq.id);
         setScannerActive(false);
         return;
       }
-      await startSession(eq.id);
-      setScannerActive(false);
-      return;
+      if (doorMode) {
+        // tag da PORTARIA: valida entrada e volta ao treino (aluno inicia quando quiser)
+        navigator.vibrate?.([60, 40, 60]);
+        startDaySession();
+        stopScanning();
+        toast.success("Entrada validada! Treino liberado");
+        router.push("/treino");
+        return;
+      }
+      toast.error("Código não corresponde a nenhum equipamento");
+    } finally {
+      decodingRef.current = false;
     }
-    if (doorMode) {
-      // tag da PORTARIA: valida entrada e volta ao treino (aluno inicia quando quiser)
-      navigator.vibrate?.([60, 40, 60]);
-      startDaySession();
-      stopScanning();
-      toast.success("Entrada validada! Treino liberado");
-      router.push("/treino");
-      return;
-    }
-    toast.error("Código não corresponde a nenhum equipamento");
   };
 
   const startScanning = () => setScannerActive(true);

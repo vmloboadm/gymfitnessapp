@@ -61,3 +61,19 @@ export function useFeedRealtime(
   useRealtime(`feed-likes-${gymId}`, { table: "feed_likes", gymId }, handlerRef);
   useRealtime(`feed-comments-${gymId}`, { table: "feed_comments", gymId }, handlerRef);
 }
+
+/**
+ * Realtime para a frase motivacional da academia:
+ * staff edita no perfil, todos os alunos veem na hora.
+ */
+export function useGymMotivationRealtime(
+  gymId: string | undefined,
+  onRefetch: () => void
+) {
+  const handlerRef = useCallback(() => {
+    if (!gymId) return;
+    onRefetch();
+  }, [gymId, onRefetch]);
+
+  useRealtime(`motivation-${gymId}`, { table: "gym_motivation", gymId }, handlerRef);
+}
