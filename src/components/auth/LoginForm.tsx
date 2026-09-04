@@ -10,6 +10,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
 import { BUILD_LABEL } from "~/lib/build";
+import { assetPath } from "~/lib/asset-path";
 import { cn } from "~/lib/utils";
 import { useAuth } from "~/hooks/useAuth";
 import { readOnboarding } from "~/lib/profile-store";
@@ -143,7 +144,7 @@ export function LoginForm() {
           Acesso exclusivo · GymFitness
         </span>
         <img
-          src="/images/logo-academia.png"
+          src={assetPath("/images/logo-academia.png")}
           alt="GymFitness"
           width={280}
           height={84}

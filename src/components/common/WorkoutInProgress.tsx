@@ -9,6 +9,7 @@ import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { ExerciseVideoModal } from "~/components/common/ExerciseVideoModal";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
+import { assetPath } from "~/lib/asset-path";
 import { readSessionProgress, saveSessionProgress, clearSessionProgress } from "~/lib/workout-session";
 import { ImageLightbox } from "~/components/common/ImageLightbox";
 
@@ -302,7 +303,7 @@ export default function WorkoutInProgress({
                     className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-white"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={photo ?? ""} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+                    <img src={assetPath(photo ?? "")} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
                   </button>
                 ) : (
                   <FitnessIcon glyph={fitnessForName(current.name)} size={72} className="rounded-2xl" />
