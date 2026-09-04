@@ -90,6 +90,41 @@ export interface Database {
         Args: { p_codes: string[] };
         Returns: DayPasses[];
       };
+      update_onboarding_step: {
+        Args: { p_patch: Record<string, unknown>; p_next_step: number };
+        Returns: void;
+      };
+      finish_onboarding: {
+        Args: Record<string, never>;
+        Returns: void;
+      };
+      update_student_profile: {
+        Args: {
+          p_name?: string | null;
+          p_bio?: string | null;
+          p_goal?: string | null;
+          p_objetivo?: string | null;
+        };
+        Returns: void;
+      };
+      update_profile_own: {
+        Args: {
+          p_name?: string | null;
+          p_bio?: string | null;
+          p_avatar_url?: string | null;
+          p_phone?: string | null;
+        };
+        Returns: void;
+      };
+      assign_workout_plan: {
+        Args: {
+          p_student_id: string;
+          p_trainer_id: string;
+          p_plan: Record<string, unknown>;
+          p_start_date?: string;
+        };
+        Returns: string;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

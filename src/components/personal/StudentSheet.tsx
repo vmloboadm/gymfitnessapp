@@ -76,7 +76,7 @@ export function StudentSheet({
           {/* identificação */}
           <div className="flex items-center gap-3">
             <Avatar className="h-14 w-14 border-2 border-brand/60">
-              <AvatarImage src={student.avatar} alt="" />
+              <AvatarImage src={student.avatar ?? undefined} alt="" />
               <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-sm font-black text-brand-foreground">
                 {student.name[0]}
               </AvatarFallback>

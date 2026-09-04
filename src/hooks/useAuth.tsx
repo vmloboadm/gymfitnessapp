@@ -39,6 +39,8 @@ function demoProfileFor(role: string): Profiles {
     avatar_url: null,
     birth_date: null,
     goal: "ganho de massa",
+    bio: null,
+    objetivo: null,
     medical_risk: false,
     onboarding_completed: true,
     onboarding_step: 5,

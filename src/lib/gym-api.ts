@@ -80,7 +80,7 @@ async function fetchRealStudents(gymId: string): Promise<PersonalStudent[]> {
       id: p.id,
       profile_id: p.id,
       name: p.name,
-      avatar: p.avatar_url ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=1B3A66&color=fff`,
+      avatar: p.avatar_url ?? null,
       phone: p.phone,
       whatsapp_consent: p.whatsapp_consent ?? true,
       lastTrainingDaysAgo: last ? daysAgo(last) : 30,

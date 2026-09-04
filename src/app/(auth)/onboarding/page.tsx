@@ -138,10 +138,10 @@ function OnboardingFlow() {
       }
       if (!profile) return;
       const supabase = supabaseBrowser();
-      const { error } = await supabase
-        .from("profiles")
-        .update({ ...patch, onboarding_step: nextStep } as never)
-        .eq("id", profile.id);
+      const { error } = await supabase.rpc("update_onboarding_step", {
+        p_patch: patch,
+        p_next_step: nextStep,
+      });
       if (!error) {
         setProfile((prev) => (prev ? { ...prev, ...patch, onboarding_step: nextStep } : prev));
         setMaxReached((m) => Math.max(m, nextStep));
@@ -161,10 +161,10 @@ function OnboardingFlow() {
     }
     if (!profile) return;
     const supabase = supabaseBrowser();
-    await supabase
-      .from("profiles")
-      .update({ onboarding_completed: true, onboarding_step: 5 } as never)
-      .eq("id", profile.id);
+    const { error } = await supabase.rpc("finish_onboarding");
+    if (error) {
+      console.error("Erro ao finalizar onboarding:", error);
+    }
     router.replace("/");
   }, [profile, router]);
 

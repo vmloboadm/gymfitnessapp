@@ -69,8 +69,7 @@ export default function PersonalAprovacoesPage() {
   };
 
   const avatarFor = (a: ApprovalRequest) =>
-    students.find((s) => s.name === a.studentName)?.avatar ??
-    `https://i.pravatar.cc/80?img=${5 + (a.id.length % 40)}`;
+    students.find((s) => s.name === a.studentName)?.avatar ?? null;
 
   return (
     <div className="space-y-5">
@@ -104,7 +103,7 @@ export default function PersonalAprovacoesPage() {
             <motion.article key={a.id} variants={row} className="gf-card gf-glass !p-4">
               <div className="flex items-start gap-3">
                 <Avatar className="h-10 w-10 border border-white/[0.08]">
-                  <AvatarImage src={avatarFor(a)} alt="" />
+                  <AvatarImage src={avatarFor(a) ?? undefined} alt="" />
                   <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-[11px] font-black text-brand-foreground">
                     {a.studentName[0]}
                   </AvatarFallback>

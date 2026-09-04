@@ -63,8 +63,8 @@ export interface CommunityFeat {
   author: string;
   role: string;
   text: string;
-  /** Foto de perfil (obrigatória, pra já, mock com pravatar). */
-  avatar: string;
+  /** Foto de perfil (null usa iniciais). */
+  avatar: string | null;
   /** Dono da conquista (para notificar em reação 🔥). */
   ownerId?: string;
 }

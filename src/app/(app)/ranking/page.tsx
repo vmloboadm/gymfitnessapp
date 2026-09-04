@@ -23,11 +23,9 @@ import type { Leaderboard, Profiles } from "~/lib/types/models";
 
 const ME = "00000000-0000-0000-0000-000000000099";
 
-/** Avatar mock determinístico, campo avatar_url do perfil assume em produção. */
-function avatarFor(id: string | undefined): string {
-  let n = 0;
-  for (const ch of id ?? "") n = (n * 31 + ch.charCodeAt(0)) % 70;
-  return `https://i.pravatar.cc/96?img=${n + 1}`;
+/** Avatar mock: retorna null para usar AvatarFallback com iniciais. */
+function avatarFor(_id: string | undefined): string | null {
+  return null;
 }
 
 /* Ícones de liga em traço consistente (nada de emoji): mesmo padrão da home */
@@ -222,7 +220,7 @@ export default function RankingPage() {
                         style={{ boxShadow: `inset 0 0 0 3px ${medalColor}` }}
                         aria-hidden
                       />
-                      <AvatarImage src={row.student?.avatar_url ?? avatarFor(row.student_id)} alt={row.student?.name ?? "Atleta"} />
+                      <AvatarImage src={row.student?.avatar_url ?? avatarFor(row.student_id) ?? undefined} alt={row.student?.name ?? "Atleta"} />
                       <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
                         {(row.student?.name?.[0] ?? "?").toUpperCase()}
                       </AvatarFallback>
@@ -309,7 +307,7 @@ export default function RankingPage() {
                       <span className="gf-hero-num text-sm font-bold text-muted-foreground">{i + 4}</span>
                     </div>
                     <Avatar className="h-9 w-9">
-                      <AvatarImage src={row.student?.avatar_url ?? avatarFor(row.student_id)} alt={row.student?.name ?? "Atleta"} />
+                      <AvatarImage src={row.student?.avatar_url ?? avatarFor(row.student_id) ?? undefined} alt={row.student?.name ?? "Atleta"} />
                       <AvatarFallback className="bg-secondary text-[11px] text-secondary-foreground">
                         {(row.student?.name?.[0] ?? "?").toUpperCase()}
                       </AvatarFallback>

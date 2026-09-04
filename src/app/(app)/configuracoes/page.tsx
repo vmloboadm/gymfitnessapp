@@ -16,11 +16,11 @@ import {
 import { TopBar } from "~/components/layout/TopBar";
 import { BUILD_LABEL } from "~/lib/build";
 import { getProfileEdits, saveProfileEdits, type ProfileEdits } from "~/lib/profile-store";
+import { supabaseBrowser } from "~/lib/supabase/client";
+import { useAuth } from "~/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const AVATAR_BUCKET = "avatars";
+import { ImageCropModal } from "~/components/common/ImageCropModal";
 
 const OBJETIVOS: Array<{ id: NonNullable<ProfileEdits["objetivo"]>; label: string }> = [
   { id: "hipertrofia", label: "Hipertrofia" },
@@ -29,25 +29,9 @@ const OBJETIVOS: Array<{ id: NonNullable<ProfileEdits["objetivo"]>; label: strin
   { id: "saude", label: "Saúde" },
 ];
 
-/** comprime imagem no client (canvas → webp ~0.75) pra caber no Storage */
-async function compressImage(file: File, size = 320): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const canvas = document.createElement("canvas");
-  const scale = Math.min(1, size / Math.max(bitmap.width, bitmap.height));
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error("falha ao comprimir"))),
-      "image/webp",
-      0.75
-    );
-  });
-}
-
 export default function ConfiguracoesPage() {
   const router = useRouter();
+  const { refreshProfile } = useAuth();
   const [edits, setEdits] = useState<ProfileEdits>({});
   const [bio, setBio] = useState("");
   const [objetivo, setObjetivo] = useState<ProfileEdits["objetivo"]>("hipertrofia");
@@ -55,6 +39,8 @@ export default function ConfiguracoesPage() {
   const [saving, setSaving] = useState(false);
   const [notifs, setNotifs] = useState({ treino: true, conquistas: true, Ranking: false });
   const fileRef = useRef<HTMLInputElement>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   useEffect(() => {
     const e = getProfileEdits();
@@ -66,19 +52,31 @@ export default function ConfiguracoesPage() {
 
   const avatarSrc = useMemo(() => edits.avatar_url ?? null, [edits.avatar_url]);
 
-  const handleFoto = async (file: File) => {
+  const handleFoto = (file: File) => {
+    const url = URL.createObjectURL(file);
+    setCropSrc(url);
+    setCropOpen(true);
+  };
+
+  const onCropConfirm = async (blob: Blob) => {
+    setCropOpen(false);
     try {
       setSaving(true);
-      const blob = await compressImage(file);
-      const path = `aluno-demo-${Date.now()}.webp`;
-      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${AVATAR_BUCKET}/${path}`, {
+      // Usa a API route que salva no Supabase (Storage + profiles.avatar_url)
+      const { data: sess } = await supabaseBrowser().auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) throw new Error("Faça login para trocar a foto.");
+      const fd = new FormData();
+      fd.append("file", new File([blob], "avatar.webp", { type: "image/webp" }));
+      const res = await fetch("/api/avatar", {
         method: "POST",
-        headers: { "Content-Type": "image/webp", apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "", Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}` },
-        body: blob,
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
       });
-      if (!res.ok) throw new Error(`upload ${res.status}`);
-      const url = `${SUPABASE_URL}/storage/v1/object/public/${AVATAR_BUCKET}/${path}`;
-      const next = saveProfileEdits({ avatar_url: url });
+      const data = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+      if (!data.ok || !data.url) throw new Error(data.error ?? "Falha no upload");
+      // Salva localmente também
+      const next = saveProfileEdits({ avatar_url: data.url });
       setEdits(next);
       toast.success("Foto atualizada!");
     } catch (e) {
@@ -88,14 +86,29 @@ export default function ConfiguracoesPage() {
     }
   };
 
-  const salvar = () => {
+  const salvar = async () => {
     setSaving(true);
+    // Salva localmente (demo/cache)
     const next = saveProfileEdits({ name: nome.trim(), bio: bio.trim(), objetivo });
     setEdits(next);
-    setTimeout(() => {
-      setSaving(false);
+    // Salva no Supabase via RPC
+    try {
+      const supabase = supabaseBrowser();
+      const { error } = await supabase.rpc("update_student_profile", {
+        p_name: nome.trim() || null,
+        p_bio: bio.trim() || null,
+        p_goal: null,
+        p_objetivo: objetivo || null,
+      });
+      if (error) throw error;
+      // Atualiza o profile no contexto global para refletir mudanças imediatamente
+      await refreshProfile();
       toast.success("Perfil salvo!");
-    }, 400);
+    } catch (e) {
+      toast.error("Falha ao salvar no servidor", { description: String(e).slice(0, 80) });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -124,7 +137,7 @@ export default function ConfiguracoesPage() {
             </button>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-foreground">Foto de perfil</p>
-              <p className="text-[11px] text-muted-foreground">Toque pra trocar (WebP comprimido no aparelho)</p>
+              <p className="text-[11px] text-muted-foreground">Toque pra trocar (recorte automático antes de enviar)</p>
               <input
                 ref={fileRef}
                 type="file"
@@ -264,6 +277,13 @@ export default function ConfiguracoesPage() {
           <p className="mt-2 text-[10px] font-semibold tracking-wide text-muted-foreground/70">{BUILD_LABEL}</p>
         </section>
       </div>
+
+      <ImageCropModal
+        open={cropOpen}
+        src={cropSrc}
+        onClose={() => { setCropOpen(false); setCropSrc(null); }}
+        onConfirm={onCropConfirm}
+      />
     </>
   );
 }

@@ -331,6 +331,11 @@ export default function PersonalDashboardPage() {
         <LivePulse online={online} />
       </motion.div>
 
+      {/* Gráfico de frequência semanal */}
+      <motion.section variants={item} initial="hidden" animate="show">
+        <WeeklyChart students={students} />
+      </motion.section>
+
       {/* Agenda de hoje */}
       {agenda.length > 0 ? (
         <motion.section variants={item} initial="hidden" animate="show" aria-labelledby="agenda-title">
@@ -347,7 +352,7 @@ export default function PersonalDashboardPage() {
               >
                 <div className="relative mx-auto w-fit">
                   <Avatar className="h-12 w-12 border-2 border-white/[0.08]">
-                    <AvatarImage src={s.avatar} alt={s.name} />
+                    <AvatarImage src={s.avatar ?? undefined} alt={s.name} />
                     <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
                       {s.name[0]}
                     </AvatarFallback>
@@ -419,6 +424,67 @@ const rowItem: Variants = {
   hidden: { opacity: 0, y: 14 },
   show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] } },
 };
+
+/** Mini-gráfico de barras: check-ins por dia da semana (últimos 7 dias) */
+function WeeklyChart({ students }: { students: PersonalStudent[] }) {
+  const days = useMemo(() => {
+    const result: { label: string; count: number; isToday: boolean }[] = [];
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+      const isToday = i === 0;
+      // Simula check-ins baseado no padrão de atividade dos alunos
+      const activeOnDay = students.filter((s) => {
+        const dow = d.getDay();
+        if (s.freq >= 5) return dow >= 1 && dow <= 5;
+        if (s.freq >= 3) return [1, 3, 5].includes(dow);
+        return dow === 1 || dow === 4;
+      }).length;
+      result.push({ label: dayNames[d.getDay()], count: activeOnDay, isToday });
+    }
+    return result;
+  }, [students]);
+
+  const maxCount = Math.max(1, ...days.map((d) => d.count));
+
+  return (
+    <div className="gf-card gf-glass !rounded-2xl !p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[11px] font-bold text-foreground">Frequência da semana</p>
+        <p className="text-[9px] text-muted-foreground">check-ins/dia</p>
+      </div>
+      <div className="flex items-end gap-1.5" style={{ height: 56 }}>
+        {days.map((d, i) => (
+          <div key={i} className="flex flex-1 flex-col items-center gap-1">
+            <span className="text-[8px] font-bold text-muted-foreground">{d.count}</span>
+            <div className="w-full overflow-hidden rounded-t-sm" style={{ height: 40 }}>
+              <div
+                className={cn(
+                  "w-full rounded-t-sm transition-all duration-500",
+                  d.isToday ? "bg-brand" : "bg-white/10"
+                )}
+                style={{
+                  height: `${(d.count / maxCount) * 100}%`,
+                  minHeight: d.count > 0 ? 4 : 0,
+                }}
+              />
+            </div>
+            <span
+              className={cn(
+                "text-[8px] font-bold",
+                d.isToday ? "text-brand" : "text-muted-foreground/60"
+              )}
+            >
+              {d.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function QueueRow({
   item: queueItem,

@@ -69,14 +69,15 @@ export default function PerfilPage() {
     setEdits(getProfileEdits());
   }, []);
   const displayName = edits.name || profile?.name || "Atleta";
-  const displayBio = edits.bio || null;
+  const displayBio = edits.bio || profile?.bio || null;
+  const displayObjetivo = edits.objetivo || (profile as any)?.objetivo || null;
 
   const initials = useMemo(() => {
     const parts = displayName.trim().split(/\s+/);
     return ((parts[0]?.[0] ?? "?") + (parts[1]?.[0] ?? "")).toUpperCase();
   }, [displayName]);
 
-  const avatarUrl = edits.avatar_url || (demo ? "https://i.pravatar.cc/160?img=12" : profile?.avatar_url || null);
+  const avatarUrl = edits.avatar_url || profile?.avatar_url || null;
 
   const weightSeries = useMemo(
     () =>
@@ -134,7 +135,7 @@ export default function PerfilPage() {
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <Badge variant="secondary">Aluno</Badge>
                   <Badge variant="success">Ativo</Badge>
-                  {edits.objetivo ? <Badge variant="outline">{edits.objetivo === "hipertrofia" ? "Hipertrofia" : edits.objetivo === "emagrecimento" ? "Emagrecimento" : edits.objetivo === "condicionamento" ? "Condicionamento" : "Saúde"}</Badge> : null}
+                  {displayObjetivo ? <Badge variant="outline">{displayObjetivo === "hipertrofia" ? "Hipertrofia" : displayObjetivo === "emagrecimento" ? "Emagrecimento" : displayObjetivo === "condicionamento" ? "Condicionamento" : "Saúde"}</Badge> : null}
                 </div>
                 {displayBio ? <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-slate-300">{displayBio}</p> : null}
               </div>

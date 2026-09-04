@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2, LogOut } from "lucide-react";
+import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2, LogOut, Shield, Settings, Crown } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { toast } from "sonner";
@@ -11,13 +11,21 @@ import { useAuth } from "~/hooks/useAuth";
 import { demoPersonalStudents, studentStatus } from "~/lib/personal-data";
 import { listAssignedWorkouts, streakOverride } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
+import { hasRole } from "~/lib/utils/roles";
+import { ImageCropModal } from "~/components/common/ImageCropModal";
 
-const TABS = [
+const TABS_BASE = [
   { id: "alunos", label: "Meus Alunos", icon: Users },
   { id: "stats", label: "Estatísticas", icon: BarChart3 },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+const TABS_MANAGER = [
+  ...TABS_BASE,
+  { id: "config", label: "Configurações", icon: Settings },
+  { id: "equipe", label: "Equipe", icon: Shield },
+] as const;
+
+type TabId = (typeof TABS_BASE)[number]["id"] | "config" | "equipe";
 
 const fmt = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
@@ -33,6 +41,8 @@ export default function PersonalPerfilPage() {
   );
   const [editingBio, setEditingBio] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [pwOpen, setPwOpen] = useState(false);
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
@@ -49,22 +59,29 @@ export default function PersonalPerfilPage() {
 
   const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
 
-  /** Foto: /api/avatar faz o smart crop (rosto centrado) e salva no perfil. */
-  const onPickPhoto = async (file: File | null) => {
-    if (!file || uploading) return;
+  /** Foto: abre modal de corte antes de enviar ao servidor. */
+  const onPickPhoto = (file: File | null) => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setCropSrc(url);
+    setCropOpen(true);
+  };
+
+  /** Envia o blob cortado para /api/avatar ou salva local (demo). */
+  const onCropConfirm = async (blob: Blob) => {
+    setCropOpen(false);
     setUploading(true);
     try {
       if (isDemo) {
-        // demo sem Supabase: preview local
-        const url = URL.createObjectURL(file);
-        toast.success("Foto carregada (modo teste, não salva no servidor)");
+        const url = URL.createObjectURL(blob);
+        toast.success("Foto cortada (modo teste, não salva no servidor)");
         setDemoAvatar(url);
       } else {
         const { data: sess } = await supabaseBrowser().auth.getSession();
         const token = sess.session?.access_token;
         if (!token) throw new Error("Faça login para trocar a foto.");
         const fd = new FormData();
-        fd.append("file", file);
+        fd.append("file", new File([blob], "avatar.webp", { type: "image/webp" }));
         const res = await fetch("/api/avatar", {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
@@ -156,7 +173,13 @@ export default function PersonalPerfilPage() {
           <div className="min-w-0 flex-1">
             <p className="truncate text-lg font-bold text-foreground">{profile?.name ?? "Personal"}</p>
             <p className="text-[11px] font-bold uppercase tracking-widest text-brand">
-              Personal Trainer · CREF 000000 G/SP
+              {hasRole(profile?.role, "manager") ? (
+                <span className="flex items-center gap-1">
+                  <Crown className="h-3 w-3" /> Gestor & Personal Trainer
+                </span>
+              ) : (
+                "Personal Trainer · CREF 000000 G/SP"
+              )}
             </p>
             <p className="mt-0.5 inline-flex rounded-full bg-brand/15 px-2 py-0.5 text-[9.5px] font-bold text-brand">
               Especialidade: Hipertrofia e Recomposição
@@ -269,14 +292,14 @@ export default function PersonalPerfilPage() {
 
       {/* abas */}
       <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-white/[0.03] p-1" role="tablist">
-        {TABS.map((t) => {
+        {(hasRole(profile?.role, "manager") ? TABS_MANAGER : TABS_BASE).map((t) => {
           const Icon = t.icon;
           return (
             <button
               key={t.id}
               role="tab"
               aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => setTab(t.id as TabId)}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[11px] font-bold transition-colors",
                 tab === t.id ? "bg-brand text-brand-foreground" : "text-muted-foreground hover:text-foreground"
@@ -297,7 +320,7 @@ export default function PersonalPerfilPage() {
               <div key={s.id} className="gf-card gf-glass !rounded-2xl !p-3 text-center">
                 <div className="relative mx-auto w-fit">
                   <Avatar className="h-14 w-14 border-2 border-white/[0.08]">
-                    <AvatarImage src={s.avatar} alt={s.name} />
+                    <AvatarImage src={s.avatar ?? undefined} alt={s.name} />
                     <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-sm font-black text-brand-foreground">
                       {s.name[0]}
                     </AvatarFallback>
@@ -315,6 +338,70 @@ export default function PersonalPerfilPage() {
                 </p>
                 <p className="truncate text-[9px] text-muted-foreground">{s.activeWorkout ?? "Sem treino"}</p>
               </div>
+            );
+          })}
+        </div>
+      ) : tab === "equipe" && hasRole(profile?.role, "manager") ? (
+        /* aba Equipe (gestor) — pessoas mockadas e dados demo */
+        <div className="space-y-3">
+          <div className="gf-card gf-glass !rounded-2xl !p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Personais ativos</p>
+            <div className="mt-3 space-y-2.5">
+              {[
+                { name: "Claudeir Machado", role: "Gestor & Personal", online: true },
+                { name: "Rafael Costa", role: "Personal", online: true },
+                { name: "Ana Silva", role: "Personal", online: false },
+              ].map((p, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10 border-2 border-white/[0.08]">
+                    <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
+                      {p.name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] font-bold text-foreground">{p.name}</p>
+                    <p className="truncate text-[10px] text-muted-foreground">{p.role}</p>
+                  </div>
+                  <span className={cn("h-2.5 w-2.5 rounded-full", p.online ? "bg-[#4ADE80]" : "bg-white/20")} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="gf-card gf-glass !rounded-2xl !p-4 text-center">
+              <p className="font-display text-2xl font-black text-brand">23</p>
+              <p className="text-[10px] font-semibold text-muted-foreground">Alunos ativos</p>
+            </div>
+            <div className="gf-card gf-glass !rounded-2xl !p-4 text-center">
+              <p className="font-display text-2xl font-black text-[#4ADE80]">4</p>
+              <p className="text-[10px] font-semibold text-muted-foreground">Pessoas na academia</p>
+            </div>
+          </div>
+        </div>
+      ) : tab === "config" && hasRole(profile?.role, "manager") ? (
+        /* aba Configurações (gestor) */
+        <div className="gf-card gf-glass !rounded-2xl !p-4 space-y-3">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Configurações da academia</p>
+          {[
+            { label: "Gerenciar personais", icon: Users, desc: "Adicionar, remover ou alterar permissões" },
+            { label: "Planos e preços", icon: ClipboardList, desc: "Configurar planos de matrícula" },
+            { label: "Horário de funcionamento", icon: Settings, desc: "Definir horários da academia" },
+            { label: "Notificações", icon: Shield, desc: "Gerenciar alertas e comunicados" },
+          ].map((item, i) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={i}
+                className="tactile flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.06]"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/20 bg-brand/10">
+                  <Icon className="h-4 w-4 text-brand" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-bold text-foreground">{item.label}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">{item.desc}</p>
+                </div>
+              </button>
             );
           })}
         </div>
@@ -352,6 +439,14 @@ export default function PersonalPerfilPage() {
           </div>
         </div>
       )}
+
+      {/* modal de corte de foto */}
+      <ImageCropModal
+        open={cropOpen}
+        src={cropSrc}
+        onClose={() => { setCropOpen(false); setCropSrc(null); }}
+        onConfirm={onCropConfirm}
+      />
     </div>
   );
 }

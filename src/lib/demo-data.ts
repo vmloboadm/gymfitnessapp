@@ -195,10 +195,10 @@ export const demoRanking = [
 ] as any[];
 
 export const demoProfiles = [
-  { id: "u1", gym_id: "1", role: "student", name: "Lucas Andrade", email: "lucas@gmail.com", avatar_url: "https://i.pravatar.cc/80?img=12", status: "active" },
-  { id: "u2", gym_id: "1", role: "student", name: "Marina Costa", email: "marina@gmail.com", avatar_url: "https://i.pravatar.cc/80?img=45", status: "active" },
-  { id: "u3", gym_id: "1", role: "student", name: "Pedro Rocha", email: "pedro@gmail.com", avatar_url: "https://i.pravatar.cc/80?img=15", status: "active" },
-  { id: "u4", gym_id: "1", role: "student", name: "Ana Souza", email: "ana@gmail.com", avatar_url: "https://i.pravatar.cc/80?img=47", status: "active" },
+  { id: "u1", gym_id: "1", role: "student", name: "Lucas Andrade", email: "lucas@gmail.com", avatar_url: null, status: "active" },
+  { id: "u2", gym_id: "1", role: "student", name: "Marina Costa", email: "marina@gmail.com", avatar_url: null, status: "active" },
+  { id: "u3", gym_id: "1", role: "student", name: "Pedro Rocha", email: "pedro@gmail.com", avatar_url: null, status: "active" },
+  { id: "u4", gym_id: "1", role: "student", name: "Ana Souza", email: "ana@gmail.com", avatar_url: null, status: "active" },
 ] as any[];
 
 // ---------------------------------------------------------------------------

@@ -268,6 +268,7 @@ export async function handleAssistente(request: Request) {
   // ===== MODO NORMAL: cadeia de modelos, primeira resposta boa vence =====
   for (const model of modelChain()) {
     try {
+      const t0 = Date.now();
       const res = await callModel(model, messages, false);
       if (!res.ok) continue;
       const data = (await res.json()) as {
@@ -276,6 +277,25 @@ export async function handleAssistente(request: Request) {
       let reply = data.choices?.[0]?.message?.content?.trim() ?? "";
       reply = stripThinking(reply);
       if (isLeaky(reply)) continue;
+
+      // P1.7: Audit log (purpose, model, tokens, latency)
+      const latencyMs = Date.now() - t0;
+      try {
+        const { extractJson } = await import("~/lib/ai/validate");
+        const jsonPayload = context === "personal" ? extractJson(reply) : null;
+        // Log best-effort (não bloqueia resposta)
+        console.log(JSON.stringify({
+          audit: true,
+          purpose: context === "personal" ? "generate_workout" : "coach_chat",
+          model,
+          latency_ms: latencyMs,
+          reply_len: reply.length,
+          is_json: !!jsonPayload,
+        }));
+      } catch {
+        // audit é best-effort
+      }
+
       return NextResponse.json({ ok: true, model, text: reply });
     } catch {
       continue; // timeout/rede → próximo modelo

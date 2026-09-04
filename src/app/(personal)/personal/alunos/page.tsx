@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { motion, type Variants } from "framer-motion";
 import {
@@ -18,6 +18,7 @@ import { StudentSheet } from "~/components/personal/StudentSheet";
 import { useAuth } from "~/hooks/useAuth";
 import { studentStatus, type PersonalStudent } from "~/lib/personal-data";
 import { getGymStudents } from "~/lib/gym-api";
+import { supabaseBrowser } from "~/lib/supabase/client";
 import { cn } from "~/lib/utils";
 
 const container: Variants = {
@@ -43,13 +44,38 @@ export default function PersonalAlunosPage() {
   const { profile } = useAuth();
   const [students, setStudents] = useState<PersonalStudent[]>([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
+
+  const loadStudents = useCallback(() => {
     if (!profile?.gym_id) return;
     getGymStudents(profile.gym_id)
       .then(setStudents)
       .catch(() => setStudents([]))
       .finally(() => setLoading(false));
   }, [profile?.gym_id]);
+
+  useEffect(() => {
+    loadStudents();
+  }, [loadStudents]);
+
+  // Realtime: atualiza lista quando novo aluno se cadastra
+  useEffect(() => {
+    if (!profile?.gym_id) return;
+    const sb = supabaseBrowser();
+    const channel = sb
+      .channel(`alunos-${profile.gym_id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "profiles", filter: `gym_id=eq.${profile.gym_id}` },
+        () => loadStudents()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `gym_id=eq.${profile.gym_id}` },
+        () => loadStudents()
+      )
+      .subscribe();
+    return () => { sb.removeChannel(channel); };
+  }, [profile?.gym_id, loadStudents]);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PersonalStudent | null>(null);
 
@@ -98,7 +124,7 @@ export default function PersonalAlunosPage() {
                 className="gf-card gf-glass flex w-full items-center gap-3 !rounded-2xl !p-3.5 text-left transition-transform active:scale-[0.985]"
               >
                 <Avatar className="h-11 w-11 border border-white/[0.08]">
-                  <AvatarImage src={s.avatar} alt="" />
+                  <AvatarImage src={s.avatar ?? undefined} alt="" />
                   <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
                     {s.name[0]}
                   </AvatarFallback>

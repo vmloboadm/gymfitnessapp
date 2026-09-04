@@ -1,4 +1,5 @@
 import { handleAssistente } from "~/lib/ai/assistente-core";
+import { validateSession } from "~/lib/auth-guard";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -8,5 +9,7 @@ export const maxDuration = 60;
  * com contexto "aluno". Mantido por compatibilidade de URL.
  */
 export async function POST(request: Request) {
+  // P0.2: Autenticação obrigatória — impede uso anônimo
+  await validateSession(request);
   return handleAssistente(request);
 }

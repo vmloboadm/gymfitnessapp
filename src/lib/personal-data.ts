@@ -11,7 +11,7 @@ export type RadarAlert = {
   severity: RadarSeverity;
   studentId: string;
   studentName: string;
-  avatar: string;
+  avatar: string | null;
   /** Frase principal do alerta */
   message: string;
   /** Contexto curto (último treino, RPE, marca) */
@@ -27,7 +27,7 @@ export type PersonalStudent = {
   /** id na tabela profiles/leaderboard (liga o ranking aos alunos do personal) */
   profile_id?: string;
   name: string;
-  avatar: string;
+  avatar: string | null;
   phone: string | null;
   /** Consentimento LGPD para contato via WhatsApp (onboarding) */
   whatsapp_consent: boolean;
@@ -52,7 +52,8 @@ export type WorkoutTemplate = {
   exercises: Array<{ name: string; sets: number; reps: string; rest: string }>;
 };
 
-const AV = (n: number) => `https://i.pravatar.cc/80?img=${n}`;
+/** Avatar: retorna null para usar AvatarFallback com iniciais (sem URLs externas). */
+const AV = (_n: number) => null;
 
 /**
  * Radar de retenção DINÂMICO: deriva os alertas do estado real

@@ -40,6 +40,8 @@ export type Profiles = {
   avatar_url: string | null;
   birth_date: string | null;
   goal: string | null;
+  bio: string | null;
+  objetivo: string | null;
   medical_risk: boolean;
   onboarding_completed: boolean;
   onboarding_step: number;

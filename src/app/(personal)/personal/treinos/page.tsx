@@ -284,7 +284,7 @@ export default function PersonalTreinosPage() {
         {/* Passo 2: aluno fixo */}
         <header className="gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-4">
           <Avatar className="h-11 w-11 border-2 border-brand/60">
-            <AvatarImage src={target.avatar} alt="" />
+            <AvatarImage src={target.avatar ?? undefined} alt="" />
             <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
               {target.name[0]}
             </AvatarFallback>
@@ -659,7 +659,7 @@ export default function PersonalTreinosPage() {
             {assigned.map((w) => (
               <div key={w.id} className="gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-3.5">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={students.find((s) => s.id === w.studentId)?.avatar} alt="" />
+                  <AvatarImage src={students.find((s) => s.id === w.studentId)?.avatar ?? undefined} alt="" />
                   <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-[10px] font-black text-brand-foreground">
                     {w.studentName[0]}
                   </AvatarFallback>
@@ -727,7 +727,7 @@ export default function PersonalTreinosPage() {
                     className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-left transition-colors hover:border-brand/30"
                   >
                     <Avatar className="h-9 w-9">
-                      <AvatarImage src={s.avatar} alt="" />
+                      <AvatarImage src={s.avatar ?? undefined} alt="" />
                       <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-[10px] font-black text-brand-foreground">
                         {s.name[0]}
                       </AvatarFallback>
@@ -777,7 +777,7 @@ export default function PersonalTreinosPage() {
                       )}
                     >
                       <Avatar className="h-9 w-9">
-                        <AvatarImage src={s.avatar} alt="" />
+                        <AvatarImage src={s.avatar ?? undefined} alt="" />
                         <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-[10px] font-black text-brand-foreground">
                           {s.name[0]}
                         </AvatarFallback>

@@ -158,11 +158,14 @@ export async function middleware(request: NextRequest) {
   if (user && (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password")) {
     const { data: p } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, onboarding_completed")
       .eq("id", user.id)
       .maybeSingle();
 
     if (!p) return NextResponse.redirect(new URL("/onboarding", request.url));
+    if (p.role === "student" && !p.onboarding_completed) {
+      return NextResponse.redirect(new URL("/onboarding", request.url));
+    }
     return NextResponse.redirect(new URL(HOME_BY_ROLE[p.role] ?? "/", request.url));
   }
 
@@ -180,12 +183,17 @@ export async function middleware(request: NextRequest) {
   if (user) {
     const { data: p } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, onboarding_completed")
       .eq("id", user.id)
       .maybeSingle();
 
     // Falta profile → force onboarding
     if (!p && !pathname.startsWith("/onboarding")) {
+      return NextResponse.redirect(new URL("/onboarding", request.url));
+    }
+
+    // Aluno com onboarding incompleto → força onboarding
+    if (p && p.role === "student" && !p.onboarding_completed && !pathname.startsWith("/onboarding")) {
       return NextResponse.redirect(new URL("/onboarding", request.url));
     }
 

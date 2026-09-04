@@ -18,7 +18,7 @@ const EXTRA = [
   { specialty: "Iniciantes & Adaptação", pitch: "Primeiros 90 dias sem lesão e sem medo de máquina. Acompanhamento de perto." },
 ];
 
-const PHOTOS = ["https://i.pravatar.cc/160?img=12", "https://i.pravatar.cc/160?img=33", "https://i.pravatar.cc/160?img=59"];
+const PHOTOS: (string | null)[] = [null, null, null];
 
 export default function PersonaisMarketplacePage() {
   const personais = demoPersonais();
