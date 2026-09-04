@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { OnboardingStepper } from "~/components/onboarding/OnboardingStepper";
 import { OnboardingProgress } from "~/components/onboarding/OnboardingProgress";
@@ -105,7 +106,12 @@ function OnboardingFlow() {
         onboarding_step: requested,
         lgpd_consent_at: new Date().toISOString(),
       } as never;
-      await supabase.from("profiles").insert(base);
+      const { error: insertErr } = await supabase.from("profiles").insert(base);
+      if (insertErr) {
+        toast.error("Falha ao criar perfil", { description: "Tente novamente ou entre em contato." });
+        setLoading(false);
+        return;
+      }
       const { data: d2 } = await supabase
         .from("profiles")
         .select("*")
@@ -142,11 +148,13 @@ function OnboardingFlow() {
         p_patch: patch,
         p_next_step: nextStep,
       });
-      if (!error) {
-        setProfile((prev) => (prev ? { ...prev, ...patch, onboarding_step: nextStep } : prev));
-        setMaxReached((m) => Math.max(m, nextStep));
-        router.replace(`/onboarding?step=${nextStep}`);
+      if (error) {
+        toast.error("Falha ao salvar progresso", { description: "Verifique sua conexão e tente novamente." });
+        return;
       }
+      setProfile((prev) => (prev ? { ...prev, ...patch, onboarding_step: nextStep } : prev));
+      setMaxReached((m) => Math.max(m, nextStep));
+      router.replace(`/onboarding?step=${nextStep}`);
     },
     [profile, router, isDemo]
   );
@@ -163,7 +171,7 @@ function OnboardingFlow() {
     const supabase = supabaseBrowser();
     const { error } = await supabase.rpc("finish_onboarding");
     if (error) {
-      console.error("Erro ao finalizar onboarding:", error);
+      toast.error("Erro ao finalizar onboarding", { description: "Seus dados foram salvos, mas houve um problema ao concluir." });
     }
     router.replace("/");
   }, [profile, router]);

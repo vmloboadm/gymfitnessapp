@@ -290,7 +290,7 @@ export default function HomePage() {
     const vol = new Map<string, number>();
     logs.forEach((l) => {
       const k = l.date.slice(0, 10);
-      vol.set(k, (vol.get(k) ?? 0) + (l.weight_kg ?? 0) * (l.reps ?? 1) || 1);
+      vol.set(k, (vol.get(k) ?? 0) + ((l.weight_kg ?? 0) * (l.reps ?? 1) || 1));
     });
     const now = new Date();
     const year = now.getFullYear();
@@ -327,8 +327,6 @@ export default function HomePage() {
 
   const hour = today.getHours();
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
-  const [edits] = useState(() => ({ name: "" }));
-  void edits;
   const profileEdits = typeof window !== "undefined" ? getProfileEdits() : { name: "" };
   const name = (profileEdits.name || profile?.name || "Atleta").split(" ")[0];
 
@@ -376,6 +374,14 @@ export default function HomePage() {
   const showConfetti = isMilestone && firedMilestone === `${streak}`;
 
   if (loading || (dataLoading && !demo)) {
+    return (
+      <div className="mx-auto max-w-md space-y-3 p-4">
+        <SkeletonList rows={6} />
+      </div>
+    );
+  }
+
+  if (!demo && data === undefined && !dataLoading) {
     return (
       <div className="mx-auto max-w-md space-y-3 p-4">
         <SkeletonList rows={6} />
@@ -786,19 +792,23 @@ function PremiumRequestCard() {
   return (
     <button
       onClick={async () => {
-        const { submitRequest } = await import("~/lib/gym-api");
-        const { supabaseBrowser } = await import("~/lib/supabase/client");
-        const { data: sess } = await supabaseBrowser().auth.getSession();
-        const uid = sess.session?.user?.id ?? "student-self";
-        await submitRequest({
-          gymId: "00000000-0000-0000-0000-000000000001",
-          userId: uid,
-          userName: "Você",
-          type: "premium",
-          message: "Quero desbloquear o Plano Premium com acompanhamento do Personal.",
-        });
-        setSent(true);
-        toast.success("Pedido enviado ao seu Personal");
+        try {
+          const { submitRequest } = await import("~/lib/gym-api");
+          const { supabaseBrowser } = await import("~/lib/supabase/client");
+          const { data: sess } = await supabaseBrowser().auth.getSession();
+          const uid = sess.session?.user?.id ?? "student-self";
+          await submitRequest({
+            gymId: "00000000-0000-0000-0000-000000000001",
+            userId: uid,
+            userName: "Você",
+            type: "premium",
+            message: "Quero desbloquear o Plano Premium com acompanhamento do Personal.",
+          });
+          setSent(true);
+          toast.success("Pedido enviado ao seu Personal");
+        } catch {
+          toast.error("Falha ao enviar pedido", { description: "Tente novamente." });
+        }
       }}
       className="w-[72%] shrink-0 snap-start rounded-[18px] border border-[#FFC24D]/35 bg-gradient-to-br from-[#FFC24D]/15 via-card to-card p-4 text-left transition-transform active:scale-[0.98]"
     >

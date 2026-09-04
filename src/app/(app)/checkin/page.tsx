@@ -150,7 +150,6 @@ export default function CheckinPage() {
       if (!ok) return;
     }
     setShowWorkoutModal(true);
-    setSession(session);
   }, [session]);
 
   const { remainingLabel, resetTimer } = useSessionTimeout(
@@ -359,22 +358,35 @@ export default function CheckinPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpened]);
 
-  // QR scanning handler
-useEffect(() => {
+  // QR scanning handler — store ref for cleanup to avoid camera leak
+  const codeReaderRef = useRef<any>(null);
+  useEffect(() => {
     if (!scannerActive) return;
-    import("html5-qrcode").then((module) => {
-      const codeReader = new (module.default as any)("scanner-reader");
-      const onDecode = (result: string) => scanSuccess(result);
-      codeReader
-        .start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onDecode, () => {})
-        .catch(() => {
-          toast.error("Câmera indisponível. Selecione uma máquina manualmente.");
-          stopScanning();
-        });
-      return () => {
-        codeReader.stop().catch(() => {});
-      };
-    });
+    let alive = true;
+    import("html5-qrcode")
+      .then((module) => {
+        if (!alive) return;
+        const codeReader = new (module.default as any)("scanner-reader");
+        codeReaderRef.current = codeReader;
+        const onDecode = (result: string) => scanSuccess(result);
+        codeReader
+          .start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onDecode, () => {})
+          .catch(() => {
+            if (!alive) return;
+            toast.error("Câmera indisponível. Selecione uma máquina manualmente.");
+            stopScanning();
+          });
+      })
+      .catch(() => {
+        if (!alive) return;
+        toast.error("Falha ao carregar leitor QR. Tente novamente.");
+        stopScanning();
+      });
+    return () => {
+      alive = false;
+      codeReaderRef.current?.stop().catch(() => {});
+      codeReaderRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scannerActive]);
 
@@ -510,21 +522,13 @@ endWorkoutSession();
                   Check-in agora
                 </Button>
                 {doorMode && demo ? (
-                  <button
-                    onClick={() => {
-                      setMockValidating(true);
-                      setTimeout(() => {
-                        setMockValidating(false);
-                        navigator.vibrate?.([60, 40, 60]);
-                        startDaySession();
-                        toast.success("Entrada validada! Treino liberado");
-                        backToOrigin();
-                      }, 1000);
+                  <MockPortariaButton
+                    onValidated={() => {
+                      startDaySession();
+                      toast.success("Entrada validada! Treino liberado");
+                      backToOrigin();
                     }}
-                    className="rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-warning"
-                  >
-                    Simular leitura da portaria (demo)
-                  </button>
+                  />
                 ) : null}
               </div>
             )}
@@ -782,5 +786,39 @@ endWorkoutSession();
         </div>
       )}
     </>
+  );
+}
+
+function MockPortariaButton({ onValidated }: { onValidated: () => void }) {
+  const [validating, setValidating] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const handleClick = () => {
+    setValidating(true);
+    timerRef.current = setTimeout(() => {
+      setValidating(false);
+      navigator.vibrate?.([60, 40, 60]);
+      onValidated();
+    }, 1000);
+  };
+
+  if (validating) {
+    return (
+      <span className="flex shrink-0 items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-4 py-2 text-[12px] font-bold text-brand">
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-brand/30 border-t-brand" />
+        Validando…
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      className="rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-warning"
+    >
+      Simular leitura da portaria (demo)
+    </button>
   );
 }

@@ -113,8 +113,6 @@ function groupExercises(grupo: string, limit = 6) {
 
 const IMG: string | null = "/workout/workout-strength.jpg";
 const YT = (q: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q + " execução")}`;
-// const VID_M = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"; // REPLACED WITH YOUTUBE SEARCH
-// const VID_F = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"; // REPLACED WITH YOUTUBE SEARCH
 const UNS = (id: string) => `https://images.unsplash.com/${id}?w=300&h=300&fit=crop&q=70`;
 const DEFAULT_DEMO_EX: Array<{ id: string; name: string; sets: number; reps: string; rest: number; info: string; tips?: string[] | null; imageUrl: string | null; videoUrl: string | null; thumbUrl: string | null; videoUrlMale: string | null; videoUrlFemale: string | null }> = [
   { id: "d1", name: "Supino Reto", sets: 4, reps: "10", rest: 90, imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqHkC2h0vB6PpTZ6wPJMs88U2ep-tRZoc2mx1FZbVREw&s=10", videoUrl: YT("Supino Reto"), info: "Empurre sem travar o cotovelo.", thumbUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqHkC2h0vB6PpTZ6wPJMs88U2ep-tRZoc2mx1FZbVREw&s=10", videoUrlMale: YT("Supino Reto"), videoUrlFemale: YT("Supino Reto") },
@@ -247,7 +245,7 @@ export default function TreinoHomePage() {
 
 
 
-  const conclude = (completedIds?: string[]) => {
+  const conclude = async (completedIds?: string[]) => {
     setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
     endDaySession();
     if (completedIds?.length) {
@@ -266,7 +264,12 @@ export default function TreinoHomePage() {
             reps: planExerciseMap[id].reps,
             rpe: planExerciseMap[id].rpe ?? null,
           }));
-        if (rows.length) void supabase.from("workout_logs").insert(rows as never);
+        if (rows.length) {
+          const { error: logErr } = await supabase.from("workout_logs").insert(rows as never);
+          if (logErr) {
+            toast.error("Falha ao registrar treino", { description: "Tente novamente." });
+          }
+        }
       }
     }
     navigator.vibrate?.([60, 40, 90]);
@@ -396,8 +399,8 @@ export default function TreinoHomePage() {
     );
   }
 
-  // Tela de encerramento, pós-treino (RPE não fica preso no topo)
-    if (phase === "done") {
+  // Tela de encerramento, pós-treino
+  if (phase === "done") {
     return (
       <WorkoutSummary
         seconds={summarySeconds ?? 0}
@@ -407,80 +410,6 @@ export default function TreinoHomePage() {
           router.replace("/");
         }}
       />
-    );
-  }
-
-  // legado RPE desativado
-  if (false) {
-    return (
-      <>
-        <TopBar title="Treino" subtitle="Encerrado" />
-        <div className="space-y-6 p-4">
-        {checkinBanner}
-          <div className="rounded-[20px] border border-success/35 bg-gradient-to-b from-success/15 to-card p-5 text-center">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success/20">
-              <CheckCircle2 className="h-7 w-7 text-success" />
-            </span>
-            <h2 className="mt-3 font-display text-xl font-bold text-foreground">Treino concluído!</h2>
-            <p className="mt-1 gf-card-text">Bora anotar como foi, esse dado treina o seu plano.</p>
-          </div>
-
-          <div className="gf-card gf-glass !py-4">
-            <p className="gf-section mb-2">Como foi o treino?</p>
-            <p className="gf-card-text mb-3">Toque em como o treino pesou, sem número, sem grilo.</p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { key: "tranquilo", label: "Tranquilo", icon: Meh, tone: "text-sky-400" },
-                { key: "na medida", label: "Na medida", icon: ThumbsUp, tone: "text-success" },
-                { key: "difícil", label: "Difícil", icon: Frown, tone: "text-warning" },
-              ].map((opt) => {
-                const Icon = opt.icon;
-                const active = rpe === opt.key;
-                return (
-                  <button
-                    key={opt.key}
-                    onClick={() => {
-                      setRpe(opt.key);
-                      toast.success(`RPE registrado: ${opt.label}`);
-                    }}
-                    className={cn(
-                      "gf-touch tactile flex items-center justify-center gap-1.5 rounded-xl border px-2 py-3 text-xs font-semibold transition-colors",
-                      active ? "border-brand bg-brand-soft text-foreground" : "border-border bg-card/40 text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Icon className={cn("h-4 w-4", opt.tone)} />
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-            {rpe ? (
-              <p className="mt-2 text-[11px] text-brand">RPE {rpe} salvo, entra no cálculo de progresso do seu plano.</p>
-            ) : (
-              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                RPE é a nota de 0 a 10 de como o treino pesou pra você. Ajuda o Assistente de Treino a calibrar a carga de amanhã.
-              </p>
-            )}
-          </div>
-
-          <Link
-            href="/progresso"
-            className="gf-touch flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-sm font-bold text-brand-foreground shadow-lg shadow-brand/25"
-          >
-            Ver resumo do treino <ChevronRight className="h-4 w-4" />
-          </Link>
-          <button
-            onClick={() => {
-              setRpe(null);
-              setPhase("idle");
-            }}
-            className="gf-touch flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-semibold text-muted-foreground"
-          >
-            <RotateCcw className="h-4 w-4" /> Treinar novamente
-          </button>
-        </div>
-        <AiCoach />
-      </>
     );
   }
 
@@ -529,12 +458,6 @@ export default function TreinoHomePage() {
   const startPlanSession = () => {
     if (!plan?.plan?.dias || todayIdx < 0) return;
     const day = plan.plan.dias[Math.min(todayIdx, plan.plan.dias.length - 1)];
-    // resolve ids reais (workout_exercises) do plano ativo pra gravar logs
-    void fetchMyAssignedPlans(user?.id ?? "", profile?.gym_id ?? "").then((rows) => {
-      const map: Record<string, { programId: string; exerciseId: string; reps: string; rpe: number | null }> = {};
-      const ex = (rows[0]?.plan?.dias ?? []).flatMap((d) => d.exercicios);
-      void ex;
-    });
     const exList = day.exercicios.map((e, i) => ({
       id: `plan-${i}`,
       name: e.exercicio,
