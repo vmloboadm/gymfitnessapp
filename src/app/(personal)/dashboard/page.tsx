@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Users, Dumbbell, DollarSign, TrendingUp, AlarmClock, Wrench, ChevronRight, BarChart3 } from "lucide-react";
+import { Users, Dumbbell, DollarSign, TrendingUp, AlarmClock, BarChart3 } from "lucide-react";
 import { OcupacaoBarChart, ReceitaLineChart } from "~/components/charts";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -63,7 +63,7 @@ export default function DashboardPage() {
   const kpis = data;
   const ocupacao = demo ? demoOcupacaoHorario() : [];
   const planos = demo ? demoCheckinPorPlano() : [];
-  const manut = demo ? demoManutencaoRecorrente() : [];
+  const _manut = demo ? demoManutencaoRecorrente() : [];
   const tendencia = demo ? demoTendenciaReceita() : [];
 
   const pico = ocupacao.reduce((a, b) => (b.alunos > a.alunos ? b : a), ocupacao[0] ?? { hora: "", alunos: 0 });

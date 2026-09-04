@@ -13,7 +13,6 @@ import {
   Frown,
   Play,
   CheckCircle2,
-  RotateCcw,
   Lock,
   ScanLine,
   ArrowUpRight,
@@ -126,7 +125,7 @@ export default function TreinoHomePage() {
   const demo = isDemoMode();
   const [feeling, setFeeling] = useState<string | null>(null);
   const [summarySeconds, setSummarySeconds] = useState<number | null>(null);
-  const [rpe, setRpe] = useState<string | null>(null);
+  const [_rpe, _setRpe] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "active" | "done">("idle");
   const [session, setSession] = useState<typeof DEFAULT_DEMO_EX | null>(null);
   const [hasSavedProgress, setHasSavedProgress] = useState(false);
@@ -205,7 +204,7 @@ export default function TreinoHomePage() {
 
   // PLANO DO PERSONAL (produção): treino de hoje vem do student_workouts ativo
   const [planActive, setPlanActive] = useState<Awaited<ReturnType<typeof fetchMyAssignedPlans>>> ([]);
-  const [planExerciseMap, setPlanExerciseMap] = useState<Record<string, { programId: string; exerciseId: string; reps: string; rpe: number | null }>>({});
+  const [planExerciseMap, _setPlanExerciseMap] = useState<Record<string, { programId: string; exerciseId: string; reps: string; rpe: number | null }>>({});
   const [planTodayActive, setPlanTodayActive] = useState(false);
   useEffect(() => {
     if (demo || !user || !profile?.gym_id) return;
@@ -335,7 +334,7 @@ export default function TreinoHomePage() {
 
   // Sem check-in NÃO bloqueia mais a tela: mostra aviso discreto e libera tudo
   const needsCheckin = !daySession;
-  const checkinBanner = needsCheckin ? (
+  const _checkinBanner = needsCheckin ? (
     <div className="mx-auto max-w-md px-4 pt-3">
       <Link href="/checkin?scan=1&from=/treino" className="flex items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning/[0.08] px-4 py-2.5">
         <span className="flex items-center gap-2 text-[12px] font-bold text-warning">

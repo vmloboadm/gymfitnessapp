@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { Play } from "lucide-react";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { curatedSearch, findInDatabase } from "~/lib/exercises-database";

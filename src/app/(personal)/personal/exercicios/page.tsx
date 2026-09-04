@@ -9,7 +9,6 @@ import {
   Play,
   Pencil,
   X,
-  Dumbbell,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "~/components/ui/badge";

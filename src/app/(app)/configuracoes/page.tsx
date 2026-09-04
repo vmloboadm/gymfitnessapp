@@ -262,7 +262,15 @@ export default function ConfiguracoesPage() {
         <section className="rounded-2xl border border-border bg-card/50 p-4">
           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Conta</p>
           <button
-            onClick={() => toast("Em produção: encerra a sessão no Supabase Auth")}
+            onClick={async () => {
+              try {
+                const supabase = supabaseBrowser();
+                await supabase.auth.signOut();
+                window.location.href = "/login";
+              } catch {
+                window.location.href = "/login";
+              }
+            }}
             className="mt-2 flex w-full items-center gap-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2.5 text-sm font-bold text-danger"
           >
             <LogOut className="h-4 w-4" /> Sair da conta

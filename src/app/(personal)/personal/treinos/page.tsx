@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, Reorder, motion } from "framer-motion";
 import {
@@ -89,6 +89,14 @@ function templateToPlan(t: WorkoutTemplate): WorkoutPlan {
  * revisão editável com drag antes de atribuir.
  */
 export default function PersonalTreinosPage() {
+  return (
+    <Suspense fallback={<div className="p-4 text-center text-muted-foreground">Carregando...</div>}>
+      <PersonalTreinosContent />
+    </Suspense>
+  );
+}
+
+function PersonalTreinosContent() {
   const router = useRouter();
   const params = useSearchParams();
   const { profile, user } = useAuth();

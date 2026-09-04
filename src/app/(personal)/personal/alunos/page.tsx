@@ -1,19 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
-import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
 import { motion, type Variants } from "framer-motion";
 import {
   Search,
-  MessageCircle,
-  ClipboardList,
-  Flame,
   ChevronRight,
-  Dumbbell,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { BottomSheet } from "~/components/ui/bottom-sheet";
-import { Button } from "~/components/ui/button";
 import { StudentSheet } from "~/components/personal/StudentSheet";
 import { useAuth } from "~/hooks/useAuth";
 import { studentStatus, type PersonalStudent } from "~/lib/personal-data";

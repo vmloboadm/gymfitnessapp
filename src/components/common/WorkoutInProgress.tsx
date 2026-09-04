@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Info, PlayCircle, Timer, X } from "lucide-react";
-import Image from "next/image";
 import { type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import { BottomSheet } from "~/components/ui/bottom-sheet";

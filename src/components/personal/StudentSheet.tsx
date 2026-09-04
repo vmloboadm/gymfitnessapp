@@ -6,10 +6,8 @@ import { MessageCircle, ClipboardList, Flame, Dumbbell, Plus, Activity, Sparkles
 import { insightOffline } from "~/lib/ai/local-gen";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
-import { Button } from "~/components/ui/button";
 import { Sparkline } from "~/components/common/Sparkline";
 import {
-  demoPersonalStudents,
   mockWeightSeries,
   mockWorkoutHistory,
   studentStatus,

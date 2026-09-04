@@ -37,7 +37,6 @@ export type GymUser = { id: string; gymId: string; name: string };
 
 type CheckinRow = { student_id: string; checked_at: string };
 type LogRow = { student_id: string; rpe: number | null; date: string; exercise_name?: string | null };
-type AssignmentRow = { student_id: string; program_name: string | null };
 
 async function fetchRealStudents(gymId: string): Promise<PersonalStudent[]> {
   const sb = supabaseBrowser();
@@ -115,7 +114,7 @@ async function assignReal(
   trainerId: string,
   student: PersonalStudent,
   plan: WorkoutPlan,
-  notes: string | null
+  _notes: string | null
 ): Promise<void> {
   const sb = supabaseBrowser();
 

@@ -23,7 +23,7 @@ const QUICK = [
 
 
 /** Personal GymFitness: resposta CURTA, direta, no assunto (máx 3 frases). */
-function concise(s: string): string {
+function _concise(s: string): string {
 const parts = s.split(/(?<=[.!?])\s+/);
 return parts.slice(0, 3).join(" ");
 }

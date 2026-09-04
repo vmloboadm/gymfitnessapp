@@ -8,7 +8,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { demoPersonalStudents } from "~/lib/personal-data";
 import { useAuth } from "~/hooks/useAuth";
 import {
-  pendingApprovalCount,
   TRAINER_APPROVALS_EVENT,
   type ApprovalRequest,
 } from "~/lib/trainer-store";
@@ -56,7 +55,7 @@ export default function PersonalAprovacoesPage() {
   }, [profile?.gym_id]);
 
   const pending = items.filter((a) => a.status === "pendente");
-  const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+  const _isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
   const resolved = items.filter((a) => a.status !== "pendente");
 
   const decide = async (id: string, status: "aprovado" | "recusado") => {

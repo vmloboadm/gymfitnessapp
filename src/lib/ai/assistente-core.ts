@@ -201,7 +201,7 @@ export async function handleAssistente(request: Request) {
                     if (!token) continue;
                     // processa caractere a caractere com o estado de <think>
                     pendingText += token;
-                    let idx: number;
+                    let _idx: number;
                     while ((pendingText.length > 0)) {
                       if (inThink) {
                         const close = pendingText.indexOf("</think>");

@@ -8,13 +8,6 @@ import { supabaseBrowser } from "~/lib/supabase/client";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
 import { toast } from "sonner";
 import { BUILD_LABEL } from "~/lib/build";
 import { cn } from "~/lib/utils";
@@ -60,52 +53,62 @@ export function LoginForm() {
       return;
     }
 
-    const supabase = supabaseBrowser();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const supabase = supabaseBrowser();
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      toast.error("Não foi possível entrar", { description: error.message });
+      if (error) {
+        toast.error("Não foi possível entrar", { description: error.message });
+        setLoading(false);
+        return;
+      }
+
+      // "Manter conectado": desmarcado → o cookie de sessão morre ao fechar o navegador
+      if (!keepSigned) {
+        setTimeout(() => {
+          document.cookie.split(";").forEach((c) => {
+            const name = c.split("=")[0].trim();
+            if (name.startsWith("sb-") && name.includes("auth-token")) {
+              const raw = c.slice(name.length + 1);
+              document.cookie = `${name}=${raw}; path=/`;
+            }
+          });
+        }, 600); // depois que o client ssr gravar os cookies da sessão
+      }
+
+      // Middleware redireciona para a home da role
+      router.push("/");
+      router.refresh();
+    } catch {
+      toast.error("Falha ao conectar", { description: "Verifique sua internet e tente novamente." });
       setLoading(false);
-      return;
     }
-
-    // "Manter conectado": desmarcado → o cookie de sessão morre ao fechar o navegador
-    if (!keepSigned) {
-      setTimeout(() => {
-        document.cookie.split(";").forEach((c) => {
-          const name = c.split("=")[0].trim();
-          if (name.startsWith("sb-") && name.includes("auth-token")) {
-            const raw = c.slice(name.length + 1);
-            document.cookie = `${name}=${raw}; path=/`;
-          }
-        });
-      }, 600); // depois que o client ssr gravar os cookies da sessão
-    }
-
-    // Middleware redireciona para a home da role
-    router.push("/");
-    router.refresh();
   };
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const supabase = supabaseBrowser();
-    const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/login`;
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo },
-    });
-    setLoading(false);
+    try {
+      const supabase = supabaseBrowser();
+      const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/login`;
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: redirectTo },
+      });
+      setLoading(false);
 
-    if (error) {
-      toast.error("Erro ao enviar o link", { description: error.message });
-      return;
+      if (error) {
+        toast.error("Erro ao enviar o link", { description: error.message });
+        return;
+      }
+      setMagicSent(true);
+      toast.success("Link mágico enviado!", {
+        description: "Verifique sua caixa de entrada.",
+      });
+    } catch {
+      setLoading(false);
+      toast.error("Falha ao conectar", { description: "Verifique sua internet e tente novamente." });
     }
-    setMagicSent(true);
-    toast.success("Link mágico enviado!", {
-      description: "Verifique sua caixa de entrada.",
-    });
   };
 
   if (magicSent) {

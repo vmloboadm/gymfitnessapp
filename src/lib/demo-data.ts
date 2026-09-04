@@ -251,7 +251,6 @@ export type DemoCategory = {
 
 const YT = (q: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q + " execução")}`;
 
-const UNSPLASH = (id: string) => `https://images.unsplash.com/${id}?w=300&h=300&fit=crop&q=70`;
 // const VID_M = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"; // REPLACED WITH YOUTUBE SEARCH
 // const VID_F = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"; // REPLACED WITH YOUTUBE SEARCH
 

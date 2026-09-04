@@ -27,9 +27,6 @@ const TABS_MANAGER = [
 
 type TabId = (typeof TABS_BASE)[number]["id"] | "config" | "equipe";
 
-const fmt = (iso: string) =>
-  new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-
 /** Perfil profissional do personal: apresentação, alunos e estatísticas. */
 export default function PersonalPerfilPage() {
   const { profile } = useAuth();

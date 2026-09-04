@@ -75,9 +75,15 @@ function OnboardingFlow() {
     }
 
     const supabase = supabaseBrowser();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    let user;
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      user = u;
+    } catch {
+      toast.error("Falha ao verificar sessão", { description: "Tente novamente." });
+      setLoading(false);
+      return;
+    }
 
     if (!user) {
       router.replace("/login");
@@ -144,17 +150,21 @@ function OnboardingFlow() {
       }
       if (!profile) return;
       const supabase = supabaseBrowser();
-      const { error } = await supabase.rpc("update_onboarding_step", {
-        p_patch: patch,
-        p_next_step: nextStep,
-      });
-      if (error) {
-        toast.error("Falha ao salvar progresso", { description: "Verifique sua conexão e tente novamente." });
-        return;
+      try {
+        const { error } = await supabase.rpc("update_onboarding_step", {
+          p_patch: patch,
+          p_next_step: nextStep,
+        });
+        if (error) {
+          toast.error("Falha ao salvar progresso", { description: "Verifique sua conexão e tente novamente." });
+          return;
+        }
+        setProfile((prev) => (prev ? { ...prev, ...patch, onboarding_step: nextStep } : prev));
+        setMaxReached((m) => Math.max(m, nextStep));
+        router.replace(`/onboarding?step=${nextStep}`);
+      } catch {
+        toast.error("Falha ao conectar", { description: "Verifique sua internet e tente novamente." });
       }
-      setProfile((prev) => (prev ? { ...prev, ...patch, onboarding_step: nextStep } : prev));
-      setMaxReached((m) => Math.max(m, nextStep));
-      router.replace(`/onboarding?step=${nextStep}`);
     },
     [profile, router, isDemo]
   );
@@ -169,12 +179,16 @@ function OnboardingFlow() {
     }
     if (!profile) return;
     const supabase = supabaseBrowser();
-    const { error } = await supabase.rpc("finish_onboarding");
-    if (error) {
-      toast.error("Erro ao finalizar onboarding", { description: "Seus dados foram salvos, mas houve um problema ao concluir." });
+    try {
+      const { error } = await supabase.rpc("finish_onboarding");
+      if (error) {
+        toast.error("Erro ao finalizar onboarding", { description: "Seus dados foram salvos, mas houve um problema ao concluir." });
+      }
+    } catch {
+      toast.error("Falha ao conectar", { description: "Seus dados foram salvos, tente novamente mais tarde." });
     }
     router.replace("/");
-  }, [profile, router]);
+    }, [profile, router, isDemo]);
 
   if (loading || !profile) {
     return <AuthSkeleton />;

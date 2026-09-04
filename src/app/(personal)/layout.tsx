@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
 import { TRAINER_APPROVALS_EVENT } from "~/lib/trainer-store";
 import { countPendingRequests } from "~/lib/gym-api";
-import { isDemoMode } from "~/lib/demo-bridge";
 import { cn } from "~/lib/utils";
 import {
   LayoutDashboard,

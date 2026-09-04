@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import {
   MessageCircle,
   Flame,
@@ -10,7 +10,6 @@ import {
   CircleAlert,
   ChevronRight,
   Bell,
-  Activity,
   Users,
   ClipboardList,
   UserRoundX,
@@ -40,7 +39,7 @@ import {
 } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
 
-const container: Variants = {
+const _container: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
 };

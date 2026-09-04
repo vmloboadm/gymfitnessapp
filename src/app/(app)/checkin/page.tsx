@@ -40,7 +40,7 @@ export default function CheckinPage() {
   const [doorMode, setDoorMode] = useState(false);
   const [cameFrom, setCameFrom] = useState<string | null>(null);
   const [autoOpened, setAutoOpened] = useState(false);
-  const [mockValidating, setMockValidating] = useState(false);
+  const [mockValidating, _setMockValidating] = useState(false);
   const demo = isDemoMode();
 
   // ---- métricas "Sua sessão hoje" ----

@@ -45,28 +45,33 @@ export function RegisterForm() {
     }
 
     const supabase = supabaseBrowser();
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name },
-      },
-    });
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { name },
+        },
+      });
 
-    setLoading(false);
+      setLoading(false);
 
-    if (error) {
-      toast.error("Não foi possível criar a conta", { description: error.message });
-      return;
-    }
+      if (error) {
+        toast.error("Não foi possível criar a conta", { description: error.message });
+        return;
+      }
 
-    if (data.user) {
-      toast.success("Conta criada!");
-      // Cria o profile + gym padrão do onboarding
-      router.push("/onboarding");
-      router.refresh();
-    } else {
-      toast.info("Verifique seu e-mail para confirmar o cadastro");
+      if (data.user) {
+        toast.success("Conta criada!");
+        // Cria o profile + gym padrão do onboarding
+        router.push("/onboarding");
+        router.refresh();
+      } else {
+        toast.info("Verifique seu e-mail para confirmar o cadastro");
+      }
+    } catch {
+      setLoading(false);
+      toast.error("Falha ao conectar", { description: "Verifique sua internet e tente novamente." });
     }
   };
 
