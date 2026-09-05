@@ -36,7 +36,6 @@ import {
 } from "~/lib/ai/local-gen";
 import { demoLib } from "~/lib/demo-bridge";
 import {
-  demoPersonalStudents,
   demoTemplates,
   type PersonalStudent,
   type WorkoutTemplate,
@@ -100,7 +99,7 @@ function PersonalTreinosContent() {
   const router = useRouter();
   const params = useSearchParams();
   const { profile, user } = useAuth();
-  const [students, setStudents] = useState<PersonalStudent[]>(demoPersonalStudents());
+  const [students, setStudents] = useState<PersonalStudent[]>([]);
   const templates = useMemo(() => demoTemplates(), []);
   const gymId = profile?.gym_id ?? "";
 

@@ -32,6 +32,7 @@ import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
 import { fetchMyAssignedPlans } from "~/lib/gym-api";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
+import { assetPath } from "~/lib/asset-path";
 import { toast } from "sonner";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
@@ -451,14 +452,19 @@ export default function TreinoHomePage() {
     ? ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].filter((d) => daysSel.includes(d))
     : [];
   const todayIdx = orderedDays.length ? orderedDays.indexOf(todayLabel) : -1;
-  const planToday = plan?.plan?.dias && todayIdx >= 0 && todayIdx < plan.plan.dias.length
-    ? { day: plan.plan.dias[Math.min(todayIdx, plan.plan.dias.length - 1)], isRest: false }
-    : plan && orderedDays.length > 0
-      ? { day: null, isRest: true }
+  // Dia de hoje do plano: se o dia da semana está na pauta, SEMPRE mostra um
+  // treino (cicla pelos dias cadastrados). Só é descanso quando o dia não
+  // está na pauta — antes, planos com menos dias que a pauta caiam em
+  // "Hoje é descanso" na sexta (todayIdx >= dias.length).
+  const planToday =
+    plan?.plan?.dias && plan.plan.dias.length > 0
+      ? todayIdx >= 0
+        ? { day: plan.plan.dias[todayIdx % plan.plan.dias.length], isRest: false }
+        : { day: null, isRest: true }
       : null;
   const startPlanSession = () => {
-    if (!plan?.plan?.dias || todayIdx < 0) return;
-    const day = plan.plan.dias[Math.min(todayIdx, plan.plan.dias.length - 1)];
+    if (!plan?.plan?.dias || plan.plan.dias.length === 0 || todayIdx < 0) return;
+    const day = plan.plan.dias[todayIdx % plan.plan.dias.length];
     const exList = day.exercicios.map((e, i) => ({
       id: `plan-${i}`,
       name: e.exercicio,
@@ -564,9 +570,14 @@ export default function TreinoHomePage() {
             <div>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold text-foreground">Treino de hoje</h2>
-                <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand">
-                  {todayLabel} · {plan.name}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Link href="/equipamento" aria-label="Catálogo de aparelhos e exercícios" className="gf-touch flex h-6 items-center gap-1 rounded-full border border-border px-2.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:border-brand/40 hover:text-brand">
+                    <Dumbbell className="h-3 w-3" /> Catálogo
+                  </Link>
+                  <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand">
+                    {todayLabel} · {plan.name}
+                  </span>
+                </div>
               </div>
               <div className="relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-card/60">
                 <div className="space-y-3 p-4">
@@ -629,7 +640,7 @@ export default function TreinoHomePage() {
             <div className="space-y-3">
               <div className="relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-card/60">
                 <Image
-                  src="/workout/workout-rack.jpg"
+                  src={assetPath("/workout/workout-rack.jpg")}
                   alt=""
                   fill
                   sizes="(max-width: 640px) 100vw, 448px"

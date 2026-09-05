@@ -3,6 +3,7 @@
 import { Play } from "lucide-react";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { curatedSearch, findInDatabase } from "~/lib/exercises-database";
+import { assetPath } from "~/lib/asset-path";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 
 /**
@@ -57,7 +58,7 @@ export function ExerciseInfoSheet({
           <div className="relative h-44 w-full overflow-hidden rounded-2xl border border-white/[0.06]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={ex.imageUrl ?? "/group-images/peito.webp"}
+              src={assetPath(ex.imageUrl ?? "/group-images/peito.webp")}
               alt={`Execução de ${ex.name}`}
               loading="lazy"
               decoding="async"

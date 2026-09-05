@@ -8,7 +8,7 @@ import { supabaseBrowser } from "~/lib/supabase/client";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { useAuth } from "~/hooks/useAuth";
-import { demoPersonalStudents, studentStatus } from "~/lib/personal-data";
+import { studentStatus, type PersonalStudent } from "~/lib/personal-data";
 import { listAssignedWorkouts, streakOverride } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
 import { hasRole } from "~/lib/utils/roles";
@@ -44,7 +44,7 @@ const MOTIVATION_PRESETS = [
 /** Perfil profissional do personal: apresentação, alunos e estatísticas. */
 export default function PersonalPerfilPage() {
   const { profile, user } = useAuth();
-  const students = useMemo(() => demoPersonalStudents(), []);
+  const students = useMemo(() => [] as PersonalStudent[], []);
   const [tab, setTab] = useState<TabId>("alunos");
   const [demoAvatar, setDemoAvatar] = useState<string | null>(null);
   const [bio, setBio] = useState(

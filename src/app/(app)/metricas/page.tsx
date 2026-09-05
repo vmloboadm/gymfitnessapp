@@ -212,26 +212,18 @@ if (loading) {
     );
   }
 
-  if (!data?.latest) {
-    return (
-      <>
-        <TopBar title="Métricas" />
-        <div className="space-y-6 p-4">
-          <EmptyState
-            title="Nenhuma medição registrada"
-            description="Sua primeira medição é salva no onboarding (passo de métricas corporais)."
-            icon={Scale}
-          />
-        </div>
-      </>
-    );
-  }
-
-  const latest = data.latest;
+  // Sem histórico: mostra cards zerados + formulário de primeira medição
+  const history = (data?.history ?? []) as BodyMetrics[];
+  const latest = data?.latest ?? {
+    weight_kg: null,
+    height_m: null,
+    body_fat_pct: null,
+    recorded_at: "",
+  };
 
   return (
     <>
-      <TopBar title="Métricas" subtitle={data.history.length ? `Atualizado em ${formatDate(latest.recorded_at)}` : undefined} />
+      <TopBar title="Métricas" subtitle={history.length ? `Atualizado em ${formatDate(latest.recorded_at)}` : undefined} />
       <div className="space-y-6 p-4">
         <div className="gf-rise grid grid-cols-3 gap-2">
           <StatCard
@@ -440,11 +432,11 @@ if (loading) {
         </div>
 
         {/* Histórico de medições */}
-        {(data.history as BodyMetrics[]).length >= 2 ? (
+        {history.length >= 2 ? (
           <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "240ms" }}>
             <p className="gf-section mb-2">Histórico de medições</p>
             <div className="space-y-1.5">
-              {(data.history as BodyMetrics[]).slice(0, 5).map((m) => (
+              {history.slice(0, 5).map((m) => (
                 <div key={m.id} className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3.5 py-2.5">
                   <span className="text-sm font-medium text-foreground">{formatDate(m.recorded_at)}</span>
                   <span className="gf-hero-num text-xs text-muted-foreground">

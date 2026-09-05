@@ -219,7 +219,7 @@ export async function fetchMyAssignedPlans(
       workout_programs (
         id, name, objective, ai_draft, created_at,
         workout_days ( id, name, day_order,
-          workout_exercises ( exercise_id, sets, reps, rest_seconds, rpe, notes, ord )
+          workout_exercises ( exercise_id, sets, reps, rest_seconds, rpe, notes, ord, exercises ( name ) )
         )
       )
     `)
@@ -238,7 +238,7 @@ export async function fetchMyAssignedPlans(
       workout_days: Array<{
         name: string;
         day_order: number;
-        workout_exercises: Array<{ sets: number; reps: string; rest_seconds: number; rpe: number | null; notes: string | null; ord: number }>;
+        workout_exercises: Array<{ sets: number; reps: string; rest_seconds: number; rpe: number | null; notes: string | null; ord: number; exercises?: { name: string } | null }>;
       }>;
     };
   };
@@ -267,7 +267,7 @@ export async function fetchMyAssignedPlans(
         notes: null,
         frequency: `${days.length}x semana`,
         level: prog.objective ?? "Treino",
-        exercises: days.flatMap((d) => d.workout_exercises.map((e) => ({ name: e.notes?.split(".")[0] ?? "Exercício", sets: e.sets, reps: e.reps, rest: `${e.rest_seconds}s` }))),
+        exercises: days.flatMap((d) => d.workout_exercises.map((e) => ({ name: e.exercises?.name ?? e.notes?.split(".")[0] ?? "Exercício", sets: e.sets, reps: e.reps, rest: `${e.rest_seconds}s` }))),
         plan: {
           nome: prog.name,
           frequencia: `${days.length}x semana`,
@@ -282,7 +282,7 @@ export async function fetchMyAssignedPlans(
             exercicios: d.workout_exercises
               .sort((a, b) => a.ord - b.ord)
               .map((e) => ({
-                exercicio: e.notes?.split(".")[0] ?? "Exercício",
+                exercicio: e.exercises?.name ?? e.notes?.split(".")[0] ?? "Exercício",
                 series: e.sets,
                 reps: e.reps,
                 descanso: `${e.rest_seconds}s`,

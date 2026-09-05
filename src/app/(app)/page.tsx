@@ -10,6 +10,7 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { useWorkoutLogsRealtime, useGymMotivationRealtime } from "~/hooks/useRealtimeSubscriptions";
+import { assetPath } from "~/lib/asset-path";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { SkeletonList } from "~/components/common/AsyncStates";
 import { toast } from "sonner";
@@ -453,7 +454,7 @@ export default function HomePage() {
         <motion.div variants={item} className="px-2">
           <div className="flex items-center justify-between gap-3">
             <Image
-              src="/images/logo-academia.png"
+              src={assetPath("/images/logo-academia.png")}
               alt="GymFitness"
               width={128}
               height={40}
@@ -568,7 +569,7 @@ export default function HomePage() {
         {/* TREINO DE HOJE, ação principal; recebe o scroll quando check-in feito */}
         <motion.div variants={item} ref={heroRef} className="pt-2">
           <HeroWorkout
-            image={FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? "/workout/workout-hero.jpg"}
+            image={FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
             title={todayLabel}
             exerciseCount={exCount}
             estMin={45}

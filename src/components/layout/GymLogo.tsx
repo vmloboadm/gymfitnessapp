@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "~/lib/utils";
+import { assetPath } from "~/lib/asset-path";
 
 /**
  * Logo GymFitness, asset oficial (logo GF) com fundo transparente (PNG).
@@ -32,7 +33,7 @@ export function GymLogo({
       }}
     >
       <Image
-        src="/logo-gf.png"
+        src={assetPath("/logo-gf.png")}
         alt="GymFitness"
         width={size}
         height={size}

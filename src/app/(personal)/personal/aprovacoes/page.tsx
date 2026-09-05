@@ -5,7 +5,7 @@ import { motion, type Variants } from "framer-motion";
 import { Inbox, Crown, Dumbbell, Check, X, Inbox as InboxIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { demoPersonalStudents } from "~/lib/personal-data";
+import type { PersonalStudent } from "~/lib/personal-data";
 import { useAuth } from "~/hooks/useAuth";
 import { usePremiumRequestsRealtime } from "~/hooks/useRealtimeSubscriptions";
 import {
@@ -33,7 +33,7 @@ const fmt = (iso: string) =>
  */
 export default function PersonalAprovacoesPage() {
   const { profile, user } = useAuth();
-  const students = useMemo(() => demoPersonalStudents(), []);
+  const students = useMemo(() => [] as PersonalStudent[], []);
   const [items, setItems] = useState<ApprovalRequest[]>([]);
 
   useEffect(() => {

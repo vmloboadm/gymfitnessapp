@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { assetPath } from "~/lib/asset-path";
 import {
   Search,
   Lightbulb,
@@ -260,7 +261,7 @@ function CategoryAccordion({
               <Accordion.Trigger className="gf-touch flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none [&[data-state=open]>svg]:rotate-180">
                 <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0B1426]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/group-images/${cat.id}.webp`} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                  <img src={assetPath(`/group-images/${cat.id}.webp`)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                 </span>
                 <span className="gf-card-title flex-1">{cat.name}</span>
                 <span className="gf-hero-num flex h-6 min-w-6 items-center justify-center rounded-full bg-card px-1.5 text-[11px]">
