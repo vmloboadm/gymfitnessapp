@@ -62,3 +62,7 @@ create unique index if not exists ux_wsession_active on workout_sessions (studen
 create index if not exists ix_wsession_gym_started on workout_sessions (gym_id, started_at desc);
 
 alter publication supabase_realtime add table workout_sessions;
+
+-- grants DML (tabelas criadas fora do runner não herdam os grants do Supabase)
+grant select, insert, update, delete on workout_sessions to anon, authenticated;
+grant all on workout_sessions to service_role;
