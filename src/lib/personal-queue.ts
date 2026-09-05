@@ -49,7 +49,7 @@ export function computeQueue(
         approvalsPending === 1
           ? "1 solicitação de aluno esperando sua decisão"
           : `${approvalsPending} solicitações de alunos esperando sua decisão`,
-      detail: "Desbloqueio premium ou ajuste de carga.",
+      detail: "Desbloqueio premium ou ajuste de treino.",
       action: { kind: "link", label: "Ver agora", href: "/personal/aprovacoes" },
     });
   }

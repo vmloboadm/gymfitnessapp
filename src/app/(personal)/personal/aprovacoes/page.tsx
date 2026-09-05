@@ -110,7 +110,7 @@ export default function PersonalAprovacoesPage() {
           <InboxIcon className="mx-auto mb-2 h-7 w-7 text-muted-foreground" />
           <p className="text-sm font-semibold text-foreground">Caixa vazia</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Pedidos de ajuste de carga e desbloqueio premium chegam aqui.
+            Pedidos de ajuste de treino e desbloqueio premium chegam aqui.
           </p>
         </div>
       ) : (
@@ -131,7 +131,7 @@ export default function PersonalAprovacoesPage() {
                     ) : (
                       <Dumbbell className="h-3.5 w-3.5 text-brand" />
                     )}
-                    {a.type === "premium" ? "Desbloqueio de Plano Premium" : "Ajuste de carga"}
+                    {a.type === "premium" ? "Desbloqueio de Plano Premium" : "Ajuste de treino"}
                   </p>
                   <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">{a.message}</p>
                   <p className="mt-1 text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
