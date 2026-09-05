@@ -560,6 +560,42 @@ export function demoLibCategory(catId: string): DemoCategory | undefined {
   return demoLib.find((c) => c.id === catId);
 }
 
+/** Casamento fuzzy nome→exercício da biblioteca (mesma fonte do catálogo). */
+const normName = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+
+const LIB_INDEX = demoLib.flatMap((c) =>
+  c.subs.flatMap((s) =>
+    s.exercises.map((e) => ({
+      name: e.name,
+      norm: normName(e.name),
+      words: normName(e.name).split(" ").filter((w) => w.length > 2),
+      imageUrl: e.imageUrl ?? null,
+      videoUrl: e.videoUrl ?? null,
+    }))
+  )
+);
+
+export function libraryMatch(name: string): { name: string; imageUrl: string | null; videoUrl: string | null } | null {
+  const n = normName(name);
+  if (!n || LIB_INDEX.length === 0) return null;
+  let best: { score: number; hit: (typeof LIB_INDEX)[number] } | null = null;
+  for (const e of LIB_INDEX) {
+    let score = 0;
+    if (e.norm === n) score = 100;
+    else if (e.norm.includes(n) || n.includes(e.norm)) score = 80;
+    else {
+      const nWords = n.split(" ").filter((w) => w.length > 2);
+      const fwd = e.words.filter((w) => n.includes(w)).length;
+      const back = nWords.filter((w) => e.norm.includes(w)).length;
+      const total = e.words.length + nWords.length;
+      score = total > 0 ? Math.round(((fwd + back) / total) * 70) : 0;
+    }
+    if (score > (best?.score ?? 0)) best = { score, hit: e };
+  }
+  return best && best.score >= 45 ? { name: best.hit.name, imageUrl: best.hit.imageUrl, videoUrl: best.hit.videoUrl } : null;
+}
+
 
 /** Sessões de aparelho em aberto agora (fonte real: equipment_sessions active). */
 export function demoOpenSessions() {
