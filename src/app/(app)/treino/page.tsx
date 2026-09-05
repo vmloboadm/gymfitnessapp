@@ -378,6 +378,7 @@ export default function TreinoHomePage() {
             fast={demo}
             onFinish={() => {
               setSummarySeconds(elapsedSeconds(daySession.startedAt, Date.now()));
+              void conclude([...doneIds]);
               endDaySession();
               setPhase("done");
             }}
@@ -387,6 +388,7 @@ export default function TreinoHomePage() {
           onClick={() => {
             navigator.vibrate?.([60, 40, 60]);
             setSummarySeconds(elapsedSeconds(daySession.startedAt, Date.now()));
+            void conclude([...doneIds]);
             endDaySession();
             toast.success("Sessão finalizada. Registre como foi!");
             setPhase("done");
