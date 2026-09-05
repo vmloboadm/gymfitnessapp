@@ -22,6 +22,7 @@ import {
   useCheckinsRealtime,
   useEquipmentSessionsRealtime,
   usePremiumRequestsRealtime,
+  useWorkoutSessionsRealtime,
 } from "~/hooks/useRealtimeSubscriptions";
 import { Badge } from "~/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -59,6 +60,15 @@ type PresencaRow = {
   minutes: number;
   over2h: boolean;
   equipmentName: string | null;
+  workoutSince: string | null;
+};
+
+type WSession = {
+  id: string;
+  student_id: string;
+  status: string;
+  started_at: string;
+  student: { name: string } | null;
 };
 
 type DashboardData = {
@@ -116,6 +126,11 @@ export default function DashboardPage() {
         .update({ status: "completed", ended_at: now })
         .eq("student_id", p.studentId)
         .eq("status", "active");
+      await sb
+        .from("workout_sessions")
+        .update({ status: "completed", ended_at: now } as never)
+        .eq("student_id", p.studentId)
+        .eq("status", "active");
       if (errCk || errSess) throw new Error(errCk?.message ?? errSess?.message ?? "erro");
       toast.success(`Treino de ${p.name} encerrado (${tempo})`);
       setConfirming(null);
@@ -143,8 +158,7 @@ export default function DashboardPage() {
           checkinsHoje: k.activeCheckins,
           workoutsHoje: 0,
           sessions: [],
-          presenca: [],
-          fluxoSemana: [],
+          presenca: [],          fluxoSemana: [],
           ocupacao: demoOcupacaoHorario(),
           pendentes: [],
         },
@@ -160,7 +174,7 @@ export default function DashboardPage() {
     start7.setDate(start7.getDate() - 6);
     start7.setHours(0, 0, 0, 0);
 
-    const [sRes, eRes, sessRes, ckRes, logsRes, pendRes] = await Promise.all([
+    const [sRes, eRes, sessRes, ckRes, wsRes, logsRes, pendRes] = await Promise.all([
       sb.from("profiles").select("id").eq("gym_id", gym).eq("role", "student"),
       sb.from("equipment").select("id").eq("gym_id", gym),
       sb
@@ -175,6 +189,13 @@ export default function DashboardPage() {
         .select("id, type, checked_at, student_id, student:student_id ( name )")
         .eq("gym_id", gym)
         .gte("checked_at", start7.toISOString()),
+      sb
+        .from("workout_sessions")
+        .select("id, student_id, status, started_at, student:student_id ( name )")
+        .eq("gym_id", gym)
+        .gte("started_at", startToday.toISOString())
+        .order("started_at", { ascending: false })
+        .limit(30),
       sb.from("workout_logs").select("id").eq("gym_id", gym).gte("date", startToday.toISOString()),
       sb
         .from("premium_requests")
@@ -184,7 +205,7 @@ export default function DashboardPage() {
         .order("created_at", { ascending: false })
         .limit(3) as unknown as Promise<{ data: PendingRequest[] | null; error: { message: string } | null }>,
     ]);
-    if (sRes.error || eRes.error || sessRes.error || ckRes.error || logsRes.error || pendRes.error) {
+    if (sRes.error || eRes.error || sessRes.error || ckRes.error || wsRes.error || logsRes.error || pendRes.error) {
       return { data: null, error: { message: "Erro ao carregar dados do dashboard" } };
     }
 
@@ -199,12 +220,15 @@ export default function DashboardPage() {
     }
     const nowMs = Date.now();
     const activeSessions = (sessRes.data ?? []) as unknown as ActiveSession[];
+    const wSessions = (wsRes.data ?? []) as unknown as WSession[];
+    const activeWs = wSessions.filter((w) => w.status === "active");
     const presenca: PresencaRow[] = [];
     for (const r of lastByStudent.values()) {
       const t = new Date(r.checked_at).getTime();
       const mins = Math.floor((nowMs - t) / 60000);
       if (r.type === "entrada" && mins >= 0 && nowMs - t < PRESENT_WINDOW_MS) {
         const sess = activeSessions.find((s) => s.student_id === r.student_id);
+        const w = activeWs.find((w) => w.student_id === r.student_id);
         presenca.push({
           studentId: r.student_id,
           name: r.student?.name ?? "Aluno",
@@ -212,8 +236,24 @@ export default function DashboardPage() {
           minutes: mins,
           over2h: mins >= 120,
           equipmentName: sess?.equipment?.name ?? null,
+          workoutSince: w?.started_at ?? null,
         });
       }
+    }
+    // alunos em treino SEM check-in também aparecem (treino = presença)
+    for (const w of activeWs) {
+      if (presenca.some((p) => p.studentId === w.student_id)) continue;
+      const t = new Date(w.started_at).getTime();
+      const mins = Math.floor((nowMs - t) / 60000);
+      presenca.push({
+        studentId: w.student_id,
+        name: w.student?.name ?? "Aluno",
+        since: w.started_at,
+        minutes: mins,
+        over2h: mins >= 120,
+        equipmentName: null,
+        workoutSince: w.started_at,
+      });
     }
     presenca.sort((a, b) => b.minutes - a.minutes);
 
@@ -243,7 +283,7 @@ export default function DashboardPage() {
         students: sRes.data?.length ?? 0,
         equipment: eRes.data?.length ?? 0,
         checkinsHoje: entradasHoje.length,
-        workoutsHoje: logsRes.data?.length ?? 0,
+        workoutsHoje: wSessions.length,
         sessions: activeSessions,
         presenca,
         fluxoSemana,
@@ -259,6 +299,7 @@ export default function DashboardPage() {
   // live: checkins, aparelhos e aprovações atualizam o dashboard sem refresh
   useCheckinsRealtime(profile?.gym_id, refetch);
   useEquipmentSessionsRealtime(profile?.gym_id, refetch);
+  useWorkoutSessionsRealtime(profile?.gym_id, refetch);
   usePremiumRequestsRealtime(profile?.gym_id, refetch);
 
   const primeiroNome = (profile?.name ?? "Gestor").split(" ")[0];
@@ -372,7 +413,14 @@ export default function DashboardPage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-[13px] font-bold text-foreground">{p.name}</p>
+                    <p className="flex items-center gap-1.5 truncate text-[13px] font-bold text-foreground">
+                      {p.name}
+                      {p.workoutSince ? (
+                        <span className="shrink-0 rounded-md bg-brand/15 px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wide text-brand">
+                          🏋 em treino
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="truncate text-[10.5px] text-muted-foreground">
                       treina há {fmtTempo(p.minutes)}
                       {p.equipmentName ? ` · ${p.equipmentName}` : ""}

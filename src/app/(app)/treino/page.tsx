@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { startWorkoutSession, completeWorkoutSession } from "~/lib/supabase/workout-session";
 import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Badge } from "~/components/ui/badge";
@@ -250,6 +251,9 @@ export default function TreinoHomePage() {
   const conclude = async (completedIds?: string[]) => {
     setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
     endDaySession();
+    if (!demo && user?.id) {
+      void completeWorkoutSession(user.id);
+    }
     if (completedIds?.length) {
       setDoneIds((prev) => new Set([...prev, ...completedIds]));
       // produção: grava workout_logs reais dos exercícios concluídos
@@ -287,6 +291,9 @@ export default function TreinoHomePage() {
 
   const startWorkout = (list: typeof DEFAULT_DEMO_EX) => {
     setSession(list);
+    if (!demo && user?.id && profile?.gym_id) {
+      void startWorkoutSession(profile.gym_id, user.id);
+    }
     setPhase("active");
   };
 
@@ -521,6 +528,9 @@ export default function TreinoHomePage() {
     setSession(exList);
     setPlanTodayActive(true);
     startDaySession();
+    if (!demo && user?.id && profile?.gym_id) {
+      void startWorkoutSession(profile.gym_id, user.id, plan?.id ?? null);
+    }
     setPhase("active");
   };
 

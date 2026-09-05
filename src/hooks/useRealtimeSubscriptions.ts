@@ -103,3 +103,16 @@ export function useEquipmentSessionsRealtime(gymId: string | undefined, onRefetc
 
   useRealtime(`equipment-sessions-${gymId}`, { table: "equipment_sessions", gymId }, handlerRef);
 }
+
+/**
+ * Realtime para workout_sessions: aluno inicia/encerra o treino
+ * → dashboard do personal mostra "em treino" ao vivo.
+ */
+export function useWorkoutSessionsRealtime(gymId: string | undefined, onRefetch: () => void) {
+  const handlerRef = useCallback(() => {
+    if (!gymId) return;
+    onRefetch();
+  }, [gymId, onRefetch]);
+
+  useRealtime(`workout-sessions-${gymId}`, { table: "workout_sessions", gymId }, handlerRef);
+}

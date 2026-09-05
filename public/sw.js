@@ -4,7 +4,7 @@
  * BASE-aware: deriva o prefixo (/app) do próprio scope do SW, funcionando
  * tanto na raiz quanto sob basePath.
  */
-const CACHE_VERSION = "gymfitness-v50";
+const CACHE_VERSION = "gymfitness-v51";
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
