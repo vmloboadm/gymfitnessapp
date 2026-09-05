@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import type { PersonalStudent } from "~/lib/personal-data";
 import { useAuth } from "~/hooks/useAuth";
-import { usePremiumRequestsRealtime } from "~/hooks/useRealtimeSubscriptions";
+import { usePremiumRequestsRealtime, useMedicalClearancesRealtime } from "~/hooks/useRealtimeSubscriptions";
 import {
   TRAINER_APPROVALS_EVENT,
   type ApprovalRequest,
@@ -67,6 +67,11 @@ export default function PersonalAprovacoesPage() {
 
   // Realtime: refetch when student submits or trainer decides
   usePremiumRequestsRealtime(profile?.gym_id, () => {
+    if (!profile?.gym_id) return;
+    getRequests(profile.gym_id).then(setItems).catch(() => {});
+  });
+
+  useMedicalClearancesRealtime(profile?.gym_id, () => {
     if (!profile?.gym_id) return;
     getRequests(profile.gym_id).then(setItems).catch(() => {});
   });

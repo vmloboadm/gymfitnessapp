@@ -116,3 +116,55 @@ export function useWorkoutSessionsRealtime(gymId: string | undefined, onRefetch:
 
   useRealtime(`workout-sessions-${gymId}`, { table: "workout_sessions", gymId }, handlerRef);
 }
+
+/**
+ * Realtime para student_workouts: quando o personal atribui um treino,
+ * o aluno vê o plano na página de treinos sem precisar recarregar.
+ */
+export function useStudentWorkoutsRealtime(gymId: string | undefined, onRefetch: () => void) {
+  const handlerRef = useCallback(() => {
+    if (!gymId) return;
+    onRefetch();
+  }, [gymId, onRefetch]);
+
+  useRealtime(`student-workouts-${gymId}`, { table: "student_workouts", gymId }, handlerRef);
+}
+
+/**
+ * Realtime para leaderboard_adjustments: ajustes de pontos pelo gestor
+ * → ranking do aluno atualiza ao vivo.
+ */
+export function useLeaderboardRealtime(gymId: string | undefined, onRefetch: () => void) {
+  const handlerRef = useCallback(() => {
+    if (!gymId) return;
+    onRefetch();
+  }, [gymId, onRefetch]);
+
+  useRealtime(`leaderboard-${gymId}`, { table: "leaderboard_adjustments", gymId }, handlerRef);
+}
+
+/**
+ * Realtime para profiles: quando o aluno ou personal muda avatar/nome,
+ * todas as listas e cards se atualizam (dashboard, feed, ranking).
+ */
+export function useProfilesRealtime(gymId: string | undefined, onRefetch: () => void) {
+  const handlerRef = useCallback(() => {
+    if (!gymId) return;
+    onRefetch();
+  }, [gymId, onRefetch]);
+
+  useRealtime(`profiles-${gymId}`, { table: "profiles", gymId }, handlerRef);
+}
+
+/**
+ * Realtime para medical_clearances: aluno envia laudo médico
+ * → gestor vê na fila de pendências sem refresh.
+ */
+export function useMedicalClearancesRealtime(gymId: string | undefined, onRefetch: () => void) {
+  const handlerRef = useCallback(() => {
+    if (!gymId) return;
+    onRefetch();
+  }, [gymId, onRefetch]);
+
+  useRealtime(`medical-clearances-${gymId}`, { table: "medical_clearances", gymId }, handlerRef);
+}

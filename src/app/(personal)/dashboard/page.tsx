@@ -22,6 +22,7 @@ import {
   useCheckinsRealtime,
   useEquipmentSessionsRealtime,
   usePremiumRequestsRealtime,
+  useProfilesRealtime,
   useWorkoutSessionsRealtime,
 } from "~/hooks/useRealtimeSubscriptions";
 import { Badge } from "~/components/ui/badge";
@@ -301,6 +302,7 @@ export default function DashboardPage() {
   useEquipmentSessionsRealtime(profile?.gym_id, refetch);
   useWorkoutSessionsRealtime(profile?.gym_id, refetch);
   usePremiumRequestsRealtime(profile?.gym_id, refetch);
+  useProfilesRealtime(profile?.gym_id, refetch);
 
   const primeiroNome = (profile?.name ?? "Gestor").split(" ")[0];
   const pico = data?.ocupacao.reduce((a, b) => (b.alunos > a.alunos ? b : a), data?.ocupacao[0] ?? { hora: "", alunos: 0 });

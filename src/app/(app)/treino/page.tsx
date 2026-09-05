@@ -20,6 +20,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { useStudentWorkoutsRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { startWorkoutSession, completeWorkoutSession } from "~/lib/supabase/workout-session";
 import { TopBar } from "~/components/layout/TopBar";
@@ -203,6 +204,9 @@ export default function TreinoHomePage() {
     },
     [user?.id, profile?.id, demo]
   );
+
+  useStudentWorkoutsRealtime(profile?.gym_id, refetch);
+
   const router = useRouter();
   const { session: daySession, start: startDaySession, end: endDaySession } = useWorkoutSession();
 

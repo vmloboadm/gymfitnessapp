@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { useLeaderboardRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
@@ -104,6 +105,8 @@ export default function RankingPage() {
     },
     [user?.id, profile?.id, demo]
   );
+
+  useLeaderboardRealtime(profile?.gym_id, refetch);
 
   const mine = data?.mine ?? null;
   const myLeague = leagueFor(mine?.points ?? 0);
