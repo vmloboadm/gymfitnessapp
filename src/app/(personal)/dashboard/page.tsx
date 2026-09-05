@@ -113,7 +113,7 @@ export default function DashboardPage() {
         .limit(12),
       sb.from("checkins").select("checked_at").eq("gym_id", gym).eq("type", "entrada").gte("checked_at", start7.toISOString()),
       sb.from("checkins").select("checked_at").eq("gym_id", gym).eq("type", "saida").gte("checked_at", startToday.toISOString()),
-      sb.from("workout_logs").select("id").eq("gym_id", gym).gte("logged_at", startToday.toISOString()),
+      sb.from("workout_logs").select("id").eq("gym_id", gym).gte("date", startToday.toISOString()),
       sb
         .from("premium_requests")
         .select("id, details, created_at, student:student_id ( name )")
