@@ -14,6 +14,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { OcupacaoBarChart } from "~/components/charts";
+import { toast } from "sonner";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -31,6 +32,7 @@ import { isDemoMode, demoKpis, demoOcupacaoHorario } from "~/lib/demo-bridge";
 type ActiveSession = {
   id: string;
   started_at: string;
+  student_id: string | null;
   equipment: { name: string } | null;
   student: { name: string } | null;
 };
@@ -42,17 +44,37 @@ type PendingRequest = {
   student: { name: string } | null;
 };
 
+type TodayCheckin = {
+  id: string;
+  type: string;
+  checked_at: string;
+  student_id: string;
+  student: { name: string } | null;
+};
+
+type PresencaRow = {
+  studentId: string;
+  name: string;
+  since: string;
+  minutes: number;
+  over2h: boolean;
+  equipmentName: string | null;
+};
+
 type DashboardData = {
   students: number;
   equipment: number;
-  presentes: number;
   checkinsHoje: number;
   workoutsHoje: number;
   sessions: ActiveSession[];
+  presenca: PresencaRow[];
   fluxoSemana: { label: string; n: number }[];
   ocupacao: { hora: string; alunos: number }[];
   pendentes: PendingRequest[];
 };
+
+/** Presença expira depois de 4h sem saída (aluno esqueceu o checkout). */
+const PRESENT_WINDOW_MS = 4 * 3600000;
 
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -67,6 +89,43 @@ export default function DashboardPage() {
   const { profile } = useAuth();
   const demo = isDemoMode();
   const [, setTick] = useState(0);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [closing, setClosing] = useState<string | null>(null);
+
+  const fmtTempo = (mins: number) => {
+    if (mins < 60) return `${mins}min`;
+    return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}`;
+  };
+
+  /** Encerrar treino do aluno: registra a saída e libera os aparelhos (RLS de staff). */
+  const endTraining = async (p: PresencaRow) => {
+    setClosing(p.studentId);
+    try {
+      const sb = supabaseBrowser();
+      const now = new Date().toISOString();
+      const tempo = fmtTempo(p.minutes);
+      const { error: errCk } = await sb.from("checkins").insert({
+        gym_id: profile?.gym_id ?? "",
+        student_id: p.studentId,
+        type: "saida",
+        source: "app",
+        checked_at: now,
+      } as never);
+      const { error: errSess } = await sb
+        .from("equipment_sessions")
+        .update({ status: "completed", ended_at: now })
+        .eq("student_id", p.studentId)
+        .eq("status", "active");
+      if (errCk || errSess) throw new Error(errCk?.message ?? errSess?.message ?? "erro");
+      toast.success(`Treino de ${p.name} encerrado (${tempo})`);
+      setConfirming(null);
+      refetch();
+    } catch {
+      toast.error("Não deu encerrar agora. Tente de novo.");
+    } finally {
+      setClosing(null);
+    }
+  };
 
   // tick por minuto p/ tempo decorrido das sessões
   useEffect(() => {
@@ -81,10 +140,10 @@ export default function DashboardPage() {
         data: {
           students: k.students,
           equipment: k.equipment,
-          presentes: k.activeCheckins,
           checkinsHoje: k.activeCheckins,
           workoutsHoje: 0,
           sessions: [],
+          presenca: [],
           fluxoSemana: [],
           ocupacao: demoOcupacaoHorario(),
           pendentes: [],
@@ -101,18 +160,21 @@ export default function DashboardPage() {
     start7.setDate(start7.getDate() - 6);
     start7.setHours(0, 0, 0, 0);
 
-    const [sRes, eRes, sessRes, entRes, saiRes, logsRes, pendRes] = await Promise.all([
+    const [sRes, eRes, sessRes, ckRes, logsRes, pendRes] = await Promise.all([
       sb.from("profiles").select("id").eq("gym_id", gym).eq("role", "student"),
       sb.from("equipment").select("id").eq("gym_id", gym),
       sb
         .from("equipment_sessions")
-        .select("id, started_at, equipment:equipment_id ( name ), student:student_id ( name )")
+        .select("id, started_at, student_id, equipment:equipment_id ( name ), student:student_id ( name )")
         .eq("gym_id", gym)
         .eq("status", "active")
         .order("started_at", { ascending: false })
         .limit(12),
-      sb.from("checkins").select("checked_at").eq("gym_id", gym).eq("type", "entrada").gte("checked_at", start7.toISOString()),
-      sb.from("checkins").select("checked_at").eq("gym_id", gym).eq("type", "saida").gte("checked_at", startToday.toISOString()),
+      sb
+        .from("checkins")
+        .select("id, type, checked_at, student_id, student:student_id ( name )")
+        .eq("gym_id", gym)
+        .gte("checked_at", start7.toISOString()),
       sb.from("workout_logs").select("id").eq("gym_id", gym).gte("date", startToday.toISOString()),
       sb
         .from("premium_requests")
@@ -122,23 +184,50 @@ export default function DashboardPage() {
         .order("created_at", { ascending: false })
         .limit(3) as unknown as Promise<{ data: PendingRequest[] | null; error: { message: string } | null }>,
     ]);
-    if (sRes.error || eRes.error || sessRes.error || entRes.error || saiRes.error || logsRes.error || pendRes.error) {
+    if (sRes.error || eRes.error || sessRes.error || ckRes.error || logsRes.error || pendRes.error) {
       return { data: null, error: { message: "Erro ao carregar dados do dashboard" } };
     }
 
-    const entradas = (entRes.data ?? []) as { checked_at: string }[];
-    const saidasHoje = (saiRes.data ?? []) as { checked_at: string }[];
+    const checkins7d = (ckRes.data ?? []) as unknown as TodayCheckin[];
+    const entradasHoje = checkins7d.filter((r) => new Date(r.checked_at) >= startToday);
+
+    // presença: último evento do dia por aluno; presente se entrada (janela 4h)
+    const lastByStudent = new Map<string, TodayCheckin>();
+    for (const r of entradasHoje) {
+      const cur = lastByStudent.get(r.student_id);
+      if (!cur || new Date(r.checked_at) > new Date(cur.checked_at)) lastByStudent.set(r.student_id, r);
+    }
+    const nowMs = Date.now();
+    const activeSessions = (sessRes.data ?? []) as unknown as ActiveSession[];
+    const presenca: PresencaRow[] = [];
+    for (const r of lastByStudent.values()) {
+      const t = new Date(r.checked_at).getTime();
+      const mins = Math.floor((nowMs - t) / 60000);
+      if (r.type === "entrada" && nowMs - t < PRESENT_WINDOW_MS) {
+        const sess = activeSessions.find((s) => s.student_id === r.student_id);
+        presenca.push({
+          studentId: r.student_id,
+          name: r.student?.name ?? "Aluno",
+          since: r.checked_at,
+          minutes: mins,
+          over2h: mins >= 120,
+          equipmentName: sess?.equipment?.name ?? null,
+        });
+      }
+    }
+    presenca.sort((a, b) => b.minutes - a.minutes);
 
     // ocupação por hora (hoje, 6h–22h)
     const counts = new Array(17).fill(0) as number[];
-    for (const r of entradas) {
+    for (const r of entradasHoje) {
       const d = new Date(r.checked_at);
-      if (d >= startToday && d.getHours() >= 6 && d.getHours() <= 22) counts[d.getHours() - 6]++;
+      if (d.getHours() >= 6 && d.getHours() <= 22) counts[d.getHours() - 6]++;
     }
 
     // fluxo últimos 7 dias
     const fluxo = new Array(7).fill(0) as number[];
-    for (const r of entradas) {
+    for (const r of checkins7d) {
+      if (r.type !== "entrada") continue;
       const d = new Date(r.checked_at);
       const idx = Math.floor((new Date(d).setHours(0, 0, 0, 0) - start7.setHours(0, 0, 0, 0)) / 86400000);
       if (idx >= 0 && idx < 7) fluxo[idx]++;
@@ -149,16 +238,14 @@ export default function DashboardPage() {
       return { label: DIAS[d.getDay()], n };
     });
 
-    const presentes = Math.max(0, entradas.filter((r) => new Date(r.checked_at) >= startToday).length - saidasHoje.length);
-
     return {
       data: {
         students: sRes.data?.length ?? 0,
         equipment: eRes.data?.length ?? 0,
-        presentes,
-        checkinsHoje: entradas.filter((r) => new Date(r.checked_at) >= startToday).length,
+        checkinsHoje: entradasHoje.length,
         workoutsHoje: logsRes.data?.length ?? 0,
-        sessions: (sessRes.data ?? []) as unknown as ActiveSession[],
+        sessions: activeSessions,
+        presenca,
         fluxoSemana,
         ocupacao: counts.map((n, i) => ({ hora: `${i + 6}h`, alunos: n })),
         pendentes: (pendRes.data ?? []) as unknown as PendingRequest[],
@@ -240,9 +327,9 @@ export default function DashboardPage() {
             live
           </span>
         </div>
-        <p className="mt-1 text-5xl font-black leading-none tracking-tight text-foreground">{formatNumber(data.presentes)}</p>
+        <p className="mt-1 text-5xl font-black leading-none tracking-tight text-foreground">{formatNumber(data.presenca.length)}</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          {data.presentes === 1 ? "aluno na academia agora" : "alunos na academia agora"}
+          {data.presenca.length === 1 ? "aluno na academia agora" : "alunos na academia agora"}
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-card/70 px-2.5 py-2">
@@ -260,6 +347,74 @@ export default function DashboardPage() {
             <p className="text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">treinos hoje</p>
           </div>
         </div>
+      </div>
+
+      {/* NA ACADEMIA AGORA — presença real + encerrar treino */}
+      <div className="rounded-2xl border border-border bg-card/50 p-4">
+        <div className="flex items-center justify-between">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            <Users className="h-3.5 w-3.5 text-brand" /> Na academia agora
+          </p>
+          <Badge variant="outline" className="text-[10px]">
+            {data.presenca.length} {data.presenca.length === 1 ? "presente" : "presentes"}
+          </Badge>
+        </div>
+        {data.presenca.length === 0 ? (
+          <p className="mt-3 rounded-xl bg-card/60 px-3 py-3 text-[11.5px] text-muted-foreground">
+            Ninguém na academia neste momento.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-1.5">
+            {data.presenca.map((p) => (
+              <div
+                key={p.studentId}
+                className={`rounded-xl px-3 py-2.5 ${p.over2h ? "bg-warning/10 ring-1 ring-warning/30" : "bg-card/70"}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-bold text-foreground">{p.name}</p>
+                    <p className="truncate text-[10.5px] text-muted-foreground">
+                      treina há {fmtTempo(p.minutes)}
+                      {p.equipmentName ? ` · ${p.equipmentName}` : ""}
+                      {p.over2h ? " · esqueceu o checkout?" : ""}
+                    </p>
+                  </div>
+                  {confirming === p.studentId ? (
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button
+                        onClick={() => endTraining(p)}
+                        disabled={closing === p.studentId}
+                        className="tactile rounded-lg bg-brand px-2.5 py-1.5 text-[10px] font-black text-white disabled:opacity-50"
+                      >
+                        {closing === p.studentId ? "..." : "Confirmar"}
+                      </button>
+                      <button
+                        onClick={() => setConfirming(null)}
+                        className="rounded-lg border border-border px-2 py-1.5 text-[10px] font-bold text-muted-foreground"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirming(p.studentId)}
+                      className={`tactile shrink-0 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition-colors ${
+                        p.over2h
+                          ? "border-warning/50 bg-warning/10 text-warning"
+                          : "border-border bg-card/60 text-muted-foreground hover:border-warning/40 hover:text-warning"
+                      }`}
+                    >
+                      Encerrar treino
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <p className="px-1 pt-1 text-[9.5px] text-muted-foreground">
+              Encerrar registra a saída do aluno e libera os aparelhos dele.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* KPIs secundários */}
