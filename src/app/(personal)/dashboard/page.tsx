@@ -203,7 +203,7 @@ export default function DashboardPage() {
     for (const r of lastByStudent.values()) {
       const t = new Date(r.checked_at).getTime();
       const mins = Math.floor((nowMs - t) / 60000);
-      if (r.type === "entrada" && nowMs - t < PRESENT_WINDOW_MS) {
+      if (r.type === "entrada" && mins >= 0 && nowMs - t < PRESENT_WINDOW_MS) {
         const sess = activeSessions.find((s) => s.student_id === r.student_id);
         presenca.push({
           studentId: r.student_id,
