@@ -3,6 +3,7 @@ import { Sora, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { AppProviders } from "./providers";
+import { SWUpdater } from "~/components/common/SWUpdater";
 
 const sora = Sora({
   subsets: ["latin"],
@@ -46,6 +47,7 @@ export default function RootLayout({
     <html lang="pt-BR" className="dark" style={{ colorScheme: "dark" }}>
       <body className={`${inter.variable} ${sora.variable} ${jetbrainsMono.variable} antialiased`}>
         <AppProviders>{children}</AppProviders>
+        <SWUpdater />
         <Toaster position="top-center" richColors closeButton />
       </body>
     </html>
