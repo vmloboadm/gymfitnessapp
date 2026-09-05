@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, type Variants } from "framer-motion";
 import { Inbox, Crown, Dumbbell, Check, X, Inbox as InboxIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -12,7 +12,7 @@ import {
   TRAINER_APPROVALS_EVENT,
   type ApprovalRequest,
 } from "~/lib/trainer-store";
-import { decideRequest, getRequests } from "~/lib/gym-api";
+import { decideRequest, getRequests, getGymStudents } from "~/lib/gym-api";
 import { cn } from "~/lib/utils";
 
 const container: Variants = {
@@ -33,8 +33,18 @@ const fmt = (iso: string) =>
  */
 export default function PersonalAprovacoesPage() {
   const { profile, user } = useAuth();
-  const students = useMemo(() => [] as PersonalStudent[], []);
+  const [students, setStudents] = useState<PersonalStudent[]>([]);
   const [items, setItems] = useState<ApprovalRequest[]>([]);
+
+  // Alunos reais p/ resolver avatares dos pedidos
+  useEffect(() => {
+    if (!profile?.gym_id) return;
+    let alive = true;
+    getGymStudents(profile.gym_id)
+      .then((rows) => { if (alive) setStudents(rows); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [profile?.gym_id]);
 
   useEffect(() => {
     if (!profile?.gym_id) return;

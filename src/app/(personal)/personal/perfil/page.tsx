@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getGymStudents } from "~/lib/gym-api";
 import { motion } from "framer-motion";
 import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2, LogOut, Shield, Settings, Crown, Sparkles } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -44,7 +45,7 @@ const MOTIVATION_PRESETS = [
 /** Perfil profissional do personal: apresentação, alunos e estatísticas. */
 export default function PersonalPerfilPage() {
   const { profile, user } = useAuth();
-  const students = useMemo(() => [] as PersonalStudent[], []);
+  const [students, setStudents] = useState<PersonalStudent[]>([]);
   const [tab, setTab] = useState<TabId>("alunos");
   const [demoAvatar, setDemoAvatar] = useState<string | null>(null);
   const [bio, setBio] = useState(
@@ -67,6 +68,16 @@ export default function PersonalPerfilPage() {
     window.addEventListener("gymfit-trainer-workouts", bump);
     return () => window.removeEventListener("gymfit-trainer-workouts", bump);
   }, []);
+
+  // Alunos REAIS da academia (getGymStudents cobre demo internamente)
+  useEffect(() => {
+    if (!profile?.gym_id) return;
+    let alive = true;
+    getGymStudents(profile.gym_id)
+      .then((rows) => { if (alive) setStudents(rows); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [profile?.gym_id]);
 
   const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
 
