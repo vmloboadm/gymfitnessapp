@@ -77,3 +77,29 @@ export function useGymMotivationRealtime(
 
   useRealtime(`motivation-${gymId}`, { table: "gym_motivation", gymId }, handlerRef);
 }
+
+/**
+ * Realtime para checkins: entrada/saída de alunos atualiza o dashboard
+ * (presentes agora, ocupação por hora) ao vivo.
+ */
+export function useCheckinsRealtime(gymId: string | undefined, onRefetch: () => void) {
+  const handlerRef = useCallback(() => {
+    if (!gymId) return;
+    onRefetch();
+  }, [gymId, onRefetch]);
+
+  useRealtime(`checkins-${gymId}`, { table: "checkins", gymId }, handlerRef);
+}
+
+/**
+ * Realtime para equipment_sessions: aluno abre/fecha sessão em aparelho
+ * → dashboard e lista "em uso agora" atualizam sem refresh.
+ */
+export function useEquipmentSessionsRealtime(gymId: string | undefined, onRefetch: () => void) {
+  const handlerRef = useCallback(() => {
+    if (!gymId) return;
+    onRefetch();
+  }, [gymId, onRefetch]);
+
+  useRealtime(`equipment-sessions-${gymId}`, { table: "equipment_sessions", gymId }, handlerRef);
+}
