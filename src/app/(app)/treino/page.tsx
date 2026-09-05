@@ -33,6 +33,7 @@ import { fetchMyAssignedPlans } from "~/lib/gym-api";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
 import { assetPath } from "~/lib/asset-path";
+import { findInDatabase } from "~/lib/exercises-database";
 import { toast } from "sonner";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
@@ -291,17 +292,19 @@ export default function TreinoHomePage() {
   /** Sessão construída a partir do TREINO DE HOJE real (não mais lista fixa). */
   const sessionFromDetails = ((data?.details ?? []).map((d) => {
     const ex = d.exercise as ({ photo_url?: string | null; image_url?: string | null; video_url?: string | null } | null) | undefined;
-    const img = ex?.photo_url ?? ex?.image_url ?? null;
+    const exName = d.exercise?.name ?? "Exercício";
+    const curated = findInDatabase(exName);
+    const img = ex?.photo_url ?? ex?.image_url ?? curated?.thumbUrl ?? null;
     return {
       id: d.exercise_id ?? d.id,
-      name: d.exercise?.name ?? "Exercício",
+      name: exName,
       sets: d.sets,
       reps: String(d.reps),
       rest: d.rest_seconds ?? 60,
       info: d.exercise?.tips?.[0] ?? null,
       tips: d.exercise?.tips ?? null,
       imageUrl: img,
-      videoUrl: ex?.video_url ?? null,
+      videoUrl: ex?.video_url ?? curated?.youtubeUrl ?? null,
       thumbUrl: img,
       videoUrlMale: null,
       videoUrlFemale: null,
@@ -465,20 +468,24 @@ export default function TreinoHomePage() {
   const startPlanSession = () => {
     if (!plan?.plan?.dias || plan.plan.dias.length === 0 || todayIdx < 0) return;
     const day = plan.plan.dias[todayIdx % plan.plan.dias.length];
-    const exList = day.exercicios.map((e, i) => ({
-      id: `plan-${i}`,
-      name: e.exercicio,
-      sets: e.series,
-      reps: e.reps,
-      rest: parseInt(e.descanso) || 60,
-      info: e.dica || null,
-      tips: null,
-      imageUrl: null,
-      videoUrl: null,
-      thumbUrl: null,
-      videoUrlMale: null,
-      videoUrlFemale: null,
-    })) as typeof DEFAULT_DEMO_EX;
+    // Fotos/vídeos do banco curado (mesma fonte do catálogo) por nome
+    const exList = day.exercicios.map((e, i) => {
+      const hit = findInDatabase(e.exercicio);
+      return {
+        id: `plan-${i}`,
+        name: e.exercicio,
+        sets: e.series,
+        reps: e.reps,
+        rest: parseInt(e.descanso) || 60,
+        info: e.dica || null,
+        tips: null,
+        imageUrl: hit?.thumbUrl ?? null,
+        videoUrl: hit?.youtubeUrl ?? null,
+        thumbUrl: hit?.thumbUrl ?? null,
+        videoUrlMale: null,
+        videoUrlFemale: null,
+      };
+    }) as typeof DEFAULT_DEMO_EX;
     // Resolve ids REAIS p/ gravar workout_logs ao concluir:
     // workout_id = student_workouts.id; exercise_id casando nome na biblioteca.
     if (!demo && user && profile?.gym_id && plan.id) {
