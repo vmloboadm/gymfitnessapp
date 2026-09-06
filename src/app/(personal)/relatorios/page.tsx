@@ -55,8 +55,9 @@ export default function RelatoriosPage() {
       const wRes = await supabase
         .from("workout_logs")
         .select("weight_kg, reps")
+        .eq("gym_id", profile.gym_id)
         .gte("date", since)
-        .limit(300);
+        .limit(1000);
       if (wRes.error) return { data: null, error: wRes.error };
 
       const checkins = (cRes.data ?? []) as Checkins[];

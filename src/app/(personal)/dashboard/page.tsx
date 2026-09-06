@@ -175,9 +175,9 @@ export default function DashboardPage() {
     start7.setDate(start7.getDate() - 6);
     start7.setHours(0, 0, 0, 0);
 
-    const [sRes, eRes, sessRes, ckRes, wsRes, logsRes, pendRes] = await Promise.all([
-      sb.from("profiles").select("id").eq("gym_id", gym).eq("role", "student"),
-      sb.from("equipment").select("id").eq("gym_id", gym),
+    const [sRes, eRes, sessRes, ckRes, wsRes, pendRes] = await Promise.all([
+      sb.from("profiles").select("id", { count: "exact", head: true }).eq("gym_id", gym).eq("role", "student"),
+      sb.from("equipment").select("id", { count: "exact", head: true }).eq("gym_id", gym),
       sb
         .from("equipment_sessions")
         .select("id, started_at, student_id, equipment:equipment_id ( name ), student:student_id ( name )")
@@ -197,7 +197,6 @@ export default function DashboardPage() {
         .gte("started_at", startToday.toISOString())
         .order("started_at", { ascending: false })
         .limit(30),
-      sb.from("workout_logs").select("id").eq("gym_id", gym).gte("date", startToday.toISOString()),
       sb
         .from("premium_requests")
         .select("id, details, created_at, student:student_id ( name )")
@@ -206,7 +205,7 @@ export default function DashboardPage() {
         .order("created_at", { ascending: false })
         .limit(3) as unknown as Promise<{ data: PendingRequest[] | null; error: { message: string } | null }>,
     ]);
-    if (sRes.error || eRes.error || sessRes.error || ckRes.error || wsRes.error || logsRes.error || pendRes.error) {
+    if (sRes.error || eRes.error || sessRes.error || ckRes.error || wsRes.error || pendRes.error) {
       return { data: null, error: { message: "Erro ao carregar dados do dashboard" } };
     }
 
@@ -281,8 +280,8 @@ export default function DashboardPage() {
 
     return {
       data: {
-        students: sRes.data?.length ?? 0,
-        equipment: eRes.data?.length ?? 0,
+        students: sRes.count ?? 0,
+        equipment: eRes.count ?? 0,
         checkinsHoje: entradasHoje.length,
         workoutsHoje: wSessions.length,
         sessions: activeSessions,
