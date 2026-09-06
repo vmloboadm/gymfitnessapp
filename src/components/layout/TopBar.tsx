@@ -32,7 +32,7 @@ export function TopBar({
               {title}
             </h1>
             {subtitle ? (
-              <p className="break-words text-[11px] leading-snug text-muted-foreground">{subtitle}</p>
+              <p className="break-words text-[11px] leading-snug text-muted-foreground" suppressHydrationWarning>{subtitle}</p>
             ) : null}
           </div>
         </div>
