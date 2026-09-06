@@ -207,6 +207,15 @@ function OnboardingFlow() {
       </div>
 
       {StepComponent ? <StepComponent profile={profile} onSave={saveAndGo} onFinish={finish} /> : null}
+
+      {step < 5 ? (
+        <button
+          onClick={() => saveAndGo({}, step + 1)}
+          className="w-full py-2 text-center text-[12px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Pular esta etapa →
+        </button>
+      ) : null}
     </div>
   );
 }
