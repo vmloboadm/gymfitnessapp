@@ -10,3 +10,6 @@ ALTER PUBLICATION supabase_realtime ADD TABLE squad_messages;
 
 -- Segurança: workout_sessions não deve ser editável por anônimos
 REVOKE DELETE, INSERT, UPDATE ON workout_sessions FROM anon;
+
+-- grant SELECT em gym_motivation (tabela sem grants DML p/ anon/authenticated)
+grant select on gym_motivation to anon, authenticated;
