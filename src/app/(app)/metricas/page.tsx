@@ -62,20 +62,22 @@ export default function MetricasPage() {
       const supabase = supabaseBrowser();
       if (!user || !profile) return { data: null, error: { message: "Sessão indisponível" } };
 
-      const metricsRes = await supabase
-        .from("body_metrics")
-        .select("*")
-        .eq("student_id", user.id)
-        .order("recorded_at", { ascending: false })
-        .limit(10);
+      const [metricsRes, prevRes] = await Promise.all([
+        supabase
+          .from("body_metrics")
+          .select("*")
+          .eq("student_id", user.id)
+          .order("recorded_at", { ascending: false })
+          .limit(10),
+        supabase
+          .from("body_metrics")
+          .select("*")
+          .eq("student_id", user.id)
+          .order("recorded_at", { ascending: false })
+          .range(10, 12),
+      ]);
       if (metricsRes.error) return { data: null, error: metricsRes.error };
-
-      const prevRes = await supabase
-        .from("body_metrics")
-        .select("*")
-        .eq("student_id", user.id)
-        .order("recorded_at", { ascending: false })
-        .range(10, 12);
+      if (prevRes.error) return { data: null, error: prevRes.error };
 
       const metrics = (metricsRes.data ?? []) as BodyMetrics[];
       return {

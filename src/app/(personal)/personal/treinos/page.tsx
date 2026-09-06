@@ -259,25 +259,30 @@ function PersonalTreinosContent() {
 
   const applyMass = async () => {
     if (!massTemplate || massSelected.size === 0 || !profile || !user) return;
-    for (const sid of massSelected) {
-      const student = students.find((s) => s.id === sid);
-      if (!student) continue;
-      const p = templateToPlan(massTemplate);
-      try {
-        await approvePlan({
+    const targets = [...massSelected]
+      .map((sid) => students.find((s) => s.id === sid))
+      .filter((s): s is PersonalStudent => !!s);
+    const results = await Promise.allSettled(
+      targets.map((student) =>
+        approvePlan({
           gymId: profile.gym_id,
           trainerId: user.id,
           student,
-          plan: p,
+          plan: templateToPlan(massTemplate),
           notes: null,
-        });
-      } catch {
-        toast.error(`Falha ao enviar para ${student.name.split(" ")[0]}`);
-      }
+        })
+      )
+    );
+    const okCount = results.filter((r) => r.status === "fulfilled").length;
+    const failNames = targets.filter((_, i) => results[i].status === "rejected").map((s) => s.name.split(" ")[0]);
+    if (failNames.length > 0) {
+      toast.error(`Falha ao enviar para ${failNames.join(", ")}`);
     }
-    toast.success("Plano enviado com sucesso!", {
-      description: `Template aplicado para ${massSelected.size} alunos.`,
-    });
+    if (okCount > 0) {
+      toast.success("Plano enviado com sucesso!", {
+        description: `Template aplicado para ${okCount} aluno${okCount === 1 ? "" : "s"}.`,
+      });
+    }
     setMassTemplate(null);
     setMassSelected(new Set());
     refresh();

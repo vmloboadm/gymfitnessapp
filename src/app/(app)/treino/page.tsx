@@ -165,11 +165,15 @@ export default function TreinoHomePage() {
       }
 
       const programId = (workouts as StudentWorkouts).program_id;
-      const programRes = await supabase.from("workout_programs").select("*").eq("id", programId).maybeSingle();
-      const daysRes = await supabase.from("workout_days").select("*").eq("program_id", programId).order("day_order", { ascending: true });
-      const logsRes = await supabase.from("workout_logs").select("date, weight_kg, reps").eq("student_id", user.id).gte("date", new Date(Date.now() - 13 * 86400000).toISOString().slice(0, 10));
+      const [programRes, daysRes, logsRes] = await Promise.all([
+        supabase.from("workout_programs").select("id, name, objective").eq("id", programId).maybeSingle(),
+        supabase.from("workout_days").select("id, name, day_order").eq("program_id", programId).order("day_order", { ascending: true }),
+        supabase.from("workout_logs").select("date, weight_kg, reps").eq("student_id", user.id).gte("date", new Date(Date.now() - 13 * 86400000).toISOString().slice(0, 10)),
+      ]);
 
-      if (daysRes.error || logsRes.error) return errorResult(daysRes.error?.message ?? logsRes.error?.message ?? "Erro");
+      if (programRes.error || daysRes.error || logsRes.error) {
+        return errorResult(programRes.error?.message ?? daysRes.error?.message ?? logsRes.error?.message ?? "Erro");
+      }
 
       const days = (daysRes.data ?? []) as WorkoutDays[];
       let details: TreinoDay[] = [];
@@ -504,31 +508,36 @@ export default function TreinoHomePage() {
     }) as typeof DEFAULT_DEMO_EX;
     // Resolve ids REAIS p/ gravar workout_logs ao concluir:
     // workout_id = student_workouts.id; exercise_id casando nome na biblioteca.
+    // Batch: 1 query com OR em vez de N queries sequenciais.
     if (!demo && user && profile?.gym_id && plan.id) {
       void (async () => {
-        const supabase = supabaseBrowser();
-        const map: Record<string, { workoutId: string; exerciseId: string; reps: string; rpe: number | null }> = {};
-        for (let i = 0; i < day.exercicios.length; i++) {
-          const e = day.exercicios[i];
-          try {
-            const { data: ex } = await supabase
-              .from("exercises")
-              .select("id")
-              .ilike("name", `%${e.exercicio}%`)
-              .limit(1)
-              .maybeSingle();
-            const exerciseId = (ex as { id: string } | null)?.id;
-            if (exerciseId) {
+        try {
+          const supabase = supabaseBrowser();
+          const names = day.exercicios.map((e) => e.exercicio);
+          const orFilter = names.map((n) => `name.ilike.%${n.replace(/[%_,]/g, "")}%`).join(",");
+          const { data: found } = await supabase
+            .from("exercises")
+            .select("id, name")
+            .or(orFilter)
+            .limit(names.length * 2);
+          const rows = (found ?? []) as { id: string; name: string }[];
+          const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "");
+          const map: Record<string, { workoutId: string; exerciseId: string; reps: string; rpe: number | null }> = {};
+          day.exercicios.forEach((e, i) => {
+            const hit = rows.find((r) => norm(r.name).includes(norm(e.exercicio).split(" ").slice(0, 2).join(" ")) || norm(e.exercicio).includes(norm(r.name)));
+            if (hit) {
               map[`plan-${i}`] = {
                 workoutId: plan.id,
-                exerciseId,
+                exerciseId: hit.id,
                 reps: e.reps,
                 rpe: e.rpe ?? null,
               };
             }
-          } catch { /* sem log para este exercício */ }
+          });
+          setPlanExerciseMap(map);
+        } catch {
+          /* sem mapa: conclude pula os logs, treino segue */
         }
-        setPlanExerciseMap(map);
       })();
     }
     setSession(exList);

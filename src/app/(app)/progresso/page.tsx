@@ -54,25 +54,25 @@ export default function ProgressoPage() {
       const today = new Date();
       const since = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 13).toISOString().slice(0, 10);
 
-      const last14Res = await supabase
-        .from("workout_logs")
-        .select("date, weight_kg, reps")
-        .eq("student_id", user.id)
-        .gte("date", since);
+      const [last14Res, prev14Res, checkinsRes] = await Promise.all([
+        supabase
+          .from("workout_logs")
+          .select("date, weight_kg, reps")
+          .eq("student_id", user.id)
+          .gte("date", since),
+        supabase
+          .from("workout_logs")
+          .select("date, weight_kg, reps")
+          .eq("student_id", user.id)
+          .lt("date", since),
+        supabase
+          .from("checkins")
+          .select("checked_at")
+          .eq("student_id", user.id)
+          .gte("checked_at", since),
+      ]);
       if (last14Res.error) return { data: null, error: last14Res.error };
-
-      const prev14Res = await supabase
-        .from("workout_logs")
-        .select("date, weight_kg, reps")
-        .eq("student_id", user.id)
-        .lt("date", since);
       if (prev14Res.error) return { data: null, error: prev14Res.error };
-
-      const checkinsRes = await supabase
-        .from("checkins")
-        .select("checked_at")
-        .eq("student_id", user.id)
-        .gte("checked_at", since);
       if (checkinsRes.error) return { data: null, error: checkinsRes.error };
 
       return {

@@ -27,6 +27,8 @@ export function useRealtime(
   handlerRef.current = onEvent;
 
   useEffect(() => {
+    // Sem gymId não assina: evita canais `*-undefined` sem filtro (vazamento cross-gym)
+    if (!config.gymId) return;
     const supabase = supabaseBrowser();
     const filter = config.gymId
       ? `${config.filterCol ?? "gym_id"}=eq.${config.gymId}`

@@ -30,10 +30,11 @@ export default function ConquistasPage() {
       const supabase = supabaseBrowser();
       if (!user || !profile) return { data: null, error: { message: "Sessão indisponível" } };
 
-      const achRes = await supabase.from("achievements").select("*").or(`gym_id.is.null,gym_id.eq.${profile.gym_id}`);
+      const [achRes, mineRes] = await Promise.all([
+        supabase.from("achievements").select("*").or(`gym_id.is.null,gym_id.eq.${profile.gym_id}`),
+        supabase.from("student_achievements").select("achievement_id, earned_at").eq("student_id", user.id),
+      ]);
       if (achRes.error) return { data: null, error: achRes.error };
-
-      const mineRes = await supabase.from("student_achievements").select("achievement_id, earned_at").eq("student_id", user.id);
       if (mineRes.error) return { data: null, error: mineRes.error };
 
       const achievements = (achRes.data ?? []) as any[];

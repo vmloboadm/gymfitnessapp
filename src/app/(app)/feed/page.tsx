@@ -118,19 +118,22 @@ export default function FeedPage() {
       let likes: FeedLikes[] = [];
       let comments: FeedComments[] = [];
 
-      if (authorIds.length) {
-        const aRes = await supabase.from("profiles").select("id, name, avatar_url, role").in("id", authorIds);
-        if (aRes.error) return { data: null, error: aRes.error };
-        authors = (aRes.data ?? []) as Profiles[];
-      }
-      if (postIds.length) {
-        const lRes = await supabase.from("feed_likes").select("*").in("post_id", postIds);
-        if (lRes.error) return { data: null, error: lRes.error };
-        likes = (lRes.data ?? []) as FeedLikes[];
-
-        const cRes = await supabase.from("feed_comments").select("*").in("post_id", postIds).order("created_at", { ascending: true });
-        if (!cRes.error) comments = (cRes.data ?? []) as FeedComments[];
-      }
+      const [aRes, lRes, cRes] = await Promise.all([
+        authorIds.length
+          ? supabase.from("profiles").select("id, name, avatar_url, role").in("id", authorIds)
+          : Promise.resolve({ data: [], error: null }),
+        postIds.length
+          ? supabase.from("feed_likes").select("id, post_id, user_id").in("post_id", postIds).limit(500)
+          : Promise.resolve({ data: [], error: null }),
+        postIds.length
+          ? supabase.from("feed_comments").select("id, post_id, user_id, body, created_at").in("post_id", postIds).order("created_at", { ascending: true }).limit(500)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (aRes.error) return { data: null, error: aRes.error };
+      if (lRes.error) return { data: null, error: lRes.error };
+      authors = (aRes.data ?? []) as Profiles[];
+      likes = (lRes.data ?? []) as FeedLikes[];
+      if (!cRes.error) comments = (cRes.data ?? []) as FeedComments[];
 
       const commenterIds = [...new Set(comments.map((c) => c.user_id))];
       if (commenterIds.length > authors.filter((a) => commenterIds.includes(a.id)).length) {
