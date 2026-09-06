@@ -66,6 +66,10 @@ function OnboardingFlow() {
         goal: saved.goal ?? null,
         daily_intake: saved.daily_intake ?? null,
         medical_risk: saved.medical_risk ?? null,
+        sex: saved.sex ?? null,
+        experience_level: saved.experience_level ?? null,
+        available_days: saved.available_days ?? null,
+        emergency_contact: saved.emergency_contact ?? null,
       } as unknown as Profiles;
       setProfile(p);
       setMaxReached(Math.max(requested, saved.onboarding_step ?? requested));
@@ -128,8 +132,11 @@ function OnboardingFlow() {
 
     const p = data as Profiles | null;
     setProfile(p);
-    setMaxReached(p?.onboarding_step ?? requested);
-    setStep(Math.min(requested, p?.onboarding_step ?? requested) || requested);
+    const savedStep = p?.onboarding_step ?? 1;
+    setMaxReached(Math.max(requested, savedStep));
+    // Clamp: novos users só podem avançar 1 step por vez (sem bypass via ?step=5)
+    const clamped = savedStep <= 1 ? 1 : Math.min(requested, savedStep + 1);
+    setStep(clamped);
     setLoading(false);
   }, [requested, router, isDemo]);
 

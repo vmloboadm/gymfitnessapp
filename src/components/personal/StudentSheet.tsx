@@ -28,6 +28,7 @@ const TONE = {
 
 const TABS = [
   { id: "resumo", label: "Resumo" },
+  { id: "anamnese", label: "Anamnese" },
   { id: "treinos", label: "Treinos" },
   { id: "metricas", label: "Métricas" },
 ] as const;
@@ -36,6 +37,16 @@ type TabId = (typeof TABS)[number]["id"];
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+
+function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null;
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 flex items-center justify-between">
+      <span className="text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="text-[12px] font-medium text-foreground">{value}</span>
+    </div>
+  );
+}
 
 /** Bottom sheet detalhado do aluno com abas, reusado pelo Cockpit e pela lista. */
 export function StudentSheet({
@@ -151,6 +162,42 @@ export function StudentSheet({
                   <p className="mt-0.5 text-[10px] text-[#FFC24D]">Último RPE: {student.lastRpe}</p>
                 ) : null}
               </div>
+            </div>
+          ) : null}
+
+          {tab === "anamnese" ? (
+            <div className="space-y-2">
+              {student.medical_risk ? (
+                <div className="rounded-xl border border-[#F87171]/40 bg-[#F87171]/10 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#F87171]">⚠ Risco clínico ativo</p>
+                  <p className="mt-1 text-[11px] text-[#F87171]/80">Laudo médico pendente de aprovação pelo gestor.</p>
+                </div>
+              ) : null}
+              <InfoRow label="Objetivo" value={student.goal} />
+              <InfoRow label="Nível" value={student.experience_level} />
+              <InfoRow label="Sexo" value={student.sex === "M" ? "Masculino" : student.sex === "F" ? "Feminino" : student.sex} />
+              <InfoRow label="Frequência" value={student.daily_intake ? `${student.daily_intake}× semana` : null} />
+              {student.available_days?.length ? (
+                <InfoRow label="Dias disponíveis" value={student.available_days.join(", ")} />
+              ) : null}
+              {student.medications ? (
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
+                  <p className="text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">Medicamentos</p>
+                  <p className="mt-1 text-[12px] text-foreground">{student.medications}</p>
+                </div>
+              ) : null}
+              {student.surgery_history ? (
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
+                  <p className="text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">Cirurgias</p>
+                  <p className="mt-1 text-[12px] text-foreground">{student.surgery_history}</p>
+                </div>
+              ) : null}
+              {student.emergency_contact ? (
+                <InfoRow label="Emergência" value={`${student.emergency_contact.name} · ${student.emergency_contact.phone}`} />
+              ) : null}
+              {!student.goal && !student.experience_level && !student.medical_risk && !student.medications && !student.surgery_history ? (
+                <p className="text-center text-[11px] text-muted-foreground py-4">Aluno ainda não completou o onboarding.</p>
+              ) : null}
             </div>
           ) : null}
 

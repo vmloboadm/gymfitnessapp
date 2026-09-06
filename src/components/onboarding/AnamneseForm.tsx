@@ -12,7 +12,7 @@ import type { Profiles } from "~/lib/types/models";
 interface RiskFlag {
   id: string;
   label: string;
-  highImpact: boolean; // se true e marcado → medical_risk = true
+  highImpact: boolean;
 }
 
 const RISK_FLAGS: RiskFlag[] = [
@@ -27,8 +27,8 @@ const RISK_FLAGS: RiskFlag[] = [
 
 /**
  * STEP 2, Anamnese completíssima (blueprint §3.1/§6.3d).
- * Se marcar condição grave → medical_risk = true → TRAVA CLÍNICA ativa
- * (status = pending_clearance) no step 4.
+ * Inicializa do profile (persiste ao revisitar) e nunca zera medical_risk
+ * sem intenção explícita do usuário.
  */
 export function AnamneseForm({
   profile,
@@ -37,9 +37,9 @@ export function AnamneseForm({
   profile: Profiles;
   onSave: (patch: Partial<Profiles>, nextStep: number) => Promise<void>;
 }) {
-  const [selected, setSelected] = useState<string[]>([]);
-  const [medications, setMedications] = useState("");
-  const [surgery, setSurgery] = useState("");
+  const [selected, setSelected] = useState<string[]>(profile.medical_flags ?? []);
+  const [medications, setMedications] = useState(profile.medications ?? "");
+  const [surgery, setSurgery] = useState(profile.surgery_history ?? "");
   const [saving, setSaving] = useState(false);
 
   const toggle = (id: string) =>
@@ -59,6 +59,7 @@ export function AnamneseForm({
         medical_risk: medicalRisk,
         medications: medications.trim() || null,
         surgery_history: surgery.trim() || null,
+        medical_flags: selected.length > 0 ? selected : null,
       },
       3
     );

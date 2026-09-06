@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Scale, Loader2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -12,8 +12,7 @@ import type { Profiles } from "~/lib/types/models";
 
 /**
  * STEP 3, Métricas corporais iniciais (blueprint §3.1).
- * Calcula IMC ao vivo e salva em body_metrics + profile.daily_intake
- * com frequência meta.
+ * Pré-preenche da última medição salva; deduplica por dia (uma medição por dia).
  */
 export function IntentInput({
   profile,
@@ -27,9 +26,30 @@ export function IntentInput({
   const [waist, setWaist] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Pré-preencher da última medição
+  useEffect(() => {
+    if (!profile.id || profile.id === "demo-onboarding") return;
+    const sb = supabaseBrowser();
+    sb.from("body_metrics")
+      .select("weight_kg, height_m, waist_cm")
+      .eq("student_id", profile.id)
+      .order("recorded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          if (data.weight_kg) setWeight(String(data.weight_kg).replace(".", ","));
+          if (data.height_m) {
+            const cm = Math.round(data.height_m * 100);
+            setHeight(cm > 10 ? String(cm) : String(data.height_m).replace(".", ","));
+          }
+          if (data.waist_cm) setWaist(String(data.waist_cm).replace(".", ","));
+        }
+      });
+  }, [profile.id]);
+
   const w = parseFloat(weight.replace(",", "."));
   const hRaw = parseFloat(height.replace(",", "."));
-  // Aceita 181 (cm) ou 1,81 (m): converte sozinho
   const h = hRaw > 10 ? hRaw / 100 : hRaw;
   const bmi = w > 0 && h > 0.5 && h < 2.8 ? calcBmi(w, h) : null;
   const valid = w > 20 && w < 400 && h > 0.5 && h < 2.8;
@@ -40,20 +60,50 @@ export function IntentInput({
     setSaving(true);
 
     const supabase = supabaseBrowser();
-    const { error } = await supabase.from("body_metrics").insert({
-      gym_id: profile.gym_id,
-      student_id: profile.id,
-      weight_kg: w,
-      height_m: h,
-      waist_cm: waist ? parseFloat(waist.replace(",", ".")) : null,
-      bmi: bmi ? Math.round(bmi * 10) / 10 : null,
-      source: "manual",
-    } as never);
+    const today = new Date().toISOString().slice(0, 10);
 
-    if (error) {
-      toast.error("Falha ao salvar medidas", { description: error.message });
-      setSaving(false);
-      return;
+    // Deduplicar: checar se já existe medição hoje
+    const { data: existing } = await supabase
+      .from("body_metrics")
+      .select("id")
+      .eq("student_id", profile.id)
+      .gte("recorded_at", today)
+      .lt("recorded_at", today + "T23:59:59")
+      .maybeSingle();
+
+    if (existing) {
+      // Atualiza a medição de hoje em vez de criar duplicata
+      const { error } = await supabase
+        .from("body_metrics")
+        .update({
+          weight_kg: w,
+          height_m: h,
+          waist_cm: waist ? parseFloat(waist.replace(",", ".")) : null,
+          bmi: bmi ? Math.round(bmi * 10) / 10 : null,
+        } as never)
+        .eq("id", existing.id);
+
+      if (error) {
+        toast.error("Falha ao atualizar medidas", { description: error.message });
+        setSaving(false);
+        return;
+      }
+    } else {
+      const { error } = await supabase.from("body_metrics").insert({
+        gym_id: profile.gym_id,
+        student_id: profile.id,
+        weight_kg: w,
+        height_m: h,
+        waist_cm: waist ? parseFloat(waist.replace(",", ".")) : null,
+        bmi: bmi ? Math.round(bmi * 10) / 10 : null,
+        source: "manual",
+      } as never);
+
+      if (error) {
+        toast.error("Falha ao salvar medidas", { description: error.message });
+        setSaving(false);
+        return;
+      }
     }
 
     await onSave({}, 4);

@@ -8,17 +8,45 @@ import { saveOnboarding } from "~/lib/profile-store";
 import { cn } from "~/lib/utils";
 import type { Profiles } from "~/lib/types/models";
 
-const SUMMARY: Array<{ label: string; get: (p: Profiles) => string }> = [
+function calcAge(birth: string | null): string | null {
+  if (!birth) return null;
+  const d = new Date(birth);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return `${age} anos`;
+}
+
+const SUMMARY: Array<{ label: string; get: (p: Profiles) => string | null }> = [
   { label: "Nome", get: (p) => p.name },
   { label: "Data de nascimento", get: (p) => p.birth_date ?? "-" },
+  { label: "Idade", get: (p) => calcAge(p.birth_date) ?? "-" },
+  {
+    label: "Sexo",
+    get: (p) => (p.sex === "M" ? "Masculino" : p.sex === "F" ? "Feminino" : null),
+  },
   { label: "Objetivo", get: (p) => p.goal ?? "-" },
   {
     label: "Frequência semanal",
-    get: (p) => (p.daily_intake ? `${p.daily_intake}×` : "-"),
+    get: (p) => (p.daily_intake ? `${p.daily_intake}×` : null),
+  },
+  {
+    label: "Nível",
+    get: (p) => p.experience_level ?? null,
+  },
+  {
+    label: "Dias disponíveis",
+    get: (p) => (p.available_days?.length ? p.available_days.join(", ") : null),
   },
   {
     label: "Restrição clínica",
     get: (p) => (p.medical_risk ? "Sim, laudo requisitado" : "Nenhuma"),
+  },
+  {
+    label: "Contato de emergência",
+    get: (p) => (p.emergency_contact ? `${p.emergency_contact.name} · ${p.emergency_contact.phone}` : null),
   },
 ];
 
@@ -40,7 +68,6 @@ export function OnboardingReview({
   const finish = async () => {
     if (!consent) return;
     setSaving(true);
-    // Persiste o consentimento LGPD no banco (antes só ia pro localStorage)
     saveOnboarding({ whatsapp_consent: true });
     await onSave({ whatsapp_consent: true }, 5);
     await onFinish();
@@ -56,14 +83,18 @@ export function OnboardingReview({
       </div>
 
       <dl className="divide-y divide-border rounded-lg border border-border">
-        {SUMMARY.map(({ label, get }) => (
-          <div key={label} className="flex items-center justify-between gap-3 px-4 py-2.5">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="text-right text-sm font-medium text-foreground">
-              {get(profile)}
-            </dd>
-          </div>
-        ))}
+        {SUMMARY.map(({ label, get }) => {
+          const value = get(profile);
+          if (!value) return null;
+          return (
+            <div key={label} className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <dt className="text-xs text-muted-foreground">{label}</dt>
+              <dd className="text-right text-sm font-medium text-foreground">
+                {value}
+              </dd>
+            </div>
+          );
+        })}
       </dl>
 
       <p className="rounded-lg border border-success/30 bg-success/10 p-3 text-xs text-success">
@@ -72,7 +103,6 @@ export function OnboardingReview({
         já fica disponível.
       </p>
 
-      {/* Consentimento obrigatório de contato (LGPD) */}
       <label
         htmlFor="consent-whatsapp"
         className={cn(

@@ -12,12 +12,14 @@ import {
   ClipboardList,
   UserRound,
   BarChart3,
+  ShieldCheck,
 } from "lucide-react";
 import { OcupacaoBarChart } from "~/components/charts";
 import { toast } from "sonner";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { usePendingClearances } from "~/hooks/usePendingClearances";
 import {
   useCheckinsRealtime,
   useEquipmentSessionsRealtime,
@@ -302,6 +304,8 @@ export default function DashboardPage() {
   useWorkoutSessionsRealtime(profile?.gym_id, refetch);
   usePremiumRequestsRealtime(profile?.gym_id, refetch);
   useProfilesRealtime(profile?.gym_id, refetch);
+
+  const { clearances, approve: approveClearance } = usePendingClearances(profile?.gym_id);
 
   const primeiroNome = (profile?.name ?? "Gestor").split(" ")[0];
   const pico = data?.ocupacao.reduce((a, b) => (b.alunos > a.alunos ? b : a), data?.ocupacao[0] ?? { hora: "", alunos: 0 });
@@ -593,6 +597,56 @@ export default function DashboardPage() {
             Abrir aprovações <ChevronRight className="h-3 w-3" />
           </p>
         </Link>
+      ) : null}
+
+      {/* Laudos médicos pendentes */}
+      {!demo && clearances.length > 0 ? (
+        <div className="rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.06] p-4">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#F87171]">
+              <ShieldCheck className="h-3.5 w-3.5" /> Laudos médicos pendentes
+            </p>
+            <Badge variant="outline" className="border-[#F87171]/40 text-[10px] text-[#F87171]">{clearances.length} aguardando</Badge>
+          </div>
+          <div className="mt-2 space-y-1.5">
+            {clearances.map((c) => (
+              <div key={c.id} className="flex items-center justify-between rounded-xl bg-card/70 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11.5px] font-bold text-foreground">{c.student_name}</p>
+                  <p className="truncate text-[10.5px] text-muted-foreground">
+                    {c.medications ? `Med: ${c.medications}` : ""}
+                    {c.medications && c.surgery_history ? " · " : ""}
+                    {c.surgery_history ? `Cirurgia: ${c.surgery_history}` : "Laudo enviado"}
+                  </p>
+                </div>
+                <div className="flex gap-1.5 shrink-0 ml-2">
+                  <a
+                    href={c.document_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="tactile rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Ver laudo
+                  </a>
+                  <button
+                    onClick={async () => {
+                      if (!profile) return;
+                      try {
+                        await approveClearance(c.id, profile.id);
+                        toast.success(`${c.student_name} liberado(a) para treino!`);
+                      } catch (e) {
+                        toast.error(e instanceof Error ? e.message : "Erro ao aprovar");
+                      }
+                    }}
+                    className="tactile rounded-lg bg-[#4ADE80]/15 px-2.5 py-1 text-[10px] font-bold text-[#4ADE80] transition-colors hover:bg-[#4ADE80]/25"
+                  >
+                    Aprovar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : null}
 
       {/* Ações rápidas */}

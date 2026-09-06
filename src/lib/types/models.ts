@@ -53,6 +53,16 @@ export type Profiles = {
   medications?: string | null;
   /** Cirurgias/internações recentes (anamnese step 2) */
   surgery_history?: string | null;
+  /** Flags de risco selecionadas na anamnese (para pré-preencher ao revisitar) */
+  medical_flags?: string[] | null;
+  /** Sexo biológico (M/F) — usado para vídeo de execução correto */
+  sex?: string | null;
+  /** Nível de experiência (iniciante/intermediário/avançado) */
+  experience_level?: string | null;
+  /** Dias da semana disponíveis para treino */
+  available_days?: string[] | null;
+  /** Contato de emergência { name, phone } */
+  emergency_contact?: { name: string; phone: string } | null;
 };
 
 export type StudentSubscriptions = {

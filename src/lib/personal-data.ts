@@ -41,6 +41,17 @@ export type PersonalStudent = {
   freq: number;
   /** Último RPE registrado, quando houver */
   lastRpe?: number;
+  /** Dados de anamnese do onboarding (visíveis ao personal) */
+  goal?: string | null;
+  medical_risk?: boolean | null;
+  medications?: string | null;
+  surgery_history?: string | null;
+  sex?: string | null;
+  experience_level?: string | null;
+  available_days?: string[] | null;
+  emergency_contact?: { name: string; phone: string } | null;
+  birth_date?: string | null;
+  daily_intake?: string | null;
 };
 
 export type WorkoutTemplate = {

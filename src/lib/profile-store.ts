@@ -107,6 +107,10 @@ export type OnboardingState = {
   onboarding_completed?: boolean;
   /** Consentimento para contato via WhatsApp (checkbox obrigatório no passo 5) */
   whatsapp_consent?: boolean;
+  sex?: string | null;
+  experience_level?: string | null;
+  available_days?: string[] | null;
+  emergency_contact?: { name: string; phone: string } | null;
 };
 
 export function readOnboarding(): OnboardingState {
