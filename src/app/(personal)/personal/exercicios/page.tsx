@@ -15,6 +15,7 @@ import { Badge } from "~/components/ui/badge";
 import { AnimatePresence, motion } from "framer-motion";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import { isDemoMode, demoLib } from "~/lib/demo-bridge";
+import { assetPath } from "~/lib/asset-path";
 import { curatedSearch } from "~/lib/exercises-database";
 import { readLibraryEdits, saveLibraryEdit } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
@@ -159,7 +160,7 @@ export default function PersonalExerciciosPage() {
                 {e.imageUrl ? (
                   <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/[0.06] bg-white">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={e.imageUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain" />
+                    <img src={assetPath(e.imageUrl ?? "")} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain" />
                   </span>
                 ) : (
                   <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-muted">
@@ -230,7 +231,7 @@ export default function PersonalExerciciosPage() {
                   {detail.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={detail.imageUrl}
+                      src={assetPath(detail.imageUrl ?? "")}
                       alt={`Ilustração de ${detail.name}`}
                       className="h-full w-full object-contain"
                     />

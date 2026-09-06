@@ -407,7 +407,7 @@ function InfoSheet({ ex, onClose }: { ex: DemoExercise; onClose: () => void }) {
             className="gf-touch relative mt-4 block h-48 w-full cursor-zoom-in overflow-hidden rounded-2xl border border-white/[0.06] bg-white"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={ex.imageUrl} alt={`Execução de ${ex.name}`} loading="lazy" decoding="async" className="h-full w-full object-contain" />
+            <img src={assetPath(ex.imageUrl ?? "")} alt={`Execução de ${ex.name}`} loading="lazy" decoding="async" className="h-full w-full object-contain" />
             <span className="absolute bottom-2 right-2 rounded-full bg-black/50 px-2 py-0.5 text-[9px] font-bold text-white">ampliar 🔍</span>
           </button>
         ) : null}

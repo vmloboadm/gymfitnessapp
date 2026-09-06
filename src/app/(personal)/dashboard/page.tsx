@@ -601,7 +601,7 @@ export default function DashboardPage() {
         {[
           { href: "/matriculas", label: "Nova matrícula", emoji: "📋" },
           { href: "/personal/treinos", label: "Criar treino", emoji: "🧩" },
-          { href: "/biblioteca", label: "Biblioteca de exercícios", emoji: "📚" },
+          { href: "/personal/exercicios", label: "Biblioteca de exercícios", emoji: "📚" },
           { href: "/personal/perfil", label: "Frase motivacional", emoji: "💬" },
           { href: "/relatorios", label: "Relatórios", emoji: "📊" },
           { href: "/feed-moderacao", label: "Moderar feed", emoji: "🛡️" },

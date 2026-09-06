@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Activity } from "lucide-react";
 import { MiniEcg } from "./ECGLine";
@@ -8,8 +9,12 @@ import { livePulse } from "./mocks";
 /** Pulso da academia, termômetro vivo de ocupação (FOMO & social proof).
     O ícone de batimento é um ECG contínuo (trilha em loop), nunca imagem parada. */
 export function LivePulse({ online }: { online: number }) {
-  const hour = new Date().getHours();
-  const { phrase, occupancy } = livePulse(hour, online);
+  // Hora só no cliente: evita hydration mismatch (servidor UTC vs fuso local)
+  const [hour, setHour] = useState<number | null>(null);
+  useEffect(() => {
+    setHour(new Date().getHours());
+  }, []);
+  const { phrase, occupancy } = livePulse(hour ?? 12, online);
   const pct = Math.max(8, Math.round(occupancy * 100));
 
   return (

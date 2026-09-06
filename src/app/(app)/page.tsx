@@ -243,9 +243,12 @@ export default function HomePage() {
       }
       const supabase = supabaseBrowser();
       if (!user) return { data: null, error: { message: "Sessão indisponível" } };
+      const gymId = profile?.gym_id ?? "";
       const [lRes, rRes] = await Promise.all([
         supabase.from("workout_logs").select("date, weight_kg, reps").eq("student_id", user.id).order("date", { ascending: false }).limit(60),
-        supabase.from("leaderboard").select("points").eq("student_id", user.id).eq("gym_id", profile?.gym_id ?? "").eq("week_start", startOfWeek().toISOString()).eq("rank_type", "load").maybeSingle(),
+        gymId
+          ? supabase.from("leaderboard").select("points").eq("student_id", user.id).eq("gym_id", gymId).eq("week_start", startOfWeek().toISOString()).eq("rank_type", "load").maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
       ]);
       const pts = (rRes.data as { points?: number } | null)?.points ?? 0;
       const rows = (lRes.data ?? []) as WorkoutLogs[];
