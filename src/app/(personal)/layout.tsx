@@ -61,7 +61,7 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
         .then((n) => { if (alive) setPendingApprovals(n); })
         .catch(() => {});
     hydrate();
-    const t = setInterval(hydrate, 20000); // produção: fila atualiza sozinha
+    const t = setInterval(() => { if (document.visibilityState === 'visible') hydrate(); }, 20000); // produção: fila atualiza sozinha
     window.addEventListener(TRAINER_APPROVALS_EVENT, hydrate);
     window.addEventListener("storage", hydrate);
     return () => {

@@ -45,7 +45,7 @@ function LeagueGlyph({ id, className, size = 16 }: { id: string; className?: str
 }
 
 export default function RankingPage() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const demo = isDemoMode();
 
   const { data, loading, error, refetch } = useAsyncQuery<{
@@ -103,7 +103,8 @@ export default function RankingPage() {
         error: null,
       };
     },
-    [user?.id, profile?.id, demo]
+    [user?.id, profile?.id, demo],
+    { enabled: !authLoading && !!user }
   );
 
   useLeaderboardRealtime(profile?.gym_id, refetch);

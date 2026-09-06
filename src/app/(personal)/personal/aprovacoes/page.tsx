@@ -56,7 +56,7 @@ export default function PersonalAprovacoesPage() {
     hydrate();
     window.addEventListener(TRAINER_APPROVALS_EVENT, hydrate);
     window.addEventListener("storage", hydrate);
-    const t = setInterval(hydrate, 15000); // produção: fila atualiza sozinha
+    const t = setInterval(() => { if (document.visibilityState === 'visible') hydrate(); }, 15000); // produção: fila atualiza sozinha
     return () => {
       alive = false;
       window.removeEventListener(TRAINER_APPROVALS_EVENT, hydrate);
@@ -81,12 +81,17 @@ export default function PersonalAprovacoesPage() {
   const resolved = items.filter((a) => a.status !== "pendente");
 
   const decide = async (id: string, status: "aprovado" | "recusado") => {
-    await decideRequest(id, status, user?.id ?? "");
-    setItems(await getRequests(profile?.gym_id ?? "").catch(() => items));
-    toast.success(
-      status === "aprovado" ? "Solicitação aprovada" : "Solicitação recusada",
-      { description: "O aluno vê a resposta na área dele." }
-    );
+    try {
+      await decideRequest(id, status, user?.id ?? "");
+      if (!profile?.gym_id) return;
+      setItems(await getRequests(profile.gym_id));
+      toast.success(
+        status === "aprovado" ? "Solicitação aprovada" : "Solicitação recusada",
+        { description: "O aluno vê a resposta na área dele." }
+      );
+    } catch {
+      toast.error("Não deu registrar a decisão. Tente de novo.");
+    }
   };
 
   const avatarFor = (a: ApprovalRequest) =>

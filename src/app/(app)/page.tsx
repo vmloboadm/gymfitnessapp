@@ -257,7 +257,8 @@ export default function HomePage() {
         error: null,
       };
     },
-    [user?.id, profile?.id, demo]
+    [user?.id, profile?.id, demo],
+    { enabled: !loading && !!user }
   );
 
   // Realtime: refetch workout_logs when any student in the gym logs a workout

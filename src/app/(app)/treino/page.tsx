@@ -127,7 +127,7 @@ const DEFAULT_DEMO_EX: Array<{ id: string; name: string; sets: number; reps: str
 ];
 
 export default function TreinoHomePage() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const demo = isDemoMode();
   const [feeling, setFeeling] = useState<string | null>(null);
   const [summarySeconds, setSummarySeconds] = useState<number | null>(null);
@@ -207,7 +207,8 @@ export default function TreinoHomePage() {
         error: null,
       };
     },
-    [user?.id, profile?.id, demo]
+    [user?.id, profile?.id, demo],
+    { enabled: !authLoading && !!user }
   );
 
   useStudentWorkoutsRealtime(profile?.gym_id, refetch);

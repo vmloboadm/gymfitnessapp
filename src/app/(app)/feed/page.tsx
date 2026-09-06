@@ -47,7 +47,7 @@ type PostRow = FeedPosts & {
  * No modo demo as interações funcionam localmente (curtir/comentar/publicar).
  */
 export default function FeedPage() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
   const [commentingId, setCommentingId] = useState<string | null>(null);
@@ -155,7 +155,8 @@ export default function FeedPage() {
         error: null,
       };
     },
-    [user?.id, profile?.id, demo]
+    [user?.id, profile?.id, demo],
+    { enabled: !authLoading && !!user }
   );
 
   // Realtime: refetch feed when posts, likes, or comments change
@@ -226,12 +227,18 @@ export default function FeedPage() {
     }
     if (!user || !profile) return;
     const supabase = supabaseBrowser();
-    if (post.likedByMe) {
-      await supabase.from("feed_likes").delete().eq("post_id", post.id).eq("user_id", user.id);
-    } else {
-      await supabase.from("feed_likes").insert({ gym_id: profile.gym_id, post_id: post.id, user_id: user.id } as never);
+    try {
+      if (post.likedByMe) {
+        const { error } = await supabase.from("feed_likes").delete().eq("post_id", post.id).eq("user_id", user.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("feed_likes").insert({ gym_id: profile.gym_id, post_id: post.id, user_id: user.id } as never);
+        if (error) throw error;
+      }
+      refetch();
+    } catch {
+      toast.error("Não deu curtir agora. Tente de novo.");
     }
-    refetch();
   };
 
   const addComment = async (postId: string) => {

@@ -27,16 +27,17 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
   const gymId = profile?.gym_id ?? "";
   const uid = user?.id ?? studentId ?? "student-self";
   const [workouts, setWorkouts] = useState<AssignedWorkout[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!gymId) return;
     let alive = true;
     const hydrate = () =>
       fetchMyAssignedPlans(uid, gymId)
-        .then((rows) => { if (alive) setWorkouts(rows.slice(0, 5)); })
-        .catch(() => {});
+        .then((rows) => { if (alive) { setWorkouts(rows.slice(0, 5)); setLoaded(true); } })
+        .catch(() => { if (alive) setLoaded(true); });
     hydrate();
-    const t = setInterval(hydrate, 20000); // produção: plano novo aparece sozinho
+    const t = setInterval(() => { if (document.visibilityState === 'visible') hydrate(); }, 20000); // produção: plano novo aparece sozinho
     window.addEventListener(TRAINER_WORKOUTS_EVENT, hydrate);
     return () => {
       alive = false;
@@ -57,6 +58,18 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
     }
     for (const w of novos) seen.current.add(w.id);
   }, [workouts]);
+
+  if (!loaded) {
+    return (
+      <section aria-label="Carregando treinos do personal">
+        <div className="h-5 w-36 animate-pulse rounded-md bg-white/[0.06]" />
+        <div className="mt-2 space-y-2">
+          <div className="h-24 animate-pulse rounded-2xl bg-white/[0.04]" />
+          <div className="h-24 animate-pulse rounded-2xl bg-white/[0.04]" />
+        </div>
+      </section>
+    );
+  }
 
   if (workouts.length === 0) return null;
 
