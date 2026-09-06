@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { m } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import {
   Dumbbell,
   CalendarDays,
@@ -410,7 +410,19 @@ export default function TreinoHomePage() {
   // Treino em andamento (demo), substitui a navegação normal.
   if (phase === "active" && (demo || planTodayActive)) {
     const activeExercises = session ?? DEFAULT_DEMO_EX;
-    return <WorkoutInProgress exercises={activeExercises} onFinish={(ids) => { conclude(ids); setPlanTodayActive(false); }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />;
+    return (
+      <AnimatePresence mode="wait">
+        <m.div
+          key="treino-active"
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          transition={{ duration: 0.18 }}
+        >
+          <WorkoutInProgress exercises={activeExercises} onFinish={(ids) => { conclude(ids); setPlanTodayActive(false); }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
+        </m.div>
+      </AnimatePresence>
+    );
   }
 
   if (!data?.workouts) {
@@ -428,14 +440,24 @@ export default function TreinoHomePage() {
   // Tela de encerramento, pós-treino
   if (phase === "done") {
     return (
-      <WorkoutSummary
-        seconds={summarySeconds ?? 0}
-        done={Math.min(todayLogs || 1, totalToday || 1)}
-        total={totalToday || 1}
-        onDone={() => {
-          router.replace("/");
-        }}
-      />
+      <AnimatePresence mode="wait">
+        <m.div
+          key="treino-done"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.22 }}
+        >
+          <WorkoutSummary
+            seconds={summarySeconds ?? 0}
+            done={Math.min(todayLogs || 1, totalToday || 1)}
+            total={totalToday || 1}
+            onDone={() => {
+              router.replace("/");
+            }}
+          />
+        </m.div>
+      </AnimatePresence>
     );
   }
 

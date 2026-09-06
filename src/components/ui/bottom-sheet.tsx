@@ -38,7 +38,7 @@ export function BottomSheet({
               <button
                 onClick={onClose}
                 aria-label="Fechar"
-                className="tactile absolute right-0 top-0 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                className="tactile absolute right-0 top-0 inline-flex h-8 w-8 gf-touch items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 <X className="h-4 w-4" />
               </button>

@@ -369,7 +369,7 @@ export default function DashboardPage() {
             live
           </span>
         </div>
-        <p className="mt-1 text-5xl font-black leading-none tracking-tight text-foreground">{formatNumber(data.presenca.length)}</p>
+        <p className="mt-1 text-5xl font-black leading-none tracking-tight text-foreground tabular-nums">{formatNumber(data.presenca.length)}</p>
         <p className="mt-1 text-xs text-muted-foreground">
           {data.presenca.length === 1 ? "aluno na academia agora" : "alunos na academia agora"}
         </p>
@@ -431,7 +431,7 @@ export default function DashboardPage() {
                   {confirming === p.studentId ? (
                     <div className="flex shrink-0 items-center gap-1.5">
                       <button
-                        onClick={() => endTraining(p)}
+                        onClick={() => { navigator.vibrate?.(35); endTraining(p); }}
                         disabled={closing === p.studentId}
                         className="tactile rounded-lg bg-brand px-2.5 py-1.5 text-[10px] font-black text-white disabled:opacity-50"
                       >

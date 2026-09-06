@@ -221,7 +221,7 @@ export default function WorkoutInProgress({
             onClick={goPrev}
             disabled={currentIdx === 0}
             aria-label="Exercício anterior"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground disabled:opacity-25"
+            className="flex h-9 w-9 gf-touch shrink-0 items-center justify-center rounded-full text-muted-foreground disabled:opacity-25"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
