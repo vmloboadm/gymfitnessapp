@@ -64,11 +64,14 @@ const FOCUS_IMAGE: Record<string, string> = {
 };
 
 function LiveClock() {
-  const [now, setNow] = useState(() => new Date());
+  // null até montar: evita hydration mismatch (segundos sempre divergem SSR vs cliente)
+  const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
+    setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+  if (!now) return <span className="tabular-nums">--:--:--</span>;
   const hh = String(now.getHours()).padStart(2, "0");
   const mm = String(now.getMinutes()).padStart(2, "0");
   const ss = String(now.getSeconds()).padStart(2, "0");
@@ -471,13 +474,13 @@ export default function HomePage() {
               <p className="pm-mono text-[12px] font-medium tracking-[0.08em] text-[#F4F6FB]">
                 <LiveClock />
               </p>
-              <p className="pm-mono mt-0.5 text-[#7E8AA0]">
+              <p className="pm-mono mt-0.5 text-[#7E8AA0]" suppressHydrationWarning>
                 {weekdayShort} · {dayNum} {monthShort}
               </p>
             </div>
           </div>
           <div className="mt-4">
-            <p className="pm-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8B95A9]">
+            <p className="pm-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8B95A9]" suppressHydrationWarning>
               {greeting}
             </p>
             <h1 className="mt-1 truncate bg-gradient-to-r from-[#F4F6FB] to-[#B8C4D8] bg-clip-text font-display text-[30px] font-black leading-none tracking-tight text-transparent">
@@ -610,7 +613,7 @@ export default function HomePage() {
           <div className="flex items-end justify-between">
             <div>
               <p className="pm-mono text-[#7E8AA0]">Ritmo do mês</p>
-              <p className="mt-1 font-display text-[14px] font-semibold tracking-tight text-[#F4F6FB]">{cap(monthLabel)}</p>
+              <p className="mt-1 font-display text-[14px] font-semibold tracking-tight text-[#F4F6FB]" suppressHydrationWarning>{cap(monthLabel)}</p>
             </div>
             <Link href="/progresso" className="pm-mono tactile flex items-center gap-1 text-[#FF9A5C]">
               detalhes <ChevronRight className="h-3 w-3" />
