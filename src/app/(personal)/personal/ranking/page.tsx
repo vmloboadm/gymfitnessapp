@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion, type Variants } from "framer-motion";
+import { m, type Variants } from "framer-motion";
 import {
   Trophy,
   MoreVertical,
@@ -154,12 +154,12 @@ export default function PersonalRankingPage() {
           </p>
         </div>
       ) : (
-        <motion.ul variants={container} initial="hidden" animate="show" className="space-y-2">
+        <m.ul variants={container} initial="hidden" animate="show" className="space-y-2">
           {rows.map((r, i) => {
             const final = r.basePoints + r.adjustments.reduce((x, a) => x + a.points, 0);
             const bonus = final - r.basePoints;
             return (
-              <motion.li key={r.studentId} variants={row}>
+              <m.li key={r.studentId} variants={row}>
                 <div
                   className={cn(
                     "gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-3.5",
@@ -221,10 +221,10 @@ export default function PersonalRankingPage() {
                     <MoreVertical className="h-4 w-4" />
                   </button>
                 </div>
-              </motion.li>
+              </m.li>
             );
           })}
-        </motion.ul>
+        </m.ul>
       )}
 
       {/* Menu de ações de gestão */}

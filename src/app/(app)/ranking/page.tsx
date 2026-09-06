@@ -2,7 +2,7 @@
 
 import { Crown, Medal, Trophy, Users, Flame, TrendingUp, ChevronRight, Gem, Award } from "lucide-react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { useLeaderboardRealtime } from "~/hooks/useRealtimeSubscriptions";
@@ -349,7 +349,7 @@ export default function RankingPage() {
                     </span>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-card">
-                    <motion.div
+                    <m.div
                       className="h-full rounded-full bg-gradient-to-r from-brand to-warning"
                       initial={{ width: 0 }}
                       animate={{ width: `${pct}%` }}

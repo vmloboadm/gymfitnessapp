@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { Activity } from "lucide-react";
 import { MiniEcg } from "./ECGLine";
 import { livePulse } from "./mocks";
@@ -33,7 +33,7 @@ export function LivePulse({ online }: { online: number }) {
       <div className="flex items-center gap-4 px-5 pb-5 pt-1">
         <svg viewBox="0 0 44 44" className="h-11 w-11 shrink-0">
           <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
-          <motion.circle
+          <m.circle
             cx="22"
             cy="22"
             r="18"

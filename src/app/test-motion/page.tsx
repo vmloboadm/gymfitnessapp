@@ -1,5 +1,5 @@
 "use client";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 export default function TestMotion() {
-  return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>Test</motion.div>;
+  return <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>Test</m.div>;
 }

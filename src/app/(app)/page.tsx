@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, type Variants } from "framer-motion";
+import { AnimatePresence,m, type Variants } from "framer-motion";
 import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLine } from "lucide-react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useAuth } from "~/hooks/useAuth";
@@ -113,7 +113,7 @@ function ConfettiBurst() {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden>
       {pieces.map((p, i) => (
-        <motion.span
+        <m.span
           key={i}
           className="absolute left-1/2 top-1/2 rounded-[2px]"
           style={{ width: p.size, height: p.size * 1.6, backgroundColor: p.color }}
@@ -146,7 +146,7 @@ function LeagueGlyphMotion({ id }: { id: string }) {
   const reduced = useReducedMotion();
   return (
     <Link href="/ranking" aria-label="Ver ranking da semana" className="tactile">
-      <motion.span
+      <m.span
         className="block"
         animate={
           reduced
@@ -157,7 +157,7 @@ function LeagueGlyphMotion({ id }: { id: string }) {
         style={{ filter: "drop-shadow(0 0 10px rgba(255,194,77,0.35))" }}
       >
         <Icon className="h-[28px] w-[28px]" style={{ color: glyph.color }} />
-      </motion.span>
+      </m.span>
     </Link>
   );
 }
@@ -417,7 +417,7 @@ export default function HomePage() {
   return (
       <div className="mx-auto max-w-md pb-32 pt-8">
         {/* CHECK-IN CONTEXTUAL: some após o check-in do dia; foco vai pro treino */}
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="px-4 pb-5">
+        <m.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="px-4 pb-5">
           {isCheckedInToday ? (
             <div className="flex items-center justify-between gap-3 rounded-2xl border border-success/40 bg-success/12 px-4 py-3">
               <div className="flex items-center gap-2.5">
@@ -445,16 +445,16 @@ export default function HomePage() {
             </div>
           ) : (
           <Link href="/checkin" className="tactile block rounded-2xl bg-[#F4711E] px-5 py-4 text-center shadow-[0_0_20px_rgba(244,113,30,0.4)]" style={{ willChange: "transform" }}>
-            <motion.span whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex items-center justify-center gap-2.5 text-[15px] font-black text-black">
+            <m.span whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex items-center justify-center gap-2.5 text-[15px] font-black text-black">
               <ScanLine className="h-5 w-5" />
               Cheguei na academia, fazer check-in
-            </motion.span>
+            </m.span>
           </Link>
           )}
-        </motion.div>
-      <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 px-4">
+        </m.div>
+      <m.div variants={container} initial="hidden" animate="show" className="space-y-6 px-4">
         {/* LINHA 1, Logo + relógio/data; LINHA 2, saudação */}
-        <motion.div variants={item} className="px-2">
+        <m.div variants={item} className="px-2">
           <div className="flex items-center justify-between gap-3">
             <Image
               src={assetPath("/images/logo-academia.png")}
@@ -483,16 +483,16 @@ export default function HomePage() {
               {name}
             </h1>
           </div>
-        </motion.div>
+        </m.div>
 
         {/* COCKPIT, Anel da meta + Streak + Liga */}
-        <motion.section variants={item} className="pm-surface overflow-hidden">
+        <m.section variants={item} className="pm-surface overflow-hidden">
           <div className="px-2 pb-6 pt-1">
             <div className="relative">
               <PerformanceRing done={sessionsWeek} goal={META_SEMANAL} />
               {/* Pulse ring - lightweight visual feedback */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <motion.div
+                <m.div
                   className="absolute inset-0 rounded-full border-2 border-[#FF6F16]/30"
                   animate={{ scale: [1, 1.02, 1], opacity: [0.4, 0.1, 0.4] }}
                   transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
@@ -512,7 +512,7 @@ export default function HomePage() {
 
             {/* Streak + Liga, mesma vitrine, células respiradas */}
             <div className="mt-7 grid grid-cols-2 gap-3 px-4">
-              <motion.div
+              <m.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.94 }}
                 className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[20px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] px-3 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_30px_-18px_rgba(0,0,0,0.8)] after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
@@ -525,8 +525,8 @@ export default function HomePage() {
                 <p className="pm-num mt-1 text-[30px] text-[#F4F6FB]"><CountUp value={streakCount} /></p>
                 <p className="text-[12px] font-medium text-[#7E8AA0]">dias seguidos</p>
                 <FlameStageHint streak={streak} />
-              </motion.div>
-              <motion.div
+              </m.div>
+              <m.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.94 }}
                 className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[20px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] px-3 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_30px_-18px_rgba(0,0,0,0.8)] after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
@@ -542,7 +542,7 @@ export default function HomePage() {
                 <Link href="/ranking" className="text-[11px] font-semibold text-brand">
                   ver classificação
                 </Link>
-              </motion.div>
+              </m.div>
             </div>
 
             {/* Ocupação ao vivo + mensagem motivadora */}
@@ -567,10 +567,10 @@ export default function HomePage() {
               ) : null}
             </p>
           </div>
-        </motion.section>
+        </m.section>
 
         {/* TREINO DE HOJE, ação principal; recebe o scroll quando check-in feito */}
-        <motion.div variants={item} ref={heroRef} className="pt-2">
+        <m.div variants={item} ref={heroRef} className="pt-2">
           <HeroWorkout
             image={FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
             title={todayLabel}
@@ -581,7 +581,7 @@ export default function HomePage() {
             notice={fatigueNotice ?? undefined}
             ready
           />
-        </motion.div>
+        </m.div>
 
         {/* VER MAIS, densidade controlada (#9): o essencial fica visível,
             o resto (ritmo detalhado, comunidade, artigo, dica, parceiros)
@@ -589,7 +589,7 @@ export default function HomePage() {
         {/* Parceiros: sempre visíveis (cards de benefício da academia) */}
         <PartnerCarousel />
 
-        <motion.div variants={item}>
+        <m.div variants={item}>
           <button
             onClick={() => {
               navigator.vibrate?.(15);
@@ -601,11 +601,11 @@ export default function HomePage() {
             {showMore ? "Ver menos" : "Ver mais"}
             <ChevronDown className={cn("h-4 w-4 text-[#FF9A5C] transition-transform duration-200", showMore && "rotate-180")} />
           </button>
-        </motion.div>
+        </m.div>
 
         {showMore ? (
           <>
-        <motion.section variants={item} className="pm-surface p-6">
+        <m.section variants={item} className="pm-surface p-6">
           <div className="flex items-end justify-between">
             <div>
               <p className="pm-mono text-[#7E8AA0]">Ritmo do mês</p>
@@ -732,10 +732,10 @@ export default function HomePage() {
                   : "estável"}
             </span>
           </div>
-        </motion.section>
+        </m.section>
 
         {/* HOJE NA ACADEMIA — só conteúdo com fonte real (feed da comunidade, dica, personais) */}
-        <motion.section variants={item}>
+        <m.section variants={item}>
           <p className="gf-section mb-2 px-1">Hoje na academia</p>
           <div className="scrollbar-hide -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
             {destaque ? (
@@ -768,19 +768,19 @@ export default function HomePage() {
             </Link>
             <PremiumRequestCard />
           </div>
-        </motion.section>
+        </m.section>
 
 
         {/* Marcador de build, confirma visualmente que o app está atualizado */}
         <p className="text-center text-[10px] text-[#4A5568]">{BUILD_LABEL}</p>
           </>
         ) : null}
-      </motion.div>
+      </m.div>
 
       {/* Voltar ao topo (nav:back-to-top) */}
       <AnimatePresence>
         {showTopBtn ? (
-          <motion.button
+          <m.button
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
@@ -793,7 +793,7 @@ export default function HomePage() {
             className="fixed bottom-24 right-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-brand/40 bg-[#0B1A33]/90 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur"
           >
             <ChevronDown className="h-5 w-5 rotate-180 text-brand" />
-          </motion.button>
+          </m.button>
         ) : null}
       </AnimatePresence>
       <AiCoach />

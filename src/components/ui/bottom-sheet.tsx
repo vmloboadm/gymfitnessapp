@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence,m } from "framer-motion";
 
 /** Bottom Sheet deslizante de baixo (mobile-first), fecha no backdrop. */
 export function BottomSheet({
@@ -16,14 +16,14 @@ export function BottomSheet({
   return (
     <AnimatePresence>
       {open ? (
-        <motion.div
+        <m.div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 md:items-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
         >
-          <motion.div
+          <m.div
             role="dialog"
             aria-modal="true"
             className="max-h-[86vh] w-full max-w-md overflow-y-auto rounded-t-[24px] border border-border bg-background p-5 pb-9 md:rounded-[24px] md:pb-5"
@@ -44,8 +44,8 @@ export function BottomSheet({
               </button>
             </div>
             {children}
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       ) : null}
     </AnimatePresence>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, type Variants } from "framer-motion";
+import { m, type Variants } from "framer-motion";
 import { Inbox, Crown, Dumbbell, Check, X, Inbox as InboxIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -119,9 +119,9 @@ export default function PersonalAprovacoesPage() {
           </p>
         </div>
       ) : (
-        <motion.div variants={container} initial="hidden" animate="show" className="space-y-2.5">
+        <m.div variants={container} initial="hidden" animate="show" className="space-y-2.5">
           {pending.map((a) => (
-            <motion.article key={a.id} variants={row} className="gf-card gf-glass !p-4">
+            <m.article key={a.id} variants={row} className="gf-card gf-glass !p-4">
               <div className="flex items-start gap-3">
                 <Avatar className="h-10 w-10 border border-white/[0.08]">
                   <AvatarImage src={avatarFor(a) ?? undefined} alt="" />
@@ -158,9 +158,9 @@ export default function PersonalAprovacoesPage() {
                   <X className="h-4 w-4" /> Recusar
                 </button>
               </div>
-            </motion.article>
+            </m.article>
           ))}
-        </motion.div>
+        </m.div>
       )}
 
       {/* resolvidas */}

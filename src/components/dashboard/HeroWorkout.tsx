@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion, type Variants } from "framer-motion";
+import { m, type Variants } from "framer-motion";
 import { Play, Clock, AlertTriangle } from "lucide-react";
 
 interface HeroWorkoutProps {
@@ -31,7 +31,7 @@ export function HeroWorkout({
   notice,
 }: HeroWorkoutProps) {
   return (
-    <motion.div variants={item} whileTap={{ scale: 0.985 }}>
+    <m.div variants={item} whileTap={{ scale: 0.985 }}>
       <Link
         href="/treino?ir=hoje"
         aria-label={`Treino de hoje: ${title}`}
@@ -103,7 +103,7 @@ export function HeroWorkout({
           </span>
         </div>
       </Link>
-    </motion.div>
+    </m.div>
   );
 }
 

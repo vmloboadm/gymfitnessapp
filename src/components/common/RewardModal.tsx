@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence,m } from "framer-motion";
 
 
 /**
@@ -29,7 +29,7 @@ export function RewardModal({
   return (
     <AnimatePresence>
       {open ? (
-        <motion.div
+        <m.div
           className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-black/90 p-6 backdrop-blur-xl"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -37,7 +37,7 @@ export function RewardModal({
         >
           {/* confete */}
           {pieces.map((i) => (
-            <motion.span
+            <m.span
               key={i}
               className="absolute top-[-10%] h-2 w-[6px] rounded-[2px]"
               style={{
@@ -51,7 +51,7 @@ export function RewardModal({
           ))}
 
           {videoUrl ? (
-            <motion.video
+            <m.video
               src={videoUrl}
               autoPlay
               loop
@@ -64,20 +64,20 @@ export function RewardModal({
               transition={{ type: "spring", stiffness: 220, damping: 16 }}
             />
           ) : (
-            <motion.div
+            <m.div
               className="relative z-10 flex h-44 w-44 items-center justify-center rounded-full border-4 border-brand bg-gradient-to-b from-warning/25 to-warning/5 shadow-[0_0_40px_rgba(244,113,30,0.5)]"
               initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 220, damping: 16 }}
             >
-              <motion.span
+              <m.span
                 className="text-[80px] leading-none"
                 animate={{ rotate: [0, -8, 8, 0], scale: [1, 1.08, 1] }}
                 transition={{ duration: 1.4, delay: 0.3, repeat: Infinity, repeatDelay: 1.6 }}
               >
                 {icon || "🏆"}
-              </motion.span>
-            </motion.div>
+              </m.span>
+            </m.div>
           )}
 
           <p className="relative z-10 text-[11px] font-black uppercase tracking-[0.25em] text-warning">
@@ -90,7 +90,7 @@ export function RewardModal({
             +{points} pts
           </span>
 
-          <motion.button
+          <m.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={async () => {
@@ -104,7 +104,7 @@ export function RewardModal({
             className="gf-touch relative z-10 mt-2 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#E1306C] to-[#F77737] px-8 py-4 text-sm font-black text-white"
           >
             Compartilhar no Instagram
-          </motion.button>
+          </m.button>
 
           <button
             onClick={onClose}
@@ -112,7 +112,7 @@ export function RewardModal({
           >
             Continuar
           </button>
-        </motion.div>
+        </m.div>
       ) : null}
     </AnimatePresence>
   );

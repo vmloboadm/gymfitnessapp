@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { motion, type Variants } from "framer-motion";
+import { m, type Variants } from "framer-motion";
 import { ChevronRight, Flame, BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "~/hooks/useAuth";
@@ -48,7 +48,7 @@ export function CommunityHighlight({ feat }: { feat: CommunityFeat }) {
   };
 
   return (
-    <motion.div variants={item} whileTap={{ scale: 0.985 }}>
+    <m.div variants={item} whileTap={{ scale: 0.985 }}>
       <Link href="/feed" className="pm-surface tactile block p-6">
         <span className="pointer-events-none absolute left-3 top-3 h-3 w-3 border-l border-t border-[#FF9A5C]/40" aria-hidden />
         <span className="pointer-events-none absolute right-3 top-3 h-3 w-3 border-r border-t border-[#FF9A5C]/40" aria-hidden />
@@ -109,7 +109,7 @@ export function CommunityHighlight({ feat }: { feat: CommunityFeat }) {
           </button>
         </div>
       </Link>
-    </motion.div>
+    </m.div>
   );
 }
 

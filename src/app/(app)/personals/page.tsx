@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { MessageCircle, Star } from "lucide-react";
 import { TopBar } from "~/components/layout/TopBar";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -27,13 +27,13 @@ export default function PersonaisMarketplacePage() {
     <>
       <TopBar title="Personals da Casa" subtitle="Acompanhamento premium dentro do gym" />
       <div className="space-y-5 p-4">
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="rounded-[20px] border border-brand/35 bg-gradient-to-br from-brand/15 via-card to-card p-5">
+        <m.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="rounded-[20px] border border-brand/35 bg-gradient-to-br from-brand/15 via-card to-card p-5">
           <p className="text-sm font-bold text-foreground">Resultado mais rápido com quem faz isso por ofício</p>
           <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
             Escolha um personal da casa, fale direto no WhatsApp e monte seu acompanhamento.
             Sem burocracia, sem mensalidade escondida.
           </p>
-        </motion.div>
+        </m.div>
 
         {personais.map((p, i) => {
           const extra = EXTRA[i % EXTRA.length];
@@ -41,7 +41,7 @@ export default function PersonaisMarketplacePage() {
             `Olá ${p.trainer.name.split(" ")[0]}! Vi seu perfil no GymFitness e quero saber mais sobre: ${extra.specialty}.`
           );
           return (
-            <motion.article
+            <m.article
               key={p.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -70,7 +70,7 @@ export default function PersonaisMarketplacePage() {
               </div>
 
               <div className="p-4 pt-3">
-                <motion.a
+                <m.a
                   href={`https://wa.me/552299999000${i + 1}?text=${msg}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -80,9 +80,9 @@ export default function PersonaisMarketplacePage() {
                 >
                   <MessageCircle className="h-4 w-4" />
                   Quero Consultoria Premium
-                </motion.a>
+                </m.a>
               </div>
-            </motion.article>
+            </m.article>
           );
         })}
 

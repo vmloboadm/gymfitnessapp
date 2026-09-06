@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getGymStudents } from "~/lib/gym-api";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2, LogOut, Shield, Settings, Crown, Sparkles } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -212,7 +212,7 @@ export default function PersonalPerfilPage() {
   return (
     <div className="space-y-5">
       {/* apresentação profissional */}
-      <motion.header
+      <m.header
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
@@ -296,7 +296,7 @@ export default function PersonalPerfilPage() {
             </div>
           )}
         </div>
-      </motion.header>
+      </m.header>
 
       {/* Sair da conta */}
       <button
@@ -545,7 +545,7 @@ export default function PersonalPerfilPage() {
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Streak médio da turma</p>
             <p className="mt-1 font-display text-xl font-black text-foreground">{avgStreak} dias</p>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-              <motion.div
+              <m.div
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.min(100, (avgStreak / 10) * 100)}%` }}
                 transition={{ duration: 0.9, ease: [0.2, 0.8, 0.2, 1] }}

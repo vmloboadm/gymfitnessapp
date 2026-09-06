@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 
 /**
  * Elemento de assinatura GymFitness (manual de marca v1):
@@ -50,7 +50,7 @@ export function ProgressRing({
           stroke="var(--bg-elevated)"
           strokeWidth={strokeWidth}
         />
-        <motion.circle
+        <m.circle
           cx={size / 2}
           cy={size / 2}
           r={r}

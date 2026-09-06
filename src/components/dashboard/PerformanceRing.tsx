@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 
 const prefersReduced = () =>
   typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -75,7 +75,7 @@ export function PerformanceRing({ done, goal }: { done: number; goal: number }) 
         {pct > 0 && (
           <>
             {/* glow suave */}
-            <motion.path
+            <m.path
               d={arcPath}
               fill="none"
               stroke={doneGoal ? "url(#pm-ringdone)" : "url(#pm-ringfill)"}
@@ -90,7 +90,7 @@ export function PerformanceRing({ done, goal }: { done: number; goal: number }) 
               opacity={0.35}
             />
             {/* traço principal */}
-            <motion.path
+            <m.path
               d={arcPath}
               fill="none"
               stroke={doneGoal ? "url(#pm-ringdone)" : "url(#pm-ringfill)"}

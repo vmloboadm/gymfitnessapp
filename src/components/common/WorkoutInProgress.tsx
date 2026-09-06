@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Info, PlayCircle, Timer, X } from "lucide-react";
 import { type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
@@ -258,7 +258,7 @@ export default function WorkoutInProgress({
       {/* Timer de descanso */}
       <AnimatePresence>
         {restLeft !== null && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
@@ -278,7 +278,7 @@ export default function WorkoutInProgress({
                 Pular
               </button>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
@@ -286,7 +286,7 @@ export default function WorkoutInProgress({
       <main className="flex-1 px-4 pb-40 pt-4">
         <AnimatePresence mode="wait">
           {current && (
-            <motion.div
+            <m.div
               key={current.id}
               initial={{ opacity: 0, x: 24 }}
               animate={{ opacity: 1, x: 0 }}
@@ -419,7 +419,7 @@ export default function WorkoutInProgress({
                   </button>
                 </div>
               )}
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </main>
@@ -443,14 +443,14 @@ export default function WorkoutInProgress({
       {/* Confirmação de finalização */}
       <AnimatePresence>
         {showFinish && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 md:items-center"
             onClick={() => setShowFinish(false)}
           >
-            <motion.div
+            <m.div
               initial={{ y: 40, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 40, opacity: 0 }}
@@ -479,8 +479,8 @@ export default function WorkoutInProgress({
                   Finalizar
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, type Variants } from "framer-motion";
+import { m, type Variants } from "framer-motion";
 import { MessageSquareText, Dumbbell, UserRoundCheck, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { TRAINER_WORKOUTS_EVENT, type AssignedWorkout } from "~/lib/trainer-store";
@@ -69,9 +69,9 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
         <UserRoundCheck className="h-4 w-4 text-brand" />
         Do seu Personal
       </h2>
-      <motion.div variants={container} initial="hidden" animate="show" className="space-y-2.5">
+      <m.div variants={container} initial="hidden" animate="show" className="space-y-2.5">
         {workouts.map((w, idx) => (
-          <motion.article key={w.id} variants={item} className="gf-card gf-glass !p-4">
+          <m.article key={w.id} variants={item} className="gf-card gf-glass !p-4">
             {idx === 0 ? (
               <span className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-brand-foreground">
                 Novo
@@ -143,9 +143,9 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
             ) : null}
 
             <AdjustRequestCard workoutName={w.name} studentId={studentId} />
-          </motion.article>
+          </m.article>
         ))}
-      </motion.div>
+      </m.div>
     </section>
   );
 }

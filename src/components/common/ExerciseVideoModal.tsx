@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence,m } from "framer-motion";
 import { X } from "lucide-react";
 
 /**
@@ -23,7 +23,7 @@ export function ExerciseVideoModal({
   return (
     <AnimatePresence>
       {open && videoUrl ? (
-        <motion.div
+        <m.div
           className="fixed inset-0 z-[60] flex flex-col bg-black/95"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -43,7 +43,7 @@ export function ExerciseVideoModal({
           </div>
 
           {/* vídeo */}
-          <motion.div
+          <m.div
             className="flex flex-1 items-center justify-center px-2 pb-6"
             initial={{ scale: 0.96, y: 12 }}
             animate={{ scale: 1, y: 0 }}
@@ -60,12 +60,12 @@ export function ExerciseVideoModal({
               className="max-h-[72vh] w-full rounded-2xl border border-white/10 bg-black"
               src={videoUrl}
             />
-          </motion.div>
+          </m.div>
 
           <p className="pb-6 text-center text-[11px] text-white/50">
             Dica: gire o celular para ver em tela cheia.
           </p>
-        </motion.div>
+        </m.div>
       ) : null}
     </AnimatePresence>
   );

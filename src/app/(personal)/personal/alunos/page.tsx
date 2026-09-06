@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { motion, type Variants } from "framer-motion";
+import { m, type Variants } from "framer-motion";
 import {
   Search,
   ChevronRight,
@@ -107,11 +107,11 @@ export default function PersonalAlunosPage() {
           ))}
         </div>
       ) : (
-      <motion.ul variants={container} initial="hidden" animate="show" className="space-y-2">
+      <m.ul variants={container} initial="hidden" animate="show" className="space-y-2">
         {filtered.map((s) => {
           const status = studentStatus(s);
           return (
-            <motion.li key={s.id} variants={row}>
+            <m.li key={s.id} variants={row}>
               <button
                 onClick={() => setSelected(s)}
                 className="gf-card gf-glass flex w-full items-center gap-3 !rounded-2xl !p-3.5 text-left transition-transform active:scale-[0.985]"
@@ -144,7 +144,7 @@ export default function PersonalAlunosPage() {
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
               </button>
-            </motion.li>
+            </m.li>
           );
         })}
         {filtered.length === 0 ? (
@@ -154,7 +154,7 @@ export default function PersonalAlunosPage() {
               : `Nenhum aluno encontrado para &quot;{q}&quot;.`}
           </li>
         ) : null}
-      </motion.ul>
+      </m.ul>
       )}
 
       {/* Bottom Sheet de detalhes */}

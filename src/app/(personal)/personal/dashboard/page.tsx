@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion, type Variants } from "framer-motion";
+import { m, type Variants } from "framer-motion";
 import {
   MessageCircle,
   Flame,
@@ -179,7 +179,7 @@ export default function PersonalDashboardPage() {
   return (
     <div className="space-y-5">
       {/* Header: identidade do personal + sino com badge da fila */}
-      <motion.header variants={item} initial="hidden" animate="show" className="flex items-center gap-3">
+      <m.header variants={item} initial="hidden" animate="show" className="flex items-center gap-3">
         <span className="relative shrink-0 rounded-full bg-brand p-[2px] shadow-[0_0_18px_rgba(244,113,30,0.35)]">
           <Avatar className="h-12 w-12 border-2 border-background">
             <AvatarImage src={profile?.avatar_url ?? undefined} alt={profile?.name ?? "Personal"} />
@@ -208,7 +208,7 @@ export default function PersonalDashboardPage() {
             </span>
           ) : null}
         </button>
-      </motion.header>
+      </m.header>
 
       {/* Skeleton do primeiro load (imita o layout real) */}
       {students.length === 0 ? (
@@ -225,7 +225,7 @@ export default function PersonalDashboardPage() {
       ) : null}
 
       {/* Fila de Hoje: card principal */}
-      <motion.section variants={item} initial="hidden" animate="show" aria-labelledby="queue-title">
+      <m.section variants={item} initial="hidden" animate="show" aria-labelledby="queue-title">
         <div className="mb-2 flex items-center justify-between">
           <h2 id="queue-title" className="flex items-center gap-2 text-sm font-bold text-foreground">
             <ListChecks className="h-4 w-4 text-brand" />
@@ -261,10 +261,10 @@ export default function PersonalDashboardPage() {
         <p className="mt-2.5 rounded-xl border border-white/[0.05] bg-white/[0.02] p-2.5 text-[10.5px] leading-snug text-muted-foreground">
           {briefingLine}
         </p>
-      </motion.section>
+      </m.section>
 
       {/* Métricas de gestão (count-up) */}
-      <motion.div variants={item} initial="hidden" animate="show" className="grid grid-cols-3 gap-2">
+      <m.div variants={item} initial="hidden" animate="show" className="grid grid-cols-3 gap-2">
         <Link href="/personal/alunos" className="gf-card gf-glass !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
             <Users className="h-3.5 w-3.5 text-brand" />
@@ -323,21 +323,21 @@ export default function PersonalDashboardPage() {
             </p>
           ) : null}
         </Link>
-      </motion.div>
+      </m.div>
 
       {/* Pulso da academia (mesmo componente do aluno) */}
-      <motion.div variants={item} initial="hidden" animate="show">
+      <m.div variants={item} initial="hidden" animate="show">
         <LivePulse online={online} />
-      </motion.div>
+      </m.div>
 
       {/* Gráfico de frequência semanal */}
-      <motion.section variants={item} initial="hidden" animate="show">
+      <m.section variants={item} initial="hidden" animate="show">
         <WeeklyChart students={students} />
-      </motion.section>
+      </m.section>
 
       {/* Agenda de hoje */}
       {agenda.length > 0 ? (
-        <motion.section variants={item} initial="hidden" animate="show" aria-labelledby="agenda-title">
+        <m.section variants={item} initial="hidden" animate="show" aria-labelledby="agenda-title">
           <h2 id="agenda-title" className="mb-2 flex items-center gap-2 text-sm font-bold text-foreground">
             <CalendarCheck className="h-4 w-4 text-brand" />
             Agenda de hoje
@@ -373,11 +373,11 @@ export default function PersonalDashboardPage() {
               </button>
             ))}
           </div>
-        </motion.section>
+        </m.section>
       ) : null}
 
       {/* Ações rápidas */}
-      <motion.section variants={item} initial="hidden" animate="show" aria-labelledby="quick-title">
+      <m.section variants={item} initial="hidden" animate="show" aria-labelledby="quick-title">
         <h2 id="quick-title" className="mb-2 text-sm font-bold text-foreground">Ferramentas</h2>
         <div className="grid grid-cols-3 gap-2">
           <Link href="/personal/ranking" className="gf-card gf-glass !rounded-2xl !p-3 text-center transition-transform active:scale-[0.96]">
@@ -396,7 +396,7 @@ export default function PersonalDashboardPage() {
             <p className="text-[8.5px] text-muted-foreground">289 na base</p>
           </Link>
         </div>
-      </motion.section>
+      </m.section>
 
       {/* Sino: fila completa no bottom sheet */}
       <BottomSheet open={queueOpen} onClose={() => setQueueOpen(false)}>
@@ -503,7 +503,7 @@ function QueueRow({
   };
 
   return (
-    <motion.article
+    <m.article
       variants={rowItem}
       initial="hidden"
       animate="show"
@@ -550,6 +550,6 @@ function QueueRow({
           </span>
         )}
       </div>
-    </motion.article>
+    </m.article>
   );
 }

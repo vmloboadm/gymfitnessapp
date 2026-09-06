@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "~/components/ui/badge";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence,m } from "framer-motion";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import { isDemoMode, demoLib } from "~/lib/demo-bridge";
 import { assetPath } from "~/lib/asset-path";
@@ -146,9 +146,9 @@ export default function PersonalExerciciosPage() {
           </p>
         </div>
       ) : (
-        <motion.ul variants={container} initial="hidden" animate="show" className="space-y-2">
+        <m.ul variants={container} initial="hidden" animate="show" className="space-y-2">
           {filtered.map((e) => (
-            <motion.li key={e.id} variants={row}>
+            <m.li key={e.id} variants={row}>
               <div
                 role="button"
                 tabIndex={0}
@@ -188,22 +188,22 @@ export default function PersonalExerciciosPage() {
                   <MoreVertical className="h-4 w-4" />
                 </button>
               </div>
-            </motion.li>
+            </m.li>
           ))}
-        </motion.ul>
+        </m.ul>
       )}
 
       {/* Modal de detalhes: sheet glass deslizando de baixo */}
       <AnimatePresence>
         {detail ? (
-          <motion.div
+          <m.div
             className="fixed inset-0 z-50 flex items-end justify-center bg-black/70"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setDetail(null)}
           >
-            <motion.div
+            <m.div
               role="dialog"
               aria-modal="true"
               aria-label={`Detalhes de ${detail.name}`}
@@ -303,8 +303,8 @@ export default function PersonalExerciciosPage() {
                   )}
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         ) : null}
       </AnimatePresence>
     </div>

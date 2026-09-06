@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "~/lib/utils";
 import {
   elapsedSeconds,
@@ -73,13 +73,13 @@ export function SessionClock({
         />
         <span className={cn("relative inline-flex h-2 w-2 rounded-full", alerta ? "bg-warning" : "bg-success")} />
       </span>
-      <motion.span
+      <m.span
         className={cn("pm-num text-[18px] leading-none", alerta ? "text-warning" : "text-foreground")}
         animate={alerta ? { scale: [1, 1.06, 1] } : undefined}
         transition={{ duration: 1.2, repeat: Infinity }}
       >
         {formatMMSS(secs)}
-      </motion.span>
+      </m.span>
       {alerta ? (
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-warning">Ainda treinando?</span>

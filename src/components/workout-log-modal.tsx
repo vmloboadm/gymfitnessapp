@@ -7,7 +7,6 @@ import { Button } from "~/components/ui/button";
 import { FormInput } from "~/components/ui/form-input";
 import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
-import confetti from "canvas-confetti";
 import { isDemoMode } from "~/lib/demo-bridge";
 import { useAuth } from "~/hooks/useAuth";
 
@@ -78,12 +77,14 @@ export function WorkoutLogModal({ open, onOpenChange, sessionId, equipmentName, 
         if (error) throw error;
       }
 
-      confetti({
-        particleCount: 140,
-        spread: 75,
-        origin: { y: 0.6 },
-        colors: ["#F4711E", "#33D17A", "#3B82F6", "#F5A623"],
-      });
+      void import("canvas-confetti").then((m) =>
+        m.default({
+          particleCount: 140,
+          spread: 75,
+          origin: { y: 0.6 },
+          colors: ["#F4711E", "#33D17A", "#3B82F6", "#F5A623"],
+        })
+      );
       toast.success("Treino registrado com sucesso!");
       setForm({ sets: "", reps: "", weightKg: "", rpe: "" });
       onClose();

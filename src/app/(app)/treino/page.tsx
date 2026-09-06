@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   Dumbbell,
   CalendarDays,
@@ -27,7 +27,8 @@ import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Badge } from "~/components/ui/badge";
 import WorkoutInProgress from "~/components/common/WorkoutInProgress";
-import BodyMap from "~/components/body-map";
+import dynamic from "next/dynamic";
+const BodyMap = dynamic(() => import("~/components/body-map"), { ssr: false });
 import { ImageLightbox } from "~/components/common/ImageLightbox";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
@@ -704,7 +705,7 @@ export default function TreinoHomePage() {
                     {!demo ? <ChevronRight className="h-4 w-4 shrink-0 text-white/50" /> : null}
                   </div>
                   <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/15">
-                    <motion.div
+                    <m.div
                       className="h-full rounded-full bg-[#FF7A2F]"
                       initial={false}
                       animate={{ width: `${Math.min(100, ((demo ? doneCount : Math.max(todayLogs, doneCount)) / Math.max(totalToday, 1)) * 100)}%` }}

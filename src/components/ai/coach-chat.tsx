@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { Dumbbell, Send, X, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -138,7 +138,7 @@ export default function AiCoach() {
 
   return (
     <>
-      <motion.button
+      <m.button
         onClick={() => setOpen((v) => !v)}
         className="gf-touch fixed bottom-[88px] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-[0_12px_28px_-8px_rgba(244,113,30,0.55)]"
         whileTap={{ scale: 0.9 }}
@@ -146,11 +146,11 @@ export default function AiCoach() {
       >
         {open ? <X className="h-6 w-6" /> : <Dumbbell className="h-6 w-6" />}
         {!open && <span className="hero-live-dot absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-success" />}
-      </motion.button>
+      </m.button>
 
       <AnimatePresence>
         {open && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.96 }}
@@ -246,7 +246,7 @@ export default function AiCoach() {
                 <Send className="h-4 w-4" />
               </button>
             </form>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </>

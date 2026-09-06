@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { Award, Lock } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -87,7 +87,7 @@ export default function ConquistasPage() {
       <TopBar title="Conquistas" subtitle={`${earnedCount}/${data?.list.length ?? 0} liberadas`} />
       <div className="space-y-6 p-4">
         {/* Cabeçalho com progresso geral */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
@@ -104,14 +104,14 @@ export default function ConquistasPage() {
             <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand/15"><FitnessIcon glyph="chest" size={28} /></span>
           </div>
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-card/60">
-            <motion.div
+            <m.div
               className="h-full rounded-full bg-gradient-to-r from-brand to-warning"
               initial={{ width: 0 }}
               animate={{ width: `${data?.progress ?? 0}%` }}
               transition={{ duration: 0.7, ease: "easeOut" }}
             />
           </div>
-        </motion.div>
+        </m.div>
 
         {!data?.list.length ? (
           <div className="text-center py-12">
@@ -124,7 +124,7 @@ export default function ConquistasPage() {
             {data.list.map((a, i) => {
               const earned = !!a.earned_at;
               return (
-                <motion.div
+                <m.div
                   key={a.id}
                   initial={{ opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -148,7 +148,7 @@ export default function ConquistasPage() {
                     <span className="text-[10px] text-muted-foreground">·</span>
                     <span className="text-[10px] text-muted-foreground">{earned ? formatDate(a.earned_at!) : "Trancada"}</span>
                   </div>
-                </motion.div>
+                </m.div>
               );
             })}
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "~/lib/utils";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 
@@ -92,7 +92,7 @@ export function ECGLine({
         />
 
         {/* trilha principal animada (loop contínuo; estático em motion reduzido) */}
-        <motion.path
+        <m.path
           d={path}
           fill="none"
           stroke="url(#ecg-fade)"
@@ -107,7 +107,7 @@ export function ECGLine({
 
         {/* varredura vertical */}
         {reduced ? null : (
-          <motion.rect
+          <m.rect
             x="0"
             y="0"
             width="2.4"
@@ -152,7 +152,7 @@ export function MiniEcg({ className, height = 20 }: { className?: string; height
   const reduced = useReducedMotion();
   return (
     <svg viewBox="0 0 100 40" preserveAspectRatio="none" className={cn("block w-full", className)} style={{ height }}>
-      <motion.path
+      <m.path
         d={path}
         fill="none"
         stroke="#F3F6FC"

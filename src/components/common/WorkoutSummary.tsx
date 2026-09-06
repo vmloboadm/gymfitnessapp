@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { Camera, CheckCircle2, Copy, MessageCircle, Timer, Dumbbell , Trophy} from "lucide-react";
 import { TopBar } from "~/components/layout/TopBar";
 import { formatMMSS } from "~/lib/workout-session";
@@ -33,7 +33,7 @@ function ConfettiBurst({ count = 18 }: { count?: number }) {
   return (
     <span className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       {pieces.map((c) => (
-        <motion.span
+        <m.span
           key={c.id}
           className="absolute rounded-[2px]"
           style={{ left: `${c.x}%`, top: -12, width: c.size, height: c.size * 1.6, background: c.color }}
@@ -105,7 +105,7 @@ export default function WorkoutSummary({
       <TopBar title="Resumo do treino" subtitle="Bom trabalho hoje" />
       <div className="mx-auto max-w-md space-y-5 p-4 pb-10">
         {/* stats */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           className="gf-card gf-glass grid grid-cols-2 gap-3"
@@ -125,11 +125,11 @@ export default function WorkoutSummary({
               <span className="text-[14px] text-muted-foreground">/{total}</span>
             </p>
           </div>
-        </motion.div>
+        </m.div>
 
         {/* celebração SEMPRE: conquista desbloqueada OU missão cumprida */}
         {!achievement ? (
-          <motion.div
+          <m.div
             initial={{ scale: 0.8, opacity: 0, rotate: -2 }}
             animate={{ scale: 1, opacity: 1, rotate: 0 }}
             transition={{ type: "spring", stiffness: 220, damping: 15, delay: 0.15 }}
@@ -141,24 +141,24 @@ export default function WorkoutSummary({
               style={{ background: "radial-gradient(60% 80% at 50% 0%, rgba(255,194,77,0.35), transparent)", filter: "blur(8px)" }}
               aria-hidden
             />
-            <motion.span
+            <m.span
               className="relative mx-auto mt-3 flex h-20 w-20 items-center justify-center rounded-full bg-warning/15"
               animate={{ rotate: [0, -10, 10, 0], scale: [1, 1.12, 1] }}
               transition={{ duration: 1.2, delay: 0.35 }}
             >
               <Trophy className="h-10 w-10 text-[#FBBF24]" strokeWidth={1.8} fill="rgba(251, 191, 36, 0.25)" aria-hidden />
-            </motion.span>
+            </m.span>
             <h2 className="relative mt-3 font-display text-xl font-black text-foreground">Missão cumprida! 🏆</h2>
             <p className="relative mt-1 gf-card-text">Treino concluído com determinação. A constância tá construindo você.</p>
             <p className="relative mt-2 inline-flex rounded-full bg-brand/15 px-3 py-1 text-[11px] font-black text-brand">
               +{done * 5} pts · próxima conquista a caminho
             </p>
-          </motion.div>
+          </m.div>
         ) : null}
 
         {/* conquista desbloqueada */}
         {achievement ? (
-          <motion.div
+          <m.div
             initial={{ scale: 0.8, opacity: 0, rotate: -2 }}
             animate={{ scale: 1, opacity: 1, rotate: 0 }}
             transition={{ type: "spring", stiffness: 220, damping: 15, delay: 0.15 }}
@@ -173,26 +173,26 @@ export default function WorkoutSummary({
               style={{ background: "radial-gradient(60% 80% at 50% 0%, rgba(255,194,77,0.35), transparent)", filter: "blur(8px)" }}
               aria-hidden
             />
-            <motion.p
+            <m.p
               className="relative text-[10px] font-black uppercase tracking-[0.2em] text-warning"
               animate={unlocked ? { opacity: [0.7, 1, 0.7] } : undefined}
               transition={{ duration: 2, repeat: Infinity }}
             >
               Conquista Desbloqueada
-            </motion.p>
-            <motion.span
+            </m.p>
+            <m.span
               className="relative mx-auto mt-3 flex h-20 w-20 items-center justify-center rounded-full bg-warning/15 text-5xl"
               animate={{ rotate: [0, -8, 8, 0], scale: [1, 1.08, 1] }}
               transition={{ duration: 1.2, delay: 0.35 }}
             >
               <Trophy className="mx-auto h-10 w-10 text-[#FBBF24]" strokeWidth={1.8} fill="rgba(251, 191, 36, 0.2)" aria-hidden />
-            </motion.span>
+            </m.span>
             <h2 className="relative mt-3 font-display text-xl font-black text-foreground">{achievement.name}</h2>
             <p className="relative mt-1 gf-card-text">{achievement.description}</p>
             <p className="relative mt-2 inline-flex rounded-full bg-brand/15 px-3 py-1 text-[11px] font-black text-brand">
               +{achievement.points} pts
             </p>
-          </motion.div>
+          </m.div>
         ) : null}
 
         {/* RPE rápido */}
@@ -224,15 +224,15 @@ export default function WorkoutSummary({
         {/* COMPARTILHAR */}
         <div className="space-y-2.5">
           <p className="gf-section px-1">Espalhe o resultado</p>
-          <motion.button
+          <m.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={shareInstagram}
             className="gf-touch flex w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-[#E1306C] via-[#C13584] to-[#F77737] py-4 text-sm font-black text-white shadow-lg"
           >
             <Camera className="h-5 w-5" /> Compartilhar no Instagram
-          </motion.button>
-          <motion.a
+          </m.button>
+          <m.a
             href={whatsappHref}
             target="_blank"
             rel="noopener noreferrer"
@@ -241,7 +241,7 @@ export default function WorkoutSummary({
             className="gf-touch flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#25D366] py-4 text-sm font-black text-black shadow-lg"
           >
             <MessageCircle className="h-5 w-5" /> Compartilhar no WhatsApp
-          </motion.a>
+          </m.a>
           {!("share" in navigator) ? (
             <p className="flex items-center justify-center gap-1 text-center text-[10px] text-muted-foreground">
               <Copy className="h-3 w-3" /> No desktop o texto é copiado pra colar no app.

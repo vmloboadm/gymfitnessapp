@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence,m } from "framer-motion";
 import { RotateCw } from "lucide-react";
 import Model, { type Muscle } from "react-body-highlighter";
 import { cn } from "~/lib/utils";
@@ -131,7 +131,7 @@ export default function BodyMap({
         />
         {/* halo pulsante quando há grupo selecionado */}
         {activeGroup ? (
-          <motion.span
+          <m.span
             className="pointer-events-none absolute inset-x-14 bottom-12 top-14 rounded-full"
             style={{ background: "radial-gradient(closest-side, rgba(244,113,30,0.20), transparent)", filter: "blur(16px)" }}
             animate={{ opacity: [0.5, 0.9, 0.5] }}
@@ -174,7 +174,7 @@ export default function BodyMap({
         ) : null}
 
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div
+          <m.div
             key={side}
             initial={{ opacity: 0, rotateY: isBack ? -15 : 15, scale: 0.98 }}
             animate={{ opacity: 1, rotateY: 0, scale: 1 }}
@@ -198,7 +198,7 @@ export default function BodyMap({
               svgStyle={{ filter: activeGroup ? "drop-shadow(0 6px 18px rgba(244,113,30,0.25)) drop-shadow(0 2px 6px rgba(0,0,0,0.5))" : "drop-shadow(0 4px 14px rgba(0,0,0,0.45))" }}
               style={{ width: "100%", cursor: "pointer" }}
             />
-          </motion.div>
+          </m.div>
         </AnimatePresence>
 
         {/* botão girar sobre a ilustração — pedido confirmado */}
