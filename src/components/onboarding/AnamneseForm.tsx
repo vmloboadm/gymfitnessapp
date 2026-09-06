@@ -57,7 +57,8 @@ export function AnamneseForm({
     await onSave(
       {
         medical_risk: medicalRisk,
-        daily_intake: `${profile.daily_intake ?? ""}${medications ? ` | Med: ${medications}` : ""}`.trim() || null,
+        medications: medications.trim() || null,
+        surgery_history: surgery.trim() || null,
       },
       3
     );

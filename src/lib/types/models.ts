@@ -49,6 +49,10 @@ export type Profiles = {
   daily_intake: string | null;
   /** Consentimento LGPD para contato via WhatsApp (onboarding, campo novo) */
   whatsapp_consent?: boolean | null;
+  /** Medicamentos em uso (anamnese step 2) */
+  medications?: string | null;
+  /** Cirurgias/internações recentes (anamnese step 2) */
+  surgery_history?: string | null;
 };
 
 export type StudentSubscriptions = {

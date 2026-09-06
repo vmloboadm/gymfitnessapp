@@ -203,19 +203,17 @@ function OnboardingFlow() {
           Boas-vindas, {profile.name?.split(" ")[0] ?? "atleta"}!
         </h1>
         <OnboardingProgress current={step} total={5} />
-        <OnboardingStepper current={step} maxReached={maxReached} />
+        <OnboardingStepper
+          current={step}
+          maxReached={maxReached}
+          onBack={(s) => {
+            setStep(s);
+            router.replace(`/onboarding?step=${s}`);
+          }}
+        />
       </div>
 
       {StepComponent ? <StepComponent profile={profile} onSave={saveAndGo} onFinish={finish} /> : null}
-
-      {step < 5 ? (
-        <button
-          onClick={() => saveAndGo({}, step + 1)}
-          className="w-full py-2 text-center text-[12px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Pular esta etapa →
-        </button>
-      ) : null}
     </div>
   );
 }

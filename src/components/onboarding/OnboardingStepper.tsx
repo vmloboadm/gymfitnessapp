@@ -11,23 +11,37 @@ const STEPS = [
   { id: 5, label: "Revisar" },
 ] as const;
 
-/** Stepper visual do onboarding (não navega sozinho, só exibe o progresso). */
-export function OnboardingStepper({ current, maxReached }: { current: number; maxReached: number }) {
+/** Stepper do onboarding: etapas concluídas são clicáveis (voltar e corrigir). */
+export function OnboardingStepper({
+  current,
+  maxReached,
+  onBack,
+}: {
+  current: number;
+  maxReached: number;
+  onBack?: (step: number) => void;
+}) {
   return (
     <ol className="flex items-center gap-1.5" aria-label="Progresso do cadastro">
       {STEPS.map((s) => {
         const active = s.id === current;
         const done = s.id <= maxReached;
+        const clickable = !!onBack && s.id < current && s.id <= maxReached;
         return (
           <li key={s.id} className="flex flex-1 items-center gap-1.5">
-            <span
+            <button
+              type="button"
+              disabled={!clickable}
+              onClick={() => clickable && onBack?.(s.id)}
+              aria-label={clickable ? `Voltar para etapa ${s.id}: ${s.label}` : `Etapa ${s.id}: ${s.label}`}
               className={cn(
                 "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors",
                 done
                   ? "bg-brand text-white"
                   : active
                     ? "bg-brand/25 text-brand ring-1 ring-brand"
-                    : "bg-secondary text-muted-foreground"
+                    : "bg-secondary text-muted-foreground",
+                clickable && "cursor-pointer hover:ring-2 hover:ring-brand/60"
               )}
             >
               {done && s.id !== current ? (
@@ -35,7 +49,7 @@ export function OnboardingStepper({ current, maxReached }: { current: number; ma
               ) : (
                 s.id
               )}
-            </span>
+            </button>
             {s.id < STEPS.length && (
               <span
                 className={cn(

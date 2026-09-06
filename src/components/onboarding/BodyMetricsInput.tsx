@@ -6,6 +6,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { toast } from "sonner";
 import { calcBmi } from "~/lib/utils/calculations";
 import type { Profiles } from "~/lib/types/models";
 
@@ -27,9 +28,11 @@ export function IntentInput({
   const [saving, setSaving] = useState(false);
 
   const w = parseFloat(weight.replace(",", "."));
-  const h = parseFloat(height.replace(",", "."));
-  const bmi = w > 0 && h > 0 ? calcBmi(w, h) : null;
-  const valid = w > 0 && h > 0;
+  const hRaw = parseFloat(height.replace(",", "."));
+  // Aceita 181 (cm) ou 1,81 (m): converte sozinho
+  const h = hRaw > 10 ? hRaw / 100 : hRaw;
+  const bmi = w > 0 && h > 0.5 && h < 2.8 ? calcBmi(w, h) : null;
+  const valid = w > 20 && w < 400 && h > 0.5 && h < 2.8;
 
   const handleNext = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +40,7 @@ export function IntentInput({
     setSaving(true);
 
     const supabase = supabaseBrowser();
-    await supabase.from("body_metrics").insert({
+    const { error } = await supabase.from("body_metrics").insert({
       gym_id: profile.gym_id,
       student_id: profile.id,
       weight_kg: w,
@@ -46,6 +49,12 @@ export function IntentInput({
       bmi: bmi ? Math.round(bmi * 10) / 10 : null,
       source: "manual",
     } as never);
+
+    if (error) {
+      toast.error("Falha ao salvar medidas", { description: error.message });
+      setSaving(false);
+      return;
+    }
 
     await onSave({}, 4);
     setSaving(false);
@@ -81,15 +90,16 @@ export function IntentInput({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="height">Altura (m)</Label>
+          <Label htmlFor="height">Altura</Label>
           <Input
             id="height"
             inputMode="decimal"
             value={height}
             onChange={(e) => setHeight(e.target.value)}
-            placeholder="1,81"
+            placeholder="1,81 ou 181"
             className="font-mono"
           />
+          <p className="text-[11px] text-muted-foreground">Vale em metros (1,81) ou centímetros (181).</p>
         </div>
       </div>
       <div className="space-y-2">

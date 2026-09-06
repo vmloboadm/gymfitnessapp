@@ -25,6 +25,10 @@ export function MedicalRestrictionForm({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (f: File) => {
+    if (f.size > 5 * 1024 * 1024) {
+      toast.error("Arquivo grande demais", { description: "Envie um PDF ou imagem de até 5 MB." });
+      return;
+    }
     setFile(f);
     setUploading(true);
     const supabase = supabaseBrowser();

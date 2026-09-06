@@ -27,9 +27,11 @@ const SUMMARY: Array<{ label: string; get: (p: Profiles) => string }> = [
  */
 export function OnboardingReview({
   profile,
+  onSave,
   onFinish,
 }: {
   profile: Profiles;
+  onSave: (patch: Partial<Profiles>, nextStep: number) => Promise<void>;
   onFinish: () => Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
@@ -38,8 +40,9 @@ export function OnboardingReview({
   const finish = async () => {
     if (!consent) return;
     setSaving(true);
-    // Persiste o consentimento LGPD (demo: profile-store; produção: coluna nova)
+    // Persiste o consentimento LGPD no banco (antes só ia pro localStorage)
     saveOnboarding({ whatsapp_consent: true });
+    await onSave({ whatsapp_consent: true }, 5);
     await onFinish();
   };
 
