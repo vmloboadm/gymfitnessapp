@@ -16,6 +16,7 @@ import {
   Lock,
   ScanLine,
   ArrowUpRight,
+  KeyRound,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
@@ -49,7 +50,8 @@ import { libraryMatch } from "~/lib/demo-data";
 import { toast } from "sonner";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
-import { useWorkoutSession, elapsedSeconds, readSessionProgress } from "~/lib/workout-session";
+import { useWorkoutSession, elapsedSeconds, readSessionProgress, startWorkoutSession as startLocalDaySession } from "~/lib/workout-session";
+import { checkDayPassword } from "~/lib/day-pass";
 import { SessionClock } from "~/components/common/SessionClock";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
 
@@ -452,7 +454,8 @@ export default function TreinoHomePage() {
 
   // Sem check-in NÃO bloqueia mais a tela: mostra aviso discreto e libera tudo
   const needsCheckin = !daySession;
-  const _checkinBanner = needsCheckin ? (
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  const checkinBanner = needsCheckin ? (
     <div className="mx-auto max-w-md px-4 pt-3">
       <Link href="/checkin?scan=1&from=/treino" className="flex items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning/[0.08] px-4 py-2.5">
         <span className="flex items-center gap-2 text-[12px] font-bold text-warning">
@@ -604,6 +607,11 @@ export default function TreinoHomePage() {
       : null;
   const startPlanSession = async () => {
     if (!plan?.plan?.dias || plan.plan.dias.length === 0 || todayIdx < 0) return;
+    // Gate: sem check-in (QR/NFC) nem senha do dia, abre o desbloqueio
+    if (!demo && !daySession) {
+      setUnlockOpen(true);
+      return;
+    }
     // Trava: só um treino por vez — finalize o anterior antes de começar outro
     if (!demo && user?.id) {
       const active = await getActiveWorkoutSession(user.id);
@@ -681,6 +689,7 @@ export default function TreinoHomePage() {
   return (
     <>
       <TopBar title="Treino" subtitle={cap(weekdayName())} />
+      {checkinBanner}
       {sessionBar}
       <div className="space-y-8 p-4">
         {/* 1. STATUS ATUAL, linha compacta sem card pesado */}
@@ -975,6 +984,16 @@ export default function TreinoHomePage() {
       </BottomSheet>
       <ImageLightbox src={zoomSrc} alt="Exercício" open={!!zoomSrc} onClose={() => setZoomSrc(null)} />
       <AiCoach />
+      {unlockOpen ? (
+        <UnlockSheet
+          gymId={profile?.gym_id ?? ""}
+          onClose={() => setUnlockOpen(false)}
+          onUnlocked={() => {
+            setUnlockOpen(false);
+            toast.success("Treino liberado! Toque em Iniciar.");
+          }}
+        />
+      ) : null}
       {/* Feedback do treino anterior (sessão concluída sem feedback) */}
       <WorkoutFeedbackSheet
         open={feedbackOpen && !!pendingFeedback}
@@ -1042,6 +1061,77 @@ function HistoryList({ logs }: { logs: WorkoutLogs[] }) {
           </div>
         )
       ) : null}
+    </div>
+  );
+}
+/** Desbloqueio do treino: QR/NFC na portaria OU senha do dia (trocada todo dia). */
+function UnlockSheet({ gymId, onClose, onUnlocked }: {
+  gymId: string;
+  onClose: () => void;
+  onUnlocked: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [err, setErr] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  const confirm = () => {
+    if (!gymId) return;
+    if (checkDayPassword(gymId, code)) {
+      startLocalDaySession();
+      navigator.vibrate?.(60);
+      onUnlocked();
+    } else {
+      setErr(true);
+      navigator.vibrate?.([40, 40]);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Liberar treino de hoje">
+      <button aria-label="Fechar" onClick={onClose} className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-3xl border border-border bg-background p-5 pb-8">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-brand">
+          <Lock className="h-3.5 w-3.5" /> Treino bloqueado
+        </p>
+        <h3 className="mt-0.5 text-lg font-black text-foreground">Libere o treino de hoje</h3>
+        <p className="mt-1 text-[12px] text-muted-foreground">
+          Escaneie o QR da portaria ou peça a senha do dia na recepção.
+        </p>
+        <Link
+          href="/checkin?scan=1&from=/treino"
+          className="tactile mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-brand/30 bg-brand/10 py-3 text-[13px] font-black text-brand"
+        >
+          <ScanLine className="h-4 w-4" /> Escanear QR / NFC
+        </Link>
+        <div className="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+          <span className="h-px flex-1 bg-white/10" /> ou senha do dia <span className="h-px flex-1 bg-white/10" />
+        </div>
+        <label className="block">
+          <span className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <KeyRound className="h-3 w-3" /> Senha de hoje (4 dígitos)
+          </span>
+          <input
+            value={code}
+            onChange={(e) => { setCode(e.target.value.replace(/\D/g, "").slice(0, 4)); setErr(false); }}
+            inputMode="numeric"
+            aria-label="Senha do dia"
+            placeholder="••••"
+            className="h-12 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] px-3.5 text-center text-lg font-black tracking-[0.5em] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+          />
+        </label>
+        {err ? <p className="mt-1.5 text-center text-[11px] font-bold text-[#F87171]">Senha incorreta. Confira na recepção.</p> : null}
+        <button
+          onClick={confirm}
+          disabled={code.length !== 4}
+          className="tactile mt-3 flex h-12 w-full items-center justify-center gap-1.5 rounded-2xl bg-brand text-[13px] font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-40"
+        >
+          <CheckCircle2 className="h-4 w-4" strokeWidth={3} /> Liberar treino
+        </button>
+      </div>
     </div>
   );
 }

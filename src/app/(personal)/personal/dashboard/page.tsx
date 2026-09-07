@@ -19,6 +19,7 @@ import {
   CalendarCheck,
   ListChecks,
   Sparkles,
+  KeyRound,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
@@ -27,6 +28,7 @@ import { demoOnlineAgora } from "~/lib/demo-bridge";
 import { LivePulse } from "~/components/dashboard/LivePulse";
 import { CountUp } from "~/components/common/CountUp";
 import { StudentSheet } from "~/components/personal/StudentSheet";
+import { getDayPassword } from "~/lib/day-pass";
 import type { PersonalStudent } from "~/lib/personal-data";
 import { getGymStudents } from "~/lib/gym-api";
 import { briefingOffline } from "~/lib/ai/local-gen";
@@ -239,6 +241,12 @@ export default function PersonalDashboardPage() {
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F87171]/10 px-2.5 py-1 text-[10px] font-bold text-[#F87171] ring-1 ring-[#F87171]/30">
               <UserRoundX className="h-3 w-3" />
               {stats.missesWeek} sumidos
+            </span>
+          ) : null}
+          {profile?.gym_id ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-1 text-[10px] font-bold text-brand ring-1 ring-brand/30">
+              <KeyRound className="h-3 w-3" />
+              Senha de hoje: {getDayPassword(profile.gym_id)}
             </span>
           ) : null}
         </div>
