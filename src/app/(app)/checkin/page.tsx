@@ -132,6 +132,17 @@ export default function CheckinPage() {
     const raw = (params.get("maquina") ?? params.get("eq") ?? "").trim();
     if (!raw) return;
 
+    // TAG DA ENTRADA: check-in de presença + treino do dia liberado
+    if (raw.toLowerCase() === "entrada") {
+      window.history.replaceState({}, "", window.location.pathname);
+      void (async () => {
+        await doEntry("nfc");
+        toast.success("Treino de hoje liberado! Bora treinar.");
+        router.push("/treino?ir=hoje");
+      })();
+      return;
+    }
+
     const norm = (s: string | null | undefined) =>
       (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const target = decodeURIComponent(raw).toLowerCase();

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Settings, LogOut, CalendarClock, ChevronRight, Scale, ListMusic, FileText } from "lucide-react";
+  Settings, LogOut, CalendarClock, ChevronRight, Scale, ListMusic, FileText, BadgePercent } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -241,9 +241,14 @@ export default function PerfilPage() {
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">Playlist da academia</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           </Link>
-          <Link href="/premium" className="tactile flex w-full items-center gap-3 bg-card/40 px-4 py-3.5 transition-colors hover:bg-card/70">
+          <Link href="/premium" className="tactile flex w-full items-center gap-3 border-b border-border bg-card/40 px-4 py-3.5 transition-colors hover:bg-card/70">
             <FileText className="h-4 w-4 shrink-0 text-brand" />
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">Relatórios avançados (PDF)</span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Link>
+          <Link href="/beneficios" className="tactile flex w-full items-center gap-3 bg-card/40 px-4 py-3.5 transition-colors hover:bg-card/70">
+            <BadgePercent className="h-4 w-4 shrink-0 text-[#4ADE80]" />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">Benefícios e descontos</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           </Link>
         </div>

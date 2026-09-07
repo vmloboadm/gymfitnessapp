@@ -99,17 +99,19 @@ export default function EquipamentoPage() {
     return (id: string) => map.get(id);
   }, [demo]);
 
-  const { loading, error } = useAsyncQuery<{ equipment: Equipment[] }>(
+  const { data: eqData, loading, error } = useAsyncQuery<{ equipment: Equipment[] }>(
     async () => {
       if (demo) return { data: { equipment: [] as Equipment[] }, error: null };
       const supabase = supabaseBrowser();
       if (!profile) return { data: null, error: { message: "Perfil indisponível" } };
-      const eqRes = await supabase.from("equipment").select("*").eq("gym_id", profile.gym_id).order("name");
+      const eqRes = await supabase.from("equipment").select("*").eq("gym_id", profile.gym_id).neq("status", "pending").order("name");
       if (eqRes.error) return { data: null, error: eqRes.error };
       return { data: { equipment: (eqRes.data ?? []) as Equipment[] }, error: null };
     },
     [profile?.id, demo]
   );
+
+  const gymMachines = useMemo(() => eqData?.equipment ?? [], [eqData]);
 
   const todayNames = useMemo(() => {
     if (!demo) return new Set<string>();
@@ -178,6 +180,30 @@ export default function EquipamentoPage() {
       </div>
 
       <TopBar title="Equipamentos" subtitle={`Catálogo · ${CANON.length} grupos · ${totalExercises} exercícios`} />
+
+      {/* Máquinas do gym: cada chip abre a máquina na biblioteca */}
+      {!demo && gymMachines.length > 0 ? (
+        <section aria-label="Máquinas do gym" className="px-4 pt-3">
+          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Máquinas do gym · toque para abrir
+          </p>
+          <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1">
+            {gymMachines.map((m) => (
+              <Link
+                key={m.id}
+                href={`/maquina/${m.id}`}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] py-1.5 pl-1.5 pr-3 transition-colors hover:border-brand/40"
+              >
+                <span className={cn(
+                  "h-2 w-2 rounded-full",
+                  m.status === "available" ? "bg-[#4ADE80]" : m.status === "in_use" ? "bg-[#FFC24D]" : "bg-[#F87171]"
+                )} />
+                <span className="whitespace-nowrap text-[11px] font-bold text-foreground">{m.name}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* Busca por nome */}
       <div className="px-4 pt-3">
