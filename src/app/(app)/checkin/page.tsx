@@ -143,6 +143,13 @@ export default function CheckinPage() {
       return;
     }
 
+    // TAG DO ESPELHO: QR/NFC do adesivo do espelho abre o cartão compartilhável
+    if (raw.toLowerCase() === "espelho" || raw.toLowerCase() === "mirror") {
+      window.history.replaceState({}, "", window.location.pathname);
+      router.push("/mirror");
+      return;
+    }
+
     const norm = (s: string | null | undefined) =>
       (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const target = decodeURIComponent(raw).toLowerCase();
