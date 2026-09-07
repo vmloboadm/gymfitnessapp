@@ -20,5 +20,12 @@
       "source": "/app/manifest.json",
       "destination": "/manifest.json"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/app",
+      "permanent": false
+    }
   ]
 }
