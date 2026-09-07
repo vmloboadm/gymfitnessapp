@@ -15,7 +15,7 @@ import { cn } from "~/lib/utils";
 import { isDemoMode } from "~/lib/demo-bridge";
 import type { Equipment } from "~/lib/types/models";
 
-type MachineExercise = { id: string; name: string; category: string };
+type MachineExercise = { id: string; name: string; category: string; muscles: string[]; tips: string[] };
 type MachineHistory = {
   id: string;
   started_at: string;
@@ -49,7 +49,7 @@ export default function MaquinaPage() {
     if (!user || !profile) return { data: null, error: { message: "Sessão indisponível" } };
     const [{ data: mach, error: mErr }, { data: exs }, { data: hist }] = await Promise.all([
       sb.from("equipment").select("*").eq("id", id).eq("gym_id", profile.gym_id).maybeSingle(),
-      sb.from("exercises").select("id, name, category").eq("equipment_id", id).order("name").limit(30),
+      sb.from("exercises").select("id, name, category, muscles, tips").eq("equipment_id", id).order("name").limit(30),
       sb
         .from("equipment_sessions")
         .select("id, started_at, ended_at, meta")
@@ -119,7 +119,9 @@ export default function MaquinaPage() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-black text-foreground">{m.name}</p>
-              <p className="text-[11px] capitalize text-muted-foreground">{m.category}</p>
+              <p className="text-[11px] capitalize text-muted-foreground">
+                {m.category} · {m.capacity > 1 ? `até ${m.capacity} pessoas` : "1 pessoa por vez"}
+              </p>
             </div>
             <span className={cn(
               "shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider",
@@ -141,7 +143,14 @@ export default function MaquinaPage() {
 
         {/* exercícios neste aparelho */}
         <section aria-label="Exercícios neste aparelho">
-          <h2 className="mb-2 text-sm font-bold text-foreground">Exercícios neste aparelho</h2>
+          <h2 className="mb-2 text-sm font-bold text-foreground">
+            Exercícios neste aparelho
+            {data.exercises.length > 0 ? (
+              <span className="ml-1.5 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-black text-brand">
+                {data.exercises.length}
+              </span>
+            ) : null}
+          </h2>
           {data.exercises.length === 0 ? (
             <p className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-center text-[11.5px] text-muted-foreground">
               Nenhum exercício vinculado ainda. O personal vincula na montagem do treino.
@@ -159,7 +168,14 @@ export default function MaquinaPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-semibold text-foreground">{e.name}</p>
-                      <p className="text-[10px] capitalize text-muted-foreground">{e.category}</p>
+                      <p className="text-[10px] capitalize text-muted-foreground">
+                        {(e.muscles ?? []).slice(0, 3).join(" · ") || e.category}
+                      </p>
+                      {(e.tips ?? []).length > 0 ? (
+                        <p className="mt-0.5 line-clamp-1 text-[10px] italic text-muted-foreground/80">
+                          💡 {e.tips[0]}
+                        </p>
+                      ) : null}
                     </div>
                   </Link>
                 </li>
