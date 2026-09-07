@@ -18,6 +18,7 @@ import {
   Dumbbell,
   CalendarCheck,
   ListChecks,
+  Sparkles,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
@@ -178,36 +179,69 @@ export default function PersonalDashboardPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header: identidade do personal + sino com badge da fila */}
-      <m.header variants={item} initial="hidden" animate="show" className="flex items-center gap-3">
-        <span className="relative shrink-0 rounded-full bg-brand p-[2px] shadow-[0_0_18px_rgba(244,113,30,0.35)]">
-          <Avatar className="h-12 w-12 border-2 border-background">
-            <AvatarImage src={profile?.avatar_url ?? undefined} alt={profile?.name ?? "Personal"} />
-            <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-sm font-black text-brand-foreground">
-              {(profile?.name?.[0] ?? "P").toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-bold leading-tight text-foreground">
-            {profile?.name ?? "Personal"}
-          </p>
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-brand">
-            Personal Trainer
-          </p>
+      {/* Hero: saudação do dia + pulso ao vivo + sino */}
+      <m.header
+        variants={item}
+        initial="hidden"
+        animate="show"
+        className="relative overflow-hidden rounded-[22px] border border-white/[0.07] bg-gradient-to-br from-brand/[0.14] via-transparent to-transparent p-4"
+      >
+        <div className="pointer-events-none absolute inset-0" aria-hidden>
+          <div className="absolute -right-12 -top-20 h-48 w-48 rounded-full bg-brand/25 blur-3xl" />
+          <div className="absolute -bottom-24 -left-12 h-44 w-44 rounded-full bg-[#FFC24D]/10 blur-3xl" />
         </div>
-        <button
-          onClick={() => setQueueOpen(true)}
-          aria-label={`Fila de hoje, ${queue.length} itens`}
-          className="tactile relative flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03] text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <Bell className="h-4 w-4" />
-          {queue.length > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-black text-brand-foreground">
-              {queue.length}
+        <div className="relative flex items-center gap-3">
+          <span className="relative shrink-0 rounded-full bg-brand p-[2px] shadow-[0_0_18px_rgba(244,113,30,0.35)]">
+            <Avatar className="h-12 w-12 border-2 border-background">
+              <AvatarImage src={profile?.avatar_url ?? undefined} alt={profile?.name ?? "Personal"} />
+              <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-sm font-black text-brand-foreground">
+                {(profile?.name?.[0] ?? "P").toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold text-muted-foreground">
+              {(() => {
+                const h = new Date().getHours();
+                return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
+              })()}
+              , <span className="font-bold text-foreground">{(profile?.name ?? "Personal").split(" ")[0]}</span>
+            </p>
+            <p className="truncate text-[15px] font-black leading-tight text-foreground">
+              {new Date()
+                .toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "short" })
+                .replace(/^./, (c) => c.toUpperCase())}
+            </p>
+          </div>
+          <button
+            onClick={() => setQueueOpen(true)}
+            aria-label={`Fila de hoje, ${queue.length} itens`}
+            className="tactile relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Bell className="h-4 w-4" />
+            {queue.length > 0 ? (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-black text-brand-foreground">
+                {queue.length}
+              </span>
+            ) : null}
+          </button>
+        </div>
+        <div className="relative mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1 text-[10px] font-bold text-foreground ring-1 ring-white/[0.08]">
+            <span className="hero-live-dot h-1.5 w-1.5 rounded-full bg-[#4ADE80]" />
+            {online} na academia agora
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1 text-[10px] font-bold text-foreground ring-1 ring-white/[0.08]">
+            <Flame className="h-3 w-3 text-[#FFC24D]" />
+            {stats.prescribedToday} prescritos hoje
+          </span>
+          {stats.missesWeek > 0 ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F87171]/10 px-2.5 py-1 text-[10px] font-bold text-[#F87171] ring-1 ring-[#F87171]/30">
+              <UserRoundX className="h-3 w-3" />
+              {stats.missesWeek} sumidos
             </span>
           ) : null}
-        </button>
+        </div>
       </m.header>
 
       {/* Skeleton do primeiro load (imita o layout real) */}
@@ -265,31 +299,33 @@ export default function PersonalDashboardPage() {
 
       {/* Métricas de gestão (count-up) */}
       <m.div variants={item} initial="hidden" animate="show" className="grid grid-cols-3 gap-2">
-        <Link href="/personal/alunos" className="gf-card gf-glass !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
+        <Link href="/personal/alunos" className="gf-card gf-glass relative overflow-hidden !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand to-brand/20" aria-hidden />
           <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
             <Users className="h-3.5 w-3.5 text-brand" />
           </span>
-          <p className="mt-2 font-display text-xl font-black leading-none text-foreground">
+          <p className="mt-2 font-display text-2xl font-black leading-none tracking-tight text-foreground">
             <CountUp value={stats.activeStudents} />
             <span className="text-[11px] font-bold text-muted-foreground">/{stats.totalStudents}</span>
           </p>
           <p className="mt-1 text-[9.5px] font-semibold leading-tight text-muted-foreground">
             Ativos hoje
           </p>
-          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
             <div
-              className="h-full origin-left rounded-full bg-brand transition-transform duration-700"
+              className="h-full origin-left rounded-full bg-gradient-to-r from-brand to-[#FFC24D] transition-transform duration-700"
               style={{
                 transform: `scaleX(${stats.totalStudents ? stats.activeStudents / stats.totalStudents : 0})`,
               }}
             />
           </div>
         </Link>
-        <Link href="/personal/treinos" className="gf-card gf-glass !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
+        <Link href="/personal/treinos" className="gf-card gf-glass relative overflow-hidden !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#4ADE80] to-[#4ADE80]/20" aria-hidden />
           <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#4ADE80]/25 bg-[#4ADE80]/10">
             <ClipboardList className="h-3.5 w-3.5 text-[#4ADE80]" />
           </span>
-          <p className="mt-2 font-display text-xl font-black leading-none text-foreground">
+          <p className="mt-2 font-display text-2xl font-black leading-none tracking-tight text-foreground">
             <CountUp value={stats.prescribedToday} />
           </p>
           <p className="mt-1 text-[9.5px] font-semibold leading-tight text-muted-foreground">
@@ -305,13 +341,16 @@ export default function PersonalDashboardPage() {
               {stats.prescribedToday >= stats.prescribedYesterday ? "▲" : "▼"} ontem:{" "}
               {stats.prescribedYesterday}
             </p>
-          ) : null}
+          ) : (
+            <p className="mt-0.5 text-[9px] font-bold text-muted-foreground/70">toque p/ prescrever</p>
+          )}
         </Link>
-        <Link href="/personal/alunos" className="gf-card gf-glass !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
+        <Link href="/personal/alunos" className="gf-card gf-glass relative overflow-hidden !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#F87171] to-[#F87171]/20" aria-hidden />
           <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#F87171]/25 bg-[#F87171]/10">
             <UserRoundX className="h-3.5 w-3.5 text-[#F87171]" />
           </span>
-          <p className="mt-2 font-display text-xl font-black leading-none text-foreground">
+          <p className="mt-2 font-display text-2xl font-black leading-none tracking-tight text-foreground">
             <CountUp value={stats.missesWeek} />
           </p>
           <p className="mt-1 text-[9.5px] font-semibold leading-tight text-muted-foreground">
@@ -321,7 +360,9 @@ export default function PersonalDashboardPage() {
             <p className="mt-0.5 text-[9px] font-bold text-[#F87171]">
               {Math.round((stats.missesWeek / Math.max(1, stats.totalStudents)) * 100)}% da turma
             </p>
-          ) : null}
+          ) : (
+            <p className="mt-0.5 text-[9px] font-bold text-[#4ADE80]">turma em dia</p>
+          )}
         </Link>
       </m.div>
 
@@ -379,6 +420,19 @@ export default function PersonalDashboardPage() {
       {/* Ações rápidas */}
       <m.section variants={item} initial="hidden" animate="show" aria-labelledby="quick-title">
         <h2 id="quick-title" className="mb-2 text-sm font-bold text-foreground">Ferramentas</h2>
+        <Link
+          href="/personal/treinos"
+          className="group relative mb-2 flex items-center gap-3 overflow-hidden rounded-2xl border border-brand/30 bg-gradient-to-r from-brand/[0.22] via-brand/[0.08] to-transparent p-3.5 transition-transform active:scale-[0.985]"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-dark shadow-lg shadow-brand/30">
+            <Sparkles className="h-4.5 w-4.5 text-brand-foreground" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-black leading-tight text-foreground">Montar treino com IA</span>
+            <span className="block text-[10px] text-muted-foreground">assistente pergunta, você aprova</span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-brand transition-transform group-active:translate-x-0.5" />
+        </Link>
         <div className="grid grid-cols-3 gap-2">
           <Link href="/personal/ranking" className="gf-card gf-glass !rounded-2xl !p-3 text-center transition-transform active:scale-[0.96]">
             <TrophyIcon className="mx-auto h-4.5 w-4.5 text-[#FFC24D]" />
@@ -449,20 +503,23 @@ function WeeklyChart({ students }: { students: PersonalStudent[] }) {
   const maxCount = Math.max(1, ...days.map((d) => d.count));
 
   return (
-    <div className="gf-card gf-glass !rounded-2xl !p-3">
+    <div className="gf-card gf-glass relative overflow-hidden !rounded-2xl !p-3">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand via-[#FFC24D] to-brand/20" aria-hidden />
       <div className="mb-2 flex items-center justify-between">
         <p className="text-[11px] font-bold text-foreground">Frequência da semana</p>
         <p className="text-[9px] text-muted-foreground">check-ins/dia</p>
       </div>
-      <div className="flex items-end gap-1.5" style={{ height: 56 }}>
+      <div className="flex items-end gap-1.5" style={{ height: 64 }}>
         {days.map((d, i) => (
           <div key={i} className="flex flex-1 flex-col items-center gap-1">
-            <span className="text-[8px] font-bold text-muted-foreground">{d.count}</span>
-            <div className="w-full overflow-hidden rounded-t-sm" style={{ height: 40 }}>
+            <span className={cn("text-[8px] font-bold", d.isToday ? "text-brand" : "text-muted-foreground")}>{d.count}</span>
+            <div className="w-full overflow-hidden rounded-t-md" style={{ height: 44 }}>
               <div
                 className={cn(
-                  "w-full rounded-t-sm transition-all duration-500",
-                  d.isToday ? "bg-brand" : "bg-white/10"
+                  "w-full rounded-t-md transition-all duration-500",
+                  d.isToday
+                    ? "bg-gradient-to-t from-brand-dark to-brand shadow-[0_0_12px_rgba(244,113,30,0.45)]"
+                    : "bg-white/10"
                 )}
                 style={{
                   height: `${(d.count / maxCount) * 100}%`,

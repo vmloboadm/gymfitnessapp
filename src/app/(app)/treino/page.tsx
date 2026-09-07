@@ -22,7 +22,15 @@ import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { useStudentWorkoutsRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { supabaseBrowser } from "~/lib/supabase/client";
-import { startWorkoutSession, completeWorkoutSession } from "~/lib/supabase/workout-session";
+import {
+  startWorkoutSession,
+  completeWorkoutSession,
+  completeStaleSessions,
+  getLastSessionNeedingFeedback,
+  getActiveWorkoutSession,
+  type StudentSession,
+} from "~/lib/supabase/workout-session";
+import WorkoutFeedbackSheet from "~/components/student/WorkoutFeedbackSheet";
 import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Badge } from "~/components/ui/badge";
@@ -137,6 +145,45 @@ export default function TreinoHomePage() {
   const [hasSavedProgress, setHasSavedProgress] = useState(false);
   const [libCat, setLibCat] = useState<string | null>(null);
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
+
+  // Feedback do treino anterior: sessão concluída sem feedback → pede ao abrir
+  const [pendingFeedback, setPendingFeedback] = useState<StudentSession | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
+  useEffect(() => {
+    if (demo || !user?.id) return;
+    let cancelled = false;
+    (async () => {
+      await completeStaleSessions(user.id);
+      if (cancelled) return;
+      const last = await getLastSessionNeedingFeedback(user.id);
+      if (cancelled) return;
+      if (last) {
+        setPendingFeedback(last);
+        setFeedbackOpen(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [demo, user?.id]);
+
+  const feedbackDateLabel = useMemo(() => {
+    if (!pendingFeedback?.ended_at) return "anterior";
+    const d = new Date(pendingFeedback.ended_at);
+    const today = new Date().toDateString() === d.toDateString();
+    if (today) return "de hoje";
+    const y = new Date(Date.now() - 864e5).toDateString() === d.toDateString();
+    if (y) return "de ontem";
+    return `do dia ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`;
+  }, [pendingFeedback]);
+
+  const feedbackEstimateMin = useMemo(() => {
+    if (!pendingFeedback) return null;
+    const end = pendingFeedback.ended_at ? new Date(pendingFeedback.ended_at).getTime() : Date.now();
+    const mins = Math.round((end - new Date(pendingFeedback.started_at).getTime()) / 60000);
+    return mins > 5 && mins < 240 ? mins : null;
+  }, [pendingFeedback]);
 
   useEffect(() => {
     setHasSavedProgress(!!readSessionProgress());
@@ -262,6 +309,8 @@ export default function TreinoHomePage() {
     setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
     endDaySession();
     if (!demo && user?.id) {
+      const active = await getActiveWorkoutSession(user.id).catch(() => null);
+      setFinishedSessionId(active?.id ?? null);
       void completeWorkoutSession(user.id);
     }
     if (completedIds?.length) {
@@ -298,6 +347,7 @@ export default function TreinoHomePage() {
   // Conclusões desta sessão (otimista, local): alimenta contador e reordenação
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const doneCount = doneIds.size;
+  const [finishedSessionId, setFinishedSessionId] = useState<string | null>(null);
 
   const startWorkout = (list: typeof DEFAULT_DEMO_EX) => {
     setSession(list);
@@ -452,6 +502,7 @@ export default function TreinoHomePage() {
             seconds={summarySeconds ?? 0}
             done={Math.min(todayLogs || 1, totalToday || 1)}
             total={totalToday || 1}
+            sessionId={finishedSessionId}
             onDone={() => {
               router.replace("/");
             }}
@@ -508,8 +559,18 @@ export default function TreinoHomePage() {
         ? { day: plan.plan.dias[todayIdx % plan.plan.dias.length], isRest: false }
         : { day: null, isRest: true }
       : null;
-  const startPlanSession = () => {
+  const startPlanSession = async () => {
     if (!plan?.plan?.dias || plan.plan.dias.length === 0 || todayIdx < 0) return;
+    // Trava: só um treino por vez — finalize o anterior antes de começar outro
+    if (!demo && user?.id) {
+      const active = await getActiveWorkoutSession(user.id);
+      if (active) {
+        toast.info("Você já tem um treino em andamento", {
+          description: "Finalize o treino atual antes de começar outro.",
+        });
+        return;
+      }
+    }
     const day = plan.plan.dias[todayIdx % plan.plan.dias.length];
     // Fotos/vídeos da BIBLIOTECA (mesma fonte do catálogo) por nome; curado como fallback
     const exList = day.exercicios.map((e, i) => {
@@ -871,6 +932,18 @@ export default function TreinoHomePage() {
       </BottomSheet>
       <ImageLightbox src={zoomSrc} alt="Exercício" open={!!zoomSrc} onClose={() => setZoomSrc(null)} />
       <AiCoach />
+      {/* Feedback do treino anterior (sessão concluída sem feedback) */}
+      <WorkoutFeedbackSheet
+        open={feedbackOpen && !!pendingFeedback}
+        sessionId={pendingFeedback?.id ?? null}
+        sessionDateLabel={feedbackDateLabel}
+        estimatedMin={feedbackEstimateMin}
+        onSaved={() => {
+          setFeedbackOpen(false);
+          setPendingFeedback(null);
+        }}
+        onClose={() => setFeedbackOpen(false)}
+      />
     </>
   );
 }

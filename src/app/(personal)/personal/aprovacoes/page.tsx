@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { m, type Variants } from "framer-motion";
-import { Inbox, Crown, Dumbbell, Check, X, Inbox as InboxIcon } from "lucide-react";
+import { Inbox, Crown, Dumbbell, Check, X, Inbox as InboxIcon, FileText, ArrowLeftRight } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import type { PersonalStudent } from "~/lib/personal-data";
@@ -26,6 +27,13 @@ const row: Variants = {
 
 const fmt = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+const TYPE_META: Record<ApprovalRequest["type"], { label: string; short: string; icon: typeof Crown; cls: string }> = {
+  premium: { label: "Desbloqueio de Plano Premium", short: "Premium", icon: Crown, cls: "text-[#FFC24D]" },
+  carga: { label: "Ajuste de treino", short: "Carga", icon: Dumbbell, cls: "text-brand" },
+  relatorio: { label: "Relatório de evolução", short: "Relatório", icon: FileText, cls: "text-sky-400" },
+  ajuste: { label: "Troca de exercício", short: "Troca", icon: ArrowLeftRight, cls: "text-[#4ADE80]" },
+};
 
 /**
  * Caixa de entrada de aprovações: pedidos dos alunos (premium, ajuste de
@@ -136,12 +144,12 @@ export default function PersonalAprovacoesPage() {
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 text-[13px] font-bold text-foreground">
-                    {a.type === "premium" ? (
-                      <Crown className="h-3.5 w-3.5 text-[#FFC24D]" />
-                    ) : (
-                      <Dumbbell className="h-3.5 w-3.5 text-brand" />
-                    )}
-                    {a.type === "premium" ? "Desbloqueio de Plano Premium" : "Ajuste de treino"}
+                    {(() => {
+                      const meta = TYPE_META[a.type] ?? TYPE_META.carga;
+                      const Icon = meta.icon;
+                      return <Icon className={`h-3.5 w-3.5 ${meta.cls}`} />;
+                    })()}
+                    {(TYPE_META[a.type] ?? TYPE_META.carga).label}
                   </p>
                   <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">{a.message}</p>
                   <p className="mt-1 text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -150,6 +158,14 @@ export default function PersonalAprovacoesPage() {
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
+                {(a.type === "ajuste" || a.type === "relatorio") && a.studentId ? (
+                  <Link
+                    href={a.type === "ajuste" ? `/personal/treinos?aluno=${a.studentId}` : `/personal/alunos?aluno=${a.studentId}`}
+                    className="tactile col-span-2 flex h-10 items-center justify-center gap-1.5 rounded-xl bg-brand/15 text-[12px] font-bold text-brand ring-1 ring-brand/30 transition-transform active:scale-[0.97]"
+                  >
+                    {a.type === "ajuste" ? "Abrir plano do aluno para ajustar" : "Abrir ficha do aluno"}
+                  </Link>
+                ) : null}
                 <button
                   onClick={() => decide(a.id, "aprovado")}
                   className="tactile flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#4ADE80]/15 text-[12px] font-bold text-[#4ADE80] ring-1 ring-[#4ADE80]/30 transition-transform active:scale-[0.97]"
@@ -186,7 +202,7 @@ export default function PersonalAprovacoesPage() {
                   {a.status === "aprovado" ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
                 </span>
                 <p className="min-w-0 flex-1 truncate text-[11.5px] text-muted-foreground">
-                  {a.studentName} · {a.type === "premium" ? "Premium" : "Carga"}
+                  {a.studentName} · {(TYPE_META[a.type] ?? TYPE_META.carga).short}
                 </p>
                 <span
                   className={cn(

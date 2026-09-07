@@ -37,18 +37,19 @@ function modelChain(): string[] {
 
 /** System prompt por contexto (fonte única: lib/ai/prompts). */
 async function systemFor(context: string, extras?: Record<string, string>): Promise<string> {
+  const extra = extras
+    ? Object.entries(extras)
+        .filter(([, v]) => v)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join("\n")
+    : "";
+
   if (context === "personal") {
     const { WORKOUT_PLAN_SYSTEM } = await import("~/lib/ai/prompts");
-    const extra = extras
-      ? Object.entries(extras)
-          .filter(([, v]) => v)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join("\n")
-      : "";
     return extra ? `${WORKOUT_PLAN_SYSTEM}\n\nContexto do aluno recebido:\n${extra}` : WORKOUT_PLAN_SYSTEM;
   }
   const { COACH_SYSTEM } = await import("~/lib/ai/prompts");
-  return COACH_SYSTEM;
+  return extra ? `${COACH_SYSTEM}\n\nDados do aluno (use para personalizar suas respostas):\n${extra}` : COACH_SYSTEM;
 }
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };

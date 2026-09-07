@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { cn } from "~/lib/utils";
 import { ImageCropModal } from "~/components/common/ImageCropModal";
 
+import { apiPath } from "~/lib/api-path";
 const OBJETIVOS: Array<{ id: NonNullable<ProfileEdits["objetivo"]>; label: string }> = [
   { id: "hipertrofia", label: "Hipertrofia" },
   { id: "emagrecimento", label: "Emagrecimento" },
@@ -68,7 +69,7 @@ export default function ConfiguracoesPage() {
       if (!token) throw new Error("Faça login para trocar a foto.");
       const fd = new FormData();
       fd.append("file", new File([blob], "avatar.webp", { type: "image/webp" }));
-      const res = await fetch("/api/avatar", {
+      const res = await fetch(apiPath("/api/avatar"), {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: fd,

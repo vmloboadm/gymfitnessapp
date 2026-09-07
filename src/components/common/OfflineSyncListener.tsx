@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { getSupabaseBrowser } from "~/lib/supabase/client";
 import { logger } from "~/lib/logger";
 
+import { apiPath } from "~/lib/api-path";
 type QueueAction = {
   id: string;
   table: string;
@@ -52,7 +53,7 @@ export function OfflineSyncListener() {
         const token = sessionData.session?.access_token;
         if (!token) return;
 
-        const res = await fetch("/api/sync", {
+        const res = await fetch(apiPath("/api/sync"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

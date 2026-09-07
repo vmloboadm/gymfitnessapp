@@ -39,6 +39,7 @@
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.32.0",
     "next": "14.2.35",
+    "pg": "^8.23.0",
     "react": "^18",
     "react-body-highlighter": "^2.0.5",
     "react-dom": "^18",

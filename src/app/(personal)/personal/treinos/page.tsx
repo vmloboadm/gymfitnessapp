@@ -22,6 +22,8 @@ import {
   Flame,
   Clock,
   Target,
+  ArrowLeftRight,
+  Dumbbell,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
@@ -32,7 +34,10 @@ import { buildWorkoutPrompt } from "~/lib/ai/prompts";
 import {
   generatePlanOffline,
   parsePlanFromLLM,
+  validateAndFixExercises,
   type WorkoutPlan,
+  type DBExercise,
+  type DBEquipment,
 } from "~/lib/ai/local-gen";
 import { demoLib } from "~/lib/demo-bridge";
 import {
@@ -40,6 +45,7 @@ import {
   type PersonalStudent,
   type WorkoutTemplate,
 } from "~/lib/personal-data";
+import { supabaseBrowser } from "~/lib/supabase/client";
 import { useAuth } from "~/hooks/useAuth";
 import {
   approvePlan,
@@ -47,11 +53,66 @@ import {
   getGymStudents,
   listAssignedWorkouts,
   updateAssignedWorkout,
+  fetchGymAssignedPlans,
+  fetchMyAssignedPlans,
+  completeStudentWorkout,
+  type GymAssignedPlan,
 } from "~/lib/gym-api";
 import { cn } from "~/lib/utils";
 
+import { apiPath } from "~/lib/api-path";
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+
+/* ------------------------------------------------------------------ */
+/* Assistente guiado: a IA faz perguntas (nível, objetivo, foco,        */
+/* restrições) antes de gerar, em vez de uma frase livre.              */
+/* ------------------------------------------------------------------ */
+
+const NIVEL_OPTS = ["Iniciante", "Intermediário", "Avançado"];
+const OBJETIVO_OPTS = ["Hipertrofia", "Emagrecimento", "Força", "Condicionamento"];
+
+type FocoOption = { id: string; label: string; sub: string; focus: string[] };
+
+const FOCO_OPTS: FocoOption[] = [
+  { id: "full", label: "Corpo inteiro", sub: "todos os grupos em cada dia", focus: ["Corpo inteiro"] },
+  { id: "ul", label: "Superiores e inferiores", sub: "Upper / Lower alternado", focus: ["Peito", "Costas", "Ombro", "Inferiores", "Glúteo"] },
+  { id: "ppl", label: "Empurrar / Puxar / Pernas", sub: "divisão clássica", focus: ["Empurrar", "Puxar", "Pernas"] },
+  { id: "lower", label: "Pernas e glúteos", sub: "ênfase em membros inferiores", focus: ["Inferiores", "Posterior", "Glúteo"] },
+  { id: "upper", label: "Superior completo", sub: "peito, costas, ombro e braço", focus: ["Peito", "Costas", "Ombro", "Bíceps", "Tríceps"] },
+  { id: "arms", label: "Braços", sub: "bíceps e tríceps como prioridade", focus: ["Bíceps", "Tríceps"] },
+];
+
+type RestricaoOption = { label: string; sub: string; value: string | null };
+
+const RESTRICAO_OPTS: RestricaoOption[] = [
+  { label: "Nenhuma", sub: "pode tudo", value: null },
+  { label: "Ombro", sub: "problema ou lesão", value: "Cuidado com ombro" },
+  { label: "Joelho", sub: "problema ou lesão", value: "Cuidado com joelho" },
+  { label: "Lombar", sub: "problema ou lesão", value: "Cuidado com lombar" },
+  { label: "Sem impacto", sub: "articulações sensíveis", value: "Sem impacto articular" },
+];
+
+/** Normaliza o nível salvo no perfil para uma das opções do assistente. */
+function normNivel(raw?: string | null): string | null {
+  if (!raw) return null;
+  const v = raw.toLowerCase();
+  if (/iniciante|come[çc]ando|leve/.test(v)) return "Iniciante";
+  if (/avan[çc]ado|atleta|experiente/.test(v)) return "Avançado";
+  if (/intermedi/.test(v)) return "Intermediário";
+  return null;
+}
+
+/** Normaliza o objetivo salvo no perfil para uma das opções do assistente. */
+function normObjetivo(raw?: string | null): string | null {
+  if (!raw) return null;
+  const v = raw.toLowerCase();
+  if (/massa|hipertrof|musc|ganho|volume/.test(v)) return "Hipertrofia";
+  if (/emagrec|perd|defin|seca|cutting/.test(v)) return "Emagrecimento";
+  if (/for[çc]a/.test(v)) return "Força";
+  if (/condic|resist|cardio|saude|saúde/.test(v)) return "Condicionamento";
+  return null;
+}
 
 /** Converte um template simples no formato de plano (1 dia). */
 function templateToPlan(t: WorkoutTemplate): WorkoutPlan {
@@ -115,84 +176,297 @@ function PersonalTreinosContent() {
   const [activeDay, setActiveDay] = useState(0);
   const [notes, setNotes] = useState("");
   const [daysSelected, setDaysSelected] = useState<Set<string>>(new Set());
-  const [assigned, setAssigned] = useState<Awaited<ReturnType<typeof listAssignedWorkouts>>>([]);
+  const [assigned, setAssigned] = useState<GymAssignedPlan[]>([]);
+  const [adjustSwId, setAdjustSwId] = useState<string | null>(null);
   const [massTemplate, setMassTemplate] = useState<WorkoutTemplate | null>(null);
   const [massSelected, setMassSelected] = useState<Set<string>>(new Set());
 
-  const refresh = () => setAssigned(listAssignedWorkouts());
-  useEffect(refresh, []);
+  // ===== Assistente guiado (a IA faz perguntas antes de gerar) =====
+  const [ansNivel, setAnsNivel] = useState<string | null>(null);
+  const [ansObjetivo, setAnsObjetivo] = useState<string | null>(null);
+  const [ansFoco, setAnsFoco] = useState<string | null>(null); // id do FOCO_OPTS
+  const [ansRestricoes, setAnsRestricoes] = useState<string[]>([]); // valores "Cuidado com ..."
+  const [restDone, setRestDone] = useState(false);
+
+  // zera as respostas ao trocar de aluno
+  useEffect(() => {
+    setAnsNivel(null);
+    setAnsObjetivo(null);
+    setAnsFoco(null);
+    setAnsRestricoes([]);
+    setRestDone(false);
+  }, [targetId]);
+
+  // pré-preenche nível/objetivo do perfil do aluno
+  useEffect(() => {
+    if (!targetId || students.length === 0) return;
+    const st = students.find((s) => s.id === targetId);
+    if (!st) return;
+    const n = normNivel(st.experience_level);
+    const o = normObjetivo(st.goal ?? st.activeWorkout);
+    if (n) setAnsNivel((prev) => prev ?? n);
+    if (o) setAnsObjetivo((prev) => prev ?? o);
+  }, [targetId, students]);
+
+  // passo atual do assistente: 0 nível, 1 objetivo, 2 foco, 3 restrições, 4 resumo
+  const askStep = !ansNivel
+    ? 0
+    : !ansObjetivo
+      ? 1
+      : !ansFoco
+        ? 2
+        : !restDone
+          ? 3
+          : 4;
+
+  const focoSel = FOCO_OPTS.find((f) => f.id === ansFoco) ?? null;
+  const guidedReady = !!ansNivel && !!ansObjetivo && !!ansFoco && restDone;
+
+  // Pré-seleciona os dias do aluno (disponibilidade do onboarding) ao abrir o modo atribuição
+  useEffect(() => {
+    if (!targetId) return;
+    setDaysSelected((prev) => {
+      if (prev.size > 0) return prev;
+      const avail = students.find((s) => s.id === targetId)?.available_days;
+      return avail?.length ? new Set(avail) : prev;
+    });
+  }, [targetId, students]);
+
+  // Exercícios e equipamentos reais do banco
+  const [dbExercises, setDbExercises] = useState<DBExercise[]>([]);
+  const [dbEquipment, setDbEquipment] = useState<DBEquipment[]>([]);
+
+  const refresh = () => {
+    if (!gymId) {
+      setAssigned(listAssignedWorkouts().map((w) => ({
+        id: w.id,
+        studentId: w.studentId,
+        studentName: w.studentName,
+        programId: "",
+        name: w.name,
+        objective: w.level,
+        status: "active",
+        assigned_at: w.created_at,
+        days: w.plan?.dias.length ?? 1,
+        exercises: w.exercises.length,
+      })));
+      return;
+    }
+    fetchGymAssignedPlans(gymId).then(setAssigned).catch(() => setAssigned([]));
+  };
+  useEffect(refresh, [gymId]);
   useEffect(() => {
     if (!gymId) return;
     getGymStudents(gymId).then(setStudents).catch(() => setStudents([]));
   }, [gymId]);
 
-  // modo edição: carrega o plano (ou sintetiza 1 dia de treinos antigos)
+  // Busca exercícios e equipamentos reais do banco
   useEffect(() => {
-    if (!editId) return;
-    const w = listAssignedWorkouts().find((x) => x.id === editId);
-    if (w) {
-      const synthesized: WorkoutPlan = {
-          nome: w.name,
-          frequencia: w.frequency,
-          nivel: w.level,
-          objetivo: "Hipertrofia",
-          observacao_geral: w.notes ?? "",
-          dias: [
-            {
-              nome: "A · Principal",
-              foco: w.name,
-              aquecimento: [],
-              exercicios: w.exercises.map((e) => ({
-                exercicio: e.name,
-                series: e.sets,
-                reps: e.reps,
-                descanso: e.rest,
-                rpe: 7,
-                dica: "",
-              })),
-              finalizador: "Prancha 3x30s",
-            },
-          ],
-          cardio: "",
-      };
-      setPlan(w.plan ?? synthesized);
-      setNotes(w.notes ?? "");
+    if (!gymId) return;
+    const sb = supabaseBrowser();
+    Promise.all([
+      sb.from("exercises").select("id, name, category, muscles, equipment_id, photo_url, tips").or(`gym_id.is.null,gym_id.eq.${gymId}`),
+      sb.from("equipment").select("id, name, category").eq("gym_id", gymId).neq("status", "pending"),
+    ]).then(([exRes, eqRes]) => {
+      if (exRes.data) setDbExercises(exRes.data as DBExercise[]);
+      if (eqRes.data) setDbEquipment(eqRes.data as DBEquipment[]);
+    }).catch(() => {});
+  }, [gymId]);
+
+  // modo edição/ajuste: carrega o plano (demo via localStorage, produção via banco)
+  const adjustId = params.get("adjust") ?? "";
+  useEffect(() => {
+    const loadId = editId || adjustId;
+    if (!loadId) return;
+    if (loadId.startsWith("aw-")) {
+      const w = listAssignedWorkouts().find((x) => x.id === loadId);
+      if (w) {
+        const synthesized: WorkoutPlan = {
+            nome: w.name,
+            frequencia: w.frequency,
+            nivel: w.level,
+            objetivo: "Hipertrofia",
+            observacao_geral: w.notes ?? "",
+            dias: [
+              {
+                nome: "A · Principal",
+                foco: w.name,
+                aquecimento: [],
+                exercicios: w.exercises.map((e) => ({
+                  exercicio: e.name,
+                  series: e.sets,
+                  reps: e.reps,
+                  descanso: e.rest,
+                  rpe: 7,
+                  dica: "",
+                })),
+                finalizador: "Prancha 3x30s",
+              },
+            ],
+            cardio: "",
+        };
+        setPlan(w.plan ?? synthesized);
+        setNotes(w.notes ?? "");
+      }
+      if (adjustId) setAdjustSwId(adjustId);
+      return;
     }
+    // produção: busca o plano atribuído no banco
+    if (!targetId || !gymId) return;
+    fetchMyAssignedPlans(targetId, gymId)
+      .then((rows) => {
+        const w = rows.find((x) => x.id === loadId);
+        if (w?.plan) {
+          setPlan(w.plan);
+          setNotes(w.notes ?? "");
+          if (adjustId) setAdjustSwId(adjustId);
+          if (w.plan.daysSelected?.length) setDaysSelected(new Set(w.plan.daysSelected));
+          // pré-preenche o assistente a partir do plano carregado (com fallback seguro)
+          setAnsNivel((p) => p ?? normNivel(w.plan!.nivel) ?? "Intermediário");
+          setAnsObjetivo((p) => p ?? normObjetivo(w.plan!.objetivo) ?? "Hipertrofia");
+          setAnsFoco((p) => p ?? "full");
+          setRestDone(true);
+        }
+      })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editId]);
+  }, [editId, adjustId, targetId, gymId]);
 
   const equipmentSample = useMemo(
-    () => demoLib.flatMap((c) => c.name).slice(0, 10),
-    []
+    () => dbEquipment.length > 0
+      ? dbEquipment.map((e) => e.name)
+      : demoLib.flatMap((c) => c.name).slice(0, 10),
+    [dbEquipment]
   );
 
+  // Lista de nomes de exercícios válidos para enviar ao LLM
+  const validExerciseNames = useMemo(
+    () => dbExercises.map((e) => e.name),
+    [dbExercises]
+  );
+
+  // ===== Trocar exercício por outro da biblioteca (na revisão) =====
+  const [swapTarget, setSwapTarget] = useState<{ dayIdx: number; exIdx: number } | null>(null);
+  const [swapQuery, setSwapQuery] = useState("");
+
+  const swapList = useMemo(() => {
+    const q = swapQuery.trim().toLowerCase();
+    return dbExercises
+      .filter((e) => e.name.toLowerCase() !== "registro livre")
+      .filter((e) => !q || e.name.toLowerCase().includes(q))
+      .slice(0, 60);
+  }, [dbExercises, swapQuery]);
+
+  /** Troca o exercício mantendo séries/reps/RPE/dica do original. */
+  const swapExercise = (newName: string) => {
+    if (!plan || !swapTarget) return;
+    setPlan({
+      ...plan,
+      dias: plan.dias.map((d, di) =>
+        di === swapTarget.dayIdx
+          ? {
+              ...d,
+              exercicios: d.exercicios.map((x, xi) =>
+                xi === swapTarget.exIdx ? { ...x, exercicio: newName } : x
+              ),
+            }
+          : d
+      ),
+    });
+    setSwapTarget(null);
+    setSwapQuery("");
+  };
+
+  /** Monta a frase estruturada a partir das respostas do assistente + observações livres. */
+  const buildGuidedRequest = (obs: string): string => {
+    const parts = [
+      `Plano ${ansNivel} para ${target?.name ?? "o aluno"}.`,
+      `Objetivo: ${ansObjetivo}.`,
+      `Foco: ${focoSel?.label ?? "Corpo inteiro"}.`,
+    ];
+    if (ansRestricoes.length) parts.push(`Restrições e lesões a respeitar: ${ansRestricoes.join(", ")}.`);
+    if (obs) parts.push(`Observações do personal: ${obs}`);
+    return parts.join(" ");
+  };
+
   const run = async () => {
-    if (!prompt.trim() || loading || !target) return;
+    if (loading || !target) return;
+    if (!guidedReady) {
+      toast.info("Responda as perguntas do assistente para gerar o plano.");
+      return;
+    }
+    const obs = prompt.trim();
+    const guidedRequest = buildGuidedRequest(obs);
+    // modo ajuste: pede à IA para MODIFICAR o plano atual, não criar do zero
+    const effectiveRequest = adjustSwId && plan
+      ? `AJUSTE do plano atual (mantenha dias, estrutura e o que não foi citado; aplique SÓ a mudança pedida). Mudança pedida: ${obs || "otimizar o plano"}. Plano atual em JSON: ${JSON.stringify(plan).slice(0, 6000)}`
+      : guidedRequest;
     setLoading(true);
-    const fallback = generatePlanOffline(prompt.trim(), target.name);
+    const daysArr = [...daysSelected];
+    const daysMeta = {
+      nivel: ansNivel,
+      objetivo: ansObjetivo,
+      focus: focoSel?.focus ?? ["Corpo inteiro"],
+      restricoes: ansRestricoes,
+      observacoes: obs || null,
+    };
+    const fallback = generatePlanOffline(effectiveRequest, target.name, {
+      dbExercises: dbExercises.length > 0 ? dbExercises : undefined,
+      equipment: dbEquipment.length > 0 ? dbEquipment : undefined,
+      student: {
+        name: target.name,
+        sex: target.sex,
+        experience_level: target.experience_level,
+        available_days: target.available_days,
+        goal: target.goal,
+        medical_risk: target.medical_risk,
+        medications: target.medications,
+        birth_date: target.birth_date,
+        restrictions: target.surgery_history,
+      },
+      daysSelected: daysArr.length > 0 ? daysArr : target.available_days ?? undefined,
+      daysMeta,
+    });
     try {
-      const res = await fetch("/api/assistente", {
+      const res = await fetch(apiPath("/api/assistente"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: buildWorkoutPrompt({
             studentName: target.name,
-            goal: target.activeWorkout,
-            level: fallback.nivel,
+            goal: ansObjetivo,
+            level: ansNivel,
             frequency: fallback.frequencia,
-            restrictions: fallback.observacao_geral,
+            days: daysArr.length > 0 ? daysArr : target.available_days ?? [],
+            restrictions: [target.surgery_history, target.medications, ...ansRestricoes].filter(Boolean).join(", ") || undefined,
             equipment: equipmentSample,
-            request: prompt.trim(),
+            request: effectiveRequest,
+            sex: target.sex,
+            experience_level: ansNivel,
+            medications: target.medications,
+            medical_risk: target.medical_risk,
+            birth_date: target.birth_date,
+            available_days: target.available_days,
           }),
           context: "personal",
+          extras: validExerciseNames.length > 0
+            ? {
+                "Biblioteca de exercícios (use APENAS estes nomes, exatamente como escritos)":
+                  validExerciseNames.slice(0, 200).join(" | "),
+              }
+            : undefined,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; text?: string; error?: string };
       setLoading(false);
       if (data.ok && data.text) {
-        setPlan(parsePlanFromLLM(data.text, fallback));
+        let parsed = parsePlanFromLLM(data.text, fallback);
+        // Valida e corrige nomes de exercícios contra o banco
+        if (dbExercises.length > 0) {
+          parsed = validateAndFixExercises(parsed, dbExercises);
+        }
+        setPlan(parsed);
       } else {
-        // modelo offline: aviso amigável + gerador local mantém a ferramenta viva
         toast.error(data.error ?? "O Assistente está offline no momento. Tente novamente.");
         toast.info("Montei com o gerador local do app. Revise antes de enviar.");
         setPlan(fallback);
@@ -215,13 +489,13 @@ function PersonalTreinosContent() {
     });
   };
 
-  // ===== PASSO 5: aprovar e atribuir (ou salvar edição) =====
+  // ===== PASSO 5: aprovar e atribuir (ou salvar edição / ajuste v2) =====
   const approve = async () => {
     if (!plan || !target || !profile || !user) return;
     const flat = plan.dias.flatMap((d) =>
       d.exercicios.map((e) => ({ name: e.exercicio, sets: e.series, reps: e.reps, rest: e.descanso }))
     );
-    if (editId) {
+    if (editId && editId.startsWith("aw-") && !adjustSwId) {
       updateAssignedWorkout(editId, {
         name: plan.nome,
         notes: notes.trim() || null,
@@ -242,17 +516,23 @@ function PersonalTreinosContent() {
           plan: { ...plan, daysSelected: [...daysSelected] },
           notes: notes.trim() || null,
         });
+        // edição/ajuste em produção: conclui o plano anterior (vira histórico)
+        const prevId = adjustSwId ?? (editId && !editId.startsWith("aw-") ? editId : null);
+        if (prevId) {
+          await completeStudentWorkout(prevId).catch(() => {});
+        }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Não deu salvar o plano. Tente novamente.");
         return;
       }
-      toast.success("Plano enviado com sucesso!", {
+      toast.success(adjustSwId ? "Plano ajustado com sucesso!" : editId ? "Plano atualizado com sucesso!" : "Plano enviado com sucesso!", {
         description: `${target.name} recebeu "${plan.nome}" com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
       });
     }
     setPlan(null);
     setPrompt("");
     setNotes("");
+    setAdjustSwId(null);
     refresh();
     router.replace("/personal/treinos");
   };
@@ -280,7 +560,7 @@ function PersonalTreinosContent() {
     }
     if (okCount > 0) {
       toast.success("Plano enviado com sucesso!", {
-        description: `Template aplicado para ${okCount} aluno${okCount === 1 ? "" : "s"}.`,
+        description: `Plano aplicado para ${okCount} aluno${okCount === 1 ? "" : "s"}.`,
       });
     }
     setMassTemplate(null);
@@ -317,32 +597,227 @@ function PersonalTreinosContent() {
           </Button>
         </header>
 
-        {/* Passo 3: prompt */}
-        <section className="gf-card gf-glass !p-4">
-          <div className="mb-2 flex items-center gap-2">
+        {/* Passo 3: assistente guiado — a IA faz perguntas antes de gerar */}
+        <section className="gf-card gf-glass !p-4" aria-label="Assistente de montagem">
+          <div className="mb-3 flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
               <Sparkles className="h-3.5 w-3.5 text-brand" />
             </span>
             <p className="text-[13px] font-semibold text-foreground">
-              Montar Treino Automático · plano completo e periodizado
+              {adjustSwId ? "Ajustar plano com IA · gera a v2" : `Assistente GF · montando o plano de ${target.name.split(" ")[0]} com você`}
             </p>
           </div>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                run();
-              }
-            }}
-            rows={3}
-            placeholder={`Ex.: Plano de glúteos para ${target.name.split(" ")[0]}, 4x semana, intermediária, sem impacto no joelho`}
-            aria-label="Pedido de plano"
-            className="w-full resize-none rounded-2xl border border-white/[0.06] bg-white/[0.05] p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-          />
+          {adjustSwId && plan ? (
+            <div className="mb-3 rounded-2xl border border-[#FFC24D]/25 bg-[#FFC24D]/[0.07] p-3">
+              <p className="text-[11.5px] leading-snug text-foreground">
+                Ajustando <strong>“{plan.nome}”</strong>. Descreva a mudança nas observações abaixo
+                (ex.: trocar supino por crucifixo, subir volume de pernas) e gere — o aluno recebe a v2 e a anterior vira histórico.
+              </p>
+            </div>
+          ) : null}
+
+          {/* Pergunta 1: nível */}
+          <div className="mb-2.5 max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground">
+            Qual o nível de {target.name.split(" ")[0]} hoje?
+          </div>
+          {askStep > 0 && ansNivel ? (
+            <div className="mb-2.5 flex justify-end">
+              <span className="rounded-2xl rounded-tr-sm bg-brand px-3 py-2 text-[12px] font-bold text-brand-foreground">
+                {ansNivel}
+              </span>
+            </div>
+          ) : null}
+          {askStep === 0 ? (
+            <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Nível do aluno">
+              {NIVEL_OPTS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setAnsNivel(n)}
+                  className={cn(
+                    "rounded-full border px-3.5 py-2 text-[11.5px] font-bold transition-colors",
+                    ansNivel === n
+                      ? "border-brand bg-brand text-brand-foreground"
+                      : "border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:border-brand/40 hover:text-foreground"
+                  )}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {/* Pergunta 2: objetivo */}
+          {askStep >= 1 ? (
+            <>
+              <div className="mb-2.5 mt-1 max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground">
+                E qual o objetivo principal?
+              </div>
+              {askStep > 1 && ansObjetivo ? (
+                <div className="mb-2.5 flex justify-end">
+                  <span className="rounded-2xl rounded-tr-sm bg-brand px-3 py-2 text-[12px] font-bold text-brand-foreground">
+                    {ansObjetivo}
+                  </span>
+                </div>
+              ) : null}
+              {askStep === 1 ? (
+                <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Objetivo do plano">
+                  {OBJETIVO_OPTS.map((o) => (
+                    <button
+                      key={o}
+                      type="button"
+                      onClick={() => setAnsObjetivo(o)}
+                      className={cn(
+                        "rounded-full border px-3.5 py-2 text-[11.5px] font-bold transition-colors",
+                        ansObjetivo === o
+                          ? "border-brand bg-brand text-brand-foreground"
+                          : "border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:border-brand/40 hover:text-foreground"
+                      )}
+                    >
+                      {o}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          {/* Pergunta 3: foco */}
+          {askStep >= 2 ? (
+            <>
+              <div className="mb-2.5 mt-1 max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground">
+                Qual o foco do plano?
+              </div>
+              {askStep > 2 && focoSel ? (
+                <div className="mb-2.5 flex justify-end">
+                  <span className="rounded-2xl rounded-tr-sm bg-brand px-3 py-2 text-[12px] font-bold text-brand-foreground">
+                    {focoSel.label}
+                  </span>
+                </div>
+              ) : null}
+              {askStep === 2 ? (
+                <div className="mb-3 grid grid-cols-2 gap-1.5" role="group" aria-label="Foco do plano">
+                  {FOCO_OPTS.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setAnsFoco(f.id)}
+                      className={cn(
+                        "rounded-xl border p-2.5 text-left transition-colors",
+                        ansFoco === f.id
+                          ? "border-brand bg-brand/10"
+                          : "border-white/[0.08] bg-white/[0.03] hover:border-brand/40"
+                      )}
+                    >
+                      <p className={cn("text-[11.5px] font-bold", ansFoco === f.id ? "text-brand" : "text-foreground")}>
+                        {f.label}
+                      </p>
+                      <p className="mt-0.5 text-[9.5px] leading-snug text-muted-foreground">{f.sub}</p>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          {/* Pergunta 4: restrições */}
+          {askStep >= 3 ? (
+            <>
+              <div className="mb-2.5 mt-1 max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground">
+                {target.name.split(" ")[0]} tem alguma restrição ou lesão? Toque em quantas precisar.
+              </div>
+              {(target.medical_risk || target.medications) && !restDone ? (
+                <p className="mb-2 rounded-xl border border-[#FFC24D]/25 bg-[#FFC24D]/[0.07] p-2.5 text-[10.5px] leading-snug text-[#FFC24D]">
+                  Atenção: ficha do aluno marca risco médico
+                  {target.medications ? ` (usa ${target.medications.split(",")[0].trim()})` : ""}. Confira as restrições abaixo.
+                </p>
+              ) : null}
+              {restDone && askStep > 3 ? (
+                <div className="mb-2.5 flex justify-end">
+                  <span className="rounded-2xl rounded-tr-sm bg-brand px-3 py-2 text-[12px] font-bold text-brand-foreground">
+                    {ansRestricoes.length ? ansRestricoes.join(" · ") : "Sem restrições"}
+                  </span>
+                </div>
+              ) : null}
+              {!restDone ? (
+                <div className="mb-1 flex flex-wrap gap-1.5" role="group" aria-label="Restrições do aluno">
+                  {RESTRICAO_OPTS.map((r) => {
+                    const on = r.value === null ? false : ansRestricoes.includes(r.value);
+                    return (
+                      <button
+                        key={r.label}
+                        type="button"
+                        onClick={() => {
+                          if (r.value === null) {
+                            setAnsRestricoes([]);
+                            setRestDone(true);
+                            return;
+                          }
+                          setAnsRestricoes((prev) => {
+                            const next = prev.includes(r.value!) ? prev.filter((x) => x !== r.value) : [...prev, r.value!];
+                            if (next.length) setRestDone(true);
+                            return next;
+                          });
+                        }}
+                        aria-pressed={on}
+                        className={cn(
+                          "rounded-xl border px-3 py-2 text-left transition-colors",
+                          on
+                            ? "border-brand bg-brand/15"
+                            : "border-white/[0.08] bg-white/[0.03] hover:border-brand/40"
+                        )}
+                      >
+                        <p className={cn("text-[11px] font-bold", on ? "text-brand" : "text-foreground")}>{r.label}</p>
+                        <p className="text-[9px] text-muted-foreground">{r.sub}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              {!restDone && ansRestricoes.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setRestDone(true)}
+                  className="tactile mt-1 w-full rounded-xl border border-white/[0.06] bg-white/[0.03] py-2 text-[11px] font-bold text-muted-foreground transition-colors hover:text-brand"
+                >
+                  Sem restrições, continuar
+                </button>
+              ) : null}
+            </>
+          ) : null}
+
+          {/* Resumo + observações + dias */}
+          {askStep >= 4 ? (
+            <div className="mt-2 rounded-2xl border border-brand/25 bg-brand/[0.05] p-3">
+              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Resumo para gerar
+              </p>
+              <p className="text-[11.5px] leading-relaxed text-foreground">
+                <strong>{ansNivel}</strong> · <strong>{ansObjetivo}</strong> · <strong>{focoSel?.label}</strong>
+                {ansRestricoes.length ? (
+                  <span className="text-[#FFC24D]"> · {ansRestricoes.join(", ")}</span>
+                ) : (
+                  " · sem restrições"
+                )}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setAnsNivel(null);
+                  setAnsObjetivo(null);
+                  setAnsFoco(null);
+                  setAnsRestricoes([]);
+                  setRestDone(false);
+                }}
+                className="mt-1.5 text-[10.5px] font-bold text-brand hover:underline"
+              >
+                Refazer perguntas
+              </button>
+            </div>
+          ) : null}
+
           {/* dias da semana */}
-          <div>
+          <div className="mt-3">
             <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               Dias da semana do aluno
             </p>
@@ -374,13 +849,23 @@ function PersonalTreinosContent() {
             </div>
           </div>
 
+          {/* observações livres do personal */}
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={2}
+            placeholder={adjustSwId ? "Descreva o ajuste: ex. trocar supino por crucifixo, mais volume de pernas" : "Observações (opcional): ex. evita impacto, prefere máquinas, semana de retorno"}
+            aria-label="Observações do personal"
+            className="mt-2.5 w-full resize-none rounded-2xl border border-white/[0.06] bg-white/[0.05] p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+          />
+
           <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
             <p className="mr-auto text-[9.5px] text-muted-foreground">
-              O gerador recebe objetivo, nível, dias, restrições e aparelhos.
+              Dias, aparelhos e ficha do aluno entram automaticamente.
             </p>
-            <Button onClick={run} disabled={!prompt.trim() || loading} size="sm" className="rounded-xl">
+            <Button onClick={run} disabled={loading || !guidedReady} size="sm" className="rounded-xl">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              Gerar plano completo
+              {adjustSwId ? "Gerar ajuste (v2)" : "Gerar plano completo"}
             </Button>
           </div>
         </section>
@@ -496,7 +981,7 @@ function PersonalTreinosContent() {
                 ) : null}
 
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Arraste para reordenar · edite séries e reps direto no card
+                  Arraste para reordenar · troque ou edite direto no card
                 </p>
 
                 <Reorder.Group
@@ -547,6 +1032,16 @@ function PersonalTreinosContent() {
                           aria-label={`Repetições de ${e.exercicio}`}
                           className="h-8 w-14 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[11px] text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
                         />
+                        <button
+                          onClick={() => {
+                            setSwapTarget({ dayIdx: activeDay, exIdx: i });
+                            setSwapQuery("");
+                          }}
+                          aria-label={`Trocar ${e.exercicio} por outro exercício`}
+                          className="tactile flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-brand"
+                        >
+                          <ArrowLeftRight className="h-3.5 w-3.5" />
+                        </button>
                         <button
                           onClick={() =>
                             updateDay(activeDay, {
@@ -599,6 +1094,59 @@ function PersonalTreinosContent() {
             </motion.section>
           ) : null}
         </AnimatePresence>
+
+        {/* Trocar exercício: picker da biblioteca */}
+        <BottomSheet open={!!swapTarget} onClose={() => setSwapTarget(null)}>
+          <div className="space-y-3">
+            <div>
+              <p className="text-base font-bold text-foreground">Trocar exercício</p>
+              <p className="text-[11px] text-muted-foreground">
+                {swapTarget && plan ? `Substituindo "${plan.dias[swapTarget.dayIdx]?.exercicios[swapTarget.exIdx]?.exercicio}". Mantém séries, reps e RPE.` : "Escolha um exercício da biblioteca."}
+              </p>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={swapQuery}
+                onChange={(e) => setSwapQuery(e.target.value)}
+                placeholder="Buscar exercício..."
+                aria-label="Buscar exercício para trocar"
+                className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+              />
+            </div>
+            <ul className="max-h-[46vh] space-y-1.5 overflow-y-auto">
+              {swapList.length === 0 ? (
+                <li className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 text-center text-[12px] text-muted-foreground">
+                  Nenhum exercício encontrado para essa busca.
+                </li>
+              ) : (
+                swapList.map((ex) => {
+                  const current = swapTarget && plan ? plan.dias[swapTarget.dayIdx]?.exercicios[swapTarget.exIdx]?.exercicio === ex.name : false;
+                  return (
+                    <li key={ex.id}>
+                      <button
+                        onClick={() => swapExercise(ex.name)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-2xl border p-2.5 text-left transition-colors",
+                          current ? "border-brand/40 bg-brand/10" : "border-white/[0.06] bg-white/[0.03] hover:border-brand/30"
+                        )}
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
+                          <Dumbbell className="h-3.5 w-3.5 text-brand" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-semibold text-foreground">{ex.name}</p>
+                          <p className="text-[10px] capitalize text-muted-foreground">{ex.category}</p>
+                        </div>
+                        {current ? <Check className="h-4 w-4 shrink-0 text-brand" /> : null}
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </div>
+        </BottomSheet>
       </div>
     );
   }
@@ -632,7 +1180,7 @@ function PersonalTreinosContent() {
       <section aria-labelledby="tpl-title">
         <h2 id="tpl-title" className="mb-2 flex items-center gap-2 text-sm font-bold text-foreground">
           <Layers className="h-4 w-4 text-brand" />
-          Templates prontos
+          Planos-modelo
         </h2>
         <div className="no-scrollbar snap-x snap-mandatory flex gap-3 overflow-x-auto pb-2">
           {templates.map((t) => (
@@ -680,10 +1228,19 @@ function PersonalTreinosContent() {
                   <p className="truncate text-[13px] font-bold text-foreground">{w.name}</p>
                   <p className="text-[10px] text-muted-foreground">
                     {w.studentName.split(" ")[0]} ·{" "}
-                    {w.plan ? `${w.plan.dias.length} dia${w.plan.dias.length === 1 ? "" : "s"} · ` : ""}
-                    {w.exercises.length} exercícios · {fmtDate(w.created_at)}
+                    {`${w.days} dia${w.days === 1 ? "" : "s"} · `}
+                    {w.exercises} exercícios · {fmtDate(w.assigned_at)}
+                    {w.status !== "active" ? " · concluído" : ""}
                   </p>
                 </div>
+                <button
+                  onClick={() => router.push(`/personal/treinos?aluno=${w.studentId}&adjust=${w.id}`)}
+                  aria-label={`Ajustar ${w.name} com IA`}
+                  title="Ajustar com IA"
+                  className="tactile flex h-9 w-9 items-center justify-center rounded-xl border border-brand/30 bg-brand/10 text-brand transition-colors hover:bg-brand/20"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </button>
                 <button
                   onClick={() => router.push(`/personal/treinos?aluno=${w.studentId}&edit=${w.id}`)}
                   aria-label={`Editar ${w.name}`}
@@ -692,8 +1249,12 @@ function PersonalTreinosContent() {
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  onClick={() => {
-                    deleteAssignedWorkout(w.id);
+                  onClick={async () => {
+                    if (w.id.startsWith("aw-")) {
+                      deleteAssignedWorkout(w.id);
+                    } else {
+                      await completeStudentWorkout(w.id).catch(() => {});
+                    }
                     refresh();
                     toast.success("Treino removido");
                   }}
@@ -765,7 +1326,7 @@ function PersonalTreinosContent() {
             <div>
               <p className="text-base font-bold text-foreground">{massTemplate.name}</p>
               <p className="text-[11px] text-muted-foreground">
-                Selecione os alunos que vão receber este template
+                Selecione os alunos que vão receber este plano
               </p>
             </div>
             <ul className="space-y-1.5">

@@ -4,13 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { m, AnimatePresence } from "framer-motion";
 import { Dumbbell, Send, X, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "~/hooks/useAuth";
+import { supabaseBrowser } from "~/lib/supabase/client";
 
+import { apiPath } from "~/lib/api-path";
 /**
  * Assistente de Treino: bolha de chat flutuante nas telas principais do
  * aluno. Resposta real do modelo fluindo token a token (proxy SSE da
  * /api/assistente); sem conexão com o modelo, mostra aviso amigável.
  * Escuta o evento `gf-ask-ai` para abrir com contexto pré-preenchido
  * (botão "Perguntar" por exercício).
+ *
+ * v2: Passa dados reais do aluno (perfil + treino ativo) como contexto
+ * para o LLM personalizar as respostas.
  */
 
 type Bubble = { id: number; role: "user" | "ai"; text: string; done?: boolean };
@@ -38,6 +44,34 @@ export default function AiCoach() {
   const [pending, setPending] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
+
+  // Dados reais do aluno para contexto do LLM
+  const { profile, user } = useAuth();
+  const [activePlanName, setActivePlanName] = useState<string | null>(null);
+
+  // Busca o plano ativo do aluno ao montar
+  useEffect(() => {
+    if (!user?.id || !profile?.gym_id) return;
+    const sb = supabaseBrowser();
+    void (async () => {
+      try {
+        const { data } = await sb
+          .from("student_workouts")
+          .select("workout_programs(name)")
+          .eq("student_id", user.id)
+          .eq("gym_id", profile.gym_id)
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle();
+        const prog = data?.workout_programs;
+        if (prog && typeof prog === "object" && "name" in prog) {
+          setActivePlanName((prog as { name: string }).name);
+        }
+      } catch {
+        // contexto é opcional: falha silenciosa
+      }
+    })();
+  }, [user?.id, profile?.gym_id]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -76,11 +110,29 @@ export default function AiCoach() {
     const history = bubbles
       .slice(-8)
       .map((b) => ({ role: b.role === "user" ? "user" : "assistant", content: b.text }));
+
+    // Monta contexto do aluno para o LLM
+    const extras: Record<string, string> = {};
+    if (profile?.name) extras["Aluno"] = profile.name;
+    if (profile?.goal) extras["Objetivo"] = profile.goal;
+    if (profile?.experience_level) extras["Nível"] = profile.experience_level;
+    if (profile?.sex) extras["Sexo"] = profile.sex === "M" ? "Masculino" : "Feminino";
+    if (profile?.available_days?.length) extras["Dias disponíveis"] = profile.available_days.join(", ");
+    if (profile?.medical_risk) extras["Risco médico"] = "SIM — evite exercícios de alto impacto";
+    if (profile?.medications) extras["Medicamentos"] = profile.medications;
+    if (activePlanName) extras["Plano atual"] = activePlanName;
+
     try {
-      const res = await fetch("/api/assistente", {
+      const res = await fetch(apiPath("/api/assistente"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: q, context: "aluno", history, stream: true }),
+        body: JSON.stringify({
+          message: q,
+          context: "aluno",
+          history,
+          stream: true,
+          extras,
+        }),
       });
 
       if (!res.ok) {
@@ -89,6 +141,7 @@ export default function AiCoach() {
           prev.map((b) => (b.id === bubbleId ? { ...b, text: data.error ?? OFFLINE, done: true } : b))
         );
         toast.error(data.error ?? OFFLINE);
+        setThinking(false);
         return;
       }
 
@@ -99,6 +152,7 @@ export default function AiCoach() {
         const text = data.ok && data.text ? concise(data.text) : OFFLINE;
         setBubbles((prev) => prev.map((b) => (b.id === bubbleId ? { ...b, text, done: false } : b)));
         if (!data.ok) toast.error(OFFLINE);
+        setThinking(false);
         return;
       }
 
@@ -122,6 +176,8 @@ export default function AiCoach() {
     } catch {
       setBubbles((prev) => prev.map((b) => (b.id === bubbleId ? { ...b, text: OFFLINE, done: true } : b)));
       toast.error(OFFLINE);
+    } finally {
+      setThinking(false);
     }
   }
 
@@ -132,7 +188,7 @@ export default function AiCoach() {
     setBubbles((prev) => [...prev, { id: idRef.current++, role: "user", text: q }]);
     const bubbleId = idRef.current++;
     setBubbles((prev) => [...prev, { id: bubbleId, role: "ai", text: "", done: false }]);
-    setThinking(false);
+    setThinking(true);
     void askStreaming(q, bubbleId);
   };
 

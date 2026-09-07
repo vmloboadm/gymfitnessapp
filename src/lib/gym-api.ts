@@ -215,6 +215,90 @@ export async function approvePlan(opts: {
   await assignReal(opts.gymId, opts.trainerId, opts.student, opts.plan, opts.notes);
 }
 
+/** Marca um student_workout como concluído (ao gerar v2 ajustada). */
+export async function completeStudentWorkout(workoutId: string): Promise<void> {
+  if (isDemoMode()) return;
+  const sb = supabaseBrowser();
+  await sb
+    .from("student_workouts")
+    .update({ status: "completed", completed_at: new Date().toISOString() } as never)
+    .eq("id", workoutId);
+}
+
+export type GymAssignedPlan = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  programId: string;
+  name: string;
+  objective: string | null;
+  status: string;
+  assigned_at: string;
+  days: number;
+  exercises: number;
+};
+
+/** Planos atribuídos do gym (visão do personal): produção lê o banco. */
+export async function fetchGymAssignedPlans(gymId: string): Promise<GymAssignedPlan[]> {
+  if (isDemoMode()) {
+    return listAssignedWorkouts().map((w) => ({
+      id: w.id,
+      studentId: w.studentId,
+      studentName: w.studentName,
+      programId: "",
+      name: w.name,
+      objective: w.level,
+      status: "active",
+      assigned_at: w.created_at,
+      days: w.plan?.dias.length ?? 1,
+      exercises: w.exercises.length,
+    }));
+  }
+  const sb = supabaseBrowser();
+  const { data, error } = await sb
+    .from("student_workouts")
+    .select(`
+      id, student_id, status, assigned_at,
+      workout_programs ( id, name, objective,
+        workout_days ( id, workout_exercises ( id ) )
+      ),
+      profiles ( name )
+    `)
+    .eq("gym_id", gymId)
+    .order("assigned_at", { ascending: false })
+    .limit(40);
+  if (error) throw new Error(error.message);
+  type Row = {
+    id: string;
+    student_id: string;
+    status: string;
+    assigned_at: string;
+    workout_programs: {
+      id: string;
+      name: string;
+      objective: string | null;
+      workout_days: Array<{ workout_exercises: Array<{ id: string }> }>;
+    } | null;
+    profiles: { name: string } | Array<{ name: string }> | null;
+  };
+  const profName = (p: Row["profiles"]): string =>
+    Array.isArray(p) ? p[0]?.name ?? "Aluno" : p?.name ?? "Aluno";
+  return ((data ?? []) as unknown as Row[])
+    .filter((r) => !!r.workout_programs)
+    .map((r) => ({
+      id: r.id,
+      studentId: r.student_id,
+      studentName: profName(r.profiles),
+      programId: r.workout_programs!.id,
+      name: r.workout_programs!.name,
+      objective: r.workout_programs!.objective,
+      status: r.status,
+      assigned_at: r.assigned_at,
+      days: r.workout_programs!.workout_days.length,
+      exercises: r.workout_programs!.workout_days.reduce((n, d) => n + d.workout_exercises.length, 0),
+    }));
+}
+
 /** Planos do aluno logado (aba Treino): demo → local; produção → banco. */
 export async function fetchMyAssignedPlans(
   userId: string,
@@ -334,12 +418,19 @@ export async function getRequests(gymId: string): Promise<ApprovalRequest[]> {
     .limit(30);
 
   const rows = (data ?? []) as unknown as ReqRow[];
+  const tagOf = (details: string | null): ApprovalRequest["type"] => {
+    const d = details ?? "";
+    if (d.startsWith("[relatorio]")) return "relatorio";
+    if (d.startsWith("[ajuste]")) return "ajuste";
+    if (d.startsWith("[carga]")) return "carga";
+    return "premium";
+  };
   return rows.map((r) => ({
     id: r.id,
     studentId: r.student_id,
     studentName: r.profiles?.name ?? "Aluno",
-    type: r.request_type === "report" && !(r.details ?? "").startsWith("[carga]") ? ("premium" as const) : ("carga" as const),
-    message: (r.details ?? "").replace(/^\[(carga|premium)\]\s*/, ""),
+    type: tagOf(r.details),
+    message: (r.details ?? "").replace(/^\[(carga|premium|relatorio|ajuste)\]\s*/, ""),
     status: r.status === "aprovado" || r.status === "approved" ? ("aprovado" as const) : r.status === "recusado" || r.status === "rejected" ? ("recusado" as const) : ("pendente" as const),
     created_at: r.created_at,
     resolved_at: null,
@@ -350,31 +441,31 @@ export async function submitRequest(opts: {
   gymId: string;
   userId: string;
   userName: string;
-  type: "premium" | "carga";
+  type: "premium" | "carga" | "relatorio" | "ajuste";
   message: string;
 }): Promise<void> {
   if (isDemoMode()) {
     createApproval({
       studentId: opts.userId,
       studentName: opts.userName,
-      type: opts.type,
+      type: opts.type === "relatorio" || opts.type === "ajuste" ? "carga" : opts.type,
       message: opts.message,
     });
     return;
   }
   const sb = supabaseBrowser();
+  const request_type = opts.type === "premium" || opts.type === "relatorio" ? "report" : "other";
   await sb.from("premium_requests").insert({
     gym_id: opts.gymId,
     student_id: opts.userId,
-    request_type: opts.type === "premium" ? "report" : "other",
+    request_type,
     details: `[${opts.type}] ${opts.message}`,
     status: "pending",
   } as never);
 }
 
 /** Contagem de aprovações pendentes do gym (produção lê o banco). */
-export async function countPendingRequests(gymId: string): Promise<number> {
-  if (isDemoMode()) {
+export async function countPendingRequests(gymId: string): Promise<number> {  if (isDemoMode()) {
     const { pendingApprovalCount } = await import("~/lib/trainer-store");
     return pendingApprovalCount();
   }
@@ -397,6 +488,66 @@ export async function decideRequest(id: string, status: "aprovado" | "recusado",
     .from("premium_requests")
     .update({ status: status === "aprovado" ? "approved" : "rejected", reviewed_at: new Date().toISOString(), reviewed_by: reviewerId })
     .eq("id", id);
+}
+
+/* ------------------------------------------------------------------ */
+/* Relatório de evolução (pedido do aluno a cada 15 dias)              */
+/* ------------------------------------------------------------------ */
+
+const REPORT_TAG = "[relatorio]";
+const REPORT_COOLDOWN_DAYS = 15;
+
+/** Data do último pedido de relatório do aluno (ou null). */
+export async function getLastReportRequest(gymId: string, userId: string): Promise<string | null> {
+  if (isDemoMode()) return null;
+  const sb = supabaseBrowser();
+  const { data } = await sb
+    .from("premium_requests")
+    .select("created_at")
+    .eq("gym_id", gymId)
+    .eq("student_id", userId)
+    .eq("request_type", "report")
+    .like("details", `${REPORT_TAG}%`)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return ((data as { created_at: string } | null)?.created_at) ?? null;
+}
+
+/** Dias restantes de carência para novo pedido (0 = liberado). */
+export function reportCooldownLeft(lastAt: string | null): number {
+  if (!lastAt) return 0;
+  const elapsed = (Date.now() - new Date(lastAt).getTime()) / 864e5;
+  return Math.max(0, Math.ceil(REPORT_COOLDOWN_DAYS - elapsed));
+}
+
+/** Aluno pede relatório de evolução detalhado (respeita a carência de 15 dias). */
+export async function requestEvolutionReport(opts: {
+  gymId: string;
+  userId: string;
+}): Promise<void> {
+  if (isDemoMode()) {
+    createApproval({
+      studentId: opts.userId,
+      studentName: "Você",
+      type: "premium",
+      message: "Relatório de evolução — últimos 15 dias",
+    });
+    return;
+  }
+  const last = await getLastReportRequest(opts.gymId, opts.userId);
+  if (reportCooldownLeft(last) > 0) {
+    throw new Error(`Relatório já pedido recentemente. Novo pedido em ${reportCooldownLeft(last)} dias.`);
+  }
+  const sb = supabaseBrowser();
+  const { error } = await sb.from("premium_requests").insert({
+    gym_id: opts.gymId,
+    student_id: opts.userId,
+    request_type: "report",
+    details: `${REPORT_TAG} Relatório de evolução detalhado — últimos 15 dias`,
+    status: "pending",
+  } as never);
+  if (error) throw new Error(error.message);
 }
 
 /* ------------------------------------------------------------------ */

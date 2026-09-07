@@ -21,14 +21,20 @@ Regras globais GymFitness:
 
 /** Foco muscular → orientação de split (usado no prompt e no gerador local). */
 export const SPLIT_GUIDE = `
-Diretriz de periodização:
-- 2x semana: Full Body A e B (padrões básicos, 6 exercícios por dia)
-- 3x semana: ABC (empurrar, puxar, pernas) ou foco 2x no músculo principal do pedido
-- 4x semana: Upper A, Lower A, Upper B, Lower B
-- 5x ou 6x: ABCD + foco extra no objetivo do aluno
+Diretriz de periodização (SEM EXCEÇÃO):
+- 2x semana: Full Body A e B (padrões básicos, 5 a 6 exercícios por dia)
+- 3x semana: PPL — Empurrar (peito, ombro, tríceps), Puxar (costas, bíceps), Pernas (quadríceps, posterior, glúteo). Para iniciantes, Full Body A, B e C.
+- 4x semana: NÃO crie 4 treinos diferentes. Use Upper A, Lower A, Upper B, Lower B (2 treinos distintos repetidos na semana, com leve variação A/B).
+- 5x: Superiores, Inferiores, Empurrar, Puxar, Pernas.
+- 6x: PPL repetido — Empurrar, Puxar, Pernas, Empurrar, Puxar, Pernas.
+- Quando o aluno treina o MESMO treino 2x na semana, varie 1 a 2 exercícios acessórios entre a versão A e B, mantendo o composto principal.
+Distinção CRÍTICA entre foco e restrição:
+- "Problema no ombro", "dor no joelho", "lesão na lombar" = RESTRIÇÃO. Nunca prescreva rotina focada no músculo lesionado. Troque os exercícios que sobrecarregam a região (ex.: restrição de ombro → evite supino reto pesado, desenvolvimento militar e elevação frontal acima de 90 graus; prefira crucifixo leve, puxada com pegada neutra e trabalho de pernas).
+- "Foco em glúteos", "quer desenvolver o peito", "treinar costas" = FOCO muscular real.
 - Todo dia começa com 1 a 2 aquecimentos específicos (5 min) e termina com 1 finalizador (core ou condicionamento)
 - Prescreva RPE alvo por exercício (iniciante 6 a 7, intermediário 7 a 8, avançado 8 a 9)
 - Progressão semanal: +2.5 kg em superior e +5 kg em inferior quando completar as reps no RPE alvo
+- Nomeie cada dia do plano começando pelo dia da semana escolhido (ex.: "Seg · Superiores", "Qua · Superiores").
 `;
 
 /** JSON schema do plano completo (LLM e gerador local produzem o MESMO formato). */
@@ -182,8 +188,17 @@ export function buildWorkoutPrompt(ctx: {
   equipment?: string[];
   history?: string;
   request: string;
+  /** Dados completos do aluno para personalização */
+  sex?: string | null;
+  experience_level?: string | null;
+  medications?: string | null;
+  medical_risk?: boolean | null;
+  birth_date?: string | null;
+  available_days?: string[] | null;
+  /** Lista de exercícios válidos (nomes PT-BR) para o LLM usar */
+  validExercises?: string[];
 }): string {
-  return [
+  const lines = [
     `Aluno: ${ctx.studentName}`,
     ctx.goal ? `Objetivo: ${ctx.goal}` : null,
     ctx.level ? `Nível: ${ctx.level}` : null,
@@ -191,11 +206,36 @@ export function buildWorkoutPrompt(ctx: {
     ctx.days?.length
       ? `Dias da semana escolhidos pelo aluno: ${ctx.days.join(", ")} (nomeie cada dia do plano pelo dia correspondente)`
       : null,
+    ctx.sex ? `Sexo: ${ctx.sex === "M" ? "Masculino" : "Feminino"}` : null,
+    ctx.experience_level ? `Nível de experiência: ${ctx.experience_level}` : null,
+    ctx.medications ? `Medicamentos: ${ctx.medications}` : null,
+    ctx.medical_risk ? "ATENÇÃO: aluno com risco médico. Evite exercícios de alto impacto e excesso de carga articular." : null,
+    ctx.birth_date ? `Data de nascimento: ${ctx.birth_date}` : null,
     ctx.restrictions ? `Restrições: ${ctx.restrictions}` : null,
-    ctx.equipment?.length ? `Aparelhos disponíveis: ${ctx.equipment.join(", ")}` : null,
+    ctx.equipment?.length ? `Aparelhos disponíveis na academia: ${ctx.equipment.join(", ")}` : null,
     ctx.history ? `Histórico curto: ${ctx.history}` : null,
-    `Pedido do personal: ${ctx.request}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ];
+
+  // Lista de exercícios válidos: o LLM DEVE usar apenas estes nomes
+  if (ctx.validExercises?.length) {
+    lines.push("");
+    lines.push("EXERCÍCIOS VÁLIDOS (use APENAS nomes desta lista):");
+    // Agrupa por categoria para facilitar a leitura do LLM
+    const byCategory = new Map<string, string[]>();
+    // Como a lista pode vir sem categoria, agrupa por prefixo comum
+    for (const ex of ctx.validExercises) {
+      const cat = ex.split(" ")[0]?.toLowerCase() ?? "outro";
+      if (!byCategory.has(cat)) byCategory.set(cat, []);
+      byCategory.get(cat)!.push(ex);
+    }
+    // Lista completa em blocos de 10
+    for (let i = 0; i < ctx.validExercises.length; i += 10) {
+      lines.push(ctx.validExercises.slice(i, i + 10).join(", "));
+    }
+  }
+
+  lines.push("");
+  lines.push(`Pedido do personal: ${ctx.request}`);
+
+  return lines.filter(Boolean).join("\n");
 }

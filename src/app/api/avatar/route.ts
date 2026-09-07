@@ -28,9 +28,30 @@ export async function POST(request: Request) {
     );
   }
 
-  // 1) valida o usuário pelo JWT dele (ninguém troca foto de outro)
+  // 1) valida o usuário pelo JWT dele (header ou cookie de sessão)
   const authHeader = request.headers.get("Authorization") ?? "";
-  const jwt = authHeader.replace(/^Bearer\s+/i, "").trim();
+  let jwt = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!jwt) {
+    const cookieHeader = request.headers.get("Cookie") ?? "";
+    const single = cookieHeader.match(/sb-[\w-]*auth-token=([^;]+)/);
+    let raw = single?.[1] ?? "";
+    if (!raw) {
+      const chunks: Array<{ i: number; v: string }> = [];
+      const re = /sb-[\w-]*auth-token\.(\d+)=([^;]+)/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(cookieHeader))) chunks.push({ i: Number(m[1]), v: m[2] });
+      if (chunks.length) raw = chunks.sort((a, b) => a.i - b.i).map((c) => c.v).join("");
+    }
+    if (raw) {
+      const candidate = raw.startsWith("base64-") ? raw.slice(7) : raw;
+      try {
+        const decoded = JSON.parse(Buffer.from(candidate, "base64").toString());
+        if (decoded?.access_token) jwt = decoded.access_token;
+      } catch {
+        jwt = raw;
+      }
+    }
+  }
   if (!jwt) {
     return NextResponse.json({ ok: false, error: "Sessão necessária." }, { status: 401 });
   }

@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { m, type Variants } from "framer-motion";
-import { MessageSquareText, Dumbbell, UserRoundCheck, ChevronRight } from "lucide-react";
+import { MessageSquareText, Dumbbell, UserRoundCheck, ChevronRight, ArrowLeftRight, Search, Check } from "lucide-react";
 import { toast } from "sonner";
 import { TRAINER_WORKOUTS_EVENT, type AssignedWorkout } from "~/lib/trainer-store";
 import { useAuth } from "~/hooks/useAuth";
 import { fetchMyAssignedPlans, submitRequest } from "~/lib/gym-api";
+import { supabaseBrowser } from "~/lib/supabase/client";
+import { BottomSheet } from "~/components/ui/bottom-sheet";
+import { cn } from "~/lib/utils";
+import type { WorkoutPlan } from "~/lib/ai/local-gen";
 
 const container: Variants = {
   hidden: {},
@@ -155,7 +159,7 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
               </p>
             ) : null}
 
-            <AdjustRequestCard workoutName={w.name} studentId={studentId} />
+            <AdjustRequestCard workoutName={w.name} studentId={studentId} plan={w.plan ?? null} />
           </m.article>
         ))}
       </m.div>
@@ -164,7 +168,7 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
 }
 
 /** Pedido de ajuste de treino: cai na caixa de aprovações do personal. */
-function AdjustRequestCard({ workoutName, studentId }: { workoutName: string; studentId?: string }) {
+function AdjustRequestCard({ workoutName, studentId, plan }: { workoutName: string; studentId?: string; plan?: WorkoutPlan | null }) {
   const [open, setOpen] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
   const { user, profile } = useAuth();
@@ -173,22 +177,21 @@ function AdjustRequestCard({ workoutName, studentId }: { workoutName: string; st
   const OPTIONS = [
     { label: "Carga leve demais", msg: `a carga está leve demais` },
     { label: "Carga pesada demais", msg: `a carga está pesada demais` },
-    { label: "Trocar exercício", msg: `quer trocar um exercício` },
     { label: "Dúvida na execução", msg: `tem dúvida na execução de um exercício` },
   ] as const;
 
-  const request = async (label: string, detail: string) => {
+  const request = async (label: string, detail: string, reqType: "carga" | "ajuste" = "carga") => {
     try {
       await submitRequest({
         gymId: profile?.gym_id ?? "",
         userId: uid,
         userName: profile?.name ?? "Aluno",
-        type: "carga",
+        type: reqType,
         message: `Ajuste de treino em "${workoutName}": o aluno informa que ${detail}.`,
       });
       setSent(label);
       setOpen(false);
-      toast.success("Ajuste enviado ao seu Personal");
+      toast.success(reqType === "ajuste" ? "Pedido de troca enviado ao seu Personal" : "Ajuste enviado ao seu Personal");
     } catch {
       toast.error("Não deu enviar agora. Tente de novo.");
     }
@@ -235,6 +238,16 @@ function AdjustRequestCard({ workoutName, studentId }: { workoutName: string; st
           </button>
         ))}
       </div>
+      {plan?.dias?.length ? (
+        <SwapRequestButton
+          plan={plan}
+          workoutName={workoutName}
+          onSent={(label) => {
+            setSent(label);
+            setOpen(false);
+          }}
+        />
+      ) : null}
       <button
         onClick={() => setOpen(false)}
         className="mt-2 w-full text-center text-[10px] font-semibold text-muted-foreground hover:text-foreground"
@@ -242,5 +255,156 @@ function AdjustRequestCard({ workoutName, studentId }: { workoutName: string; st
         Cancelar
       </button>
     </div>
+  );
+}
+
+/** Troca específica: aluno escolhe o exercício atual + o substituto; vira pedido [ajuste]. */
+function SwapRequestButton({
+  plan,
+  workoutName,
+  onSent,
+}: {
+  plan: WorkoutPlan;
+  workoutName: string;
+  onSent: (label: string) => void;
+}) {
+  const { user, profile } = useAuth();
+  const uid = user?.id ?? "";
+  const [step, setStep] = useState<"closed" | "pick-old" | "pick-new">("closed");
+  const [oldName, setOldName] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [library, setLibrary] = useState<Array<{ id: string; name: string; category: string }>>([]);
+
+  const allPlanExercises = useMemo(
+    () => [...new Set(plan.dias.flatMap((d) => d.exercicios.map((e) => e.exercicio)))],
+    [plan]
+  );
+
+  useEffect(() => {
+    if (step !== "pick-new" || library.length > 0 || !profile?.gym_id) return;
+    void (async () => {
+      try {
+        const sb = supabaseBrowser();
+        const { data } = await sb
+          .from("exercises")
+          .select("id, name, category")
+          .or(`gym_id.is.null,gym_id.eq.${profile.gym_id}`)
+          .order("name")
+          .limit(120);
+        const rows = (data ?? []) as Array<{ id: string; name: string; category: string }>;
+        setLibrary(rows.filter((r) => r.name.toLowerCase() !== "registro livre"));
+      } catch {
+        setLibrary([]);
+      }
+    })();
+  }, [step, library.length, profile?.gym_id]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return library.filter((e) => !q || e.name.toLowerCase().includes(q)).slice(0, 40);
+  }, [library, query]);
+
+  const send = async (newName: string) => {
+    if (!oldName) return;
+    try {
+      await submitRequest({
+        gymId: profile?.gym_id ?? "",
+        userId: uid,
+        userName: profile?.name ?? "Aluno",
+        type: "ajuste",
+        message: `Trocar "${oldName}" por "${newName}" no treino "${workoutName}".`,
+      });
+      setStep("closed");
+      setOldName(null);
+      setQuery("");
+      onSent(`Trocar ${oldName.split(" ").slice(0, 2).join(" ")}`);
+      toast.success("Pedido de troca enviado ao seu Personal");
+    } catch {
+      toast.error("Não deu enviar agora. Tente de novo.");
+    }
+  };
+
+  if (step === "closed") {
+    return (
+      <button
+        onClick={() => setStep("pick-old")}
+        className="tactile mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#4ADE80]/30 bg-[#4ADE80]/[0.07] px-2 py-2.5 text-[10.5px] font-bold text-[#4ADE80] transition-colors active:scale-[0.97]"
+      >
+        <ArrowLeftRight className="h-3.5 w-3.5" /> Trocar um exercício específico
+      </button>
+    );
+  }
+
+  return (
+    <BottomSheet open onClose={() => { setStep("closed"); setOldName(null); setQuery(""); }}>
+      <div className="space-y-3">
+        <div>
+          <p className="text-base font-bold text-foreground">
+            {step === "pick-old" ? "Qual exercício trocar?" : `Trocar "${oldName}" por:`}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {step === "pick-old"
+              ? "Escolha um exercício do seu plano atual."
+              : "Escolha o substituto na biblioteca. Seu personal aprova."}
+          </p>
+        </div>
+        {step === "pick-new" ? (
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar exercício..."
+              aria-label="Buscar substituto"
+              className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+            />
+          </div>
+        ) : null}
+        <ul className="max-h-[42vh] space-y-1.5 overflow-y-auto">
+          {step === "pick-old"
+            ? allPlanExercises.map((name) => (
+                <li key={name}>
+                  <button
+                    onClick={() => { setOldName(name); setStep("pick-new"); }}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-left transition-colors hover:border-brand/30"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
+                      <Dumbbell className="h-3.5 w-3.5 text-brand" />
+                    </span>
+                    <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">{name}</p>
+                  </button>
+                </li>
+              ))
+            : filtered.map((ex) => (
+                <li key={ex.id}>
+                  <button
+                    onClick={() => send(ex.name)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-2xl border p-2.5 text-left transition-colors",
+                      ex.name === oldName ? "border-brand/40 bg-brand/10" : "border-white/[0.06] bg-white/[0.03] hover:border-brand/30"
+                    )}
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
+                      <Dumbbell className="h-3.5 w-3.5 text-brand" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-semibold text-foreground">{ex.name}</p>
+                      <p className="text-[10px] capitalize text-muted-foreground">{ex.category}</p>
+                    </div>
+                    {ex.name === oldName ? <Check className="h-4 w-4 shrink-0 text-brand" /> : null}
+                  </button>
+                </li>
+              ))}
+        </ul>
+        {step === "pick-new" ? (
+          <button
+            onClick={() => setStep("pick-old")}
+            className="w-full text-center text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+          >
+            Voltar
+          </button>
+        ) : null}
+      </div>
+    </BottomSheet>
   );
 }

@@ -15,6 +15,7 @@ import { cn } from "~/lib/utils";
 import { hasRole } from "~/lib/utils/roles";
 import { ImageCropModal } from "~/components/common/ImageCropModal";
 
+import { apiPath } from "~/lib/api-path";
 const TABS_BASE = [
   { id: "alunos", label: "Meus Alunos", icon: Users },
   { id: "stats", label: "Estatísticas", icon: BarChart3 },
@@ -153,7 +154,7 @@ export default function PersonalPerfilPage() {
         if (!token) throw new Error("Faça login para trocar a foto.");
         const fd = new FormData();
         fd.append("file", new File([blob], "avatar.webp", { type: "image/webp" }));
-        const res = await fetch("/api/avatar", {
+        const res = await fetch(apiPath("/api/avatar"), {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           body: fd,

@@ -19,7 +19,7 @@ export const EXERCISE_CATEGORY = [
   "panturrilha",
 ] as const;
 
-export const EQUIPMENT_STATUS = ["available", "in_use", "maintenance"] as const;
+export const EQUIPMENT_STATUS = ["available", "in_use", "maintenance", "pending"] as const;
 
 export const SESSION_STATUS = ["active", "completed"] as const;
 

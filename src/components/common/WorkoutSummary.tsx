@@ -6,9 +6,11 @@ import { Camera, CheckCircle2, Copy, MessageCircle, Timer, Dumbbell , Trophy} fr
 import { TopBar } from "~/components/layout/TopBar";
 import { formatMMSS } from "~/lib/workout-session";
 import { nextToUnlock, unlockAchievement, type StudentAchievement } from "~/lib/achievements";
+import { saveSessionFeedback } from "~/lib/supabase/workout-session";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
 import { RewardModal } from "~/components/common/RewardModal";
+import { FEEDBACK_EXAMPLES } from "~/components/student/WorkoutFeedbackSheet";
 
 /**
  * Tela de Resumo/Comemoração pós-treino (Fase 4):
@@ -51,17 +53,22 @@ export default function WorkoutSummary({
   done,
   total,
   onDone,
+  sessionId,
 }: {
   seconds: number;
   done: number;
   total: number;
   /** Chamado ao concluir o fluxo do resumo (RPE escolhido ou pular). */
   onDone: () => void;
+  /** Id da workout_sessions ativa (para salvar RPE + nota + duração). */
+  sessionId?: string | null;
 }) {
   const [achievement] = useState<StudentAchievement | null>(() => nextToUnlock());
   const [unlocked, setUnlocked] = useState(false);
   const [rewardOpen, setRewardOpen] = useState(true);
   const [rpe, setRpe] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (achievement) {
@@ -221,6 +228,32 @@ export default function WorkoutSummary({
           </div>
         </div>
 
+        {/* NOTA RÁPIDA com exemplos */}
+        <div className="gf-card gf-glass !py-4">
+          <p className="gf-section mb-2">Deixe sua marca <span className="font-medium normal-case text-muted-foreground">(opcional)</span></p>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {FEEDBACK_EXAMPLES.map((ex) => (
+              <button
+                key={ex}
+                type="button"
+                onClick={() => setNote(ex)}
+                className="rounded-full border border-brand/30 bg-brand/[0.07] px-2.5 py-1 text-[10px] font-semibold text-brand transition-colors hover:bg-brand/15"
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value.slice(0, 220))}
+            rows={2}
+            maxLength={220}
+            placeholder="Como foi? (opcional)"
+            aria-label="Nota sobre o treino"
+            className="w-full resize-none rounded-xl border border-white/[0.06] bg-white/[0.05] p-2.5 text-[12px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+          />
+        </div>
+
         {/* COMPARTILHAR */}
         <div className="space-y-2.5">
           <p className="gf-section px-1">Espalhe o resultado</p>
@@ -250,13 +283,23 @@ export default function WorkoutSummary({
         </div>
 
         <button
-          onClick={() => {
-            if (!rpe) setRpe("na medida");
+          onClick={async () => {
+            const feeling = rpe ?? "na_medida";
+            if (sessionId && !saving) {
+              setSaving(true);
+              await saveSessionFeedback(sessionId, {
+                feeling,
+                note: note.trim() || null,
+                duration_min: Math.max(1, Math.round(seconds / 60)),
+                finished_by: "student",
+              });
+              setSaving(false);
+            }
             onDone();
           }}
           className="gf-touch tactile flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-bold text-muted-foreground transition-colors hover:text-foreground"
         >
-          <CheckCircle2 className="h-4 w-4" /> Concluir e voltar ao início
+          <CheckCircle2 className="h-4 w-4" /> {saving ? "Salvando..." : "Concluir e voltar ao início"}
         </button>
       </div>
     </>

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
-import { TrendingUp, CalendarClock, Flame, CalendarDays, Target, Timer } from "lucide-react";
+import { TrendingUp, CalendarClock, Flame, CalendarDays, Target, Timer, NotebookPen, FileText, Clock3 } from "lucide-react";
 const ProgressoCharts = dynamic(() => import("~/components/charts/ProgressoCharts"), {
   ssr: false,
   loading: () => (
@@ -16,6 +16,8 @@ const PesoLineChartD = dynamic(() => import("~/components/charts").then((m) => (
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { getRecentSessions, type StudentSession } from "~/lib/supabase/workout-session";
+import { requestEvolutionReport, getLastReportRequest, reportCooldownLeft } from "~/lib/gym-api";
 import { TopBar } from "~/components/layout/TopBar";
 import { ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { StatCard } from "~/components/common/StatCard";
@@ -27,6 +29,16 @@ import { buildFrequencySeries } from "~/lib/academia";
 import { cn } from "~/lib/utils";
 import { isDemoMode, demoProgressoData, demoMetricsData } from "~/lib/demo-bridge";
 import type { WorkoutLogs } from "~/lib/types/models";
+import { toast } from "sonner";
+
+const FEELING_LABEL: Record<string, string> = {
+  leve: "Leve",
+  na_medida: "Na medida",
+  puxado: "Puxado",
+  no_limite: "No limite",
+  tranquilo: "Tranquilo",
+  dificil: "Difícil",
+};
 
 /**
  * Progresso do aluno (BottomNav "Progresso"): volume por dia (últimos 7 dias),
@@ -41,6 +53,8 @@ export default function ProgressoPage() {
     logs: WorkoutLogs[];
     prevLogs: WorkoutLogs[];
     checkins: Array<{ checked_at: string }>;
+    sessions: StudentSession[];
+    lastReportAt: string | null;
   }>(
     async () => {
       if (demo) {
@@ -75,11 +89,18 @@ export default function ProgressoPage() {
       if (prev14Res.error) return { data: null, error: prev14Res.error };
       if (checkinsRes.error) return { data: null, error: checkinsRes.error };
 
+      const [sessions, lastReportAt] = await Promise.all([
+        getRecentSessions(user.id, 10),
+        getLastReportRequest(profile.gym_id, user.id).catch(() => null),
+      ]);
+
       return {
         data: {
           logs: last14Res.data as WorkoutLogs[],
           prevLogs: prev14Res.data as WorkoutLogs[],
           checkins: checkinsRes.data ?? [],
+          sessions,
+          lastReportAt,
         },
         error: null,
       };
@@ -319,6 +340,17 @@ export default function ProgressoPage() {
           ) : null}
         </div>
 
+        {/* Diário de treinos: sessões com feedback */}
+        <SessionDiary sessions={data?.sessions ?? []} />
+
+        {/* Relatório de evolução detalhado (pedido a cada 15 dias) */}
+        <ReportRequestCard
+          gymId={profile?.gym_id ?? ""}
+          userId={user?.id ?? ""}
+          lastReportAt={data?.lastReportAt ?? null}
+          onRequested={refetch}
+        />
+
         {/* Dicionário leigo, siglas e jargões explicados sem sair da tela */}
         <GlossaryCard
           className="gf-rise"
@@ -347,6 +379,103 @@ export default function ProgressoPage() {
         />
       </div>
     </>
+  );
+}
+
+/** Diário: histórico de sessões com sensação, nota e duração do aluno. */
+function SessionDiary({ sessions }: { sessions: StudentSession[] }) {
+  const withFeedback = sessions.filter((s) => s.meta?.feedback_at || s.meta?.feeling);
+  if (withFeedback.length === 0) return null;
+  return (
+    <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "270ms" }}>
+      <div className="mb-3 flex items-center gap-2">
+        <NotebookPen className="h-4 w-4 text-brand" />
+        <p className="gf-section">Diário de treinos</p>
+      </div>
+      <ul className="space-y-2">
+        {withFeedback.slice(0, 6).map((s) => {
+          const d = s.ended_at ? new Date(s.ended_at) : new Date(s.started_at);
+          return (
+            <li key={s.id} className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] font-bold text-foreground">
+                  {d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })}
+                </p>
+                {s.meta?.feeling ? (
+                  <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand">
+                    {FEELING_LABEL[s.meta.feeling] ?? s.meta.feeling}
+                  </span>
+                ) : null}
+                {typeof s.meta?.duration_min === "number" ? (
+                  <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-bold tabular-nums text-muted-foreground">
+                    <Clock3 className="h-3 w-3" /> {s.meta.duration_min} min
+                  </span>
+                ) : null}
+              </div>
+              {s.meta?.note ? (
+                <p className="mt-1 text-[11.5px] italic leading-snug text-muted-foreground">“{s.meta.note}”</p>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** Pedido de relatório de evolução detalhado (carência de 15 dias). */
+function ReportRequestCard({
+  gymId,
+  userId,
+  lastReportAt,
+  onRequested,
+}: {
+  gymId: string;
+  userId: string;
+  lastReportAt: string | null;
+  onRequested: () => void;
+}) {
+  const [sending, setSending] = useState(false);
+  const left = reportCooldownLeft(lastReportAt);
+
+  const send = async () => {
+    if (!gymId || !userId || sending || left > 0) return;
+    setSending(true);
+    try {
+      await requestEvolutionReport({ gymId, userId });
+      toast.success("Pedido enviado!", { description: "Seu personal prepara o relatório detalhado." });
+      onRequested();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não deu pra enviar. Tente novamente.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "285ms" }}>
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-brand/25 bg-brand/10">
+          <FileText className="h-4.5 w-4.5 text-brand" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="gf-section">Relatório de evolução</p>
+          <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+            {left > 0
+              ? `Último pedido há pouco — novo relatório liberado em ${left} dia${left === 1 ? "" : "s"}.`
+              : "Análise detalhada dos seus últimos 15 dias, preparada pelo seu personal."}
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={send}
+        disabled={left > 0 || sending || !gymId || !userId}
+        className="tactile mt-3 w-full rounded-2xl bg-brand py-3 text-[13px] font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-40"
+      >
+        {sending ? "Enviando..." : left > 0 ? `Aguarde ${left} dia${left === 1 ? "" : "s"}` : "Pedir relatório detalhado"}
+      </button>
+    </div>
   );
 }
 
