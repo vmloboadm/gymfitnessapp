@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { ArrowLeft, Dumbbell, Clock3, Route, Weight, Plus, History, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "~/hooks/useAuth";
@@ -10,6 +9,7 @@ import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
+import { ExerciseCard } from "~/components/common/ExerciseCard";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
 import { isDemoMode } from "~/lib/demo-bridge";
@@ -159,25 +159,7 @@ export default function MaquinaPage() {
             <ul className="space-y-1.5">
               {data.exercises.map((e) => (
                 <li key={e.id}>
-                  <Link
-                    href={`/equipamento?busca=${encodeURIComponent(e.name)}`}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-left transition-colors hover:border-brand/30"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
-                      <Dumbbell className="h-3.5 w-3.5 text-brand" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-semibold text-foreground">{e.name}</p>
-                      <p className="text-[10px] capitalize text-muted-foreground">
-                        {(e.muscles ?? []).slice(0, 3).join(" · ") || e.category}
-                      </p>
-                      {(e.tips ?? []).length > 0 ? (
-                        <p className="mt-0.5 line-clamp-1 text-[10px] italic text-muted-foreground/80">
-                          💡 {e.tips[0]}
-                        </p>
-                      ) : null}
-                    </div>
-                  </Link>
+                  <ExerciseCard exercise={e} />
                 </li>
               ))}
             </ul>
