@@ -315,28 +315,71 @@ export default function TreinoHomePage() {
     }
     if (completedIds?.length) {
       setDoneIds((prev) => new Set([...prev, ...completedIds]));
-      // produção: grava workout_logs reais dos exercícios concluídos
-      // (workout_id = student_workouts.id; só exercícios resolvidos na biblioteca)
-      if (!demo && planExerciseMap && Object.keys(planExerciseMap).length > 0 && user && profile) {
-        const supabase = supabaseBrowser();
-        const rows = completedIds
-          .map((id) => ({ id, m: planExerciseMap[id] }))
-          .filter(({ m }) => m && m.exerciseId && m.workoutId)
-          .map(({ m }) => ({
-            gym_id: profile.gym_id,
-            student_id: user.id,
-            workout_id: m.workoutId,
-            exercise_id: m.exerciseId,
-            date: new Date().toISOString(),
-            reps: m.reps,
-            rpe: m.rpe ?? null,
-          }));
-        if (rows.length) {
-          const { error: logErr } = await supabase.from("workout_logs").insert(rows as never);
-          if (logErr) {
-            toast.error("Falha ao registrar treino", { description: "Tente novamente." });
+      // produção: grava workout_logs reais dos exercícios concluídos.
+      // Resolve exercise_id na hora (mapa do plano OU busca por nome),
+      // então o dashboard/progresso SEMPRE atualizam ao finalizar.
+      if (!demo && user && profile) {
+        void (async () => {
+          try {
+            const supabase = supabaseBrowser();
+            const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
+            const parseReps = (r: string): number => {
+              const m = String(r).match(/\d+/);
+              return m ? Math.min(999, parseInt(m[0], 10)) : 0;
+            };
+            const sessList = session ?? [];
+            const missing = completedIds.filter(
+              (id) => !(planExerciseMap && planExerciseMap[id]?.exerciseId)
+            );
+            const nameToId: Record<string, string> = {};
+            if (missing.length > 0) {
+              const names = missing.map((id) => sessList.find((s) => s.id === id)?.name).filter(Boolean) as string[];
+              if (names.length > 0) {
+                const orFilter = names.map((n) => `name.ilike.%${n.replace(/[%_,]/g, "").slice(0, 24)}%`).join(",");
+                const { data: found } = await supabase
+                  .from("exercises")
+                  .select("id, name")
+                  .or(orFilter)
+                  .limit(names.length * 3);
+                for (const f of (found ?? []) as Array<{ id: string; name: string }>) {
+                  if (!nameToId[norm(f.name)]) nameToId[norm(f.name)] = f.id;
+                }
+              }
+            }
+            const findId = (name: string): string | null => {
+              const n = norm(name);
+              const words = n.split(" ").filter(Boolean);
+              for (const [k, v] of Object.entries(nameToId)) {
+                if (k.includes(n) || n.includes(k)) return v;
+              }
+              for (const [k, v] of Object.entries(nameToId)) {
+                if (words.slice(0, 2).every((w) => k.includes(w))) return v;
+              }
+              return null;
+            };
+            const rows = completedIds.flatMap((id) => {
+              const m = planExerciseMap?.[id];
+              const s = sessList.find((x) => x.id === id);
+              const exerciseId = m?.exerciseId ?? (s ? findId(s.name) : null);
+              if (!exerciseId) return [];
+              return [{
+                gym_id: profile.gym_id,
+                student_id: user.id,
+                workout_id: m?.workoutId ?? null,
+                exercise_id: exerciseId,
+                date: new Date().toISOString(),
+                reps: m?.reps ? parseReps(m.reps) : parseReps(s?.reps ?? "0"),
+                rpe: m?.rpe ?? null,
+              }];
+            });
+            if (rows.length > 0) {
+              const { error: logErr } = await supabase.from("workout_logs").insert(rows as never);
+              if (logErr) toast.error("Falha ao registrar treino", { description: "Tente novamente." });
+            }
+          } catch {
+            /* treino segue mesmo se o log falhar */
           }
-        }
+        })();
       }
     }
     navigator.vibrate?.([60, 40, 90]);

@@ -319,6 +319,7 @@ export async function fetchMyAssignedPlans(
     `)
     .eq("student_id", userId)
     .eq("gym_id", gymId)
+    .eq("status", "active")
     .order("assigned_at", { ascending: false })
     .limit(5);
 
