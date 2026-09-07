@@ -143,6 +143,7 @@ export default function TreinoHomePage() {
   const [summarySeconds, setSummarySeconds] = useState<number | null>(null);
   const [_rpe, _setRpe] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "active" | "done">("idle");
+  const [unlockOpen, setUnlockOpen] = useState(false);
   const [session, setSession] = useState<typeof DEFAULT_DEMO_EX | null>(null);
   const [hasSavedProgress, setHasSavedProgress] = useState(false);
   const [libCat, setLibCat] = useState<string | null>(null);
@@ -454,7 +455,6 @@ export default function TreinoHomePage() {
 
   // Sem check-in NÃO bloqueia mais a tela: mostra aviso discreto e libera tudo
   const needsCheckin = !daySession;
-  const [unlockOpen, setUnlockOpen] = useState(false);
   const checkinBanner = needsCheckin ? (
     <div className="mx-auto max-w-md px-4 pt-3">
       <Link href="/checkin?scan=1&from=/treino" className="flex items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning/[0.08] px-4 py-2.5">
