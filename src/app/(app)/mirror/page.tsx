@@ -10,6 +10,14 @@ import { SkeletonList } from "~/components/common/AsyncStates";
 
 const HASHTAG = "#GymFitnessCampos";
 
+const MOTIVATION = [
+  "Disciplina é o que separa o sonho do resultado.",
+  "O treino de hoje é o shape de amanhã.",
+  "Quem treina em dupla com a constância nunca perde.",
+  "Suor de hoje, orgulho de amanhã.",
+  "Feito é melhor que perfeito. Bora pro próximo!",
+];
+
 /**
  * Cartão compartilhável do espelho (/mirror).
  * Sem câmera: mostra os stats reais do aluno (treinos na semana,
@@ -56,8 +64,8 @@ export default function MirrorPage() {
   const kcal = useMemo(() => (todayMin ? Math.round(todayMin * 6) : 0), [todayMin]);
 
   const shareText = useMemo(() => {
-    const parts = [`💪 Treinei hoje na GymFitness!`];
-    if ((weekCount ?? 0) > 0) parts.push(`${weekCount}x esta semana`);
+    const parts = [`🔥 Treino concluído na GymFitness!`];
+    if ((weekCount ?? 0) > 0) parts.push(`${weekCount}x esta semana — rumo à meta`);
     if ((todayMin ?? 0) > 0) parts.push(`${todayMin} min · ~${kcal} kcal`);
     parts.push(HASHTAG);
     return parts.join("\n");
@@ -85,6 +93,7 @@ export default function MirrorPage() {
   };
 
   const loading = weekCount === null || todayMin === null;
+  const quote = useMemo(() => MOTIVATION[new Date().getDate() % MOTIVATION.length], []);
 
   return (
     <>
@@ -93,18 +102,33 @@ export default function MirrorPage() {
         {loading ? (
           <SkeletonList rows={2} />
         ) : (
-          <div className="gf-card gf-glass relative overflow-hidden !p-5 text-center">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand to-[#FFC24D]" aria-hidden />
-            <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-              <Dumbbell className="h-3.5 w-3.5 text-brand" /> GymFitness Campos · {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-            </p>
-            <p className="mt-3 text-3xl font-black text-foreground">💪 TREINEI HOJE</p>
-            <p className="mt-1 text-[15px] font-bold text-brand">{name}, {(weekCount ?? 0) > 0 ? `${weekCount}x esta semana` : "bora começar a sequência!"}</p>
-            {(todayMin ?? 0) > 0 ? (
-              <p className="mt-1 text-[13px] font-semibold text-muted-foreground">{todayMin} min · ~{kcal} kcal*</p>
-            ) : null}
-            <p className="mt-3 text-[12px] font-black text-brand">{HASHTAG}</p>
-            <p className="mt-1 text-[9px] text-muted-foreground">*calorias estimadas</p>
+          <div className="gf-card gf-glass relative overflow-hidden !p-0 text-center">
+            <div className="bg-gradient-to-br from-brand via-[#FF8A3D] to-[#FFC24D] px-5 pb-5 pt-6" aria-hidden={false}>
+              <p className="flex items-center justify-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-black/60">
+                <Dumbbell className="h-3.5 w-3.5" /> GymFitness Campos
+              </p>
+              <p className="mt-2 text-4xl font-black leading-none text-black">🔥</p>
+              <p className="mt-1 text-2xl font-black leading-tight text-black">TREINO<br />CONCLUÍDO</p>
+              <p className="mt-2 text-[14px] font-bold text-black/80">{name}, {(weekCount ?? 0) > 0 ? `${weekCount}x esta semana. Segue o plano!` : "primeiro passo dado. Amanhã tem mais!"}</p>
+            </div>
+            <div className="flex items-center justify-center gap-6 px-5 py-4">
+              <div>
+                <p className="text-xl font-black text-foreground">{todayMin ?? 0}<span className="text-[11px] font-bold text-muted-foreground"> min</span></p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">hoje</p>
+              </div>
+              <div className="h-8 w-px bg-white/10" aria-hidden />
+              <div>
+                <p className="text-xl font-black text-foreground">~{kcal}<span className="text-[11px] font-bold text-muted-foreground"> kcal</span></p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">queimadas*</p>
+              </div>
+              <div className="h-8 w-px bg-white/10" aria-hidden />
+              <div>
+                <p className="text-xl font-black text-brand">{weekCount ?? 0}x</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">na semana</p>
+              </div>
+            </div>
+            <p className="px-5 pb-1 text-[12px] italic text-muted-foreground">“{quote}”</p>
+            <p className="px-5 pb-4 text-[12px] font-black text-brand">{HASHTAG}</p>
           </div>
         )}
 
@@ -121,9 +145,9 @@ export default function MirrorPage() {
           {copied ? <Check className="h-4 w-4 text-[#4ADE80]" /> : <Copy className="h-4 w-4" />} {copied ? "Copiado!" : "Copiar texto"}
         </button>
 
-        <p className="flex items-start gap-1.5 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="flex items-start gap-1.5 rounded-2xl border border-brand/25 bg-brand/[0.07] p-3 text-[11px] leading-relaxed text-foreground">
           <Camera className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
-          Tire sua selfie no espelho da academia e cole esse texto na legenda. Cada post seu divulga a academia de graça!
+          Poste sua foto marcando a GymFitness e apareça na TV do salão! 📺
         </p>
       </div>
     </>
