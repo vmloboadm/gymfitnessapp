@@ -1,7 +1,9 @@
 # Frente futura: WhatsApp integrado ao app
 
-> Status: PLANEJADA — olhar depois. Não implementar até o número oficial existir.
-> Dono: aguardando número WhatsApp oficial da academia.
+> Status: FASE 1 ATIVA (links centralizados) · Fases 2-3 planejadas.
+> Número oficial vinculado: **(22) 99778-7186** → `5522997787186`
+> (`NEXT_PUBLIC_GYM_WHATSAPP` + `NEXT_PUBLIC_PARTNER_WHATSAPP`)
+> Acesso ao número: com a academia. CRM: fase posterior.
 
 ## Objetivo
 Número oficial da GymFitness vinculado ao app, com envios automáticos e manuais
@@ -15,9 +17,17 @@ integrados ao fluxo (não só links `wa.me` manuais como hoje).
 - Links `wa.me` manuais já usados (StudentSheet, radar, summary)
 
 ## Decisões em aberto (na hora de implementar)
-1. **Provedor**: Meta WhatsApp Cloud API direto vs. provedor (Evolution API, etc.)
-2. **Número**: oficial da academia (recomendado: número dedicado, não pessoal)
-3. **Templates Meta**: cadastrar e aprovar modelos (cobrança, win-back, avisos)
+1. **Provedor (fase 2)**: Meta WhatsApp Cloud API direto vs. provedor (Evolution API, etc.)
+2. **Templates Meta**: cadastrar e aprovar modelos (cobrança, win-back, avisos)
+
+## Fases
+- **Fase 1 — ATIVA**: número centralizado em `src/lib/whatsapp.ts`
+  (`gymSupportLink`, `partnerLink`); "Falar com a academia" no perfil;
+  CTA de parcerias apontando ao número oficial.
+- **Fase 2 — futura**: Cloud API + `whatsapp_outbox` (fila, retry, logs LGPD,
+  opt-out, webhook de status) + tela do gestor (projeção/custo).
+- **Fase 3 — futura**: CRM (histórico de conversas por aluno, etiquetas,
+  campanhas, caixa de entrada no app).
 
 ## Mensagens planejadas
 | Gatilho | Mensagem | Tipo |

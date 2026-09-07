@@ -6,7 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Settings, LogOut, CalendarClock, ChevronRight, Scale, ListMusic, FileText, BadgePercent } from "lucide-react";
+  Settings, LogOut, CalendarClock, ChevronRight, Scale, ListMusic, FileText, BadgePercent, MessageCircle } from "lucide-react";
+import { gymSupportLink } from "~/lib/whatsapp";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -246,11 +247,16 @@ export default function PerfilPage() {
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">Relatórios avançados (PDF)</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           </Link>
-          <Link href="/beneficios" className="tactile flex w-full items-center gap-3 bg-card/40 px-4 py-3.5 transition-colors hover:bg-card/70">
+          <Link href="/beneficios" className="tactile flex w-full items-center gap-3 border-b border-border bg-card/40 px-4 py-3.5 transition-colors hover:bg-card/70">
             <BadgePercent className="h-4 w-4 shrink-0 text-[#4ADE80]" />
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">Benefícios e descontos</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           </Link>
+          <a href={gymSupportLink()} target="_blank" rel="noreferrer" className="tactile flex w-full items-center gap-3 bg-card/40 px-4 py-3.5 transition-colors hover:bg-card/70">
+            <MessageCircle className="h-4 w-4 shrink-0 text-[#25D366]" />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">Falar com a academia</span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </a>
         </div>
 
         {/* tag de build — amarra evidências à versão em execução */}

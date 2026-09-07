@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Store, Tv, Ticket, Smartphone, TrendingUp, Users, CheckCircle2, MessageCircle, ArrowRight, Dumbbell } from "lucide-react";
+import { partnerLink } from "~/lib/whatsapp";
 
 export const metadata: Metadata = {
   title: "Parceiros · GymFitness Campos",
@@ -13,10 +14,7 @@ export const metadata: Metadata = {
  * Mobile-first: o parceiro escaneia o QR e vê tudo no celular.
  */
 export default function ParceirosPage() {
-  const whats = process.env.NEXT_PUBLIC_PARTNER_WHATSAPP ?? "";
-  const ctaHref = whats
-    ? `https://wa.me/${whats}?text=${encodeURIComponent("Olá! Vim pelo QR code da academia e quero saber mais sobre as parcerias do GymFitness.")}`
-    : "mailto:contato@gymfitnesscampos.com.br?subject=" + encodeURIComponent("Quero ser parceiro · GymFitness");
+  const ctaHref = partnerLink();
 
   return (
     <div className="min-h-[100dvh] bg-[#05080f] text-[#F4F6FB]">
