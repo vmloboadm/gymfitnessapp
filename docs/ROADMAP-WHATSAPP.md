@@ -17,15 +17,16 @@ integrados ao fluxo (não só links `wa.me` manuais como hoje).
 - Links `wa.me` manuais já usados (StudentSheet, radar, summary)
 
 ## Decisões em aberto (na hora de implementar)
-1. **Provedor (fase 2)**: Meta WhatsApp Cloud API direto vs. provedor (Evolution API, etc.)
-2. **Templates Meta**: cadastrar e aprovar modelos (cobrança, win-back, avisos)
+1. **Provedor (fase 2)**: WAHA self-hosted (vPS dedicada GymFitness) — sem dependência do Meta Business/Cloud API
+2. **VPS**: nova VPS dedicada para WAHA + webhook + fila de envios
 
 ## Fases
 - **Fase 1 — ATIVA**: número centralizado em `src/lib/whatsapp.ts`
   (`gymSupportLink`, `partnerLink`); "Falar com a academia" no perfil;
   CTA de parcerias apontando ao número oficial.
-- **Fase 2 — futura**: Cloud API + `whatsapp_outbox` (fila, retry, logs LGPD,
-  opt-out, webhook de status) + tela do gestor (projeção/custo).
+- **Fase 2 — futura**: WAHA self-hosted (VPS dedicada GymFitness) +
+  `whatsapp_outbox` (fila, retry, logs LGPD, opt-out, webhook de status) +
+  tela do gestor (projeção/custo).
 - **Fase 3 — futura**: CRM (histórico de conversas por aluno, etiquetas,
   campanhas, caixa de entrada no app).
 
