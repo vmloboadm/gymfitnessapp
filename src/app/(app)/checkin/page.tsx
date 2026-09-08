@@ -178,7 +178,7 @@ export default function CheckinPage() {
       window.history.replaceState({}, "", window.location.pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.equipment]);
+  }, [data?.equipment, user?.id, profile?.gym_id]);
 
   // Auto-close após 5 min inativo
   const closeSession = useCallback(async (confirm = false) => {
