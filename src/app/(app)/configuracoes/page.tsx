@@ -38,7 +38,14 @@ export default function ConfiguracoesPage() {
   const [objetivo, setObjetivo] = useState<ProfileEdits["objetivo"]>("hipertrofia");
   const [nome, setNome] = useState("");
   const [saving, setSaving] = useState(false);
-  const [notifs, setNotifs] = useState({ treino: true, conquistas: true, Ranking: false });
+  const [notifs, setNotifs] = useState<{ treino: boolean; conquistas: boolean; Ranking: boolean }>(() => {
+    try {
+      const saved = localStorage.getItem("gf-notifs");
+      return saved ? JSON.parse(saved) : { treino: true, conquistas: true, Ranking: false };
+    } catch {
+      return { treino: true, conquistas: true, Ranking: false };
+    }
+  });
   const fileRef = useRef<HTMLInputElement>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
@@ -50,6 +57,10 @@ export default function ConfiguracoesPage() {
     setBio(e.bio ?? "");
     setObjetivo(e.objetivo ?? "hipertrofia");
   }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem("gf-notifs", JSON.stringify(notifs)); } catch { /* ok */ }
+  }, [notifs]);
 
   const avatarSrc = useMemo(() => edits.avatar_url ?? null, [edits.avatar_url]);
 

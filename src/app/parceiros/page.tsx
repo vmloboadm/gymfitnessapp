@@ -147,7 +147,7 @@ export default function ParceirosPage() {
 
       <footer className="mx-auto mt-10 max-w-md px-5 pb-12 text-center">
         <Link
-          href="/app/login"
+          href="/login"
           className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-white/40 transition-colors hover:text-white/70"
         >
           <Dumbbell className="h-3.5 w-3.5" />

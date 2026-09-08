@@ -205,10 +205,10 @@ export default function RankingPage() {
                 const medalColor = pos === 0 ? "#FBBF24" : pos === 1 ? "#E5E7EB" : "#D97706";
                 const medalTone = pos === 0 ? "text-[#FBBF24]" : pos === 1 ? "text-[#E5E7EB]" : "text-[#D97706]";
                 return (
-                  <Link
+                  <div
                     key={row.id}
-                    href="/perfil"
                     className="group flex flex-col items-center gap-1.5"
+                    role="listitem"
                     aria-label={`${pos + 1}º lugar: ${row.student?.name ?? "Aluno"}`}
                   >
                     <MedalIcon className={cn("h-5 w-5", medalTone)} aria-hidden />
@@ -243,7 +243,7 @@ export default function RankingPage() {
                     >
                       <span className="gf-hero-num text-base">{formatNumber(row.points)}</span>
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>

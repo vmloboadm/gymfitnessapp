@@ -509,6 +509,7 @@ export default function PersonalPerfilPage() {
             return (
               <button
                 key={i}
+                onClick={() => toast.info("Funcionalidade em breve!")}
                 className="tactile flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.06]"
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/20 bg-brand/10">

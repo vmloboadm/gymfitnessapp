@@ -937,7 +937,7 @@ export default function TreinoHomePage() {
                 ghost: ["Rosca Direta", "Tríceps Corda", "Crucifixo Máquina", "Cadeira Extensora"],
               },
             ].map((p) => (
-              <div key={p.name} className="relative overflow-hidden rounded-[16px] border border-border bg-card/40 p-3.5">
+              <div key={p.name} className="relative overflow-hidden rounded-[16px] border border-border bg-card/40 p-3.5 select-none" aria-disabled="true">
                 <div className="flex items-start justify-between gap-2">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
                     <Lock className="h-3.5 w-3.5 text-brand" />

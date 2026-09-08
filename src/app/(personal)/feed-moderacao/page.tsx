@@ -123,7 +123,7 @@ export default function ModerationPage() {
                     Conteúdo avaliado
                   </span>
                   <div className="ml-auto flex gap-2">
-                    <Button variant="outline" size="sm" className="text-xs">
+                    <Button variant="outline" size="sm" className="text-xs" onClick={() => { toast.success("Publicação aprovada"); refetch(); }}>
                       <Check className="mr-1 h-3.5 w-3.5" />
                       Aprovar
                     </Button>
