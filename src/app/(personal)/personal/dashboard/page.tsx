@@ -24,18 +24,16 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { useAuth } from "~/hooks/useAuth";
-import { demoOnlineAgora } from "~/lib/demo-bridge";
+import { supabaseBrowser } from "~/lib/supabase/client";
 import { LivePulse } from "~/components/dashboard/LivePulse";
 import { CountUp } from "~/components/common/CountUp";
 import { StudentSheet } from "~/components/personal/StudentSheet";
 import { getDayPassword } from "~/lib/day-pass";
 import type { PersonalStudent } from "~/lib/personal-data";
-import { getGymStudents } from "~/lib/gym-api";
+import { getGymStudents, getRequests } from "~/lib/gym-api";
 import { briefingOffline } from "~/lib/ai/local-gen";
 import { computeQueue, type QueueItem } from "~/lib/personal-queue";
 import {
-  listAssignedWorkouts,
-  pendingApprovalCount,
   TRAINER_WORKOUTS_EVENT,
   TRAINER_APPROVALS_EVENT,
   TRAINER_POINTS_EVENT,
@@ -89,7 +87,13 @@ export default function PersonalDashboardPage() {
   const { profile } = useAuth();
   const gymId = profile?.gym_id ?? "";
   const [students, setStudents] = useState<PersonalStudent[]>([]);
-  const online = useMemo(() => demoOnlineAgora(), []);
+  // Presentes agora: check-ins de hoje + sessões de equipamento ativas (real, não demo)
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
+  const online = onlineIds.size;
+  // Treinos prescritos hoje (student_workouts reais) + aprovações pendentes reais
+  const [assignedTodayIds, setAssignedTodayIds] = useState<Set<string>>(new Set());
+  const [prescribedTodayCount, setPrescribedTodayCount] = useState(0);
+  const [approvalsPending, setApprovalsPending] = useState(0);
   const [sheetStudent, setSheetStudent] = useState<PersonalStudent | null>(null);
   const [queueOpen, setQueueOpen] = useState(false);
   const [tick, setTick] = useState(0);
@@ -114,37 +118,48 @@ export default function PersonalDashboardPage() {
     getGymStudents(gymId).then(setStudents).catch(() => setStudents([]));
   }, [gymId, tick]);
 
-  const assigned = useMemo(() => listAssignedWorkouts(), [tick]);
-  const pendingApprovals = useMemo(() => pendingApprovalCount(), [tick]);
+  // Dados reais do dia: presença + prescrições + aprovações
+  useEffect(() => {
+    if (!gymId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const sb = supabaseBrowser();
+        const today = new Date().toISOString().slice(0, 10);
+        const [ck, eq, sw, req] = await Promise.all([
+          sb.from("checkins").select("student_id").eq("gym_id", gymId).gte("checked_at", `${today}T00:00:00`).limit(200),
+          sb.from("equipment_sessions").select("student_id").eq("gym_id", gymId).eq("status", "active").limit(200),
+          sb.from("student_workouts").select("student_id, assigned_at").eq("gym_id", gymId).gte("assigned_at", `${today}T00:00:00`).limit(200),
+          getRequests(gymId).catch(() => []),
+        ]);
+        if (!alive) return;
+        const present = new Set<string>();
+        for (const r of ((ck.data ?? []) as Array<{ student_id: string }>)) present.add(r.student_id);
+        for (const r of ((eq.data ?? []) as Array<{ student_id: string }>)) present.add(r.student_id);
+        setOnlineIds(present);
+        const swRows = (sw.data ?? []) as Array<{ student_id: string }>;
+        setAssignedTodayIds(new Set(swRows.map((r) => r.student_id)));
+        setPrescribedTodayCount(swRows.length);
+        setApprovalsPending(req.filter((r) => r.status === "pendente").length);
+      } catch { /* mantém zeros */ }
+    })();
+    return () => { alive = false; };
+  }, [gymId, tick]);
 
   const stats = useMemo(() => {
-    const todayKey = new Date().toDateString();
-    const yesterdayKey = new Date(Date.now() - 864e5).toDateString();
-    const prescribedToday = assigned.filter(
-      (w) => new Date(w.created_at).toDateString() === todayKey
-    ).length;
-    const prescribedYesterday = assigned.filter(
-      (w) => new Date(w.created_at).toDateString() === yesterdayKey
-    ).length;
     return {
       activeStudents: students.filter((s) => s.lastTrainingDaysAgo <= 2).length,
       totalStudents: students.length,
-      prescribedToday,
-      prescribedYesterday,
+      prescribedToday: prescribedTodayCount,
+      prescribedYesterday: 0,
       missesWeek: students.filter((s) => s.lastTrainingDaysAgo >= 3).length,
     };
-  }, [students, assigned, tick]);
+  }, [students, prescribedTodayCount]);
 
   // Fila de Hoje: ações acionáveis derivadas do estado real
   const queue = useMemo(() => {
-    const todayKey = new Date().toDateString();
-    const assignedToday = new Set(
-      assigned
-        .filter((w) => new Date(w.created_at).toDateString() === todayKey)
-        .map((w) => w.studentId)
-    );
-    return computeQueue(students, pendingApprovals, assignedToday);
-  }, [students, pendingApprovals, assigned, tick]);
+    return computeQueue(students, approvalsPending, assignedTodayIds);
+  }, [students, approvalsPending, assignedTodayIds]);
 
   // linha resumida do estado do dia (rodapé do card da fila)
   const briefingLine = useMemo(
@@ -154,7 +169,7 @@ export default function PersonalDashboardPage() {
         totalStudents: stats.totalStudents,
         missesWeek: stats.missesWeek,
         prescribedToday: stats.prescribedToday,
-        pendingApprovals,
+        pendingApprovals: approvalsPending,
         worstStudent:
           students
             .filter((s) => s.lastTrainingDaysAgo >= 3)
@@ -162,7 +177,7 @@ export default function PersonalDashboardPage() {
         worstDays: Math.max(0, ...students.map((s) => s.lastTrainingDaysAgo)),
         topStudent: students.find((s) => s.lastTrainingDaysAgo === 0)?.name ?? null,
       }),
-    [stats, pendingApprovals, students, tick]
+    [stats, approvalsPending, students, tick]
   );
 
   // Agenda de hoje: quem tem treino pautado no dia da semana

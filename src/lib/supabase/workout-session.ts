@@ -97,15 +97,19 @@ export async function completeStaleSessions(studentId: string): Promise<void> {
   }
 }
 
-/** Última sessão concluída SEM feedback → o app pede "como foi o treino?". */
+/** Última sessão concluída SEM feedback → o app pede "como foi o treino?".
+ * Só sessões das últimas 36h: treino velho sem feedback não pergunta de novo
+ * (evita o "pergunta duas vezes" quando há sessões acumuladas). */
 export async function getLastSessionNeedingFeedback(studentId: string): Promise<StudentSession | null> {
   try {
     const sb = supabaseBrowser();
+    const cutoff = new Date(Date.now() - 36 * 3600000).toISOString();
     const { data } = await sb
       .from("workout_sessions")
       .select("id, started_at, ended_at, status, meta, workout_id")
       .eq("student_id", studentId)
       .eq("status", "completed")
+      .gte("ended_at", cutoff)
       .order("ended_at", { ascending: false })
       .limit(5);
     const rows = (data ?? []) as StudentSession[];
