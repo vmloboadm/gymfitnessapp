@@ -438,6 +438,7 @@ export default function HomePage() {
                 </div>
               </div>
               <button
+                data-testid="finalizar-treino-home"
                 onClick={() => {
                   endSession();
                   toast.success("Treino finalizado. Descanse bem!");

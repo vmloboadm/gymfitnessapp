@@ -488,7 +488,7 @@ export default function TreinoHomePage() {
 
   // BARRA FIXA DE SESSÃO
   const sessionBar = daySession ? (
-    <div className="sticky top-[56px] z-20 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+    <div className="sticky top-[56px] z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
       <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-4 py-2">
         <div className="flex items-center gap-2.5">
           <span className="relative flex h-2 w-2">
@@ -507,6 +507,7 @@ export default function TreinoHomePage() {
           />
         </div>
         <button
+          data-testid="finalizar-treino"
           onClick={() => {
             navigator.vibrate?.([60, 40, 60]);
             setSummarySeconds(elapsedSeconds(daySession.startedAt, Date.now()));

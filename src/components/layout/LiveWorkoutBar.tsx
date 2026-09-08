@@ -34,6 +34,7 @@ export function LiveWorkoutBar() {
           transition={{ type: "spring", stiffness: 350, damping: 28 }}
           onClick={() => router.push("/treino")}
           aria-label="Treino em andamento, voltar para a sessão"
+          data-testid="live-workout-bar"
           className={cn(
             "gf-touch tactile fixed inset-x-4 z-30 mx-auto flex max-w-[calc(28rem-2rem)] items-center gap-2.5 rounded-full border py-2 pl-3.5 pr-2 shadow-lg backdrop-blur transition-colors",
             phase === "alerta"
