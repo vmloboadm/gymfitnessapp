@@ -14,6 +14,8 @@ const PUBLIC_PATHS = [
   "/forgot-password",
   "/day-pass",
   "/parceiros",
+  "/bem-vindo",
+  "/vantagens",
   "/tv",
 ];
 

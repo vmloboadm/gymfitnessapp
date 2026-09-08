@@ -34,10 +34,12 @@ import { toast } from "sonner";
 const FEELING_LABEL: Record<string, string> = {
   leve: "Leve",
   na_medida: "Na medida",
+  "na medida": "Na medida",
   puxado: "Puxado",
   no_limite: "No limite",
   tranquilo: "Tranquilo",
   dificil: "Difícil",
+  "difícil": "Difícil",
 };
 
 /**

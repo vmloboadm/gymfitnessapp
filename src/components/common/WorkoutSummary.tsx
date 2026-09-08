@@ -205,11 +205,12 @@ export default function WorkoutSummary({
         {/* RPE rápido */}
         <div className="gf-card gf-glass !py-4">
           <p className="gf-section mb-2">Como foi o treino?</p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {[
-              { key: "tranquilo", label: "Tranquilo", tone: "text-sky-400" },
-              { key: "na medida", label: "Na medida", tone: "text-success" },
-              { key: "difícil", label: "Difícil", tone: "text-warning" },
+              { key: "leve", label: "Leve", tone: "text-sky-400" },
+              { key: "na_medida", label: "Na medida", tone: "text-success" },
+              { key: "puxado", label: "Puxado", tone: "text-warning" },
+              { key: "no_limite", label: "No limite", tone: "text-brand" },
             ].map((opt) => (
               <button
                 key={opt.key}

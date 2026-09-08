@@ -729,7 +729,8 @@ export default function TreinoHomePage() {
                   key={opt.key}
                   onClick={() => {
                     setFeeling(opt.key);
-                    toast.success(`Feedback registrado: ${opt.label}`);
+                    try { localStorage.setItem("gf-preworkout-mood", JSON.stringify({ mood: opt.key, at: new Date().toISOString() })); } catch { /* ok */ }
+                    toast.success(`Anotado: ${opt.label}`, { description: "Só o clima de hoje — o feedback do treino vem no final." });
                   }}
                   className={cn(
                     "tactile flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors",

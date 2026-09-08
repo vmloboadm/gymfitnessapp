@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, ClipboardList, Flame, Dumbbell, Plus, Activity, Sparkles } from "lucide-react";
+import { MessageCircle, ClipboardList, Flame, Dumbbell, Plus, Activity, Sparkles, Clock3, Feather } from "lucide-react";
 import { insightOffline } from "~/lib/ai/local-gen";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
@@ -18,6 +18,7 @@ import {
   streakOverride,
   TRAINER_WORKOUTS_EVENT,
 } from "~/lib/trainer-store";
+import { supabaseBrowser } from "~/lib/supabase/client";
 import { cn } from "~/lib/utils";
 
 const TONE = {
@@ -78,6 +79,39 @@ export function StudentSheet({
   const effectiveStreak = student ? (streakOverride(student.id) ?? student.streak) : 0;
   const latestWorkoutId = assigned[0]?.id;
 
+  // Fetch último feedback do aluno (workout_sessions.meta)
+  const [lastFeedback, setLastFeedback] = useState<{ feeling: string | null; note: string | null; duration_min: number | null; date: string } | null>(null);
+  useEffect(() => {
+    if (!student?.id) { setLastFeedback(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await (supabaseBrowser() as any)
+          .from("workout_sessions")
+          .select("meta, started_at")
+          .eq("student_id", student.id)
+          .eq("status", "completed")
+          .order("started_at", { ascending: false })
+          .limit(5);
+        if (cancelled) return;
+        const rows = (data ?? []) as Array<{ meta: Record<string, any> | null; started_at: string }>;
+        const withFeedback = rows.find((r) => r.meta?.feeling || r.meta?.feedback_at);
+        if (withFeedback) {
+          const meta = withFeedback.meta ?? {};
+          setLastFeedback({
+            feeling: (meta.feeling as string) ?? null,
+            note: (meta.note as string) ?? null,
+            duration_min: (meta.duration_min as number) ?? null,
+            date: withFeedback.started_at,
+          });
+        } else {
+          setLastFeedback(null);
+        }
+      } catch { if (!cancelled) setLastFeedback(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [student?.id]);
+
   return (
     <BottomSheet open={!!student} onClose={onClose}>
       {student ? (
@@ -121,6 +155,7 @@ export function StudentSheet({
 
           {/* conteúdo da aba */}
           {tab === "resumo" ? (
+            <div className="space-y-2">
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3">
                 <p className="flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -162,6 +197,35 @@ export function StudentSheet({
                   <p className="mt-0.5 text-[10px] text-[#FFC24D]">Último RPE: {student.lastRpe}</p>
                 ) : null}
               </div>
+            </div>
+            {/* Último feedback do aluno */}
+            {lastFeedback ? (
+              <div className="rounded-2xl border border-[#4ADE80]/20 bg-[#4ADE80]/[0.06] p-3">
+                <p className="flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider text-[#4ADE80]">
+                  <Feather className="h-3 w-3" /> Último feedback
+                </p>
+                <div className="mt-1.5 flex items-center gap-3">
+                  <span className="text-[13px] font-bold text-foreground">
+                    {lastFeedback.feeling === "leve" ? "Leve" : lastFeedback.feeling === "na_medida" ? "Na medida" : lastFeedback.feeling === "puxado" ? "Puxado" : lastFeedback.feeling === "no_limite" ? "No limite" : lastFeedback.feeling}
+                  </span>
+                  {lastFeedback.duration_min ? (
+                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <Clock3 className="h-3 w-3" /> {lastFeedback.duration_min} min
+                    </span>
+                  ) : null}
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(lastFeedback.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                  </span>
+                </div>
+                {lastFeedback.note ? (
+                  <p className="mt-1.5 text-[11px] italic text-muted-foreground">"{lastFeedback.note}"</p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.02] p-3 text-center">
+                <p className="text-[11px] text-muted-foreground">Sem feedback registrado ainda</p>
+              </div>
+            )}
             </div>
           ) : null}
 
