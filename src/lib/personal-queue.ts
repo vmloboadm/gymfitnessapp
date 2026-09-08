@@ -123,14 +123,9 @@ export function computeQueue(
     }
   }
 
-  // 3. Fecho: conquistas a validar
-  items.push({
-    id: "queue-ranking",
-    tone: "green",
-    text: "Conquistas da semana esperando validação",
-    detail: "Confirme RP e metas batidas pra pontuação cair no ranking.",
-    action: { kind: "link", label: "Abrir Ranking", href: "/personal/ranking" },
-  });
+  // 3. Fecho: sem filler — só itens com dado real entram na fila.
+  // (Antes havia "Conquistas esperando validação" incondicional; removido
+  // porque não existe fluxo de validação nem conquistas pendentes no banco.)
 
   const order: Record<QueueItemTone, number> = { red: 0, amber: 1, green: 2 };
   return items.sort((a, b) => order[a.tone] - order[b.tone]).slice(0, 7);
