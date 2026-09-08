@@ -16,6 +16,7 @@ const PUBLIC_PATHS = [
   "/parceiros",
   "/bem-vindo",
   "/vantagens",
+  "/evolucao",
   "/tv",
 ];
 
