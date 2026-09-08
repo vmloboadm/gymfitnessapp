@@ -1,65 +1,120 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { ScanLine, Dumbbell, TrendingUp, Trophy, ArrowRight, CheckCircle2, Smartphone } from "lucide-react";
+import { ScanLine, Dumbbell, TrendingUp, Trophy, ArrowRight } from "lucide-react";
+import { assetPath } from "~/lib/asset-path";
 
 export const metadata: Metadata = {
   title: "Bem-vindo · GymFitness Campos",
   description:
-    "Check-in na portaria, treino do seu personal, progresso e ranking — tudo no app da GymFitness Campos.",
+    "Check-in na portaria, ficha do seu personal e evolução semana a semana — o app da GymFitness Campos.",
 };
 
 /**
  * LP pública de boas-vindas — QR do banner "Conheça o app" cai aqui.
- * Mobile-first: explica em 30s + CTA para entrar/criar conta.
+ * Foto real do salão + logo + voz da academia. CTA: criar conta / entrar.
  */
 export default function BemVindoPage() {
   return (
     <div className="min-h-[100dvh] bg-[#05080f] text-[#F4F6FB]">
-      <header className="relative overflow-hidden px-5 pb-8 pt-12 text-center">
-        <div
-          className="pointer-events-none absolute -top-24 left-1/2 h-64 w-[140%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(244,113,30,0.22),transparent_70%)] blur-2xl"
+      {/* HERO com foto do salão */}
+      <header className="relative overflow-hidden">
+        <Image
+          src={assetPath("/workout/workout-hero.jpg")}
+          alt="Salão de musculação da GymFitness Campos"
+          fill
+          priority
+          sizes="(max-width: 640px) 100vw, 448px"
+          className="object-cover object-center"
+        />
+        <span className="absolute inset-0 bg-gradient-to-b from-[#05080f]/70 via-[#05080f]/55 to-[#05080f]" aria-hidden />
+        <span
+          className="absolute inset-0 mix-blend-overlay"
+          style={{ background: "linear-gradient(115deg, rgba(244,113,30,0.28) 0%, rgba(244,113,30,0) 50%)" }}
           aria-hidden
         />
-        <span className="relative inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white/60">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#F4711E] shadow-[0_0_8px_rgba(244,113,30,0.7)]" />
-          GymFitness Campos · App do aluno
-        </span>
-        <h1 className="relative mt-4 font-display text-[30px] font-black leading-tight tracking-tight">
-          Seu treino, seu progresso,{" "}
-          <span className="bg-gradient-to-r from-[#F4711E] to-[#FF9A5C] bg-clip-text text-transparent">
-            tudo no bolso
-          </span>
-        </h1>
-        <p className="relative mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-white/60">
-          Escaneou o QR da academia? Aqui começa: check-in, treino do personal
-          e evolução semana a semana.
-        </p>
+        <div className="relative px-5 pb-10 pt-8">
+          <Image
+            src={assetPath("/images/logo-academia.png")}
+            alt="GymFitness Campos"
+            width={132}
+            height={42}
+            priority
+            unoptimized
+            className="h-9 w-auto object-contain"
+            style={{ filter: "drop-shadow(0 0 16px rgba(255,111,22,0.45))" }}
+          />
+          <h1 className="mt-8 font-display text-[32px] font-black leading-[1.08] tracking-tight">
+            O treino é aqui.
+            <br />
+            <span className="bg-gradient-to-r from-[#F4711E] to-[#FF9A5C] bg-clip-text text-transparent">
+              A evolução é no app.
+            </span>
+          </h1>
+          <p className="mt-3 max-w-sm text-[14px] leading-relaxed text-white/70">
+            Você escaneou o QR do salão — bom, é por aqui que a ficha anda.
+            Check-in na portaria, treino do personal e progresso guardado.
+          </p>
+          <div className="mt-6 space-y-2.5">
+            <Link
+              href="/register"
+              className="tactile flex items-center justify-center gap-2 rounded-2xl bg-[#F4711E] py-4 text-[15px] font-black text-black shadow-[0_8px_24px_rgba(244,113,30,0.35)] transition-transform active:scale-[0.98]"
+            >
+              Criar minha conta
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/login"
+              className="tactile flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-black/40 py-4 text-[14px] font-bold text-white backdrop-blur transition-colors active:scale-[0.98]"
+            >
+              Já treino aqui — entrar
+            </Link>
+          </div>
+        </div>
       </header>
 
-      <section className="mx-auto max-w-md space-y-3 px-5">
+      {/* NÚMEROS DA CASA */}
+      <section className="mx-auto grid max-w-md grid-cols-3 gap-2.5 px-5">
+        {[
+          { value: "400+", label: "alunos treinando" },
+          { value: "3.500+", label: "check-ins por mês" },
+          { value: "51", label: "aparelhos no salão" },
+        ].map(({ value, label }) => (
+          <div
+            key={label}
+            className="rounded-[18px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] p-3.5 text-center"
+          >
+            <p className="font-display text-[20px] font-black leading-none">{value}</p>
+            <p className="mt-1 text-[10px] font-medium leading-tight text-white/50">{label}</p>
+          </div>
+        ))}
+      </section>
+
+      {/* NA PRÁTICA */}
+      <section className="mx-auto mt-8 max-w-md space-y-3 px-5">
         <p className="text-[11px] font-black uppercase tracking-widest text-white/40">
-          Como funciona
+          Na prática, como é
         </p>
         {[
           {
             Icon: ScanLine,
-            title: "1. Check-in na portaria",
-            desc: "QR, NFC ou senha do dia — libera seu treino na hora.",
+            title: "Chegou, liberou",
+            desc: "QR, NFC ou a senha do dia na portaria — o treino destrava na hora, sem papel e sem espera.",
           },
           {
             Icon: Dumbbell,
-            title: "2. Treino do seu personal",
-            desc: "Ficha montada para você, com vídeos e descanso guiado.",
+            title: "Ficha do seu personal, não genérica",
+            desc: "Séries, repetições e vídeos de execução. Terminou, o personal já sabe.",
           },
           {
             Icon: TrendingUp,
-            title: "3. Progresso de verdade",
-            desc: "Diário de treinos, volume, streak e feedback que o personal vê.",
+            title: "Progresso que você vê",
+            desc: "Streak de dias seguidos, volume por semana e diário de treinos com seu feedback.",
           },
           {
             Icon: Trophy,
-            title: "4. Ranking e conquistas",
-            desc: "Liga da semana, medalhas e desafios com a galera.",
+            title: "Liga da semana + descontos",
+            desc: "Disputa saudável com a galera e cupons dos parceiros dentro do app.",
           },
         ].map(({ Icon, title, desc }) => (
           <div
@@ -77,38 +132,34 @@ export default function BemVindoPage() {
         ))}
       </section>
 
+      {/* FOTO 2 + CTA FINAL */}
       <section className="mx-auto mt-8 max-w-md px-5">
+        <div className="relative overflow-hidden rounded-[20px] border border-white/[0.07]">
+          <Image
+            src={assetPath("/workout/workout-rack.jpg")}
+            alt="Área de pesos da GymFitness Campos"
+            width={800}
+            height={420}
+            sizes="(max-width: 640px) 100vw, 448px"
+            className="h-44 w-full object-cover object-center"
+          />
+          <span className="absolute inset-0 bg-gradient-to-t from-[#05080f] via-transparent to-transparent" aria-hidden />
+          <p className="absolute bottom-3 left-4 right-4 text-[13px] font-bold leading-snug">
+            Conta gratuita em 1 minuto — só e-mail e senha. O resto a gente resolve no salão.
+          </p>
+        </div>
         <Link
           href="/register"
-          className="tactile flex items-center justify-center gap-2 rounded-2xl bg-[#F4711E] py-4 text-[15px] font-black text-black shadow-[0_8px_24px_rgba(244,113,30,0.35)] transition-transform active:scale-[0.98]"
+          className="tactile mt-3 flex items-center justify-center gap-2 rounded-2xl bg-[#F4711E] py-4 text-[15px] font-black text-black shadow-[0_8px_24px_rgba(244,113,30,0.35)] transition-transform active:scale-[0.98]"
         >
-          <Smartphone className="h-5 w-5" />
           Criar minha conta
           <ArrowRight className="h-4 w-4" />
         </Link>
-        <Link
-          href="/login"
-          className="tactile mt-2.5 flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] py-4 text-[14px] font-bold text-white transition-colors hover:bg-white/[0.07]"
-        >
-          Já sou aluno — entrar
-        </Link>
-        <div className="mt-4 space-y-1.5">
-          {[
-            "Leva 1 minuto — só e-mail e senha",
-            "Seu personal já acompanha sua evolução",
-            "Descontos de parceiros dentro do app",
-          ].map((item) => (
-            <p key={item} className="flex items-center gap-1.5 text-[12px] text-white/50">
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#4ADE80]" />
-              {item}
-            </p>
-          ))}
-        </div>
       </section>
 
       <footer className="mx-auto mt-10 max-w-md px-5 pb-12 text-center">
         <p className="text-[10px] text-white/25">
-          GymFitness · gymfitnesscampos.com.br
+          GymFitness Campos · gymfitnesscampos.com.br
         </p>
       </footer>
     </div>

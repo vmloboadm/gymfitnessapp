@@ -1,44 +1,58 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { Store, Tv, Ticket, Smartphone, TrendingUp, Users, CheckCircle2, MessageCircle, ArrowRight, Dumbbell } from "lucide-react";
 import { partnerLink } from "~/lib/whatsapp";
+import { assetPath } from "~/lib/asset-path";
 
 export const metadata: Metadata = {
   title: "Parceiros · GymFitness Campos",
   description:
-    "Coloque sua marca dentro da academia que mais cresce em Campos: banner no salão, vídeo na TV, cupom exclusivo para os alunos e presença no app.",
+    "Banner no salão, vídeo na TV e cupom no app: sua marca na rotina de quem treina todo dia em Campos.",
 };
 
 /**
- * LP de parcerias — pública (QR do banner da academia cai aqui).
- * Mobile-first: o parceiro escaneia o QR e vê tudo no celular.
+ * LP de parcerias — pública (QR do banner "Seja parceiro" cai aqui).
+ * Mobile-first: o lojista escaneia no salão e fecha no WhatsApp.
  */
 export default function ParceirosPage() {
   const ctaHref = partnerLink();
 
   return (
     <div className="min-h-[100dvh] bg-[#05080f] text-[#F4F6FB]">
-      {/* HERO */}
-      <header className="relative overflow-hidden px-5 pb-10 pt-12 text-center">
-        <div
-          className="pointer-events-none absolute -top-24 left-1/2 h-64 w-[140%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(244,113,30,0.22),transparent_70%)] blur-2xl"
-          aria-hidden
+      {/* HERO com foto do salão */}
+      <header className="relative overflow-hidden">
+        <Image
+          src={assetPath("/workout/workout-strength.jpg")}
+          alt="Salão de musculação da GymFitness Campos"
+          fill
+          priority
+          sizes="(max-width: 640px) 100vw, 448px"
+          className="object-cover object-center"
         />
-        <span className="relative inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white/60">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#F4711E] shadow-[0_0_8px_rgba(244,113,30,0.7)]" />
-          Parcerias · GymFitness Campos
-        </span>
-        <h1 className="relative mt-4 font-display text-[30px] font-black leading-tight tracking-tight">
-          Sua marca dentro da academia{" "}
-          <span className="bg-gradient-to-r from-[#F4711E] to-[#FF9A5C] bg-clip-text text-transparent">
-            que mais cresce
-          </span>{" "}
-          em Campos
-        </h1>
-        <p className="relative mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-white/60">
-          Público frequente, treino todo dia e celular na mão. Seu negócio na
-          rotina real dos alunos — dentro do app, no salão e na TV da academia.
-        </p>
+        <span className="absolute inset-0 bg-gradient-to-b from-[#05080f]/70 via-[#05080f]/55 to-[#05080f]" aria-hidden />
+        <div className="relative px-5 pb-10 pt-8 text-center">
+          <Image
+            src={assetPath("/images/logo-academia.png")}
+            alt="GymFitness Campos"
+            width={132}
+            height={42}
+            priority
+            unoptimized
+            className="mx-auto h-9 w-auto object-contain"
+            style={{ filter: "drop-shadow(0 0 16px rgba(255,111,22,0.45))" }}
+          />
+          <h1 className="mt-8 font-display text-[30px] font-black leading-tight tracking-tight">
+            400+ alunos passam pelo seu banner{" "}
+            <span className="bg-gradient-to-r from-[#F4711E] to-[#FF9A5C] bg-clip-text text-transparent">
+              toda semana.
+            </span>
+          </h1>
+          <p className="mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-white/70">
+            Não é outdoor que ninguém olha. É o salão onde o bairro treina
+            6x por semana — sua marca no banner, na TV e no cupom do app.
+          </p>
+        </div>
       </header>
 
       {/* NÚMEROS */}
@@ -68,22 +82,22 @@ export default function ParceirosPage() {
           {
             Icon: Store,
             title: "Banner no salão",
-            desc: "Espaço destacado na academia, onde seu público treina 6x por semana.",
+            desc: "Sua marca na parede onde 400+ alunos batem ponto toda semana.",
           },
           {
             Icon: Tv,
-            title: "Vídeo na TV da academia",
-            desc: "Seu vídeo comercial rodando em loop para todo mundo que treina.",
+            title: "Vídeo na TV do salão",
+            desc: "Teu comercial rodando no descanso entre séries — ninguém pula.",
           },
           {
             Icon: Ticket,
-            title: "Cupom exclusivo para alunos",
-            desc: "Desconto especial divulgado direto no app — rastreamos o uso.",
+            title: "Cupom que o aluno usa",
+            desc: "Desconto preso no login do aluno. Sem print vazando pra fora.",
           },
           {
             Icon: Smartphone,
-            title: "Presença no app",
-            desc: "Card de parceiro na home do aluno, com destaque e CTA para o seu negócio.",
+            title: "Card dentro do app",
+            desc: "Teu nome na tela que o aluno abre todo dia antes de treinar.",
           },
         ].map(({ Icon, title, desc }) => (
           <div
@@ -107,10 +121,10 @@ export default function ParceirosPage() {
           Como funciona
         </p>
         {[
-          "Você fala com a gente e escolhe o plano de parceria",
-          "Produzimos o material (banner, vídeo, cupom) junto com você",
-          "Sua marca entra no ar — no salão, na TV e no app",
-          "Acompanha os resultados e renova se fizer sentido",
+          "Chama no WhatsApp e conta o que você vende",
+          "A gente monta banner + vídeo + cupom com você",
+          "Sua marca entra no ar no salão, na TV e no app",
+          "Vê o movimento e decide se renova — sem fidelidade",
         ].map((step, i) => (
           <div key={i} className="flex items-start gap-3 px-1">
             <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#F4711E]/15 text-[10px] font-black text-[#FF9A5C]">
@@ -133,9 +147,9 @@ export default function ParceirosPage() {
         </a>
         <div className="mt-4 space-y-1.5">
           {[
-            "Resposta rápida — falo direto com o gestor",
-            "Planos flexíveis para pequenos negócios locais",
-            "Sem burocracia: começa na mesma semana",
+            "Fala direto com o gestor, sem intermediário",
+            "Cabe no bolso do comércio de bairro",
+            "No ar ainda esta semana",
           ].map((item) => (
             <p key={item} className="flex items-center gap-1.5 text-[12px] text-white/50">
               <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#4ADE80]" />
