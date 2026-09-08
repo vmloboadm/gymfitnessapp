@@ -218,7 +218,7 @@ export function StudentSheet({
                   </span>
                 </div>
                 {lastFeedback.note ? (
-                  <p className="mt-1.5 text-[11px] italic text-muted-foreground">"{lastFeedback.note}"</p>
+                  <p className="mt-1.5 text-[11px] italic text-muted-foreground">“{lastFeedback.note}”</p>
                 ) : null}
               </div>
             ) : (
