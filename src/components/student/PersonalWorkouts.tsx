@@ -111,7 +111,9 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
                 {w.plan.dias.map((d, di) => (
                   <div key={di} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-2.5">
                     <p className="text-[11px] font-bold text-brand">{d.nome}</p>
-                    <p className="text-[9.5px] text-muted-foreground">{d.foco}</p>
+                    {d.foco && d.foco !== d.nome ? (
+                      <p className="text-[9.5px] text-muted-foreground">{d.foco}</p>
+                    ) : null}
                     <ul className="mt-1 divide-y divide-white/[0.05]">
                       {d.exercicios.slice(0, 3).map((e, i) => (
                         <li key={i} className="flex items-center justify-between gap-2 py-1">

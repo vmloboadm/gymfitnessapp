@@ -99,7 +99,7 @@ export default function CheckinPage() {
       if (!user || !profile) return { data: null, error: { message: "Sessão indisponível" } };
 
       const [equip, active] = await Promise.all([
-        supabase.from("equipment").select("*").eq("gym_id", profile.gym_id).order("name", { ascending: true }).limit(30),
+        supabase.from("equipment").select("*").eq("gym_id", profile.gym_id).order("name", { ascending: true }).limit(100),
         supabase.from("equipment_sessions").select("*").eq("student_id", user.id).eq("status", "active").maybeSingle(),
       ]);
       if (equip.error) return { data: null, error: equip.error };
