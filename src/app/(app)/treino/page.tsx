@@ -310,15 +310,27 @@ export default function TreinoHomePage() {
 
   const conclude = async (completedIds?: string[]) => {
     setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
-    setConcludedCount(completedIds?.length ?? 0);
+    // ids: parâmetro → ref ao vivo → progresso persistido (fallback triplo:
+    // garante logs mesmo se o chamador passou lista vazia)
+    let ids = completedIds?.length ? completedIds : [...completedRef.current];
+    if (ids.length === 0) {
+      try {
+        const saved = readSessionProgress();
+        const prog = (saved?.progress ?? {}) as Record<string, { sets?: Array<{ done?: boolean }> }>;
+        ids = Object.entries(prog)
+          .filter(([, v]) => (v.sets ?? []).length > 0 && (v.sets ?? []).every((s) => s.done))
+          .map(([k]) => k);
+      } catch { /* sem fallback */ }
+    }
+    setConcludedCount(ids.length);
     endDaySession();
     if (!demo && user?.id) {
       const active = await getActiveWorkoutSession(user.id).catch(() => null);
       setFinishedSessionId(active?.id ?? null);
       void completeWorkoutSession(user.id);
     }
-    if (completedIds?.length) {
-      setDoneIds((prev) => new Set([...prev, ...completedIds]));
+    if (ids.length) {
+      setDoneIds((prev) => new Set([...prev, ...ids]));
       // produção: grava workout_logs reais dos exercícios concluídos.
       // Resolve exercise_id na hora (mapa do plano OU busca por nome),
       // então o dashboard/progresso SEMPRE atualizam ao finalizar.
@@ -332,7 +344,7 @@ export default function TreinoHomePage() {
               return m ? Math.min(999, parseInt(m[0], 10)) : 0;
             };
             const sessList = session ?? [];
-            const missing = completedIds.filter(
+            const missing = ids.filter(
               (id) => !(planExerciseMap && planExerciseMap[id]?.exerciseId)
             );
             const nameToId: Record<string, string> = {};
@@ -361,7 +373,7 @@ export default function TreinoHomePage() {
               }
               return null;
             };
-            const rows = completedIds.flatMap((id) => {
+            const rows = ids.flatMap((id) => {
               const m = planExerciseMap?.[id];
               const s = sessList.find((x) => x.id === id);
               const exerciseId = m?.exerciseId ?? (s ? findId(s.name) : null);
