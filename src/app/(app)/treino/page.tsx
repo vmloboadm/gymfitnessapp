@@ -310,6 +310,7 @@ export default function TreinoHomePage() {
 
   const conclude = async (completedIds?: string[]) => {
     setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
+    setConcludedCount(completedIds?.length ?? 0);
     endDaySession();
     if (!demo && user?.id) {
       const active = await getActiveWorkoutSession(user.id).catch(() => null);
@@ -393,7 +394,11 @@ export default function TreinoHomePage() {
   // Conclusões desta sessão (otimista, local): alimenta contador e reordenação
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const doneCount = doneIds.size;
+  // ids concluídos ao vivo (WorkoutInProgress reporta; barra superior usa o ref)
+  const completedRef = useRef<string[]>([]);
   const [finishedSessionId, setFinishedSessionId] = useState<string | null>(null);
+  // quantos exercícios foram concluídos na sessão que acabou (fonte p/ resumo)
+  const [concludedCount, setConcludedCount] = useState<number | null>(null);
 
   const startWorkout = (list: typeof DEFAULT_DEMO_EX) => {
     setSession(list);
@@ -480,7 +485,7 @@ export default function TreinoHomePage() {
             fast={demo}
             onFinish={() => {
               setSummarySeconds(elapsedSeconds(daySession.startedAt, Date.now()));
-              void conclude([...doneIds]);
+              void conclude([...completedRef.current]);
               endDaySession();
               setPhase("done");
             }}
@@ -490,7 +495,7 @@ export default function TreinoHomePage() {
           onClick={() => {
             navigator.vibrate?.([60, 40, 60]);
             setSummarySeconds(elapsedSeconds(daySession.startedAt, Date.now()));
-            void conclude([...doneIds]);
+            void conclude([...completedRef.current]);
             endDaySession();
             toast.success("Sessão finalizada. Registre como foi!");
             setPhase("done");
@@ -515,7 +520,7 @@ export default function TreinoHomePage() {
           exit={{ opacity: 0, scale: 0.98 }}
           transition={{ duration: 0.18 }}
         >
-          <WorkoutInProgress exercises={activeExercises} onFinish={(ids) => { conclude(ids); setPlanTodayActive(false); }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
+          <WorkoutInProgress exercises={activeExercises} onFinish={(ids) => { conclude(ids); setPlanTodayActive(false); }} onProgressChange={(ids) => { completedRef.current = ids; }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
         </m.div>
       </AnimatePresence>
     );
@@ -546,7 +551,7 @@ export default function TreinoHomePage() {
         >
           <WorkoutSummary
             seconds={summarySeconds ?? 0}
-            done={Math.min(todayLogs || 1, totalToday || 1)}
+            done={concludedCount ?? Math.min(todayLogs, totalToday)}
             total={totalToday || 1}
             sessionId={finishedSessionId}
             onDone={() => {

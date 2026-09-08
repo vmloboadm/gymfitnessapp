@@ -48,10 +48,12 @@ export default function WorkoutInProgress({
   exercises,
   onFinish,
   onMinimize,
+  onProgressChange,
 }: {
   exercises: WExercise[];
   onFinish: (completedIds: string[]) => void;
   onMinimize?: () => void;
+  onProgressChange?: (completedIds: string[]) => void;
 }) {
   const [progress, setProgress] = useState<Record<string, ExerciseProgress>>({});
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -99,6 +101,15 @@ export default function WorkoutInProgress({
     saveSessionProgress({ exercises, progress, currentIdx });
   }, [exercises, progress, currentIdx]);
 
+  // reporta ids concluídos para cima (barra "Finalizar Treino" usa o ref)
+  const completedIds = useMemo(
+    () => exercises.filter((e) => progress[e.id]?.sets.every((s) => s.done)).map((e) => e.id),
+    [progress, exercises]
+  );
+  useEffect(() => {
+    onProgressChange?.(completedIds);
+  }, [completedIds, onProgressChange]);
+
   const startRest = useCallback((seconds: number) => {
     if (!seconds || seconds <= 0) return;
     if (restInterval.current) clearInterval(restInterval.current);
@@ -114,10 +125,6 @@ export default function WorkoutInProgress({
     }, 1000);
   }, []);
 
-  const completedIds = useMemo(
-    () => exercises.filter((e) => progress[e.id]?.sets.every((s) => s.done)).map((e) => e.id),
-    [progress, exercises]
-  );
   const doneSets = useMemo(
     () => exercises.reduce((acc, e) => acc + (progress[e.id]?.sets.filter((s) => s.done).length ?? 0), 0),
     [progress, exercises]
