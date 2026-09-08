@@ -460,16 +460,22 @@ export default function HomePage() {
         {/* LINHA 1, Logo + relógio/data; LINHA 2, saudação */}
         <m.div variants={item} className="px-2">
           <div className="flex items-center justify-between gap-3">
-            <Image
-              src={assetPath("/images/logo-academia.png")}
-              alt="GymFitness"
-              width={128}
-              height={40}
-              priority
-              unoptimized
-              className="h-8 w-auto shrink-0 object-contain"
-              style={{ filter: "drop-shadow(0 0 16px rgba(255,111,22,0.45))" }}
-            />
+            <m.div
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+            >
+              <Image
+                src={assetPath("/images/logo-academia.png")}
+                alt="GymFitness"
+                width={128}
+                height={40}
+                priority
+                unoptimized
+                className="h-8 w-auto shrink-0 object-contain"
+                style={{ filter: "drop-shadow(0 0 16px rgba(255,111,22,0.45))" }}
+              />
+            </m.div>
             <div className="shrink-0 text-right">
               <p className="pm-mono text-[12px] font-medium tracking-[0.08em] text-[#F4F6FB]">
                 <LiveClock />
@@ -483,14 +489,25 @@ export default function HomePage() {
             <p className="pm-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8B95A9]" suppressHydrationWarning>
               {greeting}
             </p>
-            <h1 className="mt-1 truncate bg-gradient-to-r from-[#F4F6FB] to-[#B8C4D8] bg-clip-text font-display text-[30px] font-black leading-none tracking-tight text-transparent">
+            <m.h1
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15, duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+              className="mt-1 truncate bg-gradient-to-r from-[#F4F6FB] via-[#D6DCEC] to-[#B8C4D8] bg-clip-text font-display text-[30px] font-black leading-none tracking-tight text-transparent"
+            >
               {name}
-            </h1>
+            </m.h1>
           </div>
         </m.div>
 
         {/* COCKPIT, Anel da meta + Streak + Liga */}
-        <m.section variants={item} className="pm-surface overflow-hidden">
+        <m.section
+          variants={item}
+          className="pm-surface overflow-hidden"
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1, duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+        >
           <div className="px-2 pb-6 pt-1">
             <div className="relative">
               <PerformanceRing done={sessionsWeek} goal={META_SEMANAL} />
@@ -506,7 +523,11 @@ export default function HomePage() {
             </div>
 
             <div className="flex items-center justify-center gap-2.5 px-4">
-              <span className={cn("h-1.5 w-1.5 rounded-full", remaining > 0 ? "bg-[#F4711E]" : "bg-[#4ADE80]")} />
+              <m.span
+                className={cn("h-1.5 w-1.5 rounded-full", remaining > 0 ? "bg-[#F4711E]" : "bg-[#4ADE80]")}
+                animate={remaining === 0 ? { scale: [1, 1.3, 1], opacity: [1, 0.7, 1] } : undefined}
+                transition={remaining === 0 ? { duration: 2, repeat: Infinity } : undefined}
+              />
               <p className="pm-mono text-[#8B95A9]">
                 {remaining > 0
                   ? `${sessionsWeek} feitos esta semana · ${remaining} restam`
@@ -552,7 +573,12 @@ export default function HomePage() {
             </div>
 
             {/* Ocupação ao vivo + mensagem motivadora */}
-            <div className="mt-4 flex items-center justify-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-2">
+            <m.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.4 }}
+              className="mt-4 flex items-center justify-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-2"
+            >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#4ADE80] opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[#4ADE80]" />
@@ -561,17 +587,25 @@ export default function HomePage() {
                 <span className="font-black text-[#F4F6FB]">{online} pessoas</span> treinando agora, 
                 <span className="text-[#FF9A5C]"> {motivationPhrase}</span>
               </p>
-            </div>
+            </m.div>
 
             {/* Título do mês consolidado como linha secundária da liga (#7) */}
-            <p className="mt-4 text-center text-[11px] leading-snug text-[#7E8AA0]">
-              Título do mês: <span className="font-semibold text-[#D6DCEC]">{titulo.label}</span>
-              {titulo.nextLabel ? (
-                <>
-                  {" · "}próxima conquista: <span className="font-semibold text-[#FF9A5C]">{titulo.nextLabel}</span>
-                </>
-              ) : null}
-            </p>
+            <m.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="mt-4 flex items-center justify-center gap-1.5 rounded-full border border-white/[0.04] bg-white/[0.02] px-3 py-1.5"
+            >
+              <Award className="h-3 w-3 text-[#FFC24D]" />
+              <p className="text-center text-[10px] leading-snug text-[#7E8AA0]">
+                <span className="font-semibold text-[#D6DCEC]">{titulo.label}</span>
+                {titulo.nextLabel ? (
+                  <>
+                    {" · "}próxima: <span className="font-semibold text-[#FF9A5C]">{titulo.nextLabel}</span>
+                  </>
+                ) : null}
+              </p>
+            </m.div>
           </div>
         </m.section>
 
