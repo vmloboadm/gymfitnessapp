@@ -466,6 +466,12 @@ export default function CheckinPage() {
       .select("id, checked_at, source")
       .maybeSingle();
     if (error) {
+      // Entrada de hoje já existe: libera mesmo assim (volta do almoço, segundo turno, etc.)
+      if (/já realizado hoje/i.test(error.message)) {
+        startDaySession();
+        toast.success("Bom treino! Entrada de hoje já registrada.");
+        return true;
+      }
       toast.error("Falha no check-in", { description: error.message });
       return false;
     }
