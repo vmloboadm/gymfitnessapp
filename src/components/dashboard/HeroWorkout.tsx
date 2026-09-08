@@ -95,12 +95,25 @@ export function HeroWorkout({
             </div>
           </div>
 
-          <span className="mt-7 flex items-center justify-center gap-3 rounded-[18px] bg-gradient-to-r from-[#FF8A3C] to-[#E85D0E] py-4 shadow-[0_22px_54px_-16px_rgba(244,113,30,0.85)]">
-            <span className="font-display text-[17px] font-extrabold tracking-wide text-white">Começar agora</span>
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/25">
+          <m.span
+            className="mt-7 relative flex items-center justify-center gap-3 overflow-hidden rounded-[18px] bg-gradient-to-r from-[#FF8A3C] to-[#E85D0E] py-4 shadow-[0_22px_54px_-16px_rgba(244,113,30,0.85)]"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+          >
+            {/* Shimmer sweep */}
+            <m.span
+              className="absolute inset-0"
+              style={{
+                background: "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.18) 45%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.18) 55%, transparent 70%)",
+              }}
+              animate={{ x: ["-120%", "220%"] }}
+              transition={{ duration: 3, repeat: Infinity, repeatDelay: 2, ease: "easeInOut" }}
+            />
+            <span className="relative font-display text-[17px] font-extrabold tracking-wide text-white">Começar agora</span>
+            <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-black/25">
               <Play className="h-5 w-5 fill-white text-white" />
             </span>
-          </span>
+          </m.span>
         </div>
       </Link>
     </m.div>

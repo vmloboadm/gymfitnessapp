@@ -810,12 +810,22 @@ export default function TreinoHomePage() {
                       Finalizador: {planToday.day.finalizador}
                     </p>
                   ) : null}
-                  <button
+                  <m.button
                     onClick={startPlanSession}
-                    className="gf-touch tactile flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-[15px] font-black text-brand-foreground shadow-lg shadow-brand/35 transition-transform active:scale-[0.98]"
+                    whileHover={{ scale: 1.015 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="gf-touch relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-brand py-3.5 text-[15px] font-black text-brand-foreground shadow-lg shadow-brand/35"
                   >
-                    <Play className="h-5 w-5 fill-current" /> Iniciar treino de hoje
-                  </button>
+                    <m.span
+                      className="absolute inset-0"
+                      style={{
+                        background: "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.15) 45%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0.15) 55%, transparent 70%)",
+                      }}
+                      animate={{ x: ["-120%", "220%"] }}
+                      transition={{ duration: 3.5, repeat: Infinity, repeatDelay: 2.5, ease: "easeInOut" }}
+                    />
+                    <Play className="relative h-5 w-5 fill-current" /> <span className="relative">Iniciar treino de hoje</span>
+                  </m.button>
                 </div>
               </div>
             </div>

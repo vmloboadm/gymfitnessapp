@@ -448,7 +448,7 @@ export default function HomePage() {
               </button>
             </div>
           ) : (
-          <Link href="/checkin" className="tactile block rounded-2xl bg-[#F4711E] px-5 py-4 text-center shadow-[0_0_20px_rgba(244,113,30,0.4)]" style={{ willChange: "transform" }}>
+          <Link href="/checkin" className="tactile block rounded-2xl bg-[#F4711E] px-5 py-4 text-center shadow-[0_0_20px_rgba(244,113,30,0.4)] animate-glow" style={{ willChange: "transform" }}>
             <m.span whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex items-center justify-center gap-2.5 text-[15px] font-black text-black">
               <ScanLine className="h-5 w-5" />
               Cheguei na academia, fazer check-in
@@ -517,10 +517,11 @@ export default function HomePage() {
             {/* Streak + Liga, mesma vitrine, células respiradas */}
             <div className="mt-7 grid grid-cols-2 gap-3 px-4">
               <m.div
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.94 }}
                 className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[20px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] px-3 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_30px_-18px_rgba(0,0,0,0.8)] after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
                 style={{ animationDelay: "80ms" }}
+                transition={{ type: "spring", stiffness: 400, damping: 22 }}
               >
                 {showConfetti ? <ConfettiBurst /> : null}
                 <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-[#F4711E]/15 to-transparent">
@@ -531,10 +532,11 @@ export default function HomePage() {
                 <FlameStageHint streak={streak} />
               </m.div>
               <m.div
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.94 }}
                 className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[20px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] px-3 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_30px_-18px_rgba(0,0,0,0.8)] after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
                 style={{ animationDelay: "160ms" }}
+                transition={{ type: "spring", stiffness: 400, damping: 22 }}
               >
                 <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-[#FBBF24]/15 to-transparent">
                   <LeagueGlyphMotion id={myLeague.id} />
@@ -603,7 +605,13 @@ export default function HomePage() {
             className="tactile flex w-full items-center justify-center gap-2 rounded-[16px] border border-white/[0.06] bg-white/[0.02] py-3.5 text-[13px] font-semibold text-[#B8C4D8] transition-colors hover:border-[#FF9A5C]/30 hover:text-[#F4F6FB]"
           >
             {showMore ? "Ver menos" : "Ver mais"}
-            <ChevronDown className={cn("h-4 w-4 text-[#FF9A5C] transition-transform duration-200", showMore && "rotate-180")} />
+            <m.span
+              animate={{ rotate: showMore ? 180 : 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="inline-flex"
+            >
+              <ChevronDown className="h-4 w-4 text-[#FF9A5C]" />
+            </m.span>
           </button>
         </m.div>
 
@@ -631,10 +639,10 @@ export default function HomePage() {
             {Array.from({ length: monthDays.firstWeekday }).map((_, i) => (
               <span key={`empty-${i}`} className="h-8" aria-hidden />
             ))}
-            {monthDays.days.map((d) => {
+            {monthDays.days.map((d, idx) => {
               const selected = selectedDay === d.key;
               return (
-                <button
+                <m.button
                   key={d.key}
                   onClick={() => {
                     navigator.vibrate?.(10);
@@ -642,8 +650,13 @@ export default function HomePage() {
                   }}
                   aria-label={`${d.day} de ${monthShort}${d.today ? ", hoje" : ""}`}
                   aria-pressed={selected}
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: idx * 0.012, duration: 0.25, ease: "easeOut" }}
+                  whileHover={{ scale: 1.15 }}
+                  whileTap={{ scale: 0.9 }}
                   className={cn(
-                    "h-8 rounded-[6px] transition-all",
+                    "h-8 rounded-[6px] transition-colors",
                     selected ? "ring-2 ring-white/70" : "",
                     d.today
                       ? "bg-[#4ADE80] shadow-[0_0_10px_rgba(74,222,128,0.55)]"
@@ -743,33 +756,55 @@ export default function HomePage() {
           <p className="gf-section mb-2 px-1">Hoje na academia</p>
           <div className="scrollbar-hide -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
             {destaque ? (
-              <div className="w-[72%] shrink-0 snap-start rounded-[18px] border border-success/30 bg-success/[0.06] p-4">
+              <m.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="w-[72%] shrink-0 snap-start rounded-[18px] border border-success/30 bg-success/[0.06] p-4"
+              >
                 <p className="text-[10px] font-bold uppercase tracking-widest text-success">Destaque da galera</p>
                 <p className="mt-1.5 line-clamp-3 text-[13px] font-medium leading-snug text-[#D6DCEC]">{destaque.text}</p>
                 <p className="mt-2 text-[11px] font-semibold text-muted-foreground">{destaque.author}</p>
-              </div>
+              </m.div>
             ) : null}
             {mundo ? (
-              <Link href="/feed" className="w-[72%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4 transition-colors hover:border-brand/30">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-brand">{mundo.source}</p>
-                <p className="mt-1.5 line-clamp-2 text-[13px] font-semibold leading-snug text-[#F4F6FB]">{mundo.title}</p>
-                <p className="mt-2 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{mundo.body}</p>
-              </Link>
+              <m.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.18 }}
+              >
+                <Link href="/feed" className="block w-[72%] shrink-0 snap-start rounded-[18px] border border-border bg-card/50 p-4 transition-colors hover:border-brand/30">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-brand">{mundo.source}</p>
+                  <p className="mt-1.5 line-clamp-2 text-[13px] font-semibold leading-snug text-[#F4F6FB]">{mundo.title}</p>
+                  <p className="mt-2 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{mundo.body}</p>
+                </Link>
+              </m.div>
             ) : null}
             {structuredTip ? (
-              <div className="w-[72%] shrink-0 snap-start rounded-[18px] border border-warning/25 bg-warning/[0.05] p-4">
+              <m.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.26 }}
+                className="w-[72%] shrink-0 snap-start rounded-[18px] border border-warning/25 bg-warning/[0.05] p-4"
+              >
                 <p className="text-[10px] font-bold uppercase tracking-widest text-warning">Dica GymFitness</p>
                 <p className="mt-1.5 line-clamp-3 text-[13px] font-medium leading-snug text-[#D6DCEC]">{structuredTip.text}</p>
                 {structuredTip.source ? (
                   <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-brand">{structuredTip.source.handle ?? "@gymfitness"}</p>
                 ) : null}
-              </div>
+              </m.div>
             ) : null}
-            <Link href="/personals" className="w-[72%] shrink-0 snap-start rounded-[18px] border border-brand/35 bg-gradient-to-br from-brand/15 via-card to-card p-4 transition-colors hover:border-brand/60">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-brand">Personals da casa</p>
-              <p className="mt-1.5 line-clamp-2 text-[13px] font-semibold leading-snug text-[#F4F6FB]">Acelere com acompanhamento premium</p>
-              <p className="mt-2 text-[11px] font-semibold text-brand">Ver personais →</p>
-            </Link>
+            <m.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.34 }}
+            >
+              <Link href="/personals" className="block w-[72%] shrink-0 snap-start rounded-[18px] border border-brand/35 bg-gradient-to-br from-brand/15 via-card to-card p-4 transition-colors hover:border-brand/60">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-brand">Personals da casa</p>
+                <p className="mt-1.5 line-clamp-2 text-[13px] font-semibold leading-snug text-[#F4F6FB]">Acelere com acompanhamento premium</p>
+                <p className="mt-2 text-[11px] font-semibold text-brand">Ver personais →</p>
+              </Link>
+            </m.div>
             <PremiumRequestCard />
           </div>
         </m.section>
