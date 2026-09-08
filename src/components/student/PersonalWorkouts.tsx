@@ -88,6 +88,7 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
       </h2>
       <m.div variants={container} initial="hidden" animate="show" className="space-y-2.5">
         {workouts.map((w, idx) => (
+          idx === 0 ? (
           <m.article key={w.id} variants={item} className="gf-card gf-glass !p-4">
             {idx === 0 ? (
               <span className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-brand-foreground">
@@ -106,53 +107,7 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
               </div>
             </div>
 
-            {w.plan && w.plan.dias.length > 0 ? (
-              <div className="mt-2 space-y-1.5">
-                {w.plan.dias.map((d, di) => (
-                  <div key={di} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-2.5">
-                    <p className="text-[11px] font-bold text-brand">{d.nome}</p>
-                    {d.foco && d.foco !== d.nome ? (
-                      <p className="text-[9.5px] text-muted-foreground">{d.foco}</p>
-                    ) : null}
-                    <ul className="mt-1 divide-y divide-white/[0.05]">
-                      {d.exercicios.slice(0, 3).map((e, i) => (
-                        <li key={i} className="flex items-center justify-between gap-2 py-1">
-                          <p className="min-w-0 flex-1 truncate text-[10.5px] font-medium text-foreground">
-                            {i + 1}. {e.exercicio}
-                          </p>
-                          <p className="shrink-0 text-[9.5px] tabular-nums text-muted-foreground">
-                            {e.series}x {e.reps} · RPE {e.rpe}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                    {d.exercicios.length > 3 ? (
-                      <p className="mt-0.5 text-[9px] text-muted-foreground">
-                        + {d.exercicios.length - 3} exercícios neste dia
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <>
-                <ul className="mt-2 divide-y divide-white/[0.05] rounded-xl border border-white/[0.06] bg-white/[0.02]">
-                  {w.exercises.slice(0, 4).map((e, i) => (
-                    <li key={i} className="flex items-center justify-between gap-2 px-3 py-1.5">
-                      <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">{e.name}</p>
-                      <p className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                        {e.sets}x {e.reps}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-                {w.exercises.length > 4 ? (
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    + {w.exercises.length - 4} exercícios na ficha completa
-                  </p>
-                ) : null}
-              </>
-            )}
+            <PlanDays w={w} />
 
             {w.notes ? (
               <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-brand/25 bg-brand/[0.08] p-2.5 text-[11px] leading-snug text-brand">
@@ -163,9 +118,80 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
 
             <AdjustRequestCard workoutName={w.name} studentId={studentId} plan={w.plan ?? null} />
           </m.article>
+          ) : (
+          <details key={w.id} className="gf-card gf-glass group !p-4">
+            <summary className="tactile flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
+              <Dumbbell className="h-3.5 w-3.5 shrink-0 text-brand" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-bold text-foreground">{w.name}</p>
+                <p className="text-[10px] text-muted-foreground">{w.frequency} · {w.level}</p>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+            </summary>
+            <div className="pt-2">
+              <PlanDays w={w} />
+              <AdjustRequestCard workoutName={w.name} studentId={studentId} plan={w.plan ?? null} />
+            </div>
+          </details>
+          )
         ))}
       </m.div>
     </section>
+  );
+}
+
+/** Dias + exercícios de um plano (reuso: card aberto e colapsado). */
+function PlanDays({ w, plan }: { w: AssignedWorkout; plan?: WorkoutPlan | null }) {
+  const p = plan ?? w.plan;
+  if (p && p.dias.length > 0) {
+    return (
+      <div className="mt-2 space-y-1.5">
+        {p.dias.map((d, di) => (
+          <div key={di} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-2.5">
+            <p className="text-[11px] font-bold text-brand">{d.nome}</p>
+            {d.foco && d.foco !== d.nome ? (
+              <p className="text-[9.5px] text-muted-foreground">{d.foco}</p>
+            ) : null}
+            <ul className="mt-1 divide-y divide-white/[0.05]">
+              {d.exercicios.slice(0, 3).map((e, i) => (
+                <li key={i} className="flex items-center justify-between gap-2 py-1">
+                  <p className="min-w-0 flex-1 truncate text-[10.5px] font-medium text-foreground">
+                    {i + 1}. {e.exercicio}
+                  </p>
+                  <p className="shrink-0 text-[9.5px] tabular-nums text-muted-foreground">
+                    {e.series}x {e.reps} · RPE {e.rpe}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            {d.exercicios.length > 3 ? (
+              <p className="mt-0.5 text-[9px] text-muted-foreground">
+                + {d.exercicios.length - 3} exercícios neste dia
+              </p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <>
+      <ul className="mt-2 divide-y divide-white/[0.05] rounded-xl border border-white/[0.06] bg-white/[0.02]">
+        {w.exercises.slice(0, 4).map((e, i) => (
+          <li key={i} className="flex items-center justify-between gap-2 px-3 py-1.5">
+            <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">{e.name}</p>
+            <p className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+              {e.sets}x {e.reps}
+            </p>
+          </li>
+        ))}
+      </ul>
+      {w.exercises.length > 4 ? (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          + {w.exercises.length - 4} exercícios na ficha completa
+        </p>
+      ) : null}
+    </>
   );
 }
 

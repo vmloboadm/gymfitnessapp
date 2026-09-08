@@ -474,12 +474,15 @@ export default function TreinoHomePage() {
   const needsCheckin = !daySession;
   const checkinBanner = needsCheckin ? (
     <div className="mx-auto max-w-md px-4 pt-3">
-      <Link href="/checkin?scan=1&from=/treino" className="flex items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning/[0.08] px-4 py-2.5">
+      <button
+        onClick={() => setUnlockOpen(true)}
+        className="tactile flex w-full items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning/[0.08] px-4 py-2.5 text-left"
+      >
         <span className="flex items-center gap-2 text-[12px] font-bold text-warning">
-          <Lock className="h-4 w-4" /> Faça o check-in na portaria pra registrar presença
+          <Lock className="h-4 w-4" /> Treino bloqueado — toque para liberar
         </span>
         <ScanLine className="h-4 w-4 shrink-0 text-warning" />
-      </Link>
+      </button>
     </div>
   ) : null;
 
@@ -754,6 +757,12 @@ export default function TreinoHomePage() {
               <p className="mt-1 text-[11.5px] text-muted-foreground">
                 Seu plano pauta {daysSel.join(", ")} · o próximo treino é {orderedDays[(todayIdx + 1) % orderedDays.length] ?? "—"}.
               </p>
+              <button
+                onClick={() => document.getElementById("personal-workouts-title")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="tactile mt-3 inline-flex items-center gap-1.5 rounded-xl border border-brand/30 bg-brand/10 px-4 py-2.5 text-[12px] font-black text-brand"
+              >
+                <Dumbbell className="h-4 w-4" /> Ver meus planos
+              </button>
             </div>
           ) : (
             <div>

@@ -85,7 +85,7 @@ export function FlameStageHint({ streak }: { streak: number }) {
       {stage.nextName
         ? stage.daysToNext === 0
           ? `Próximo estágio: ${stage.nextName.toLowerCase()}`
-          : `Faltam ${stage.daysToNext} ${stage.daysToNext === 1 ? "dia" : "dias"} para ${stage.nextName.toLowerCase()}`
+          : `Faltam ${stage.daysToNext} ${stage.daysToNext === 1 ? "dia" : "dias"} para a ${stage.nextName}`
         : "Nível máximo alcançado!"}
     </p>
   );
