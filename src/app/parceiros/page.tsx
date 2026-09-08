@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * LP de parcerias — pública (QR do banner "Seja parceiro" cai aqui).
+ * LP de parcerias, pública. QR do banner "Seja parceiro" cai aqui.
  * Mobile-first: o lojista escaneia no salão e fecha no WhatsApp.
  */
 export default function ParceirosPage() {
@@ -42,7 +42,7 @@ export default function ParceirosPage() {
             className="mx-auto h-9 w-auto object-contain"
             style={{ filter: "drop-shadow(0 0 16px rgba(255,111,22,0.45))" }}
           />
-          <h1 className="mt-8 font-display text-[30px] font-black leading-tight tracking-tight">
+          <h1 className="mt-8 text-balance font-display text-[28px] font-black leading-[1.12] tracking-tight sm:text-[30px]">
             400+ alunos passam pelo seu banner{" "}
             <span className="bg-gradient-to-r from-[#F4711E] to-[#FF9A5C] bg-clip-text text-transparent">
               toda semana.
@@ -50,7 +50,7 @@ export default function ParceirosPage() {
           </h1>
           <p className="mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-white/70">
             Não é outdoor que ninguém olha. É o salão onde o bairro treina
-            6x por semana — sua marca no banner, na TV e no cupom do app.
+            6x por semana, com sua marca no banner, na TV e no cupom do app.
           </p>
         </div>
       </header>
@@ -67,7 +67,7 @@ export default function ParceirosPage() {
             className="rounded-[18px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] p-3.5 text-center"
           >
             <Icon className="mx-auto h-4 w-4 text-[#FF9A5C]" />
-            <p className="mt-1.5 font-display text-[20px] font-black leading-none">{value}</p>
+            <p className="mt-1.5 font-display text-[19px] font-black leading-none sm:text-[20px]">{value}</p>
             <p className="mt-1 text-[10px] font-medium leading-tight text-white/50">{label}</p>
           </div>
         ))}
@@ -87,7 +87,7 @@ export default function ParceirosPage() {
           {
             Icon: Tv,
             title: "Vídeo na TV do salão",
-            desc: "Teu comercial rodando no descanso entre séries — ninguém pula.",
+            desc: "Teu comercial rodando no descanso entre as séries. Ninguém pula.",
           },
           {
             Icon: Ticket,
@@ -124,7 +124,7 @@ export default function ParceirosPage() {
           "Chama no WhatsApp e conta o que você vende",
           "A gente monta banner + vídeo + cupom com você",
           "Sua marca entra no ar no salão, na TV e no app",
-          "Vê o movimento e decide se renova — sem fidelidade",
+          "Vê o movimento e decide se renova. Sem fidelidade",
         ].map((step, i) => (
           <div key={i} className="flex items-start gap-3 px-1">
             <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#F4711E]/15 text-[10px] font-black text-[#FF9A5C]">

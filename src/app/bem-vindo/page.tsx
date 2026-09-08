@@ -7,11 +7,11 @@ import { assetPath } from "~/lib/asset-path";
 export const metadata: Metadata = {
   title: "Bem-vindo · GymFitness Campos",
   description:
-    "Check-in na portaria, ficha do seu personal e evolução semana a semana — o app da GymFitness Campos.",
+    "Check-in na portaria, ficha do seu personal e evolução semana a semana. O app da GymFitness Campos.",
 };
 
 /**
- * LP pública de boas-vindas — QR do banner "Conheça o app" cai aqui.
+ * LP pública de boas-vindas. QR do banner "Conheça o app" cai aqui.
  * Foto real do salão + logo + voz da academia. CTA: criar conta / entrar.
  */
 export default function BemVindoPage() {
@@ -44,7 +44,7 @@ export default function BemVindoPage() {
             className="h-9 w-auto object-contain"
             style={{ filter: "drop-shadow(0 0 16px rgba(255,111,22,0.45))" }}
           />
-          <h1 className="mt-8 font-display text-[32px] font-black leading-[1.08] tracking-tight">
+          <h1 className="mt-8 text-balance font-display text-[29px] font-black leading-[1.1] tracking-tight sm:text-[32px]">
             O treino é aqui.
             <br />
             <span className="bg-gradient-to-r from-[#F4711E] to-[#FF9A5C] bg-clip-text text-transparent">
@@ -52,7 +52,7 @@ export default function BemVindoPage() {
             </span>
           </h1>
           <p className="mt-3 max-w-sm text-[14px] leading-relaxed text-white/70">
-            Você escaneou o QR do salão — bom, é por aqui que a ficha anda.
+            Você escaneou o QR do salão? Bom. É por aqui que a ficha anda.
             Check-in na portaria, treino do personal e progresso guardado.
           </p>
           <div className="mt-6 space-y-2.5">
@@ -67,7 +67,7 @@ export default function BemVindoPage() {
               href="/login"
               className="tactile flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-black/40 py-4 text-[14px] font-bold text-white backdrop-blur transition-colors active:scale-[0.98]"
             >
-              Já treino aqui — entrar
+              Sou aluno, entrar
             </Link>
           </div>
         </div>
@@ -84,7 +84,7 @@ export default function BemVindoPage() {
             key={label}
             className="rounded-[18px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] p-3.5 text-center"
           >
-            <p className="font-display text-[20px] font-black leading-none">{value}</p>
+            <p className="font-display text-[19px] font-black leading-none sm:text-[20px]">{value}</p>
             <p className="mt-1 text-[10px] font-medium leading-tight text-white/50">{label}</p>
           </div>
         ))}
@@ -99,7 +99,7 @@ export default function BemVindoPage() {
           {
             Icon: ScanLine,
             title: "Chegou, liberou",
-            desc: "QR, NFC ou a senha do dia na portaria — o treino destrava na hora, sem papel e sem espera.",
+            desc: "QR, NFC ou a senha do dia na portaria. O treino destrava na hora, sem papel e sem espera.",
           },
           {
             Icon: Dumbbell,
@@ -145,7 +145,7 @@ export default function BemVindoPage() {
           />
           <span className="absolute inset-0 bg-gradient-to-t from-[#05080f] via-transparent to-transparent" aria-hidden />
           <p className="absolute bottom-3 left-4 right-4 text-[13px] font-bold leading-snug">
-            Conta gratuita em 1 minuto — só e-mail e senha. O resto a gente resolve no salão.
+            Conta gratuita em 1 minuto. Só e-mail e senha, o resto a gente resolve no salão.
           </p>
         </div>
         <Link

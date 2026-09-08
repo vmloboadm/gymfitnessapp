@@ -34,7 +34,7 @@ async function getSponsors(): Promise<Sponsor[]> {
 }
 
 /**
- * LP pública de vantagens — QR do banner "Descontos de parceiros" cai aqui.
+ * LP pública de vantagens. QR do banner "Descontos de parceiros" cai aqui.
  * Foto + logo + lista real de parceiros com cupom borrado. CTA: entrar.
  */
 export default async function VantagensPage() {
@@ -68,14 +68,14 @@ export default async function VantagensPage() {
             <Ticket className="h-3 w-3 text-[#FFC24D]" />
             Clube de vantagens · só alunos
           </span>
-          <h1 className="mt-3 font-display text-[30px] font-black leading-tight tracking-tight">
+          <h1 className="mt-3 text-balance font-display text-[28px] font-black leading-[1.12] tracking-tight sm:text-[30px]">
             Treina aqui,{" "}
             <span className="bg-gradient-to-r from-[#FFC24D] to-[#FF9A5C] bg-clip-text text-transparent">
               paga menos lá fora.
             </span>
           </h1>
           <p className="mt-3 max-w-sm text-[14px] leading-relaxed text-white/70">
-            Lanchonete, suplemento, roupa, barbearia — parceiro do bairro com
+            Lanchonete, suplemento, roupa, barbearia. Parceiro do bairro com
             desconto preso no seu login. O cupom só revela dentro do app.
           </p>
         </div>
