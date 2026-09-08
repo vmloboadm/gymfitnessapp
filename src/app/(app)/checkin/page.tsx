@@ -134,9 +134,15 @@ export default function CheckinPage() {
 
     // TAG DA ENTRADA: check-in de presença + treino do dia liberado
     if (raw.toLowerCase() === "entrada") {
-      window.history.replaceState({}, "", window.location.pathname);
       void (async () => {
-        await doEntry("nfc");
+        const ok = await doEntry("nfc");
+        if (!ok) {
+          toast.info("Aguarde carregar e aproxime de novo", {
+            description: "Ou use a senha do dia na tela do treino.",
+          });
+          return;
+        }
+        window.history.replaceState({}, "", window.location.pathname);
         toast.success("Treino de hoje liberado! Bora treinar.");
         router.push("/treino?ir=hoje");
       })();
@@ -444,15 +450,15 @@ export default function CheckinPage() {
     source: string;
   } | null>(null);
 
-  const doEntry = async (source: "nfc" | "qrcode" | "app" = "app") => {
+  const doEntry = async (source: "nfc" | "qrcode" | "app" = "app"): Promise<boolean> => {
     if (demo) {
       setGymEntry({ id: "ck-demo-" + Date.now(), checked_at: new Date().toISOString(), source });
       startDaySession();
       toast.success("Check-in de entrada realizado!");
       router.push("/treino");
-      return;
+      return true;
     }
-    if (!user || !profile) return;
+    if (!user || !profile) return false;
     const supabase = supabaseBrowser();
     const { data: inserted, error } = await supabase
       .from("checkins")
@@ -461,11 +467,12 @@ export default function CheckinPage() {
       .maybeSingle();
     if (error) {
       toast.error("Falha no check-in", { description: error.message });
-      return;
+      return false;
     }
     setGymEntry(inserted as any);
     startDaySession();
     toast.success("Check-in de entrada realizado!");
+    return true;
   };
 
   const doExit = async () => {
