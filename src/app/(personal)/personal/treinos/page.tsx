@@ -161,8 +161,46 @@ function PersonalTreinosContent() {
   const params = useSearchParams();
   const { profile, user } = useAuth();
   const [students, setStudents] = useState<PersonalStudent[]>([]);
-  const templates = useMemo(() => demoTemplates(), []);
   const gymId = profile?.gym_id ?? "";
+  // Planos-modelo REAIS: reaproveita os programas já criados no gym (ai_draft).
+  // Só usa os exemplos fixos quando o acervo ainda está vazio.
+  const [modelos, setModelos] = useState<WorkoutTemplate[] | null>(null);
+  useEffect(() => {
+    if (!gymId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await (supabaseBrowser() as any)
+          .from("workout_programs")
+          .select("id, name, objective, ai_draft")
+          .eq("gym_id", gymId)
+          .order("created_at", { ascending: false })
+          .limit(10);
+        if (!alive) return;
+        const rows = (data ?? []) as Array<{ id: string; name: string; objective: string | null; ai_draft: string | null }>;
+        const real: WorkoutTemplate[] = [];
+        for (const r of rows) {
+          try {
+            const plan = JSON.parse(r.ai_draft ?? "") as WorkoutPlan;
+            const dias = plan.dias ?? [];
+            const ex = dias.flatMap((d) => (d.exercicios ?? []).map((e) => ({ name: e.exercicio, sets: e.series, reps: e.reps, rest: e.descanso })));
+            if (ex.length === 0) continue;
+            real.push({
+              id: r.id,
+              name: r.name,
+              description: r.objective ?? plan.objetivo ?? "Plano do acervo",
+              level: plan.nivel ?? "Intermediário",
+              days: dias.length,
+              exercises: ex.slice(0, 12),
+            });
+          } catch { /* pula plano ilegível */ }
+        }
+        setModelos(real.length > 0 ? real : demoTemplates());
+      } catch { if (alive) setModelos(demoTemplates()); }
+    })();
+    return () => { alive = false; };
+  }, [gymId]);
+  const templates = modelos ?? [];
 
   const targetId = params.get("aluno") ?? "";
   const editId = params.get("edit") ?? "";
@@ -1183,7 +1221,16 @@ function PersonalTreinosContent() {
           Planos-modelo
         </h2>
         <div className="no-scrollbar snap-x snap-mandatory flex gap-3 overflow-x-auto pb-2">
-          {templates.map((t) => (
+          {modelos === null ? (
+            [0, 1].map((i) => (
+              <div key={i} className="gf-card gf-glass w-[240px] shrink-0 snap-start space-y-2 !p-4">
+                <div className="skeleton-line h-4 w-3/4" />
+                <div className="skeleton-line h-3 w-full" />
+                <div className="skeleton-line h-9 w-full" />
+              </div>
+            ))
+          ) : (
+          templates.map((t) => (
             <article key={t.id} className="gf-card gf-glass w-[240px] shrink-0 snap-start space-y-2 !p-4">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-[13px] font-bold leading-tight text-foreground">{t.name}</p>
@@ -1205,7 +1252,8 @@ function PersonalTreinosContent() {
                 Aplicar em Massa
               </Button>
             </article>
-          ))}
+          ))
+          )}
         </div>
       </section>
 

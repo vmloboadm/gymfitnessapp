@@ -80,6 +80,32 @@ export default function PersonalPerfilPage() {
     return () => { alive = false; };
   }, [profile?.gym_id]);
 
+  // Equipe REAL: staff do gym + check-ins de hoje (sem mock)
+  const [staff, setStaff] = useState<Array<{ id: string; name: string; role: string; avatar: string | null }>>([]);
+  const [todayCount, setTodayCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!profile?.gym_id) return;
+    let alive = true;
+    (async () => {
+      try {
+        const sb = supabaseBrowser();
+        const today = new Date().toISOString().slice(0, 10);
+        const [stRes, ckRes] = await Promise.all([
+          sb.from("profiles").select("id, name, role, avatar_url").eq("gym_id", profile.gym_id).in("role", ["trainer", "manager", "admin"]).order("name"),
+          sb.from("checkins").select("id").eq("gym_id", profile.gym_id).gte("checked_at", today),
+        ]);
+        if (!alive) return;
+        setStaff(((stRes.data ?? []) as Array<{ id: string; name: string; role: string; avatar_url: string | null }>).map((s) => ({
+          id: s.id, name: s.name, role: s.role, avatar: s.avatar_url,
+        })));
+        setTodayCount((ckRes.data ?? []).length);
+      } catch { /* mantém vazio */ }
+    })();
+    return () => { alive = false; };
+  }, [profile?.gym_id]);
+
+  const ROLE_LABEL: Record<string, string> = { trainer: "Personal", manager: "Gestor", admin: "Admin" };
+
   const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
 
   // ---- Frase motivacional (badge da home dos alunos) ----
@@ -414,39 +440,39 @@ export default function PersonalPerfilPage() {
           })}
         </div>
       ) : tab === "equipe" && hasRole(profile?.role, "manager") ? (
-        /* aba Equipe (gestor) — pessoas mockadas e dados demo */
+        /* aba Equipe (gestor) — staff real do gym + contagens reais */
         <div className="space-y-3">
           <div className="gf-card gf-glass !rounded-2xl !p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Personais ativos</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Equipe da academia</p>
             <div className="mt-3 space-y-2.5">
-              {[
-                { name: "Claudeir Machado", role: "Gestor & Personal", online: true },
-                { name: "Rafael Costa", role: "Personal", online: true },
-                { name: "Ana Silva", role: "Personal", online: false },
-              ].map((p, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10 border-2 border-white/[0.08]">
-                    <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
-                      {p.name[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[12px] font-bold text-foreground">{p.name}</p>
-                    <p className="truncate text-[10px] text-muted-foreground">{p.role}</p>
+              {staff.length === 0 ? (
+                <p className="text-[12px] text-muted-foreground">Nenhum membro da equipe encontrado.</p>
+              ) : (
+                staff.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 border-2 border-white/[0.08]">
+                      {p.avatar ? <AvatarImage src={p.avatar} alt={p.name} /> : null}
+                      <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
+                        {(p.name[0] ?? "?").toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[12px] font-bold text-foreground">{p.name}</p>
+                      <p className="truncate text-[10px] text-muted-foreground">{ROLE_LABEL[p.role] ?? p.role}</p>
+                    </div>
                   </div>
-                  <span className={cn("h-2.5 w-2.5 rounded-full", p.online ? "bg-[#4ADE80]" : "bg-white/20")} />
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
             <div className="gf-card gf-glass !rounded-2xl !p-4 text-center">
-              <p className="font-display text-2xl font-black text-brand">23</p>
+              <p className="font-display text-2xl font-black text-brand">{students.length}</p>
               <p className="text-[10px] font-semibold text-muted-foreground">Alunos ativos</p>
             </div>
             <div className="gf-card gf-glass !rounded-2xl !p-4 text-center">
-              <p className="font-display text-2xl font-black text-[#4ADE80]">4</p>
-              <p className="text-[10px] font-semibold text-muted-foreground">Pessoas na academia</p>
+              <p className="font-display text-2xl font-black text-[#4ADE80]">{todayCount ?? "—"}</p>
+              <p className="text-[10px] font-semibold text-muted-foreground">Check-ins hoje</p>
             </div>
           </div>
         </div>
