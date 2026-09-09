@@ -273,6 +273,8 @@ function PersonalTreinosContent() {
   // Exercícios e equipamentos reais do banco
   const [dbExercises, setDbExercises] = useState<DBExercise[]>([]);
   const [dbEquipment, setDbEquipment] = useState<DBEquipment[]>([]);
+  // Biblioteca carregada? Sem ela a IA inventa nomes fora do catálogo.
+  const [libReady, setLibReady] = useState(false);
 
   const refresh = () => {
     if (!gymId) {
@@ -308,7 +310,8 @@ function PersonalTreinosContent() {
     ]).then(([exRes, eqRes]) => {
       if (exRes.data) setDbExercises(exRes.data as DBExercise[]);
       if (eqRes.data) setDbEquipment(eqRes.data as DBEquipment[]);
-    }).catch(() => {});
+      setLibReady(true);
+    }).catch(() => { setLibReady(true); });
   }, [gymId]);
 
   // modo edição/ajuste: carrega o plano (demo via localStorage, produção via banco)
@@ -429,6 +432,14 @@ function PersonalTreinosContent() {
 
   const run = async () => {
     if (loading || !target) return;
+    if (!libReady) {
+      toast.info("Biblioteca carregando, aguarde 3 segundos.");
+      return;
+    }
+    if (dbExercises.length === 0) {
+      toast.error("Catálogo vazio", { description: "Não achei exercícios no banco. Gere de novo em instantes." });
+      return;
+    }
     if (!guidedReady) {
       toast.info("Responda as perguntas do assistente para gerar o plano.");
       return;
@@ -901,9 +912,9 @@ function PersonalTreinosContent() {
             <p className="mr-auto text-[9.5px] text-muted-foreground">
               Dias, aparelhos e ficha do aluno entram automaticamente.
             </p>
-            <Button onClick={run} disabled={loading || !guidedReady} size="sm" className="rounded-xl">
+            <Button onClick={run} disabled={loading || !guidedReady || !libReady} size="sm" className="rounded-xl">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              {adjustSwId ? "Gerar ajuste (v2)" : "Gerar plano completo"}
+              {!libReady ? "Carregando biblioteca..." : adjustSwId ? "Gerar ajuste (v2)" : "Gerar plano completo"}
             </Button>
           </div>
         </section>
@@ -1034,42 +1045,12 @@ function PersonalTreinosContent() {
                       value={e}
                       className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5"
                     >
-                      <div className="flex items-center gap-2">
-                        <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[12px] font-semibold text-foreground">
-                            {i + 1}. {e.exercicio}
-                          </p>
-                          <p className="text-[9.5px] text-muted-foreground">RPE {e.rpe} · {e.dica}</p>
-                        </div>
-                        <input
-                          type="number"
-                          min={1}
-                          max={10}
-                          value={e.series}
-                          onChange={(ev) =>
-                            updateDay(activeDay, {
-                              exercicios: day.exercicios.map((x, xi) =>
-                                xi === i ? { ...x, series: Math.max(1, Math.min(10, Number(ev.target.value) || 1)) } : x
-                              ),
-                            })
-                          }
-                          aria-label={`Séries de ${e.exercicio}`}
-                          className="h-8 w-11 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[11px] tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
-                        />
-                        <span className="text-[10px] text-muted-foreground">x</span>
-                        <input
-                          value={e.reps}
-                          onChange={(ev) =>
-                            updateDay(activeDay, {
-                              exercicios: day.exercicios.map((x, xi) =>
-                                xi === i ? { ...x, reps: ev.target.value } : x
-                              ),
-                            })
-                          }
-                          aria-label={`Repetições de ${e.exercicio}`}
-                          className="h-8 w-14 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[11px] text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
-                        />
+                      {/* linha 1: nome inteiro, sem corte */}
+                      <div className="flex items-start gap-2">
+                        <GripVertical className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing" />
+                        <p className="min-w-0 flex-1 break-words text-[12.5px] font-semibold leading-snug text-foreground">
+                          {i + 1}. {e.exercicio}
+                        </p>
                         <button
                           onClick={() => {
                             setSwapTarget({ dayIdx: activeDay, exIdx: i });
@@ -1092,6 +1073,43 @@ function PersonalTreinosContent() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
+                      {/* linha 2: séries x reps + dica */}
+                      <div className="mt-2 flex items-center gap-2 pl-6">
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={e.series}
+                          onChange={(ev) =>
+                            updateDay(activeDay, {
+                              exercicios: day.exercicios.map((x, xi) =>
+                                xi === i ? { ...x, series: Math.max(1, Math.min(10, Number(ev.target.value) || 1)) } : x
+                              ),
+                            })
+                          }
+                          aria-label={`Séries de ${e.exercicio}`}
+                          className="h-9 w-12 shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[12px] tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
+                        />
+                        <span className="shrink-0 text-[10px] text-muted-foreground">x</span>
+                        <input
+                          value={e.reps}
+                          onChange={(ev) =>
+                            updateDay(activeDay, {
+                              exercicios: day.exercicios.map((x, xi) =>
+                                xi === i ? { ...x, reps: ev.target.value } : x
+                              ),
+                            })
+                          }
+                          aria-label={`Repetições de ${e.exercicio}`}
+                          className="h-9 w-16 shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[12px] text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
+                        />
+                        <span className="shrink-0 rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-bold tabular-nums text-muted-foreground">
+                          RPE {e.rpe}
+                        </span>
+                      </div>
+                      {e.dica ? (
+                        <p className="mt-1.5 break-words pl-6 text-[10px] leading-snug text-muted-foreground">{e.dica}</p>
+                      ) : null}
                     </Reorder.Item>
                   ))}
                 </Reorder.Group>
@@ -1104,7 +1122,7 @@ function PersonalTreinosContent() {
                 {activeDay < plan.dias.length - 1 ? (
                   <button
                     onClick={() => setActiveDay(activeDay + 1)}
-                    className="tactile w-full rounded-xl border border-white/[0.06] bg-white/[0.03] py-2 text-[11px] font-bold text-muted-foreground transition-colors hover:text-brand"
+                    className="tactile w-full break-words rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[11px] font-bold leading-snug text-muted-foreground transition-colors hover:text-brand"
                   >
                     Revisar próximo dia: {plan.dias[activeDay + 1].nome}
                   </button>
