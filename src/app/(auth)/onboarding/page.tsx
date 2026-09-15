@@ -8,7 +8,8 @@ import { OnboardingStepper } from "~/components/onboarding/OnboardingStepper";
 import { OnboardingProgress } from "~/components/onboarding/OnboardingProgress";
 import { ProfileBasicForm } from "~/components/onboarding/ProfileBasicForm";
 import { AnamneseForm } from "~/components/onboarding/AnamneseForm";
-import { IntentInput } from "~/components/onboarding/BodyMetricsInput";
+import { IntentInput as MetricsForm } from "~/components/onboarding/BodyMetricsInput";
+import { EnrollmentTypeForm } from "~/components/onboarding/IntentInput";
 import { MedicalRestrictionForm } from "~/components/onboarding/MedicalRestrictionForm";
 import { OnboardingReview } from "~/components/onboarding/OnboardingReview";
 import { AuthSkeleton } from "~/components/common/AuthSkeleton";
@@ -21,11 +22,12 @@ import type { Profiles } from "~/lib/types/models";
  */
 const STEP_COMPONENTS = [
   null, // 0 index base
-  ProfileBasicForm, // step 1
-  AnamneseForm, // step 2
-  IntentInput, // step 3
-  MedicalRestrictionForm, // step 4
-  OnboardingReview, // step 5
+  ProfileBasicForm, // step 1: dados pessoais + objetivo
+  AnamneseForm, // step 2: anamnese de saúde
+  MetricsForm, // step 3: métricas corporais
+  EnrollmentTypeForm, // step 4: tipo de matrícula (Gymfitness/Gympass/TotalPass)
+  MedicalRestrictionForm, // step 5: restrições clínicas + laudo
+  OnboardingReview, // step 6: revisão + confirmação
 ] as const;
 
 export default function OnboardingPage() {
@@ -70,6 +72,8 @@ function OnboardingFlow() {
         experience_level: saved.experience_level ?? null,
         available_days: saved.available_days ?? null,
         emergency_contact: saved.emergency_contact ?? null,
+        plan_type: saved.plan_type ?? null,
+        vencimento: saved.vencimento ?? null,
       } as unknown as Profiles;
       setProfile(p);
       setMaxReached(Math.max(requested, saved.onboarding_step ?? requested));
@@ -179,7 +183,7 @@ function OnboardingFlow() {
   const finish = useCallback(async () => {
     // Modo teste: marca completo e vai pro dashboard
     if (isDemo) {
-      saveOnboarding({ onboarding_completed: true, onboarding_step: 5 });
+      saveOnboarding({ onboarding_completed: true, onboarding_step: 6 });
       document.cookie = "gf_test=1; path=/; SameSite=Lax";
       router.replace("/");
       return;
@@ -209,7 +213,7 @@ function OnboardingFlow() {
         <h1 className="text-xl font-bold tracking-tight text-foreground">
           Boas-vindas, {profile.name?.split(" ")[0] ?? "atleta"}!
         </h1>
-        <OnboardingProgress current={step} total={5} />
+        <OnboardingProgress current={step} total={6} />
         <OnboardingStepper
           current={step}
           maxReached={maxReached}

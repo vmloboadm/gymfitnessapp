@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getGymStudents } from "~/lib/gym-api";
 import { m } from "framer-motion";
-import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2, LogOut, Shield, Settings, Crown, Sparkles } from "lucide-react";
+import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2, LogOut, Shield, Settings, Crown, Sparkles, MapPin } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { toast } from "sonner";
@@ -324,6 +324,15 @@ export default function PersonalPerfilPage() {
           )}
         </div>
       </m.header>
+
+      {/* Tour guiado: reabre o super onboarding do staff */}
+      <button
+        onClick={() => window.dispatchEvent(new Event("gf:staff-tour"))}
+        className="tactile flex w-full items-center justify-center gap-2 rounded-2xl border border-brand/25 bg-brand/[0.06] py-3.5 text-[13px] font-bold text-brand transition-transform active:scale-[0.98]"
+      >
+        <MapPin className="h-4 w-4" />
+        Ver tour guiado
+      </button>
 
       {/* Sair da conta */}
       <button

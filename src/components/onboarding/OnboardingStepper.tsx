@@ -7,8 +7,9 @@ const STEPS = [
   { id: 1, label: "Dados" },
   { id: 2, label: "Anamnese" },
   { id: 3, label: "Métricas" },
-  { id: 4, label: "Saúde" },
-  { id: 5, label: "Revisar" },
+  { id: 4, label: "Matrícula" },
+  { id: 5, label: "Saúde" },
+  { id: 6, label: "Revisar" },
 ] as const;
 
 /** Stepper do onboarding: etapas concluídas são clicáveis (voltar e corrigir). */

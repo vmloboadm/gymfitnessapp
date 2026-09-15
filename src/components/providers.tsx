@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { AuthProvider } from "~/hooks/useAuth";
 import { OfflineSyncListener } from "~/components/common/OfflineSyncListener";
+import { StaffTour } from "~/components/staff/StaffTour";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -21,7 +22,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider>
+        {children}
+        <StaffTour />
+      </AuthProvider>
       <OfflineSyncListener />
     </QueryClientProvider>
   );

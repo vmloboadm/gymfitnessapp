@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import type { Profiles } from "~/lib/types/models";
 
 /**
- * STEP 4, Restrições médicas + upload de laudo.
+ * STEP 5, Restrições médicas + upload de laudo.
  * Se medical_risk e laudo enviado → trigger do Postgres seta status = pending_clearance.
  * Finish é bloqueado até o gestor aprovar o laudo.
  */
@@ -63,7 +63,7 @@ export function MedicalRestrictionForm({
   };
 
   const handleNext = async () => {
-    await onSave({}, 5);
+    await onSave({}, 6);
   };
 
   return (

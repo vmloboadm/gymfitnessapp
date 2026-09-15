@@ -41,6 +41,15 @@ const SUMMARY: Array<{ label: string; get: (p: Profiles) => string | null }> = [
     get: (p) => (p.available_days?.length ? p.available_days.join(", ") : null),
   },
   {
+    label: "Matrícula",
+    get: (p) =>
+      p.plan_type
+        ? p.plan_type === "Gymfitness" && p.vencimento
+          ? `Gymfitness · vence ${p.vencimento.split("-").reverse().join("/")}`
+          : p.plan_type
+        : null,
+  },
+  {
     label: "Restrição clínica",
     get: (p) => (p.medical_risk ? "Sim, laudo requisitado" : "Nenhuma"),
   },
@@ -51,7 +60,7 @@ const SUMMARY: Array<{ label: string; get: (p: Profiles) => string | null }> = [
 ];
 
 /**
- * STEP 5, Revisão + confirmação (blueprint §3.1).
+ * STEP 6, Revisão + confirmação (blueprint §3.1).
  */
 export function OnboardingReview({
   profile,
@@ -69,7 +78,7 @@ export function OnboardingReview({
     if (!consent) return;
     setSaving(true);
     saveOnboarding({ whatsapp_consent: true });
-    await onSave({ whatsapp_consent: true }, 5);
+    await onSave({ whatsapp_consent: true }, 6);
     await onFinish();
   };
 

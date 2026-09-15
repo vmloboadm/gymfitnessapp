@@ -111,6 +111,10 @@ export type OnboardingState = {
   experience_level?: string | null;
   available_days?: string[] | null;
   emergency_contact?: { name: string; phone: string } | null;
+  /** Tipo de matrícula: Gymfitness, Gympass ou TotalPass (step 4) */
+  plan_type?: "Gymfitness" | "Gympass" | "TotalPass" | null;
+  /** Data de vencimento da matrícula (apenas Gymfitness, step 4) */
+  vencimento?: string | null;
 };
 
 export function readOnboarding(): OnboardingState {

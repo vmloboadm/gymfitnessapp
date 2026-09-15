@@ -63,6 +63,10 @@ export type Profiles = {
   available_days?: string[] | null;
   /** Contato de emergência { name, phone } */
   emergency_contact?: { name: string; phone: string } | null;
+  /** Tipo de matrícula: Gymfitness, Gympass ou TotalPass */
+  plan_type?: "Gymfitness" | "Gympass" | "TotalPass" | null;
+  /** Data de vencimento da matrícula (apenas Gymfitness) */
+  vencimento?: string | null;
 };
 
 export type StudentSubscriptions = {
