@@ -22,6 +22,8 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
+  const [needsConfirm, setNeedsConfirm] = useState(false);
+  const [resending, setResending] = useState(false);
   const [testRole, setTestRole] = useState<"student" | "trainer" | "manager">("student");
   const [keepSigned, setKeepSigned] = useState(true);
   const { switchDemoRole } = useAuth();
@@ -60,10 +62,21 @@ export function LoginForm() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
+        // E-mail criado mas ainda não confirmado: oferece reenvio em vez de travar
+        if (/confirm/i.test(error.message)) {
+          setNeedsConfirm(true);
+          setLoading(false);
+          toast.info("Confirme seu e-mail", {
+            description: "Enviamos um link para você. Clique nele e entre de novo.",
+          });
+          return;
+        }
+        setNeedsConfirm(false);
         toast.error("Não foi possível entrar", { description: error.message });
         setLoading(false);
         return;
       }
+      setNeedsConfirm(false);
 
       // "Manter conectado": desmarcado → o cookie de sessão morre ao fechar o navegador
       if (!keepSigned) {
@@ -87,6 +100,26 @@ export function LoginForm() {
       toast.error("Falha ao conectar", { description: "Verifique sua internet e tente novamente." });
       setLoading(false);
     }
+  };
+
+  const handleResendConfirm = async () => {
+    if (!email) {
+      toast.error("Digite seu e-mail para reenviar a confirmação.");
+      return;
+    }
+    setResending(true);
+    try {
+      const supabase = supabaseBrowser();
+      const { error } = await supabase.auth.resend({ type: "signup", email });
+      if (error) {
+        toast.error("Não deu reenviar agora", { description: error.message });
+      } else {
+        toast.success("E-mail reenviado!", { description: "Confira a caixa de entrada e o spam." });
+      }
+    } catch {
+      toast.error("Falha ao conectar", { description: "Verifique sua internet e tente novamente." });
+    }
+    setResending(false);
   };
 
   const handleMagicLink = async (e: React.FormEvent) => {
@@ -229,6 +262,26 @@ export function LoginForm() {
           Entrar
         </Button>
       </form>
+
+      {needsConfirm ? (
+        <div className="rounded-xl border border-warning/40 bg-warning/10 p-3.5 text-center">
+          <p className="text-[12px] font-bold text-warning">E-mail ainda não confirmado</p>
+          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+            Clique no link que enviamos para <strong className="text-foreground">{email}</strong> e entre de novo.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2.5 h-9 w-full rounded-xl border-warning/40 text-warning hover:bg-warning/10 hover:text-warning"
+            onClick={handleResendConfirm}
+            disabled={resending}
+          >
+            {resending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Reenviar e-mail de confirmação
+          </Button>
+        </div>
+      ) : null}
 
       <div className="relative py-2">
         <div className="absolute inset-0 flex items-center">

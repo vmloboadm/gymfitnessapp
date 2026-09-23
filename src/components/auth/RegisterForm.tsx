@@ -62,6 +62,14 @@ export function RegisterForm() {
       }
 
       if (data.user) {
+        // Se o Supabase exigir confirmação de e-mail, não há sessão ainda
+        if (!data.session) {
+          toast.info("Verifique seu e-mail para confirmar o cadastro", {
+            description: "Clique no link que enviamos e depois faça login.",
+          });
+          router.push("/login");
+          return;
+        }
         toast.success("Conta criada!");
         // Cria o profile + gym padrão do onboarding
         router.push("/onboarding");

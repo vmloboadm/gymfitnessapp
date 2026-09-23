@@ -89,18 +89,21 @@ export function EnrollmentTypeForm({
         {PLAN_TYPES.map((pt) => {
           const isSelected = planType === pt;
           return (
-            <label
+            <button
               key={pt}
+              type="button"
+              onClick={() => setPlanType(pt)}
+              aria-pressed={isSelected}
               className={cn(
-                "rounded-xl border transition-colors cursor-pointer",
+                "flex flex-col items-center justify-center gap-1.5 rounded-xl border p-3 text-center transition-colors",
                 isSelected
                   ? "border-brand bg-brand/10 text-brand"
                   : "border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:border-brand/30"
               )}
-              onClick={() => setPlanType(pt)}
             >
-              <PlanTypeBadge type={pt} /> {pt}
-            </label>
+              <PlanTypeBadge type={pt} />
+              <span className="text-[11px] font-bold leading-none">{pt}</span>
+            </button>
           );
         })}
       </div>
