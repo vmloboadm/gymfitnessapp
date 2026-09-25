@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, Reorder, motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Send,
   Sparkles,
@@ -13,7 +13,8 @@ import {
   Check,
   Layers,
   Plus,
-  GripVertical,
+  ChevronUp,
+  ChevronDown,
   Trash2,
   Search,
   UserRoundPlus,
@@ -1030,24 +1031,45 @@ function PersonalTreinosContent() {
                 ) : null}
 
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Arraste para reordenar · troque ou edite direto no card
+                  Use as setas para reordenar · troque ou edite direto no card
                 </p>
 
-                <Reorder.Group
-                  axis="y"
-                  values={day.exercicios}
-                  onReorder={(next) => updateDay(activeDay, { exercicios: next })}
-                  className="space-y-2"
-                >
+                <div className="space-y-2">
                   {day.exercicios.map((e, i) => (
-                    <Reorder.Item
-                      key={e.exercicio + i}
-                      value={e}
+                    <div
+                      key={`${activeDay}-${e.exercicio}-${i}`}
                       className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5"
                     >
-                      {/* linha 1: nome inteiro, sem corte */}
-                      <div className="flex items-start gap-2">
-                        <GripVertical className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing" />
+                      {/* linha 1: setas de ordem + nome inteiro, sem corte */}
+                      <div className="flex items-start gap-1.5">
+                        <div className="flex shrink-0 flex-col">
+                          <button
+                            onClick={() => {
+                              if (i === 0) return;
+                              const next = [...day.exercicios];
+                              [next[i - 1], next[i]] = [next[i], next[i - 1]];
+                              updateDay(activeDay, { exercicios: next });
+                            }}
+                            disabled={i === 0}
+                            aria-label={`Subir ${e.exercicio} na ordem`}
+                            className="tactile flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-brand disabled:opacity-25"
+                          >
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (i === day.exercicios.length - 1) return;
+                              const next = [...day.exercicios];
+                              [next[i + 1], next[i]] = [next[i], next[i + 1]];
+                              updateDay(activeDay, { exercicios: next });
+                            }}
+                            disabled={i === day.exercicios.length - 1}
+                            aria-label={`Descer ${e.exercicio} na ordem`}
+                            className="tactile flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-brand disabled:opacity-25"
+                          >
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                         <p className="min-w-0 flex-1 break-words text-[12.5px] font-semibold leading-snug text-foreground">
                           {i + 1}. {e.exercicio}
                         </p>
@@ -1110,9 +1132,9 @@ function PersonalTreinosContent() {
                       {e.dica ? (
                         <p className="mt-1.5 break-words pl-6 text-[10px] leading-snug text-muted-foreground">{e.dica}</p>
                       ) : null}
-                    </Reorder.Item>
+                    </div>
                   ))}
-                </Reorder.Group>
+                </div>
 
                 {day.finalizador ? (
                   <p className="rounded-xl border border-brand/20 bg-brand/[0.06] p-2.5 text-[10.5px] leading-snug text-brand">
@@ -1316,13 +1338,20 @@ function PersonalTreinosContent() {
                 </button>
                 <button
                   onClick={async () => {
-                    if (w.id.startsWith("aw-")) {
-                      deleteAssignedWorkout(w.id);
-                    } else {
-                      await completeStudentWorkout(w.id).catch(() => {});
+                    if (!window.confirm(`Remover "${w.name}" de ${w.studentName}? O aluno perde o acesso ao treino.`)) return;
+                    // Otimista: some da lista na hora
+                    setAssigned((prev) => prev.filter((a) => a.id !== w.id));
+                    try {
+                      if (w.id.startsWith("aw-")) {
+                        deleteAssignedWorkout(w.id);
+                      } else {
+                        await completeStudentWorkout(w.id);
+                      }
+                      toast.success("Treino removido");
+                    } catch {
+                      toast.error("Não deu remover agora. Tente de novo.");
                     }
                     refresh();
-                    toast.success("Treino removido");
                   }}
                   aria-label={`Remover ${w.name}`}
                   className="tactile flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] text-muted-foreground transition-colors hover:text-[#F87171]"

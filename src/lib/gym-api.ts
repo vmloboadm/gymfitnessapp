@@ -265,6 +265,7 @@ export async function fetchGymAssignedPlans(gymId: string): Promise<GymAssignedP
       profiles ( name )
     `)
     .eq("gym_id", gymId)
+    .eq("status", "active")
     .order("assigned_at", { ascending: false })
     .limit(40);
   if (error) throw new Error(error.message);
