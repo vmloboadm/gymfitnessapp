@@ -101,7 +101,8 @@ async function callModel(
       messages,
       stream,
       temperature: 0.7,
-      max_tokens: stream ? 900 : 1200,
+      // plano completo (vários dias) precisa de mais que 1.2k tokens
+      max_tokens: stream ? 900 : 3500,
     }),
     signal: AbortSignal.timeout(stream ? 45000 : 30000),
   });
