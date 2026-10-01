@@ -140,7 +140,8 @@ function stripThinking(text: string): string {
 async function callModel(
   model: string,
   messages: ChatMessage[],
-  stream: boolean
+  stream: boolean,
+  timeoutMs?: number
 ): Promise<Response> {
   return fetch(`${AI_URL}/chat/completions`, {
     method: "POST",
@@ -156,7 +157,7 @@ async function callModel(
       // plano completo (vários dias) precisa de mais que 1.2k tokens
       max_tokens: stream ? 900 : 3500,
     }),
-    signal: AbortSignal.timeout(stream ? 45000 : 30000),
+    signal: AbortSignal.timeout(timeoutMs ?? (stream ? 45000 : 30000)),
   });
 }
 
@@ -321,18 +322,21 @@ export async function handleAssistente(request: Request) {
   }
 
   // ===== MODO NORMAL: cadeia de modelos + auto-correção do JSON =====
-  // Prazo do serverless (maxDuration 60s): para de tentar 10s antes.
-  const deadline = Date.now() + 48_000;
+  // Prazo do serverless (maxDuration 60s): timeout de cada chamada respeita
+  // o tempo restante, e nunca se inicia uma tentativa que não caberia.
+  const deadline = Date.now() + 52_000;
+  const MIN_SLACK = 6_000; // menos que isso não dá pra começar uma chamada
   let lastErrors: string[] = [];
   let lastReply = "";
 
   for (const model of modelChain()) {
     // até 2 passadas por modelo: original + reescrita com o feedback de erro
     for (let attempt = 0; attempt < 2; attempt++) {
-      if (Date.now() > deadline) break;
+      const remaining = deadline - Date.now();
+      if (remaining < MIN_SLACK) break;
       try {
         const t0 = Date.now();
-        const res = await callModel(model, messages, false);
+        const res = await callModel(model, messages, false, Math.min(30_000, remaining - 2_000));
         if (!res.ok) break; // modelo fora do ar → próximo modelo
         const data = (await res.json()) as {
           choices?: Array<{ message?: { content?: string } }>;
