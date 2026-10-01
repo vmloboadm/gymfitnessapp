@@ -20,6 +20,8 @@ import {
   ListChecks,
   Sparkles,
   KeyRound,
+  UserCheck,
+  CalendarClock,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
@@ -266,6 +268,41 @@ export default function PersonalDashboardPage() {
           ) : null}
         </div>
       </m.header>
+
+      {/* Lembretes: alunos aguardando aprovação + matrícula Gymfitness vencendo */}
+      {(() => {
+        const pend = students.filter((s) => !s.approved_at);
+        const venc = students.filter((s) => {
+          if (s.plan_type !== "Gymfitness" || !s.vencimento) return false;
+          const days = Math.ceil((new Date(`${s.vencimento}T12:00:00`).getTime() - Date.now()) / 864e5);
+          return days <= 14;
+        });
+        if (pend.length === 0 && venc.length === 0) return null;
+        return (
+          <Link
+            href="/personal/alunos"
+            className="tactile gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-3.5 transition-transform active:scale-[0.985]"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-brand/30 bg-brand/10 text-brand">
+              <UserCheck className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              {pend.length > 0 ? (
+                <p className="text-[12.5px] font-bold text-foreground">
+                  {pend.length} aluno{pend.length === 1 ? "" : "s"} aguardando sua aprovação
+                </p>
+              ) : null}
+              {venc.length > 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  <CalendarClock className="mr-1 inline h-3 w-3 text-[#FFC24D]" />
+                  {venc.length} matrícula{venc.length === 1 ? "" : "s"} Gymfitness vencendo em até 14 dias
+                </p>
+              ) : null}
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Link>
+        );
+      })()}
 
       {/* Skeleton do primeiro load (imita o layout real) */}
       {students.length === 0 ? (

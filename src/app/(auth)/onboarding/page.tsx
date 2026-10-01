@@ -12,6 +12,7 @@ import { IntentInput as MetricsForm } from "~/components/onboarding/BodyMetricsI
 import { EnrollmentTypeForm } from "~/components/onboarding/IntentInput";
 import { MedicalRestrictionForm } from "~/components/onboarding/MedicalRestrictionForm";
 import { OnboardingReview } from "~/components/onboarding/OnboardingReview";
+import { FinalStepForm } from "~/components/onboarding/FinalStepForm";
 import { AuthSkeleton } from "~/components/common/AuthSkeleton";
 import { readOnboarding, saveOnboarding } from "~/lib/profile-store";
 import type { Profiles } from "~/lib/types/models";
@@ -27,7 +28,8 @@ const STEP_COMPONENTS = [
   MetricsForm, // step 3: métricas corporais
   EnrollmentTypeForm, // step 4: tipo de matrícula (Gymfitness/Gympass/TotalPass)
   MedicalRestrictionForm, // step 5: restrições clínicas + laudo
-  OnboardingReview, // step 6: revisão + confirmação
+  OnboardingReview, // step 6: revisão + consentimento
+  FinalStepForm, // step 7: foto de perfil + escolha do personal (finaliza)
 ] as const;
 
 export default function OnboardingPage() {
@@ -183,7 +185,7 @@ function OnboardingFlow() {
   const finish = useCallback(async () => {
     // Modo teste: marca completo e vai pro dashboard
     if (isDemo) {
-      saveOnboarding({ onboarding_completed: true, onboarding_step: 6 });
+      saveOnboarding({ onboarding_completed: true, onboarding_step: 7 });
       document.cookie = "gf_test=1; path=/; SameSite=Lax";
       router.replace("/");
       return;
@@ -213,7 +215,7 @@ function OnboardingFlow() {
         <h1 className="text-xl font-bold tracking-tight text-foreground">
           Boas-vindas, {profile.name?.split(" ")[0] ?? "atleta"}!
         </h1>
-        <OnboardingProgress current={step} total={6} />
+        <OnboardingProgress current={step} total={7} />
         <OnboardingStepper
           current={step}
           maxReached={maxReached}

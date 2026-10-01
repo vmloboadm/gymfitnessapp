@@ -45,6 +45,39 @@ function write(s: WorkoutSession | null) {
 /** Inicia a sessão APENAS após scan/leitura validada. */
 export function startWorkoutSession() {
   write({ startedAt: Date.now() });
+  markDayUnlocked("checkin");
+}
+
+// ---------------------------------------------------------------------------
+// Check-in DO DIA: libera o treino (conteúdo borrado → visível) até a
+// meia-noite. QR, NFC e senha do dia marcam este carimbo local; o 4h da
+// sessão acima é só o relógio do treino em andamento.
+// ---------------------------------------------------------------------------
+const DAY_KEY = "gymfit_day_unlock_v1";
+
+function todayLocal(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** Marca o check-in do dia (senha do dia, QR, NFC ou início de sessão). */
+export function markDayUnlocked(via: string = "senha") {
+  try {
+    localStorage.setItem(DAY_KEY, JSON.stringify({ date: todayLocal(), via }));
+  } catch {}
+}
+
+/** true se o aluno já liberou o treino de hoje (qualquer forma). */
+export function isDayUnlocked(): boolean {
+  try {
+    const raw = localStorage.getItem(DAY_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { date?: string };
+    return parsed?.date === todayLocal();
+  } catch {
+    return false;
+  }
 }
 
 /** Encerra e limpa em todas as telas. */

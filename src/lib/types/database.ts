@@ -125,6 +125,18 @@ export interface Database {
         };
         Returns: string;
       };
+      approve_student: {
+        Args: { p_student_id: string };
+        Returns: void;
+      };
+      choose_personal: {
+        Args: { p_trainer_id: string };
+        Returns: void;
+      };
+      list_my_gym_trainers: {
+        Args: Record<string, never>;
+        Returns: Array<{ id: string; name: string; avatar_url: string | null; role: string }>;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

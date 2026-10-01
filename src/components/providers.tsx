@@ -5,6 +5,7 @@ import { useState } from "react";
 import { AuthProvider } from "~/hooks/useAuth";
 import { OfflineSyncListener } from "~/components/common/OfflineSyncListener";
 import { StaffTour } from "~/components/staff/StaffTour";
+import { StudentTour } from "~/components/student/StudentTour";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -25,6 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <AuthProvider>
         {children}
         <StaffTour />
+        <StudentTour />
       </AuthProvider>
       <OfflineSyncListener />
     </QueryClientProvider>

@@ -13,6 +13,7 @@ import {
   studentStatus,
   type PersonalStudent,
 } from "~/lib/personal-data";
+import { isDemoMode } from "~/lib/demo-bridge";
 import {
   listWorkoutsForStudent,
   streakOverride,
@@ -73,8 +74,59 @@ export function StudentSheet({
   }, []);
 
   const status = student ? studentStatus(student) : null;
-  const history = student ? mockWorkoutHistory(student) : [];
-  const weights = student ? mockWeightSeries(student) : [];
+
+  // Métricas e histórico REAIS do aluno (body_metrics + workout_logs).
+  // Séries mockadas saíram de produção: davam pesos/históricos inconsistentes.
+  const demo = isDemoMode();
+  const [realWeights, setRealWeights] = useState<number[] | null>(null);
+  const [realHistory, setRealHistory] = useState<Array<{ date: string; name: string; volume: number; sets: number }> | null>(null);
+  useEffect(() => {
+    if (!student?.id || demo) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const sb = supabaseBrowser();
+        const [bm, lg] = await Promise.all([
+          sb.from("body_metrics").select("weight_kg, recorded_at").eq("student_id", student.id).order("recorded_at", { ascending: true }).limit(12),
+          sb.from("workout_logs").select("date, weight_kg, reps").eq("student_id", student.id).order("date", { ascending: false }).limit(180),
+        ]);
+        if (cancelled) return;
+        setRealWeights(
+          ((bm.data ?? []) as Array<{ weight_kg: number | null }>)
+            .map((r) => r.weight_kg)
+            .filter((w): w is number => typeof w === "number")
+        );
+        const rows = (lg.data ?? []) as Array<{ date: string; weight_kg: number | null; reps: number | null }>;
+        const byDay = new Map<string, { sets: number; volume: number }>();
+        for (const r of rows) {
+          const day = r.date.slice(0, 10);
+          const cur = byDay.get(day) ?? { sets: 0, volume: 0 };
+          cur.sets += 1;
+          cur.volume += (r.weight_kg ?? 0) * (Number(r.reps) || 0);
+          byDay.set(day, cur);
+        }
+        setRealHistory(
+          [...byDay.entries()].slice(0, 6).map(([day, v]) => ({
+            date: day,
+            name: student.activeWorkout ?? "Treino",
+            volume: Math.round(v.volume),
+            sets: v.sets,
+          }))
+        );
+      } catch {
+        if (!cancelled) {
+          setRealWeights([]);
+          setRealHistory([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [student?.id, student?.activeWorkout, demo]);
+
+  const weights = demo ? (student ? mockWeightSeries(student) : []) : (realWeights ?? []);
+  const history = demo ? (student ? mockWorkoutHistory(student) : []) : (realHistory ?? []);
   const assigned = student ? listWorkoutsForStudent(student.id) : [];
   const effectiveStreak = student ? (streakOverride(student.id) ?? student.streak) : 0;
   const latestWorkoutId = assigned[0]?.id;
@@ -280,21 +332,30 @@ export function StudentSheet({
                   </p>
                 </div>
               ) : null}
-              <ul className="divide-y divide-white/[0.05] rounded-2xl border border-white/[0.06] bg-white/[0.02]">
-                {history.map((h, i) => (
-                  <li key={i} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
-                    <div className="min-w-0">
-                      <p className="truncate text-[12px] font-semibold text-foreground">{h.name}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {fmtDate(h.date)} · {h.sets} séries
+              {history.length > 0 ? (
+                <ul className="divide-y divide-white/[0.05] rounded-2xl border border-white/[0.06] bg-white/[0.02]">
+                  {history.map((h, i) => (
+                    <li key={i} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-[12px] font-semibold text-foreground">{h.name}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {fmtDate(h.date)} · {h.sets} séries
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-right text-[11px] font-bold tabular-nums text-brand">
+                        {h.volume.toLocaleString("pt-BR")} kg
                       </p>
-                    </div>
-                    <p className="shrink-0 text-right text-[11px] font-bold tabular-nums text-brand">
-                      {h.volume.toLocaleString("pt-BR")} kg
-                    </p>
-                  </li>
-                ))}
-              </ul>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-white/[0.1] p-5 text-center">
+                  <p className="text-[12px] font-semibold text-foreground">Nenhum treino registrado ainda</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    O histórico aparece aqui depois do primeiro treino concluído.
+                  </p>
+                </div>
+              )}
             </div>
           ) : null}
 
@@ -304,21 +365,38 @@ export function StudentSheet({
                 <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   <Activity className="h-3.5 w-3.5 text-brand" /> Evolução de peso
                 </p>
-                <p className="mt-1 font-display text-xl font-black text-foreground">
-                  {weights[weights.length - 1]} kg
-                  <span
-                    className={cn(
-                      "ml-2 text-[11px] font-bold",
-                      weights[weights.length - 1] >= weights[0] ? "text-[#4ADE80]" : "text-[#F87171]"
+                {weights.length > 0 ? (
+                  <>
+                    <p className="mt-1 font-display text-xl font-black text-foreground">
+                      {weights[weights.length - 1]} kg
+                      {weights.length >= 2 ? (
+                        <span
+                          className={cn(
+                            "ml-2 text-[11px] font-bold",
+                            weights[weights.length - 1] >= weights[0] ? "text-[#4ADE80]" : "text-[#F87171]"
+                          )}
+                        >
+                          {weights[weights.length - 1] >= weights[0] ? "+" : ""}
+                          {Math.round((weights[weights.length - 1] - weights[0]) * 10) / 10} kg no período
+                        </span>
+                      ) : null}
+                    </p>
+                    {weights.length >= 2 ? (
+                      <div className="mt-2">
+                        <Sparkline points={weights} height={56} />
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        Primeira medição registrada. A curva aparece na próxima.
+                      </p>
                     )}
-                  >
-                    {weights[weights.length - 1] >= weights[0] ? "+" : ""}
-                    {Math.round((weights[weights.length - 1] - weights[0]) * 10) / 10} kg no período
-                  </span>
-                </p>
-                <div className="mt-2">
-                  <Sparkline points={weights} height={56} />
-                </div>
+                  </>
+                ) : (
+                  <p className="mt-2 flex items-center gap-2 text-[11.5px] text-muted-foreground">
+                    <Activity className="h-4 w-4 opacity-60" />
+                    Nenhuma medição registrada ainda — peça para o aluno salvar o peso em Métricas.
+                  </p>
+                )}
               </div>
               <div className="rounded-2xl border border-brand/25 bg-brand/[0.08] p-3">
                 <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-brand">
@@ -336,8 +414,8 @@ export function StudentSheet({
                 </p>
               </div>
               <p className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-[10.5px] leading-snug text-muted-foreground">
-                Em produção esta aba lê as medições comprovadas (foto do visor) da tabela metrics.
-                No demo, série determinística por aluno.
+                Medições reais do aluno: peso salvo no app (Métricas) e volume
+                calculado dos treinos registrados.
               </p>
             </div>
           ) : null}

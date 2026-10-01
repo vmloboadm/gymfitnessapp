@@ -69,10 +69,15 @@ export default function PerfilPage() {
   const [edits, setEdits] = useState<ReturnType<typeof getProfileEdits>>({});
   useEffect(() => {
     setEdits(getProfileEdits());
+    const sync = () => setEdits(getProfileEdits());
+    window.addEventListener("gymfit-profile-store", sync);
+    return () => window.removeEventListener("gymfit-profile-store", sync);
   }, []);
-  const displayName = edits.name || profile?.name || "Atleta";
-  const displayBio = edits.bio || profile?.bio || null;
-  const displayObjetivo = edits.objetivo || (profile as any)?.objetivo || null;
+  // BANCO primeiro: o localStorage de edição é compartilhado entre contas no
+  // mesmo navegador (testes do cliente) e sobrescrevia o nome real do aluno.
+  const displayName = profile?.name || edits.name || "Atleta";
+  const displayBio = profile?.bio || edits.bio || null;
+  const displayObjetivo = (profile as any)?.objetivo || edits.objetivo || null;
 
   const initials = useMemo(() => {
     const parts = displayName.trim().split(/\s+/);
@@ -162,7 +167,7 @@ export default function PerfilPage() {
               <p className="text-sm font-bold text-foreground">
                 {sub
                   ? `${sub.plan_name}${sub.type === "gympass" || sub.type === "totalpass" ? ` · ${sub.type === "gympass" ? "Gympass" : "TotalPass"}` : ""}`
-                  : "Sem plano ativo"}
+                  : profile?.plan_type ?? "Sem plano ativo"}
               </p>
             </div>
             {sub ? (
@@ -171,11 +176,28 @@ export default function PerfilPage() {
               ) : (
                 <Badge variant="success" className="gap-1"><CalendarClock className="h-3 w-3" /> até {formatDate(sub.ends_at!)}</Badge>
               )
+            ) : profile?.plan_type === "Gymfitness" && profile.vencimento ? (
+              (() => {
+                const days = Math.ceil(
+                  (new Date(`${profile.vencimento}T12:00:00`).getTime() - Date.now()) / 864e5
+                );
+                return days < 0 ? (
+                  <Badge variant="danger" className="gap-1"><CalendarClock className="h-3 w-3" /> vencida {formatDate(profile.vencimento)}</Badge>
+                ) : days <= 14 ? (
+                  <Badge variant="warning" className="gap-1"><CalendarClock className="h-3 w-3" /> vence {formatDate(profile.vencimento)}</Badge>
+                ) : (
+                  <Badge variant="success" className="gap-1"><CalendarClock className="h-3 w-3" /> até {formatDate(profile.vencimento)}</Badge>
+                );
+              })()
             ) : (
-              <Badge variant="warning">Vencida</Badge>
+              <Badge variant="warning">Sem registro</Badge>
             )}
           </div>
-          {sub && (sub.type === "gympass" || sub.type === "totalpass") ? (
+          {profile?.plan_type === "Gymfitness" && profile.vencimento ? (
+            <p className="mt-2 rounded-lg bg-muted/70 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+              Renove na recepção antes de {formatDate(profile.vencimento)} para manter o acesso.
+            </p>
+          ) : sub && (sub.type === "gympass" || sub.type === "totalpass") ? (
             <p className="mt-2 rounded-lg bg-muted/70 px-2.5 py-1.5 text-[11px] text-muted-foreground">
               Matrícula via plataforma. Compareça nesta unidade para acumular streak, ranking e benefícios.
             </p>

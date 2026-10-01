@@ -43,14 +43,14 @@ async function fetchRealStudents(gymId: string): Promise<PersonalStudent[]> {
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
 
   const [profRes, checkRes, logRes, swRes, progRes] = await Promise.all([
-    sb.from("profiles").select("id, name, avatar_url, phone, whatsapp_consent, goal, medical_risk, medications, surgery_history, sex, experience_level, available_days, emergency_contact, birth_date, daily_intake").eq("gym_id", gymId).eq("role", "student").order("name"),
+    sb.from("profiles").select("id, name, avatar_url, phone, whatsapp_consent, goal, medical_risk, medications, surgery_history, sex, experience_level, available_days, emergency_contact, birth_date, daily_intake, approved_at, plan_type, vencimento").eq("gym_id", gymId).eq("role", "student").order("name"),
     sb.from("checkins").select("student_id, checked_at").eq("gym_id", gymId).gte("checked_at", since),
     sb.from("workout_logs").select("student_id, rpe, date").eq("gym_id", gymId).gte("date", since),
     sb.from("student_workouts").select("student_id, status, program_id").eq("gym_id", gymId),
     sb.from("workout_programs").select("id, name").eq("gym_id", gymId),
   ]);
 
-  const profiles = (profRes.data ?? []) as Array<{ id: string; name: string; avatar_url: string | null; phone: string | null; whatsapp_consent: boolean | null; goal: string | null; medical_risk: boolean | null; medications: string | null; surgery_history: string | null; sex: string | null; experience_level: string | null; available_days: string[] | null; emergency_contact: { name: string; phone: string } | null; birth_date: string | null; daily_intake: string | null }>;
+  const profiles = (profRes.data ?? []) as Array<{ id: string; name: string; avatar_url: string | null; phone: string | null; whatsapp_consent: boolean | null; goal: string | null; medical_risk: boolean | null; medications: string | null; surgery_history: string | null; sex: string | null; experience_level: string | null; available_days: string[] | null; emergency_contact: { name: string; phone: string } | null; birth_date: string | null; daily_intake: string | null; approved_at: string | null; plan_type: string | null; vencimento: string | null }>;
   const checkins = (checkRes.data ?? []) as CheckinRow[];
   const logs = (logRes.data ?? []) as LogRow[];
   const assignments = (swRes.data ?? []) as Array<{ student_id: string; status: string; program_id: string }>;
@@ -98,6 +98,9 @@ async function fetchRealStudents(gymId: string): Promise<PersonalStudent[]> {
       emergency_contact: p.emergency_contact,
       birth_date: p.birth_date,
       daily_intake: p.daily_intake,
+      approved_at: p.approved_at,
+      plan_type: p.plan_type,
+      vencimento: p.vencimento,
     };
   });
 }

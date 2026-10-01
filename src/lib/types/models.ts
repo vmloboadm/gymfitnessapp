@@ -67,6 +67,8 @@ export type Profiles = {
   plan_type?: "Gymfitness" | "Gympass" | "TotalPass" | null;
   /** Data de vencimento da matrícula (apenas Gymfitness) */
   vencimento?: string | null;
+  /** Aprovação do personal: null = aguardando aprovação (alunos novos) */
+  approved_at?: string | null;
 };
 
 export type StudentSubscriptions = {

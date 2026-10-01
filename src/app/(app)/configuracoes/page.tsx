@@ -90,6 +90,8 @@ export default function ConfiguracoesPage() {
       // Salva localmente também
       const next = saveProfileEdits({ avatar_url: data.url });
       setEdits(next);
+      // Sincroniza o contexto: perfil (aba Perfil) lê o banco como fonte da verdade
+      await refreshProfile().catch(() => {});
       toast.success("Foto atualizada!");
     } catch (e) {
       toast.error("Não foi possível enviar a foto", { description: String(e).slice(0, 80) });

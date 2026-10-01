@@ -26,6 +26,7 @@ import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { StreakFlame, FlameStageHint } from "~/components/dashboard/StreakFlame";
 import { PerformanceRing } from "~/components/dashboard/PerformanceRing";
 import { HeroWorkout } from "~/components/dashboard/HeroWorkout";
+import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { titleFor } from "~/components/dashboard/TitlePoints";
 import PartnerCarousel from "~/components/dashboard/PartnerCarousel";
 import {
@@ -420,6 +421,7 @@ export default function HomePage() {
 
   return (
       <div className="mx-auto max-w-md pb-32 pt-8">
+        <PendingApprovalBanner />
         {/* CHECK-IN CONTEXTUAL: some após o check-in do dia; foco vai pro treino */}
         <m.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="px-4 pb-5">
           {isCheckedInToday ? (

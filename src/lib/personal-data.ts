@@ -52,6 +52,11 @@ export type PersonalStudent = {
   emergency_contact?: { name: string; phone: string } | null;
   birth_date?: string | null;
   daily_intake?: string | null;
+  /** Aprovação do personal: null = aluno novo aguardando aprovação */
+  approved_at?: string | null;
+  /** Tipo de matrícula (Gymfitness/Gympass/TotalPass) e vencimento */
+  plan_type?: string | null;
+  vencimento?: string | null;
 };
 
 export type WorkoutTemplate = {

@@ -10,6 +10,7 @@ const STEPS = [
   { id: 4, label: "Matrícula" },
   { id: 5, label: "Saúde" },
   { id: 6, label: "Revisar" },
+  { id: 7, label: "Foto" },
 ] as const;
 
 /** Stepper do onboarding: etapas concluídas são clicáveis (voltar e corrigir). */

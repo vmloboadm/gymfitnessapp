@@ -65,7 +65,6 @@ const SUMMARY: Array<{ label: string; get: (p: Profiles) => string | null }> = [
 export function OnboardingReview({
   profile,
   onSave,
-  onFinish,
 }: {
   profile: Profiles;
   onSave: (patch: Partial<Profiles>, nextStep: number) => Promise<void>;
@@ -78,8 +77,8 @@ export function OnboardingReview({
     if (!consent) return;
     setSaving(true);
     saveOnboarding({ whatsapp_consent: true });
-    await onSave({ whatsapp_consent: true }, 6);
-    await onFinish();
+    // Avança para o passo final (foto + personal) — quem finaliza é ele
+    await onSave({ whatsapp_consent: true }, 7);
   };
 
   return (
@@ -144,7 +143,7 @@ export function OnboardingReview({
         disabled={saving || !consent}
       >
         {saving ? <Loader2 className="animate-spin" /> : <PartyPopper />}
-        Começar a treinar
+        Continuar — foto e personal
       </Button>
       {!consent ? (
         <p className="text-center text-[10px] text-muted-foreground">

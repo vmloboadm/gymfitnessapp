@@ -41,6 +41,7 @@ const BodyMap = dynamic(() => import("~/components/body-map"), { ssr: false });
 import { ImageLightbox } from "~/components/common/ImageLightbox";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
+import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { fetchMyAssignedPlans } from "~/lib/gym-api";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
@@ -50,7 +51,7 @@ import { libraryMatch } from "~/lib/demo-data";
 import { toast } from "sonner";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
-import { useWorkoutSession, elapsedSeconds, readSessionProgress, startWorkoutSession as startLocalDaySession } from "~/lib/workout-session";
+import { useWorkoutSession, elapsedSeconds, readSessionProgress, startWorkoutSession as startLocalDaySession, isDayUnlocked, markDayUnlocked } from "~/lib/workout-session";
 import { checkDayPassword } from "~/lib/day-pass";
 import { SessionClock } from "~/components/common/SessionClock";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
@@ -266,6 +267,12 @@ export default function TreinoHomePage() {
   const router = useRouter();
   const { session: daySession, start: startDaySession, end: endDaySession } = useWorkoutSession();
 
+  // Check-in do dia: liberou (senha/QR/NFC) → conteúdo visível até a meia-noite
+  const [dayUnlockedLocal, setDayUnlockedLocal] = useState(false);
+  useEffect(() => {
+    setDayUnlockedLocal(isDayUnlocked());
+  }, [phase, data?.workouts?.id]);
+
   // PLANO DO PERSONAL (produção): treino de hoje vem do student_workouts ativo
   const [planActive, setPlanActive] = useState<Awaited<ReturnType<typeof fetchMyAssignedPlans>>> ([]);
   const [planExerciseMap, setPlanExerciseMap] = useState<Record<string, { workoutId: string; exerciseId: string; reps: string; rpe: number | null }>>({});
@@ -470,8 +477,9 @@ export default function TreinoHomePage() {
     );
   }
 
-  // Sem check-in NÃO bloqueia mais a tela: mostra aviso discreto e libera tudo
-  const needsCheckin = !daySession;
+  // Sem check-in do dia o conteúdo fica BORRADO + bloqueado (QR, NFC ou senha)
+  const unlockedToday = demo || !!daySession || dayUnlockedLocal || finishedToday;
+  const needsCheckin = !unlockedToday;
   const checkinBanner = needsCheckin ? (
     <div className="mx-auto max-w-md px-4 pt-3">
       <button
@@ -546,8 +554,17 @@ export default function TreinoHomePage() {
     return (
       <>
         <TopBar title="Hoje" subtitle={cap(weekdayName())} />
+        <PendingApprovalBanner />
         <div className="space-y-6 p-4">
-          <EmptyState title="Sem treino prescrito para hoje" description="Quando seu personal atribuir um programa, ele aparece aqui, e os planos disponíveis já dão um gostinho do que vem por aí." icon={Dumbbell} />
+          <EmptyState
+            title={profile?.approved_at ? "Sem treino prescrito para hoje" : "Aguardando aprovação do personal"}
+            description={
+              profile?.approved_at
+                ? "Quando seu personal atribuir um programa, ele aparece aqui, e os planos disponíveis já dão um gostinho do que vem por aí."
+                : "Seu cadastro está com o personal. Assim que ele aprovar e montar seu treino, ele aparece aqui."
+            }
+            icon={Dumbbell}
+          />
         </div>
         <AiCoach />
       </>
@@ -628,8 +645,8 @@ export default function TreinoHomePage() {
       : null;
   const startPlanSession = async () => {
     if (!plan?.plan?.dias || plan.plan.dias.length === 0 || todayIdx < 0) return;
-    // Gate: sem check-in (QR/NFC) nem senha do dia, abre o desbloqueio
-    if (!demo && !daySession) {
+    // Gate: sem check-in do dia (QR/NFC/senha) o treino fica borrado
+    if (!demo && !unlockedToday) {
       setUnlockOpen(true);
       return;
     }
@@ -781,35 +798,42 @@ export default function TreinoHomePage() {
               </div>
               <div className="relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-card/60">
                 <div className="space-y-3 p-4">
-                  <div>
-                    <p className="font-display text-lg font-black text-foreground">{planToday.day.nome}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {planToday.day.foco} · {planToday.day.exercicios.length} exercícios
-                    </p>
-                  </div>
-                  {planToday.day.aquecimento?.length ? (
-                    <p className="rounded-xl border border-[#4ADE80]/20 bg-[#4ADE80]/[0.06] p-2.5 text-[10.5px] leading-snug text-[#4ADE80]">
-                      Aquecimento: {planToday.day.aquecimento.join(" · ")}
-                    </p>
-                  ) : null}
-                  <ul className="divide-y divide-white/[0.05] rounded-xl border border-white/[0.06] bg-white/[0.02]">
-                    {planToday.day.exercicios.map((e, i) => (
-                      <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[12.5px] font-semibold text-foreground">
-                            {i + 1}. {e.exercicio}
+                  <div className={needsCheckin ? "blur-[7px] select-none" : ""} aria-hidden={needsCheckin}>
+                    <div>
+                      <p className="font-display text-lg font-black text-foreground">{planToday.day.nome}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {planToday.day.foco} · {planToday.day.exercicios.length} exercícios
+                      </p>
+                    </div>
+                    {planToday.day.aquecimento?.length ? (
+                      <p className="rounded-xl border border-[#4ADE80]/20 bg-[#4ADE80]/[0.06] p-2.5 text-[10.5px] leading-snug text-[#4ADE80]">
+                        Aquecimento: {planToday.day.aquecimento.join(" · ")}
+                      </p>
+                    ) : null}
+                    <ul className="divide-y divide-white/[0.05] rounded-xl border border-white/[0.06] bg-white/[0.02]">
+                      {planToday.day.exercicios.map((e, i) => (
+                        <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[12.5px] font-semibold text-foreground">
+                              {i + 1}. {e.exercicio}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">RPE {e.rpe}{e.dica ? ` · ${e.dica}` : ""}</p>
+                          </div>
+                          <p className="shrink-0 text-[11px] font-bold tabular-nums text-brand">
+                            {e.series}x {e.reps} · {e.descanso}
                           </p>
-                          <p className="text-[10px] text-muted-foreground">RPE {e.rpe}{e.dica ? ` · ${e.dica}` : ""}</p>
-                        </div>
-                        <p className="shrink-0 text-[11px] font-bold tabular-nums text-brand">
-                          {e.series}x {e.reps} · {e.descanso}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                  {planToday.day.finalizador ? (
-                    <p className="rounded-xl border border-brand/20 bg-brand/[0.06] p-2.5 text-[10.5px] leading-snug text-brand">
-                      Finalizador: {planToday.day.finalizador}
+                        </li>
+                      ))}
+                    </ul>
+                    {planToday.day.finalizador ? (
+                      <p className="rounded-xl border border-brand/20 bg-brand/[0.06] p-2.5 text-[10.5px] leading-snug text-brand">
+                        Finalizador: {planToday.day.finalizador}
+                      </p>
+                    ) : null}
+                  </div>
+                  {needsCheckin ? (
+                    <p className="flex items-center justify-center gap-1.5 rounded-xl border border-warning/40 bg-warning/[0.07] px-3 py-2.5 text-center text-[11px] font-bold text-warning">
+                      <Lock className="h-3.5 w-3.5 shrink-0" /> Check-in do dia para ver e iniciar o treino
                     </p>
                   ) : null}
                   <m.button
@@ -826,7 +850,11 @@ export default function TreinoHomePage() {
                       animate={{ x: ["-120%", "220%"] }}
                       transition={{ duration: 3.5, repeat: Infinity, repeatDelay: 2.5, ease: "easeInOut" }}
                     />
-                    <Play className="relative h-5 w-5 fill-current" /> <span className="relative">Iniciar treino de hoje</span>
+                    {needsCheckin ? (
+                      <><Lock className="relative h-5 w-5" /> <span className="relative">Check-in para liberar</span></>
+                    ) : (
+                      <><Play className="relative h-5 w-5 fill-current" /> <span className="relative">Iniciar treino de hoje</span></>
+                    )}
                   </m.button>
                 </div>
               </div>
@@ -1028,6 +1056,16 @@ export default function TreinoHomePage() {
           onClose={() => setUnlockOpen(false)}
           onUnlocked={() => {
             setUnlockOpen(false);
+            setDayUnlockedLocal(true);
+            markDayUnlocked("senha");
+            // Check-in do dia conta para streak/ranking (a senha é uma forma
+            // de check-in; duplicidade é barrada pelo trigger do banco)
+            if (!demo && user?.id && profile?.gym_id) {
+              void supabaseBrowser()
+                .from("checkins")
+                .insert({ gym_id: profile.gym_id, student_id: user.id, type: "entrada", source: "senha" } as never)
+                .then(() => {}, () => {});
+            }
             toast.success("Treino liberado! Toque em Iniciar.");
           }}
         />
