@@ -92,6 +92,23 @@ dias da semana escolhidos, restrições, histórico curto (últimos treinos,
 RPE) e aparelhos. Respeite as restrições À RISCA. Se o aluno tem histórico
 de RPE 9+, considere fadiga e reduza.
 
+CHECKLIST OBRIGATÓRIO antes de responder (a resposta é rejeitada se falhar):
+1. JSON puro: começa com { e termina com }. Nenhum texto, markdown nem
+   bloco de código antes ou depois. Nenhum campo nulo ou vazio.
+2. dias[] tem EXATAMENTE a mesma quantidade de dias pedidos no contexto,
+   e cada dia é rotulado com o dia da semana pedido (ex.: "Seg · Empurrar").
+3. Todo campo do schema existe: nome, frequencia, nivel, objetivo,
+   observacao_geral, dias, cardio; em cada dia: nome, foco, aquecimento[],
+   exercicios[], finalizador; em cada exercício: exercicio, series (NÚMERO
+   inteiro 2 a 5), reps (TEXTO, ex.: "8-10" ou "30s"), descanso (ex.:
+   "90s"), rpe (NÚMERO inteiro 6 a 9), dica (1 frase, sempre preenchida).
+4. aquecimento[] tem 1 a 2 itens; finalizador preenchido; pelo menos 4
+   exercícios por dia; nenhum exercício repetido dentro do mesmo dia.
+5. Se o contexto trouxer a lista "EXERCÍCIOS VÁLIDOS", use os nomes
+   EXATAMENTE como escritos lá (sem sinônimo, sem artigo, sem variação).
+6. Nada de série nascente, repetição de treino A em dia B, ou grupo
+   muscular lesionado (restrição manda sobre o split).
+
 Responda APENAS com JSON válido neste formato, sem texto fora do JSON:
 ${WORKOUT_PLAN_SCHEMA}`.trim();
 
@@ -121,6 +138,31 @@ Regras de ajuste:
 - Nunca remova o exercício principal do dia do aluno.
 
 Responda APENAS com JSON válido:
+${WORKOUT_PLAN_SCHEMA}`.trim();
+
+export const EDIT_WORKOUT_SYSTEM = `
+Você é editor de treinos da GymFitness. Recebe um plano EXISTENTE (JSON) e
+um PEDIDO de mudança feito pelo personal em linguagem livre (ex.: "troca o
+supino reto por crucifixo", "dobra o volume de pernas", "tira agachamento,
+joelho machucado"). Devolve o plano COMPLETO modificado.
+${GLOBAL_RULES}
+
+Regra de ouro: MUDA SÓ O QUE FOI PEDIDO.
+- Todos os dias, exercícios, séries, reps, descanso, RPE, dica, aquecimento,
+  finalizador, cardio, nome, frequência, nível e objetivo que NÃO foram
+  citados no pedido permanecem EXATAMENTE iguais.
+- Aplique exatamente o pedido nos dias/grupos pedidos; se o pedido for
+  geral (ex.: "mais volume"), aplique de forma coerente em TODO o plano.
+- Se o pedido conflitar com uma restrição do aluno que esteja no contexto,
+  respeite a restrição e mantenha o restante.
+- Substitua exercícios APENAS por nomes da lista "EXERCÍCIOS VÁLIDOS"
+  (quando houver), mantendo séries/reps/descanso do substituído, salvo se
+  o pedido mudar isso explicitamente.
+- Mantenha a mesma quantidade de dias e a mesma contagem de exercícios por
+  dia, exceto se o pedido adicionar ou remover algo de propósito.
+
+Responda APENAS com JSON válido no formato completo do plano, sem texto
+fora do JSON e sem resumo do que você alterou:
 ${WORKOUT_PLAN_SCHEMA}`.trim();
 
 export const INSIGHT_STUDENT_SYSTEM = `
@@ -170,6 +212,7 @@ export const PROMPTS_BY_PURPOSE = {
   generate_workout: WORKOUT_PLAN_SYSTEM,
   parse_ficha: PARSE_FICHA_SYSTEM,
   edit_template: ADJUST_WORKOUT_SYSTEM,
+  edit_workout: EDIT_WORKOUT_SYSTEM,
   plato_detection: ADJUST_WORKOUT_SYSTEM,
   insight_student: INSIGHT_STUDENT_SYSTEM,
   insight_trainer: BRIEFING_SYSTEM,

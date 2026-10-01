@@ -447,9 +447,10 @@ function PersonalTreinosContent() {
     }
     const obs = prompt.trim();
     const guidedRequest = buildGuidedRequest(obs);
-    // modo ajuste: pede à IA para MODIFICAR o plano atual, não criar do zero
-    const effectiveRequest = adjustSwId && plan
-      ? `AJUSTE do plano atual (mantenha dias, estrutura e o que não foi citado; aplique SÓ a mudança pedida). Mudança pedida: ${obs || "otimizar o plano"}. Plano atual em JSON: ${JSON.stringify(plan).slice(0, 6000)}`
+    // modo ajuste: contexto "edit" usa o prompt dedicado que muda SÓ o pedido
+    const isAdjust = adjustSwId && !!plan;
+    const effectiveRequest = isAdjust
+      ? `Pedido do personal: ${obs || "otimizar o plano"}.\nPlano atual em JSON (devolva COMPLETO, mudando somente o pedido):\n${JSON.stringify(plan)}`
       : guidedRequest;
     setLoading(true);
     const daysArr = [...daysSelected];
@@ -498,13 +499,24 @@ function PersonalTreinosContent() {
             birth_date: target.birth_date,
             available_days: target.available_days,
           }),
-          context: "personal",
-          extras: validExerciseNames.length > 0
-            ? {
-                "Biblioteca de exercícios (use APENAS estes nomes, exatamente como escritos)":
-                  validExerciseNames.slice(0, 200).join(" | "),
-              }
-            : undefined,
+          context: isAdjust ? "edit" : "personal",
+          extras: {
+            ...(validExerciseNames.length > 0
+              ? {
+                  "Biblioteca de exercícios (use APENAS estes nomes, exatamente como escritos)":
+                    validExerciseNames.slice(0, 200).join(" | "),
+                }
+              : {}),
+            ...(isAdjust && plan
+              ? { "Quantidade exata de dias do plano": String(plan.dias.length) }
+              : daysArr.length > 0 || (target.available_days?.length ?? 0) > 0
+                ? {
+                    "Quantidade exata de dias do plano": String(
+                      daysArr.length > 0 ? daysArr.length : target.available_days?.length ?? 0
+                    ),
+                  }
+                : {}),
+          },
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; text?: string; error?: string };

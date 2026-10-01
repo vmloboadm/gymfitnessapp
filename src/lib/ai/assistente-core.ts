@@ -48,11 +48,63 @@ async function systemFor(context: string, extras?: Record<string, string>): Prom
     const { WORKOUT_PLAN_SYSTEM } = await import("~/lib/ai/prompts");
     return extra ? `${WORKOUT_PLAN_SYSTEM}\n\nContexto do aluno recebido:\n${extra}` : WORKOUT_PLAN_SYSTEM;
   }
+  if (context === "edit") {
+    const { EDIT_WORKOUT_SYSTEM } = await import("~/lib/ai/prompts");
+    return extra ? `${EDIT_WORKOUT_SYSTEM}\n\nContexto recebido:\n${extra}` : EDIT_WORKOUT_SYSTEM;
+  }
   const { COACH_SYSTEM } = await import("~/lib/ai/prompts");
   return extra ? `${COACH_SYSTEM}\n\nDados do aluno (use para personalizar suas respostas):\n${extra}` : COACH_SYSTEM;
 }
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+
+/**
+ * Validação estruturada da resposta de plano (contexto personal/edit).
+ * Devolve a lista de erros (vazia = aprovado). Usada pelo loop de
+ * auto-correção: erro vira feedback e o modelo reescreve o JSON.
+ */
+async function validatePlanReply(text: string, extras?: Record<string, string>): Promise<string[]> {
+  const { extractJson, validateWorkoutPlan } = await import("~/lib/ai/validate");
+  const parsed = extractJson(text);
+  if (parsed == null) return ["A resposta não contém JSON válido (nem dentro de ```json)."];
+  const v = validateWorkoutPlan(parsed);
+  if (!v.ok) return v.details;
+
+  const errors: string[] = [];
+  const plan = parsed as {
+    dias?: Array<{ exercicios?: Array<{ exercicio?: unknown }> }>;
+  };
+  const dias = Array.isArray(plan.dias) ? plan.dias : [];
+
+  // quantidade exata de dias pedida pelo front
+  const daysKey = Object.keys(extras ?? {}).find((k) => /quantidade exata de dias/i.test(k));
+  const expected = daysKey ? Number(extras![daysKey]) : NaN;
+  if (Number.isFinite(expected) && expected > 0 && dias.length !== expected) {
+    errors.push(`O plano tem ${dias.length} dias, mas o pedido pede exatamente ${expected}. Corrija para ${expected}.`);
+  }
+
+  // exercícios precisam existir na biblioteca informada
+  const libKey = Object.keys(extras ?? {}).find((k) => /biblioteca de exerc/i.test(k));
+  if (libKey && extras![libKey]) {
+    const library = extras![libKey].split("|").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (library.length > 0) {
+      const unknown = new Set<string>();
+      for (const d of dias) {
+        for (const e of d.exercicios ?? []) {
+          const name = typeof e.exercicio === "string" ? e.exercicio.trim().toLowerCase() : "";
+          if (!name) continue;
+          if (!library.includes(name)) unknown.add(String(e.exercicio));
+        }
+      }
+      if (unknown.size > 0) {
+        errors.push(
+          `Exercícios fora da biblioteca da academia: ${[...unknown].join(", ")}. Substitua por nomes EXATOS da lista "EXERCÍCIOS VÁLIDOS" enviada.`
+        );
+      }
+    }
+  }
+  return errors;
+}
 
 /** Respostas que vazam raciocínio/regras do sistema = descarta e cai pro próximo modelo. */
 function isLeaky(text: string): boolean {
@@ -132,8 +184,9 @@ export async function handleAssistente(request: Request) {
     return NextResponse.json({ ok: false, error: OFFLINE_MESSAGE }, { status: 500 });
   }
 
-  const message = typeof body.message === "string" ? body.message.slice(0, 4000).trim() : "";
-  const context = body.context === "personal" ? "personal" : "aluno";
+  const message = typeof body.message === "string" ? body.message.slice(0, 12000).trim() : "";
+  const context = body.context === "personal" ? "personal" : body.context === "edit" ? "edit" : "aluno";
+  const structured = context === "personal" || context === "edit";
   const stream = body.stream === true;
   const extras =
     body.extras && typeof body.extras === "object" && !Array.isArray(body.extras)
@@ -267,41 +320,91 @@ export async function handleAssistente(request: Request) {
     return NextResponse.json({ ok: false, error: OFFLINE_MESSAGE }, { status: 500 });
   }
 
-  // ===== MODO NORMAL: cadeia de modelos, primeira resposta boa vence =====
+  // ===== MODO NORMAL: cadeia de modelos + auto-correção do JSON =====
+  // Prazo do serverless (maxDuration 60s): para de tentar 10s antes.
+  const deadline = Date.now() + 48_000;
+  let lastErrors: string[] = [];
+  let lastReply = "";
+
   for (const model of modelChain()) {
-    try {
-      const t0 = Date.now();
-      const res = await callModel(model, messages, false);
-      if (!res.ok) continue;
-      const data = (await res.json()) as {
-        choices?: Array<{ message?: { content?: string } }>;
-      };
-      let reply = data.choices?.[0]?.message?.content?.trim() ?? "";
-      reply = stripThinking(reply);
-      if (isLeaky(reply)) continue;
-
-      // P1.7: Audit log (purpose, model, tokens, latency)
-      const latencyMs = Date.now() - t0;
+    // até 2 passadas por modelo: original + reescrita com o feedback de erro
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (Date.now() > deadline) break;
       try {
-        const { extractJson } = await import("~/lib/ai/validate");
-        const jsonPayload = context === "personal" ? extractJson(reply) : null;
-        // Log best-effort (não bloqueia resposta)
-        console.log(JSON.stringify({
-          audit: true,
-          purpose: context === "personal" ? "generate_workout" : "coach_chat",
-          model,
-          latency_ms: latencyMs,
-          reply_len: reply.length,
-          is_json: !!jsonPayload,
-        }));
-      } catch {
-        // audit é best-effort
-      }
+        const t0 = Date.now();
+        const res = await callModel(model, messages, false);
+        if (!res.ok) break; // modelo fora do ar → próximo modelo
+        const data = (await res.json()) as {
+          choices?: Array<{ message?: { content?: string } }>;
+        };
+        let reply = data.choices?.[0]?.message?.content?.trim() ?? "";
+        reply = stripThinking(reply);
+        if (isLeaky(reply)) break;
 
-      return NextResponse.json({ ok: true, model, text: reply });
-    } catch {
-      continue; // timeout/rede → próximo modelo
+        // validação estruturada (personal/edit): erro vira feedback e reescreve
+        if (structured) {
+          const errors = await validatePlanReply(reply, extras);
+          if (errors.length > 0) {
+            lastErrors = errors;
+            lastReply = reply;
+            console.log(JSON.stringify({
+              audit: true,
+              purpose: context === "edit" ? "edit_workout" : "generate_workout",
+              model,
+              attempt,
+              latency_ms: Date.now() - t0,
+              reply_len: reply.length,
+              is_json: false,
+              errors,
+            }));
+            messages.push(
+              { role: "assistant", content: reply.slice(0, 6000) },
+              {
+                role: "user",
+                content:
+                  `Sua resposta anterior foi REJEITADA pela validação automática:\n` +
+                  errors.map((e) => `- ${e}`).join("\n") +
+                  `\n\nReescreva o plano CORRIGIDO atendendo TODOS os pontos acima. ` +
+                  `Responda APENAS com o JSON completo e válido, sem texto fora dele e sem repetir os erros.`,
+              }
+            );
+            continue; // tenta de novo com o feedback
+          }
+        }
+
+        // P1.7: Audit log (purpose, model, tokens, latency)
+        const latencyMs = Date.now() - t0;
+        try {
+          const { extractJson } = await import("~/lib/ai/validate");
+          const jsonPayload = structured ? extractJson(reply) : null;
+          console.log(JSON.stringify({
+            audit: true,
+            purpose: context === "edit" ? "edit_workout" : context === "personal" ? "generate_workout" : "coach_chat",
+            model,
+            attempt,
+            latency_ms: latencyMs,
+            reply_len: reply.length,
+            is_json: !!jsonPayload,
+            corrections: attempt,
+          }));
+        } catch {
+          // audit é best-effort
+        }
+
+        return NextResponse.json({ ok: true, model, text: reply, corrections: attempt });
+      } catch {
+        break; // timeout/rede → próximo modelo
+      }
     }
+  }
+
+  // Todos os modelos falharam: se tinha um último reply com erros conhecidos,
+  // devolve ele com o aviso para o front cair no gerador local informed.
+  if (structured && lastReply && lastErrors.length > 0 && Date.now() > deadline) {
+    return NextResponse.json({
+      ok: false,
+      error: `A IA gerou um plano inválido (${lastErrors[0]}). Tente de novo ou ajuste o pedido.`,
+    }, { status: 502 });
   }
 
   return NextResponse.json({ ok: false, error: OFFLINE_MESSAGE }, { status: 500 });
