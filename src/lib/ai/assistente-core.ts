@@ -154,9 +154,8 @@ async function callModel(
       messages,
       stream,
       temperature: 0.7,
-      // plano completo (vários dias) precisa de mais que 1.2k tokens;
-      // reasoning models consomem parte do budget fora do content
-      max_tokens: stream ? 900 : 6000,
+      // reasoning consome budget fora do content: 10k cobre reasoning + plano
+      max_tokens: stream ? 900 : 10000,
     }),
     signal: AbortSignal.timeout(timeoutMs ?? (stream ? 45000 : 30000)),
   });
@@ -325,8 +324,8 @@ export async function handleAssistente(request: Request) {
   // ===== MODO NORMAL: cadeia de modelos + auto-correção do JSON =====
   // Prazo do serverless (maxDuration 60s): timeout de cada chamada respeita
   // o tempo restante, e nunca se inicia uma tentativa que não caberia.
-  const deadline = Date.now() + 52_000;
-  const MIN_SLACK = 6_000; // menos que isso não dá pra começar uma chamada
+  const deadline = Date.now() + 54_000;
+  const MIN_SLACK = 5_000; // menos que isso não dá pra começar uma chamada
   let lastErrors: string[] = [];
   let lastReply = "";
 
@@ -337,7 +336,7 @@ export async function handleAssistente(request: Request) {
       if (remaining < MIN_SLACK) break;
       try {
         const t0 = Date.now();
-        const res = await callModel(model, messages, false, Math.min(30_000, remaining - 2_000));
+        const res = await callModel(model, messages, false, Math.min(45_000, remaining - 1_500));
         if (!res.ok) break; // modelo fora do ar → próximo modelo
         const data = (await res.json()) as {
           choices?: Array<{ message?: { content?: string } }>;
