@@ -178,6 +178,12 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // Painel interno do dev (/admin): a senha é validada na própria página,
+  // então não exige sessão Supabase (nem é pra aparecer pro staff/aluno).
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return response;
+  }
+
   // Logado em rotas de auth → home da role (ou onboarding se sem profile)
   if (user && (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password")) {
     const { data: p } = await supabase
