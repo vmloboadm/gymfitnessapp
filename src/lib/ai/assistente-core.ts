@@ -154,8 +154,9 @@ async function callModel(
       messages,
       stream,
       temperature: 0.7,
-      // plano completo (vários dias) precisa de mais que 1.2k tokens
-      max_tokens: stream ? 900 : 3500,
+      // plano completo (vários dias) precisa de mais que 1.2k tokens;
+      // reasoning models consomem parte do budget fora do content
+      max_tokens: stream ? 900 : 6000,
     }),
     signal: AbortSignal.timeout(timeoutMs ?? (stream ? 45000 : 30000)),
   });
@@ -343,6 +344,7 @@ export async function handleAssistente(request: Request) {
         };
         let reply = data.choices?.[0]?.message?.content?.trim() ?? "";
         reply = stripThinking(reply);
+        if (!reply) break; // reasoning esgotou o budget → modelo não serve, próximo
         if (isLeaky(reply)) break;
 
         // validação estruturada (personal/edit): erro vira feedback e reescreve
