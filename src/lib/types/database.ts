@@ -4,6 +4,7 @@ import type {
   BodyMetrics,
   Checkins,
   DayPasses,
+  PageViews,
   Equipment,
   EquipmentMaintenanceLogs,
   EquipmentSessions,
@@ -74,6 +75,7 @@ export interface Database {
       premium_requests: RowTables<PremiumRequests>;
       medical_clearances: RowTables<MedicalClearances>;
       student_trainers: RowTables<StudentTrainers>;
+      page_views: RowTables<PageViews>;
     };
     Views: Record<string, never>;
     Functions: {

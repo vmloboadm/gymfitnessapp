@@ -666,6 +666,7 @@ export default function DashboardPage() {
           { href: "/personal/exercicios", label: "Biblioteca de exercícios", emoji: "📚" },
           { href: "/personal/perfil", label: "Frase motivacional", emoji: "💬" },
           { href: "/relatorios", label: "Relatórios", emoji: "📊" },
+          { href: "/personal/visitas", label: "QR dos banners", emoji: "📱" },
           { href: "/feed-moderacao", label: "Moderar feed", emoji: "🛡️" },
         ].map((a) => (
           <Link

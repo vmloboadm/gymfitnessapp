@@ -11,6 +11,7 @@ import { ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { toast } from "sonner";
 import { formatDate } from "~/lib/utils/format";
+import { trackConversion } from "~/lib/analytics";
 import type { DayPasses } from "~/lib/types/models";
 
 /**
@@ -79,6 +80,7 @@ export default function DayPassPage() {
       window.localStorage.setItem(DAY_PASS_CODES_KEY, JSON.stringify([pass.code]));
     }
     toast.success("Day-pass gerado. Apresente o código na recepção.");
+    trackConversion("daypass");
     setName("");
     setEmail("");
     setPhone("");

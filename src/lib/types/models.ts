@@ -108,6 +108,22 @@ export type DayPasses = {
   expires_at: string;
 };
 
+export type PAGE_EVENT_KIND = "view" | "click" | "signup" | "daypass";
+
+/** Métricas dos QR dos banners da parede (migração 034). */
+export type PageViews = {
+  id: string;
+  gym_id: string;
+  path: string;
+  kind: PAGE_EVENT_KIND;
+  cta: string | null;
+  referrer: string | null;
+  device: "mobile" | "desktop" | "tablet" | null;
+  visitor_id: string;
+  user_id: string | null;
+  created_at: string;
+};
+
 export type Equipment = {
   id: string;
   gym_id: string;

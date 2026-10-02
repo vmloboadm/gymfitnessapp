@@ -11,6 +11,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { LgpdConsent } from "~/components/auth/LgpdConsent";
 import { GymLogo } from "~/components/layout/GymLogo";
+import { trackConversion } from "~/lib/analytics";
 import { toast } from "sonner";
 
 /**
@@ -71,6 +72,7 @@ export function RegisterForm() {
           return;
         }
         toast.success("Conta criada!");
+        trackConversion("signup", data.user.id);
         // Cria o profile + gym padrão do onboarding
         router.push("/onboarding");
         router.refresh();
