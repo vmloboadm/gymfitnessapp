@@ -61,9 +61,11 @@ create policy "page_views_select_staff"
   );
 
 -- Grants explícitos: Supabase default privileges não dão INSERT p/ anon
--- (padrão também usado em day_passes). Anônimo só insere; staff só lê.
+-- (padrão também usado em day_passes). Anônimo só insere; staff só lê;
+-- service_role (painel /admin) lê e insere.
 grant insert on public.page_views to anon;
 grant select, insert on public.page_views to authenticated;
+grant select, insert on public.page_views to service_role;
 
 -- Ninguém altera ou apaga histórico de métricas.
 revoke update, delete, truncate on public.page_views from anon, authenticated;
