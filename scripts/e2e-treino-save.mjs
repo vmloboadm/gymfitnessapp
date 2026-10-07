@@ -51,6 +51,12 @@ async function cleanup() {
     .eq("gym_id", GYM)
     .like("name", "%E2E Save%");
   for (const p of progs ?? []) {
+    const { data: days } = await admin.from("workout_days").select("id").eq("program_id", p.id);
+    const dayIds = (days ?? []).map((d) => d.id);
+    if (dayIds.length) {
+      await admin.from("workout_exercises").delete().in("day_id", dayIds);
+      await admin.from("workout_days").delete().in("id", dayIds);
+    }
     await admin.from("student_workouts").delete().eq("program_id", p.id);
     await admin.from("workout_programs").delete().eq("id", p.id);
   }
