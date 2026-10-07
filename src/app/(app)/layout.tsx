@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BottomNav } from "~/components/layout/BottomNav";
 import { LiveWorkoutBar } from "~/components/layout/LiveWorkoutBar";
+import { PhotoGate } from "~/components/account/PhotoGate";
 import { useOfflineQueue } from "~/hooks/useOfflineQueue";
 import { useAuth } from "~/hooks/useAuth";
 import { CloudOff } from "lucide-react";
@@ -39,9 +40,11 @@ export default function AppLayout({
           Sem internet{pendingCount > 0 ? ` · ${pendingCount} ação(ões) sincroniza(m) quando voltar` : " · dados salvos no aparelho"}
         </div>
       ) : null}
-      <main>{children}</main>
-      <LiveWorkoutBar />
-      <BottomNav />
+      <PhotoGate>
+        <main>{children}</main>
+        <LiveWorkoutBar />
+        <BottomNav />
+      </PhotoGate>
     </div>
   );
 }

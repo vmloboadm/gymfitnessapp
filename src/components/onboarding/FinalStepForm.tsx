@@ -94,10 +94,25 @@ export function FinalStepForm({
     setSaving(true);
     try {
       if (withExtras && !isDemo) {
-        try {
-          await uploadPhoto();
-        } catch (e) {
-          toast.warning("Foto não enviada", { description: String(e).slice(0, 80) });
+        const hasSavedPhoto = !!profile.avatar_url;
+        // Foto de perfil é obrigatória: o personal precisa reconhecer o aluno pelo rosto.
+        if (!pendingBlob && !hasSavedPhoto) {
+          toast.error("A foto de perfil é obrigatória", {
+            description: "Escolha uma foto do seu rosto para concluir o cadastro.",
+          });
+          setSaving(false);
+          return;
+        }
+        if (pendingBlob) {
+          try {
+            await uploadPhoto();
+          } catch (e) {
+            toast.error("Não consegui enviar a foto", {
+              description: String(e).slice(0, 80),
+            });
+            setSaving(false);
+            return;
+          }
         }
         if (chosen) {
           const { error } = await supabaseBrowser().rpc("choose_personal", {
@@ -246,17 +261,9 @@ export function FinalStepForm({
           {saving ? <Loader2 className="animate-spin" /> : <Check strokeWidth={3} />}
           Finalizar cadastro
         </Button>
-        {/* pular: existe, mas é discreto — foto é importante */}
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={() => finish(false)}
-            disabled={saving}
-            className="text-[11px] font-medium text-muted-foreground/60 underline-offset-2 hover:text-muted-foreground hover:underline disabled:opacity-40"
-          >
-            pular por enquanto
-          </button>
-        </div>
+        <p className="text-center text-[11px] leading-snug text-muted-foreground/70">
+          A foto é obrigatória — é assim que seu personal e a academia te reconhecem.
+        </p>
       </div>
 
       <ImageCropModal

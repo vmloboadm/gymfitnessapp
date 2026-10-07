@@ -223,7 +223,8 @@ function PersonalTreinosContent() {
   // ===== Assistente guiado (a IA faz perguntas antes de gerar) =====
   const [ansNivel, setAnsNivel] = useState<string | null>(null);
   const [ansObjetivo, setAnsObjetivo] = useState<string | null>(null);
-  const [ansFoco, setAnsFoco] = useState<string | null>(null); // id do FOCO_OPTS
+  const [ansFoco, setAnsFoco] = useState<string[]>([]); // ids do FOCO_OPTS — pode marcar vários (ex.: braços + ombros)
+  const [focoDone, setFocoDone] = useState(false);
   const [ansRestricoes, setAnsRestricoes] = useState<string[]>([]); // valores "Cuidado com ..."
   const [restDone, setRestDone] = useState(false);
 
@@ -231,7 +232,8 @@ function PersonalTreinosContent() {
   useEffect(() => {
     setAnsNivel(null);
     setAnsObjetivo(null);
-    setAnsFoco(null);
+    setAnsFoco([]);
+    setFocoDone(false);
     setAnsRestricoes([]);
     setRestDone(false);
   }, [targetId]);
@@ -252,14 +254,19 @@ function PersonalTreinosContent() {
     ? 0
     : !ansObjetivo
       ? 1
-      : !ansFoco
+      : !focoDone
         ? 2
         : !restDone
           ? 3
           : 4;
 
-  const focoSel = FOCO_OPTS.find((f) => f.id === ansFoco) ?? null;
-  const guidedReady = !!ansNivel && !!ansObjetivo && !!ansFoco && restDone;
+  const focoSels = FOCO_OPTS.filter((f) => ansFoco.includes(f.id));
+  const focoLabel = focoSels.length
+    ? focoSels.map((f) => f.label).join(", ")
+    : "Corpo inteiro";
+  const toggleFoco = (id: string) =>
+    setAnsFoco((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const guidedReady = !!ansNivel && !!ansObjetivo && focoDone && ansFoco.length > 0 && restDone;
 
   // Pré-seleciona os dias do aluno (disponibilidade do onboarding) ao abrir o modo atribuição
   useEffect(() => {
@@ -424,7 +431,7 @@ function PersonalTreinosContent() {
     const parts = [
       `Plano ${ansNivel} para ${target?.name ?? "o aluno"}.`,
       `Objetivo: ${ansObjetivo}.`,
-      `Foco: ${focoSel?.label ?? "Corpo inteiro"}.`,
+      `Foco: ${focoLabel}.`,
     ];
     if (ansRestricoes.length) parts.push(`Restrições e lesões a respeitar: ${ansRestricoes.join(", ")}.`);
     if (obs) parts.push(`Observações do personal: ${obs}`);
@@ -457,7 +464,7 @@ function PersonalTreinosContent() {
     const daysMeta = {
       nivel: ansNivel,
       objetivo: ansObjetivo,
-      focus: focoSel?.focus ?? ["Corpo inteiro"],
+      focus: focoSels.length ? [...new Set(focoSels.flatMap((f) => f.focus))] : ["Corpo inteiro"],
       restricoes: ansRestricoes,
       observacoes: obs || null,
     };
@@ -744,39 +751,53 @@ function PersonalTreinosContent() {
             </>
           ) : null}
 
-          {/* Pergunta 3: foco */}
+          {/* Pergunta 3: foco (pode marcar mais de um) */}
           {askStep >= 2 ? (
             <>
               <div className="mb-2.5 mt-1 max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground">
-                Qual o foco do plano?
+                Qual o foco do plano? Toque em quantos quiser.
               </div>
-              {askStep > 2 && focoSel ? (
+              {askStep > 2 && focoSels.length ? (
                 <div className="mb-2.5 flex justify-end">
                   <span className="rounded-2xl rounded-tr-sm bg-brand px-3 py-2 text-[12px] font-bold text-brand-foreground">
-                    {focoSel.label}
+                    {focoLabel}
                   </span>
                 </div>
               ) : null}
-              {askStep === 2 ? (
+              {!focoDone ? (
                 <div className="mb-3 grid grid-cols-2 gap-1.5" role="group" aria-label="Foco do plano">
-                  {FOCO_OPTS.map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setAnsFoco(f.id)}
-                      className={cn(
-                        "rounded-xl border p-2.5 text-left transition-colors",
-                        ansFoco === f.id
-                          ? "border-brand bg-brand/10"
-                          : "border-white/[0.08] bg-white/[0.03] hover:border-brand/40"
-                      )}
-                    >
-                      <p className={cn("text-[11.5px] font-bold", ansFoco === f.id ? "text-brand" : "text-foreground")}>
-                        {f.label}
-                      </p>
-                      <p className="mt-0.5 text-[9.5px] leading-snug text-muted-foreground">{f.sub}</p>
-                    </button>
-                  ))}
+                  {FOCO_OPTS.map((f) => {
+                    const on = ansFoco.includes(f.id);
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => toggleFoco(f.id)}
+                        aria-pressed={on}
+                        className={cn(
+                          "rounded-xl border p-2.5 text-left transition-colors",
+                          on
+                            ? "border-brand bg-brand/10"
+                            : "border-white/[0.08] bg-white/[0.03] hover:border-brand/40"
+                        )}
+                      >
+                        <p className={cn("text-[11.5px] font-bold", on ? "text-brand" : "text-foreground")}>
+                          {f.label}
+                        </p>
+                        <p className="mt-0.5 text-[9.5px] leading-snug text-muted-foreground">{f.sub}</p>
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setFocoDone(true)}
+                    disabled={ansFoco.length === 0}
+                    className="tactile col-span-2 rounded-xl border border-brand/40 bg-brand/10 py-2.5 text-[12px] font-bold text-brand transition-colors hover:bg-brand/20 disabled:cursor-not-allowed disabled:border-white/[0.06] disabled:bg-white/[0.03] disabled:text-muted-foreground/60"
+                  >
+                    {ansFoco.length === 0
+                      ? "Escolha ao menos um foco"
+                      : `Confirmar foco (${ansFoco.length})`}
+                  </button>
                 </div>
               ) : null}
             </>
@@ -855,7 +876,7 @@ function PersonalTreinosContent() {
                 Resumo para gerar
               </p>
               <p className="text-[11.5px] leading-relaxed text-foreground">
-                <strong>{ansNivel}</strong> · <strong>{ansObjetivo}</strong> · <strong>{focoSel?.label}</strong>
+                <strong>{ansNivel}</strong> · <strong>{ansObjetivo}</strong> · <strong>{focoLabel}</strong>
                 {ansRestricoes.length ? (
                   <span className="text-[#FFC24D]"> · {ansRestricoes.join(", ")}</span>
                 ) : (
@@ -867,7 +888,8 @@ function PersonalTreinosContent() {
                 onClick={() => {
                   setAnsNivel(null);
                   setAnsObjetivo(null);
-                  setAnsFoco(null);
+                  setAnsFoco([]);
+                  setFocoDone(false);
                   setAnsRestricoes([]);
                   setRestDone(false);
                 }}
