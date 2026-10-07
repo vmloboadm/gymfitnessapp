@@ -178,6 +178,14 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // Rotas /api/* validam a sessão por conta própria e sempre respondem JSON
+  // (401 quando sem sessão). O middleware nunca pode redirecioná-las para
+  // página HTML: o front faz res.json() e um 307 vira SyntaxError "<!DOCTYPE".
+  // Caso real: aluno no onboarding faz upload da foto (/api/avatar) com
+  // onboarding_completed=false — sem esta exceção ele caía no redirect de
+  // "force onboarding" abaixo e o upload quebrava.
+  const isApiRoute = pathname === "/api" || pathname.startsWith("/api/");
+
   // Painel interno do dev (/admin): a senha é validada na própria página,
   // então não exige sessão Supabase (nem é pra aparecer pro staff/aluno).
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
@@ -200,10 +208,14 @@ export async function middleware(request: NextRequest) {
   }
 
   // Sem login e em rota protegida → login com next param
+  // (API responde 401 JSON em vez de redirect para página HTML)
   if (!user && !PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     if (pathname === "/") {
       // produção: visitante não vê a home do aluno — vai pro login
       return redirectTo(request, "/login");
+    }
+    if (isApiRoute) {
+      return NextResponse.json({ ok: false, error: "Sessão necessária." }, { status: 401 });
     }
     return redirectToWithNext(request, "/login", pathname);
   }
@@ -215,13 +227,14 @@ export async function middleware(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle();
 
-    // Falta profile → force onboarding
-    if (!p && !pathname.startsWith("/onboarding")) {
+    // Falta profile → force onboarding (páginas; API resolve por conta própria)
+    if (!p && !isApiRoute && !pathname.startsWith("/onboarding")) {
       return redirectTo(request, "/onboarding");
     }
 
-    // Aluno com onboarding incompleto → força onboarding
-    if (p && p.role === "student" && !p.onboarding_completed && !pathname.startsWith("/onboarding")) {
+    // Aluno com onboarding incompleto → força onboarding (páginas; API passa
+    // direto para que upload da foto e outras chamadas funcionem no cadastro)
+    if (p && p.role === "student" && !p.onboarding_completed && !isApiRoute && !pathname.startsWith("/onboarding")) {
       return redirectTo(request, "/onboarding");
     }
 

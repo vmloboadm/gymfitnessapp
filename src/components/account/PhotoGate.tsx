@@ -54,8 +54,14 @@ export function PhotoGate({ children }: { children: React.ReactNode }) {
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
-      const data = (await res.json()) as { ok?: boolean; url?: string; error?: string };
-      if (!data.ok || !data.url) throw new Error(data.error ?? "Falha no upload da foto");
+      const data = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        url?: string;
+        error?: string;
+      } | null;
+      if (!res.ok || !data?.ok || !data.url) {
+        throw new Error(data?.error ?? `Falha no upload da foto (HTTP ${res.status}). Tente de novo.`);
+      }
       await refreshProfile();
       toast.success("Foto salva!", { description: "App liberado — bom treino." });
     } catch (e) {
