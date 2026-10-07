@@ -7,16 +7,18 @@ import { z } from "zod";
 
 export const PlanExerciseSchema = z.object({
   exercicio: z.string().min(1, "Exercício obrigatório"),
-  series: z.number().int().min(1).max(20),
+  series: z.coerce.number().int().min(1).max(20),
   reps: z.string().min(1),
-  descanso: z.string(),
-  rpe: z.number().int().min(1).max(10),
+  // campos auxiliares: modelos free frequentemente omitem ou mandam número —
+  // coerção com default em vez de reprovar o plano inteiro (economiza 1 tentativa de ~20s)
+  descanso: z.union([z.string(), z.number()]).catch("60").transform((v) => String(v).trim() || "60"),
+  rpe: z.coerce.number().int().min(1).max(10).catch(7),
   dica: z.string().optional().default(""),
 });
 
 export const PlanDaySchema = z.object({
   nome: z.string().min(1),
-  foco: z.string().min(1),
+  foco: z.string().catch("Geral"),
   aquecimento: z.array(z.string()).optional().default([]),
   exercicios: z.array(PlanExerciseSchema).min(1, "Dia precisa de pelo menos 1 exercício"),
   finalizador: z.string().optional().default(""),

@@ -141,8 +141,10 @@ async function callModel(
   model: string,
   messages: ChatMessage[],
   stream: boolean,
-  timeoutMs?: number
+  timeoutMs?: number,
+  cancel?: AbortSignal
 ): Promise<Response> {
+  const timeout = AbortSignal.timeout(timeoutMs ?? (stream ? 45000 : 30000));
   return fetch(`${AI_URL}/chat/completions`, {
     method: "POST",
     headers: {
@@ -157,7 +159,7 @@ async function callModel(
       // reasoning consome budget fora do content: 10k cobre reasoning + plano
       max_tokens: stream ? 900 : 10000,
     }),
-    signal: AbortSignal.timeout(timeoutMs ?? (stream ? 45000 : 30000)),
+    signal: cancel ? AbortSignal.any([timeout, cancel]) : timeout,
   });
 }
 
@@ -321,30 +323,35 @@ export async function handleAssistente(request: Request) {
     return NextResponse.json({ ok: false, error: OFFLINE_MESSAGE }, { status: 500 });
   }
 
-  // ===== MODO NORMAL: cadeia de modelos + auto-correção do JSON =====
-  // Prazo do serverless (maxDuration 60s): timeout de cada chamada respeita
-  // o tempo restante, e nunca se inicia uma tentativa que não caberia.
-  const deadline = Date.now() + 54_000;
+  // ===== MODO NORMAL: CORRIDA de modelos (o primeiro plano válido vence) =====
+  // Modelos free levam ~15-25s cada: em série, o segundo nem chegava a
+  // responder antes dos 60s do serverless. Cada candidato tem a própria
+  // cópia das messages (o feedback de validação não vaza entre modelos) e,
+  // quando um vence, os demais são abortados (economia de cota free).
+  const deadline = Date.now() + 56_000;
   const MIN_SLACK = 5_000; // menos que isso não dá pra começar uma chamada
   let lastErrors: string[] = [];
   let lastReply = "";
 
-  for (const model of modelChain()) {
-    // até 2 passadas por modelo: original + reescrita com o feedback de erro
+  const runCandidate = async (
+    model: string,
+    cancel: AbortSignal
+  ): Promise<{ reply: string; model: string; attempt: number }> => {
+    const msgs: ChatMessage[] = [...messages];
     for (let attempt = 0; attempt < 2; attempt++) {
       const remaining = deadline - Date.now();
-      if (remaining < MIN_SLACK) break;
+      if (remaining < MIN_SLACK) throw new Error("sem orçamento");
+      const t0 = Date.now();
       try {
-        const t0 = Date.now();
-        const res = await callModel(model, messages, false, Math.min(45_000, remaining - 1_500));
-        if (!res.ok) break; // modelo fora do ar → próximo modelo
+        const res = await callModel(model, msgs, false, Math.min(50_000, remaining - 1_500), cancel);
+        if (!res.ok) throw new Error(`http ${res.status}`); // 429/outro → candidato fora
         const data = (await res.json()) as {
           choices?: Array<{ message?: { content?: string } }>;
         };
         let reply = data.choices?.[0]?.message?.content?.trim() ?? "";
         reply = stripThinking(reply);
-        if (!reply) break; // reasoning esgotou o budget → modelo não serve, próximo
-        if (isLeaky(reply)) break;
+        if (!reply) throw new Error("reply vazio"); // reasoning esgotou o budget
+        if (isLeaky(reply)) throw new Error("vazou o system prompt");
 
         // validação estruturada (personal/edit): erro vira feedback e reescreve
         if (structured) {
@@ -362,7 +369,7 @@ export async function handleAssistente(request: Request) {
               is_json: false,
               errors,
             }));
-            messages.push(
+            msgs.push(
               { role: "assistant", content: reply.slice(0, 6000) },
               {
                 role: "user",
@@ -378,7 +385,6 @@ export async function handleAssistente(request: Request) {
         }
 
         // P1.7: Audit log (purpose, model, tokens, latency)
-        const latencyMs = Date.now() - t0;
         try {
           const { extractJson } = await import("~/lib/ai/validate");
           const jsonPayload = structured ? extractJson(reply) : null;
@@ -387,7 +393,7 @@ export async function handleAssistente(request: Request) {
             purpose: context === "edit" ? "edit_workout" : context === "personal" ? "generate_workout" : "coach_chat",
             model,
             attempt,
-            latency_ms: latencyMs,
+            latency_ms: Date.now() - t0,
             reply_len: reply.length,
             is_json: !!jsonPayload,
             corrections: attempt,
@@ -395,22 +401,46 @@ export async function handleAssistente(request: Request) {
         } catch {
           // audit é best-effort
         }
-
-        return NextResponse.json({ ok: true, model, text: reply, corrections: attempt });
-      } catch {
-        break; // timeout/rede → próximo modelo
+        return { reply, model, attempt };
+      } catch (e) {
+        if (!(e instanceof Error && /REJEITADA|validação insistiu/.test(e.message))) {
+          console.log(JSON.stringify({
+            audit: true,
+            purpose: "candidate_fail",
+            model,
+            attempt,
+            latency_ms: Date.now() - t0,
+            reason: e instanceof Error ? e.message : String(e),
+          }));
+        }
+        throw e;
       }
     }
-  }
+    throw new Error("validação insistiu nas 2 tentativas");
+  };
 
-  // Todos os modelos falharam: se tinha um último reply com erros conhecidos,
-  // devolve ele com o aviso para o front cair no gerador local informed.
-  if (structured && lastReply && lastErrors.length > 0 && Date.now() > deadline) {
-    return NextResponse.json({
-      ok: false,
-      error: `A IA gerou um plano inválido (${lastErrors[0]}). Tente de novo ou ajuste o pedido.`,
-    }, { status: 502 });
-  }
+  const controllers = new Map<string, AbortController>();
+  const tasks = modelChain().map((m) => {
+    const ctrl = new AbortController();
+    controllers.set(m, ctrl);
+    return runCandidate(m, ctrl.signal);
+  });
 
-  return NextResponse.json({ ok: false, error: OFFLINE_MESSAGE }, { status: 500 });
+  try {
+    const winner = await Promise.any(tasks);
+    for (const [m, ctrl] of controllers) {
+      if (m !== winner.model) ctrl.abort();
+    }
+    return NextResponse.json({ ok: true, model: winner.model, text: winner.reply, corrections: winner.attempt });
+  } catch {
+    // Todos os modelos falharam: se houve reply com erros conhecidos,
+    // devolve o detalhe; senão o aviso genérico (front cai no gerador local).
+    if (structured && lastReply && lastErrors.length > 0) {
+      return NextResponse.json({
+        ok: false,
+        error: `A IA gerou um plano inválido (${lastErrors[0]}). Tente de novo ou ajuste o pedido.`,
+      }, { status: 502 });
+    }
+    return NextResponse.json({ ok: false, error: OFFLINE_MESSAGE }, { status: 500 });
+  }
 }
