@@ -356,6 +356,7 @@ export type Leaderboard = {
   points: number;
   load_kg: number;
   sessions: number;
+  streak?: number | null;
 };
 
 export type Notifications = {

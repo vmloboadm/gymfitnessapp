@@ -46,7 +46,7 @@ import type { WorkoutLogs, Leaderboard } from "~/lib/types/models";
 import { BUILD_LABEL } from "~/lib/build";
 import { getProfileEdits } from "~/lib/profile-store";
 
-const META_SEMANAL = 7; // mock: virá do onboarding (frequência escolhida pelo aluno)
+const META_SEMANAL_PADRAO = 3; // fallback quando o aluno ainda não definiu os dias
 const ME_ID = "00000000-0000-0000-0000-000000000099";
 
 const container: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } } };
@@ -375,7 +375,13 @@ export default function HomePage() {
   const focusResume = twSingleton ? twSingleton.resume : nextWorkoutFromLogs(logs).resume;
   const todayLabel = `Treino do dia · ${focusLabel}`;
   const activeDays = monthDays.days.filter((d) => d.level > 0).length;
-  const remaining = Math.max(0, META_SEMANAL - sessionsWeek);
+  // Meta da semana = dias que o próprio aluno marcou no cadastro (ex.: 5).
+  // O anel mostra X/meta e atualiza a cada treino gravado.
+  const weeklyGoal =
+    profile?.available_days && profile.available_days.length > 0
+      ? profile.available_days.length
+      : META_SEMANAL_PADRAO;
+  const remaining = Math.max(0, weeklyGoal - sessionsWeek);
 
   // Detalhe por dia do heatmap (#6): nº de séries + volume movido
   const dayStats = useMemo(() => {
@@ -513,7 +519,7 @@ export default function HomePage() {
         >
           <div className="px-2 pb-6 pt-1">
             <div className="relative">
-              <PerformanceRing done={sessionsWeek} goal={META_SEMANAL} />
+              <PerformanceRing done={sessionsWeek} goal={weeklyGoal} />
               {/* Pulse ring - lightweight visual feedback */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <m.div

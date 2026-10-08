@@ -119,9 +119,19 @@ export default function FeedPage() {
       let comments: FeedComments[] = [];
 
       const [aRes, lRes, cRes] = await Promise.all([
-        authorIds.length
-          ? supabase.from("profiles").select("id, name, avatar_url, role").in("id", authorIds)
-          : Promise.resolve({ data: [], error: null }),
+        // ficha pública via função do banco: RLS de profiles esconderia os
+        // autores dos outros alunos; fallback para leitura direta
+        (async () => {
+          const rpc = await supabase.rpc("gym_roster", { p_gym_id: profile.gym_id });
+          if (!rpc.error && Array.isArray(rpc.data)) {
+            const wanted = new Set<string>(authorIds);
+            return {
+              data: ((rpc.data as Profiles[]).filter((a) => wanted.has(a.id)) ?? []) as Profiles[],
+              error: null,
+            };
+          }
+          return supabase.from("profiles").select("id, name, avatar_url, role").in("id", authorIds);
+        })(),
         postIds.length
           ? supabase.from("feed_likes").select("id, post_id, user_id").in("post_id", postIds).limit(500)
           : Promise.resolve({ data: [], error: null }),
@@ -138,8 +148,14 @@ export default function FeedPage() {
       const commenterIds = [...new Set(comments.map((c) => c.user_id))];
       if (commenterIds.length > authors.filter((a) => commenterIds.includes(a.id)).length) {
         const missing = commenterIds.filter((id) => !authors.some((a) => a.id === id));
-        const mRes = await supabase.from("profiles").select("id, name, avatar_url, role").in("id", missing);
-        if (!mRes.error) authors = [...authors, ...(mRes.data ?? []) as Profiles[]];
+        const rpc2 = await supabase.rpc("gym_roster", { p_gym_id: profile.gym_id });
+        if (!rpc2.error && Array.isArray(rpc2.data)) {
+          const more = ((rpc2.data as Profiles[]).filter((a) => missing.includes(a.id)) ?? []) as Profiles[];
+          authors = [...authors, ...more];
+        } else {
+          const mRes = await supabase.from("profiles").select("id, name, avatar_url, role").in("id", missing);
+          if (!mRes.error) authors = [...authors, ...(mRes.data ?? []) as Profiles[]];
+        }
       }
 
       return {

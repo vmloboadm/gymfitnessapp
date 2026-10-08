@@ -315,6 +315,34 @@ export default function TreinoHomePage() {
 
 
 
+  const normExName = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
+
+  // Fonte primária de exercise_id: os details do plano ativo JÁ carregados
+  // (sem query extra, sem depender de ilike). O ilike na biblioteca virou
+  // fallback. Antes, nomes do plano que não casavam 1:1 com a biblioteca
+  // derrubavam as linhas em silêncio e o treino nunca era registrado.
+  const detailsExerciseId = (name: string): string | null => {
+    const n = normExName(name);
+    if (!n) return null;
+    const det = (data?.details ?? []) as Array<{
+      exercise_id?: string | null;
+      exercise?: { name?: string | null } | null;
+      notes?: string | null;
+    }>;
+    const exact = det.find(
+      (d) =>
+        normExName(d.exercise?.name ?? "") === n ||
+        normExName((d.notes ?? "").split(".")[0] ?? "") === n
+    );
+    if (exact?.exercise_id) return exact.exercise_id;
+    const fuzzy = det.find((d) => {
+      const dn = normExName(d.exercise?.name ?? "");
+      return dn.length > 0 && (dn.includes(n) || n.includes(dn));
+    });
+    return fuzzy?.exercise_id ?? null;
+  };
+
   const conclude = async (completedIds?: string[]) => {
     setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
     // ids: parâmetro → ref ao vivo → progresso persistido (fallback triplo:
@@ -354,9 +382,20 @@ export default function TreinoHomePage() {
             const missing = ids.filter(
               (id) => !(planExerciseMap && planExerciseMap[id]?.exerciseId)
             );
+            // 1) tenta os details do plano ativo (fonte mais confiável)
+            const detailIds: Record<string, string> = {};
+            const stillMissing = missing.filter((id) => {
+              const s = sessList.find((x) => x.id === id);
+              const resolved = s ? detailsExerciseId(s.name) : null;
+              if (resolved) {
+                detailIds[id] = resolved;
+                return false;
+              }
+              return true;
+            });
             const nameToId: Record<string, string> = {};
-            if (missing.length > 0) {
-              const names = missing.map((id) => sessList.find((s) => s.id === id)?.name).filter(Boolean) as string[];
+            if (stillMissing.length > 0) {
+              const names = stillMissing.map((id) => sessList.find((s) => s.id === id)?.name).filter(Boolean) as string[];
               if (names.length > 0) {
                 const orFilter = names.map((n) => `name.ilike.%${n.replace(/[%_,]/g, "").slice(0, 24)}%`).join(",");
                 const { data: found } = await supabase
@@ -383,7 +422,7 @@ export default function TreinoHomePage() {
             const rows = ids.flatMap((id) => {
               const m = planExerciseMap?.[id];
               const s = sessList.find((x) => x.id === id);
-              const exerciseId = m?.exerciseId ?? (s ? findId(s.name) : null);
+              const exerciseId = m?.exerciseId ?? detailIds[id] ?? (s ? findId(s.name) : null);
               if (!exerciseId) return [];
               return [{
                 gym_id: profile.gym_id,
@@ -395,6 +434,12 @@ export default function TreinoHomePage() {
                 rpe: m?.rpe ?? null,
               }];
             });
+            if (rows.length === 0) {
+              // nunca mais em silêncio: se concluiu mas nada resolveu, avisa
+              toast.error("Treino não entrou no histórico", {
+                description: "Concluiu mas não consegui identificar os exercícios. Avise seu personal.",
+              });
+            }
             if (rows.length > 0) {
               const { error: logErr } = await supabase.from("workout_logs").insert(rows as never);
               if (logErr) toast.error("Falha ao registrar treino", { description: "Tente novamente." });
@@ -487,7 +532,7 @@ export default function TreinoHomePage() {
         className="tactile flex w-full items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning/[0.08] px-4 py-2.5 text-left"
       >
         <span className="flex items-center gap-2 text-[12px] font-bold text-warning">
-          <Lock className="h-4 w-4" /> Treino bloqueado — toque para liberar
+          <Lock className="h-4 w-4" /> Treino bloqueado. Toque para liberar
         </span>
         <ScanLine className="h-4 w-4 shrink-0 text-warning" />
       </button>
@@ -681,13 +726,31 @@ export default function TreinoHomePage() {
       };
     }) as typeof DEFAULT_DEMO_EX;
     // Resolve ids REAIS p/ gravar workout_logs ao concluir:
-    // workout_id = student_workouts.id; exercise_id casando nome na biblioteca.
+    // workout_id = student_workouts.id; exercise_id primeiro pelos details do
+    // plano ativo (confiável), ilike na biblioteca só para o que faltar.
     // Batch: 1 query com OR em vez de N queries sequenciais.
-    if (!demo && user && profile?.gym_id && plan.id) {
+    const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "");
+    const map: Record<string, { workoutId: string; exerciseId: string; reps: string; rpe: number | null }> = {};
+    const pendingIdx: number[] = [];
+    day.exercicios.forEach((e, i) => {
+      const fromDetails = detailsExerciseId(e.exercicio);
+      if (fromDetails) {
+        map[`plan-${i}`] = {
+          workoutId: plan.id,
+          exerciseId: fromDetails,
+          reps: e.reps,
+          rpe: e.rpe ?? null,
+        };
+      } else {
+        pendingIdx.push(i);
+      }
+    });
+    setPlanExerciseMap({ ...map });
+    if (!demo && user && profile?.gym_id && plan.id && pendingIdx.length > 0) {
       void (async () => {
         try {
           const supabase = supabaseBrowser();
-          const names = day.exercicios.map((e) => e.exercicio);
+          const names = pendingIdx.map((i) => day.exercicios[i].exercicio);
           const orFilter = names.map((n) => `name.ilike.%${n.replace(/[%_,]/g, "")}%`).join(",");
           const { data: found } = await supabase
             .from("exercises")
@@ -695,12 +758,12 @@ export default function TreinoHomePage() {
             .or(orFilter)
             .limit(names.length * 2);
           const rows = (found ?? []) as { id: string; name: string }[];
-          const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "");
-          const map: Record<string, { workoutId: string; exerciseId: string; reps: string; rpe: number | null }> = {};
-          day.exercicios.forEach((e, i) => {
+          const more: typeof map = {};
+          pendingIdx.forEach((i) => {
+            const e = day.exercicios[i];
             const hit = rows.find((r) => norm(r.name).includes(norm(e.exercicio).split(" ").slice(0, 2).join(" ")) || norm(e.exercicio).includes(norm(r.name)));
             if (hit) {
-              map[`plan-${i}`] = {
+              more[`plan-${i}`] = {
                 workoutId: plan.id,
                 exerciseId: hit.id,
                 reps: e.reps,
@@ -708,9 +771,11 @@ export default function TreinoHomePage() {
               };
             }
           });
-          setPlanExerciseMap(map);
+          if (Object.keys(more).length > 0) {
+            setPlanExerciseMap((prev) => ({ ...prev, ...more }));
+          }
         } catch {
-          /* sem mapa: conclude pula os logs, treino segue */
+          /* sem complemento: conclude usa details + avisa se nada resolver */
         }
       })();
     }
@@ -747,7 +812,7 @@ export default function TreinoHomePage() {
                   onClick={() => {
                     setFeeling(opt.key);
                     try { localStorage.setItem("gf-preworkout-mood", JSON.stringify({ mood: opt.key, at: new Date().toISOString() })); } catch { /* ok */ }
-                    toast.success(`Anotado: ${opt.label}`, { description: "Só o clima de hoje — o feedback do treino vem no final." });
+                    toast.success(`Anotado: ${opt.label}`, { description: "Só o clima de hoje. O feedback do treino vem no final." });
                   }}
                   className={cn(
                     "tactile flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors",
@@ -774,7 +839,7 @@ export default function TreinoHomePage() {
             <div className="gf-card gf-glass !p-5 text-center">
               <p className="text-sm font-bold text-foreground">Hoje é descanso</p>
               <p className="mt-1 text-[11.5px] text-muted-foreground">
-                Seu plano pauta {daysSel.join(", ")} · o próximo treino é {orderedDays[(todayIdx + 1) % orderedDays.length] ?? "—"}.
+                Seu plano pauta {daysSel.join(", ")} · o próximo treino é {orderedDays[(todayIdx + 1) % orderedDays.length] ?? "a definir"}.
               </p>
               <button
                 onClick={() => document.getElementById("personal-workouts-title")?.scrollIntoView({ behavior: "smooth", block: "start" })}

@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { Bell, CloudOff } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
+import { useNotifications } from "~/hooks/useNotifications";
 import { OnlineCounter } from "~/components/layout/OnlineCounter";
 import { GymLogo } from "~/components/layout/GymLogo";
 import { cn } from "~/lib/utils";
 
 /**
  * TopBar: logo + título + contador online + sino + badge offline.
+ * O sino mostra a bolinha de não lidas (central de notificações).
  */
 export function TopBar({
   title,
@@ -18,7 +20,8 @@ export function TopBar({
   subtitle?: string;
   offlineCount?: number;
 }) {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
+  const { unread } = useNotifications(user?.id);
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-[#020D21]/90 backdrop-blur supports-[backdrop-filter]:bg-[#020D21]/70">
@@ -44,9 +47,14 @@ export function TopBar({
             className={cn(
               "relative flex h-9 w-9 gf-touch items-center justify-center rounded-full border border-border bg-card/60 text-muted-foreground transition-colors hover:text-foreground"
             )}
-            aria-label="Notificações"
+            aria-label={unread > 0 ? `Notificações (${unread} não lidas)` : "Notificações"}
           >
             <Bell className="h-4 w-4" />
+            {unread > 0 ? (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-black text-brand-foreground">
+                {unread > 9 ? "9+" : unread}
+              </span>
+            ) : null}
           </Link>
         </div>
       </div>

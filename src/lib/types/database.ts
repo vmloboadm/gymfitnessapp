@@ -139,6 +139,10 @@ export interface Database {
         Args: Record<string, never>;
         Returns: Array<{ id: string; name: string; avatar_url: string | null; role: string }>;
       };
+      gym_roster: {
+        Args: { p_gym_id: string };
+        Returns: Array<{ id: string; name: string; avatar_url: string | null; role: string }>;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

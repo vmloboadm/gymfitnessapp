@@ -63,7 +63,7 @@ export function PhotoGate({ children }: { children: React.ReactNode }) {
         throw new Error(data?.error ?? `Falha no upload da foto (HTTP ${res.status}). Tente de novo.`);
       }
       await refreshProfile();
-      toast.success("Foto salva!", { description: "App liberado — bom treino." });
+      toast.success("Foto salva!", { description: "App liberado. Bom treino." });
     } catch (e) {
       toast.error("Não foi possível enviar a foto", { description: String(e).slice(0, 80) });
     } finally {
@@ -93,7 +93,7 @@ export function PhotoGate({ children }: { children: React.ReactNode }) {
         <h1 className="text-lg font-black text-foreground">Falta a sua foto</h1>
         <p className="max-w-[300px] text-[13px] leading-relaxed text-muted-foreground">
           Seu personal e a academia precisam te reconhecer pelo rosto. Envie uma
-          foto de rosto para liberar o app — leva 10 segundos.
+          foto de rosto para liberar o app. Leva 10 segundos.
         </p>
       </div>
 

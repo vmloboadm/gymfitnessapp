@@ -51,6 +51,7 @@ export default function RankingPage() {
   const { data, loading, error, refetch } = useAsyncQuery<{
     rows: (Leaderboard & { student: Profiles | null })[];
     mine: Leaderboard | null;
+    streakById: Record<string, number>;
   }>(
     async () => {
       if (demo) {
@@ -71,13 +72,14 @@ export default function RankingPage() {
               student: profiles.find((p) => p.id === r.student_id) ?? (r.student_id === ME ? { id: ME, name: "Atleta Demo" } as any : null),
             })),
             mine: ranks.find((r) => r.student_id === ME) ?? null,
+            streakById: { [ME]: 8 } as Record<string, number>,
           },
           error: null,
         };
       }
       const supabase = supabaseBrowser();
       if (!user || !profile) return { data: null, error: { message: "Sessão indisponível" } };
-      const weekStart = startOfWeek().toISOString();
+      const weekStart = startOfWeek().toISOString().slice(0, 10);
       const { data: rows, error } = await supabase
         .from("leaderboard")
         .select("*")
@@ -89,16 +91,31 @@ export default function RankingPage() {
       if (error) return { data: null, error };
       const list = (rows ?? []) as Leaderboard[];
       const ids = [...new Set(list.map((r) => r.student_id))];
+      // ficha pública mínima (nome + foto) via função do banco; RLS de
+      // profiles é fechada entre alunos, então a leitura direta esconderia
+      // todo mundo como "Aluno". Fallback para leitura direta se o rpc falhar.
       let students: Profiles[] = [];
       if (ids.length) {
-        const sRes = await supabase.from("profiles").select("id, name, avatar_url").in("id", ids);
-        if (!sRes.error) students = (sRes.data ?? []) as Profiles[];
+        const rpcRes = await supabase.rpc("gym_roster", { p_gym_id: profile.gym_id });
+        if (!rpcRes.error && Array.isArray(rpcRes.data)) {
+          students = ((rpcRes.data as Profiles[]).filter((s) => ids.includes(s.id)) ?? []) as Profiles[];
+        } else {
+          const sRes = await supabase.from("profiles").select("id, name, avatar_url").in("id", ids);
+          if (!sRes.error) students = (sRes.data ?? []) as Profiles[];
+        }
       }
+      // chamas da semana: sequência de cada ranqueado vem da própria linha
+      // do leaderboard (alunos não leem logs uns dos outros por RLS).
+      // Só aparece a chama de quem tem 2+ dias seguidos, de forma sutil.
+      const streakById: Record<string, number> = Object.fromEntries(
+        list.map((r) => [r.student_id, r.streak ?? 0])
+      );
       const mine = list.find((r) => r.student_id === user.id) ?? null;
       return {
         data: {
           rows: list.map((r) => ({ ...r, student: students.find((s) => s.id === r.student_id) ?? null })),
           mine,
+          streakById,
         },
         error: null,
       };
@@ -204,9 +221,11 @@ export default function RankingPage() {
                 const MedalIcon = pos === 0 ? Crown : Medal;
                 const medalColor = pos === 0 ? "#FBBF24" : pos === 1 ? "#E5E7EB" : "#D97706";
                 const medalTone = pos === 0 ? "text-[#FBBF24]" : pos === 1 ? "text-[#E5E7EB]" : "text-[#D97706]";
+                const streak = data.streakById[row.student_id] ?? 0;
                 return (
-                  <div
+                  <Link
                     key={row.id}
+                    href={`/perfil/${row.student_id}`}
                     className="group flex flex-col items-center gap-1.5"
                     role="listitem"
                     aria-label={`${pos + 1}º lugar: ${row.student?.name ?? "Aluno"}`}
@@ -233,6 +252,11 @@ export default function RankingPage() {
                       {row.student?.name?.split(" ")[0] ?? "Aluno"}
                       {row.student_id === (user?.id ?? ME) ? " (você)" : ""}
                     </p>
+                    {streak >= 2 ? (
+                      <span className="flex items-center gap-0.5 text-[10px] font-semibold text-[#FF9A5C]/80" title={`${streak} dias seguidos`}>
+                        <Flame className="h-3 w-3" aria-hidden /> {streak}
+                      </span>
+                    ) : null}
                     <div
                       className={cn(
                         "flex w-full items-start justify-center rounded-t-xl border-t border-x pt-2",
@@ -243,7 +267,7 @@ export default function RankingPage() {
                     >
                       <span className="gf-hero-num text-base">{formatNumber(row.points)}</span>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -298,9 +322,11 @@ export default function RankingPage() {
               {data?.rows.slice(3).map((row, i) => {
                 const league = leagueFor(row.points);
                 const glyphC = LEAGUE_GLYPHS[league.id]?.color ?? "#B8C4D8";
+                const streak = data?.streakById[row.student_id] ?? 0;
                 return (
-                  <div
+                  <Link
                     key={row.id}
+                    href={`/perfil/${row.student_id}`}
                     className={cn(
                       "gf-rise relative flex items-center gap-3 overflow-hidden rounded-xl border border-border bg-card/40 p-3",
                       row.student_id === (user?.id ?? ME) ? "border-brand/50 bg-brand/5" : "border-border"
@@ -320,8 +346,13 @@ export default function RankingPage() {
                       {row.student?.name ?? "Aluno"}
                       {row.student_id === (user?.id ?? ME) ? <span className="ml-1 text-xs text-brand">(você)</span> : null}
                     </p>
+                    {streak >= 2 ? (
+                      <span className="flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-[#FF9A5C]/80" title={`${streak} dias seguidos`}>
+                        <Flame className="h-3 w-3" aria-hidden /> {streak}
+                      </span>
+                    ) : null}
                     <span className="gf-hero-num shrink-0 text-sm text-foreground">{formatNumber(row.points)}<span className="text-[10px] text-muted-foreground"> pts</span></span>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
