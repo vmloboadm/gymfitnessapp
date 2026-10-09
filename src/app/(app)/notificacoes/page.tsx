@@ -5,7 +5,7 @@ import { Bell, CheckCheck, Inbox, Flame, Trophy, Award, Megaphone, Target } from
 import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
 import { TopBar } from "~/components/layout/TopBar";
-import { SkeletonList, EmptyState } from "~/components/common/AsyncStates";
+import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { formatRelative } from "~/lib/utils/format";
@@ -99,6 +99,7 @@ export default function NotificacoesPage() {
     [demo, hook.items]
   );
   const loading = demo ? false : hook.loading;
+  const loadError = demo ? null : hook.error;
   const unread = demo ? items.filter((n) => !(n.read_at || demoReads[n.id])).length : hook.unread;
 
   const markAllRead = () => {
@@ -124,6 +125,8 @@ export default function NotificacoesPage() {
 
         {loading ? (
           <SkeletonList rows={4} />
+        ) : loadError ? (
+          <ErrorState message={loadError} onRetry={() => hook.refetch()} />
         ) : items.length === 0 ? (
           <EmptyState
             title="Nenhuma notificação"

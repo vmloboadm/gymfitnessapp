@@ -8,7 +8,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
-import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
+import { SkeletonList, ErrorState } from "~/components/common/AsyncStates";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { startOfWeek } from "~/lib/utils/calculations";
 import { formatNumber, displayName } from "~/lib/utils/format";
@@ -103,8 +103,6 @@ export default function PerfilAtletaPage() {
           <SkeletonList rows={4} />
         ) : error || !data || !data.mate ? (
           <ErrorState message={error ?? "Atleta não encontrado"} onRetry={refetch} />
-        ) : data.players === 0 ? (
-          <EmptyState title="Semana ainda sem treinos" description="O ranking desta semana ainda não tem ninguém. Volte depois do primeiro treino." />
         ) : (
           <>
             <div className="gf-rise flex flex-col items-center gap-3 pt-2 text-center">

@@ -14,6 +14,7 @@ import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { useWorkoutLogsRealtime, useGymMotivationRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { assetPath } from "~/lib/asset-path";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { fetchMyAssignedPlans } from "~/lib/gym-api";
 import { SkeletonList } from "~/components/common/AsyncStates";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
@@ -28,6 +29,7 @@ import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { StreakFlame, FlameStageHint } from "~/components/dashboard/StreakFlame";
 import { PerformanceRing } from "~/components/dashboard/PerformanceRing";
 import { HeroWorkout } from "~/components/dashboard/HeroWorkout";
+import { PWAInstallBanner } from "~/components/pwa/PWAInstallBanner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { titleFor } from "~/components/dashboard/TitlePoints";
@@ -269,6 +271,67 @@ export default function HomePage() {
 
   // Realtime: refetch workout_logs when any student in the gym logs a workout
   useWorkoutLogsRealtime(profile?.gym_id, user?.id, refetchLogs);
+
+  // Hero dinâmico: próximo slot da rotação do plano real (letra, foco,
+  // quantidade) + imagem de fundo conforme o treino. Sem plano, cai no
+  // comportamento anterior (sugestão por histórico).
+  const { data: heroPlan } = useAsyncQuery<{
+    name: string;
+    slot: string;
+    foco: string;
+    count: number;
+    image: string;
+  } | null>(
+    async () => {
+      if (demo || !user || !profile?.gym_id) return { data: null, error: null };
+      const plans = await fetchMyAssignedPlans(user.id, profile.gym_id).catch(() => []);
+      const p = plans[0];
+      const dias = p?.plan?.dias ?? [];
+      if (!p || dias.length === 0) return { data: null, error: null };
+      const { data: checks } = await supabaseBrowser()
+        .from("slot_checks")
+        .select("slot")
+        .eq("student_id", user.id)
+        .eq("program_id", p.id)
+        .order("checked_at", { ascending: false })
+        .limit(1);
+      const lastSlot = ((checks?.[0] ?? null) as { slot?: string } | null)?.slot ?? null;
+      let idx = 0;
+      if (lastSlot) {
+        const li = dias.findIndex((d, i) => ((d as { slot?: string }).slot ?? "ABCDEF"[i]) === lastSlot);
+        idx = li >= 0 ? (li + 1) % dias.length : 0;
+      }
+      const day = dias[idx] as { nome: string; foco: string; slot?: string; exercicios: unknown[] };
+      const slot = day.slot ?? "ABCDEF"[idx] ?? "";
+      const foco = day.foco ?? "";
+      const n = foco.toLowerCase();
+      const key = /perna|quadr|glute|posterior|panturrilha/.test(n)
+        ? "perna"
+        : /peito/.test(n)
+          ? "peito"
+          : /costas|dorsal/.test(n)
+            ? "costas"
+            : /ombro|delt|trap/.test(n)
+              ? "ombro"
+              : /bra[cç]o|biceps|triceps|antebra/.test(n)
+                ? "braco"
+                : /abd|core/.test(n)
+                  ? "abdomen"
+                  : "";
+      return {
+        data: {
+          name: day.nome,
+          slot,
+          foco,
+          count: day.exercicios.length,
+          image: (key && FOCUS_IMAGE[key]) || assetPath("/workout/workout-hero.jpg"),
+        },
+        error: null,
+      };
+    },
+    [user?.id, profile?.gym_id, demo],
+    { enabled: !loading && !!user }
+  );
 
   // Frase motivacional editada pelo staff, atualiza ao vivo para todos
   const { data: motivation, refetch: refetchMotivation } = useAsyncQuery<{ phrase: string | null }>(
@@ -541,6 +604,11 @@ export default function HomePage() {
           </div>
         </m.div>
 
+        {/* Convite de instalação do PWA (só quando dá para instalar) */}
+        <m.div variants={item} className="px-4 pt-1">
+          <PWAInstallBanner />
+        </m.div>
+
         {/* COCKPIT, Anel da meta + Streak + Liga */}
         <m.section
           variants={item}
@@ -653,12 +721,20 @@ export default function HomePage() {
         {/* TREINO DE HOJE, ação principal; recebe o scroll quando check-in feito */}
         <m.div variants={item} ref={heroRef} className="pt-2">
           <HeroWorkout
-            image={FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
-            title={todayLabel}
-            exerciseCount={exCount}
+            image={heroPlan?.image ?? FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
+            title={heroPlan ? `Treino ${heroPlan.slot} · ${heroPlan.foco}` : todayLabel}
+            exerciseCount={heroPlan?.count ?? exCount}
             estMin={45}
             sessionsWeek={sessionsWeek}
-            sessionLabel={focusResume ? "Retomando onde parou" : "Treino de hoje"}
+            sessionLabel={
+              isCheckedInToday
+                ? "Continuar treino"
+                : heroPlan
+                  ? heroPlan.name
+                  : focusResume
+                    ? "Retomando onde parou"
+                    : "Treino de hoje"
+            }
             notice={fatigueNotice ?? undefined}
             ready
           />

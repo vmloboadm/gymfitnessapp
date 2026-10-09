@@ -53,7 +53,7 @@ import { libraryMatch } from "~/lib/demo-data";
 import { toast } from "sonner";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
-import { useWorkoutSession, elapsedSeconds, readSessionProgress, startWorkoutSession as startLocalDaySession, isDayUnlocked, markDayUnlocked } from "~/lib/workout-session";
+import { useWorkoutSession, elapsedSeconds, readSessionProgress, clearSessionProgress, startWorkoutSession as startLocalDaySession, isDayUnlocked, markDayUnlocked, TRAINING_GATE_OPEN } from "~/lib/workout-session";
 import { checkDayPassword } from "~/lib/day-pass";
 import { SessionClock } from "~/components/common/SessionClock";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
@@ -381,10 +381,22 @@ export default function TreinoHomePage() {
     }
     setConcludedCount(ids.length);
     endDaySession();
+    clearSessionProgress();
+    try {
+      localStorage.removeItem("gymfit_session_slot_v1");
+    } catch { /* ok */ }
     if (!demo && user?.id) {
       const active = await getActiveWorkoutSession(user.id).catch(() => null);
       setFinishedSessionId(active?.id ?? null);
       void completeWorkoutSession(user.id);
+      // feedback do treino que acabou de terminar (abre na hora, não só no próximo acesso)
+      try {
+        const last = await getLastSessionNeedingFeedback(user.id).catch(() => null);
+        if (last) {
+          setPendingFeedback(last);
+          setFeedbackOpen(true);
+        }
+      } catch { /* feedback é bônus */ }
     }
     if (ids.length) {
       setDoneIds((prev) => new Set([...prev, ...ids]));
@@ -487,6 +499,62 @@ export default function TreinoHomePage() {
     toast.success("Treino registrado!");
   };
 
+  // Volta ao treino em andamento (mesma sessão, progresso restaurado pela
+  // lista salva; o componente de execução recarrega as séries marcadas).
+  const resumeSession = () => {
+    try {
+      const saved = readSessionProgress();
+      const list = (saved?.exercises ?? []) as Array<{ id?: string }>;
+      if (list.length > 0) {
+        setSession(list as typeof DEFAULT_DEMO_EX);
+        try {
+          const slotRaw = localStorage.getItem("gymfit_session_slot_v1");
+          const parsed = slotRaw ? (JSON.parse(slotRaw) as { slot?: string }) : null;
+          if (parsed?.slot && parsed.slot !== "TMP") setActiveSlot(parsed.slot);
+        } catch { /* sem slot: grava exercícios, sem check */ }
+        setPlanTodayActive(true);
+        setPhase("active");
+        return;
+      }
+    } catch { /* cai no início sugerido */ }
+    if (plan && dias.length > 0) {
+      void startPlanSession(suggestedIdx);
+    }
+  };
+
+  // Finaliza de qualquer lugar (barra fixa, nudge dos 45min)
+  const finishNow = () => {
+    navigator.vibrate?.([60, 40, 60]);
+    setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
+    void conclude([...completedRef.current]);
+    endDaySession();
+    toast.success("Sessão finalizada. Registre como foi!");
+    setPhase("done");
+  };
+
+  // Nudge aos 45min de sessão: pergunta se está tudo bem e oferece finalizar
+  const nudgedRef = useRef(false);
+  useEffect(() => {
+    if (!daySession || nudgedRef.current || demo) return;
+    const fireNudge = () => {
+      if (nudgedRef.current) return;
+      nudgedRef.current = true;
+      toast("45 min de treino. Tudo bem por aí?", {
+        description: "Se terminou, finalize e conte como foi.",
+        duration: 15000,
+        action: { label: "Finalizar treino", onClick: () => finishNow() },
+      });
+    };
+    const wait = 45 * 60000 - (Date.now() - daySession.startedAt);
+    if (wait <= 0) {
+      fireNudge();
+      return;
+    }
+    const t = setTimeout(fireNudge, wait);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [daySession]);
+
   // Conclusões desta sessão (otimista, local): alimenta contador e reordenação
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const doneCount = doneIds.size;
@@ -554,8 +622,9 @@ export default function TreinoHomePage() {
     );
   }
 
-  // Sem check-in do dia o conteúdo fica BORRADO + bloqueado (QR, NFC ou senha)
-  const unlockedToday = demo || !!daySession || dayUnlockedLocal || finishedToday;
+  // Sem check-in do dia o conteúdo fica BORRADO + bloqueado (QR, NFC ou senha).
+  // TEMPORÁRIO: TRAINING_GATE_OPEN libera tudo para os testes do dono.
+  const unlockedToday = demo || TRAINING_GATE_OPEN || !!daySession || dayUnlockedLocal || finishedToday;
   const needsCheckin = !unlockedToday;
   const checkinBanner = needsCheckin ? (
     <div className="mx-auto max-w-md px-4 pt-3">
@@ -564,7 +633,7 @@ export default function TreinoHomePage() {
         className="tactile flex w-full items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning/[0.08] px-4 py-2.5 text-left"
       >
         <span className="flex items-center gap-2 text-[12px] font-bold text-warning">
-          <Lock className="h-4 w-4" /> Treino bloqueado. Toque para liberar
+          <Lock className="h-4 w-4" /> Faça check-in na academia para ver o treino de hoje
         </span>
         <ScanLine className="h-4 w-4 shrink-0 text-warning" />
       </button>
@@ -806,13 +875,17 @@ export default function TreinoHomePage() {
       })();
     }
     setSession(exList);
-    setPlanTodayActive(false);
+    setPlanTodayActive(true);
+    setActiveSlot(null);
+    try {
+      localStorage.removeItem("gymfit_session_slot_v1");
+    } catch { /* provisório não marca slot */ }
     startDaySession();
     if (!demo && user?.id && profile?.gym_id) {
       void startWorkoutSession(profile.gym_id, user.id, null);
     }
     setPhase("active");
-  }
+  };
 
   const startPlanSession = async (dayIdx?: number) => {
     if (!plan?.plan?.dias || plan.plan.dias.length === 0) return;
@@ -834,6 +907,9 @@ export default function TreinoHomePage() {
     }
     const day = plan.plan.dias[idx % plan.plan.dias.length];
     setActiveSlot(diaSlot(day, idx % plan.plan.dias.length));
+    try {
+      localStorage.setItem("gymfit_session_slot_v1", JSON.stringify({ slot: diaSlot(day, idx % plan.plan.dias.length), at: Date.now() }));
+    } catch { /* ok */ }
     // Fotos/vídeos da BIBLIOTECA (mesma fonte do catálogo) por nome; curado como fallback
     const exList = day.exercicios.map((e, i) => {
       const lib = libraryMatch(e.exercicio);
@@ -960,6 +1036,31 @@ export default function TreinoHomePage() {
 
         {/* 1.5 TREINOS ENVIADOS PELO PERSONAL */}
         <PersonalWorkouts />
+
+        {/* CONTINUAR: treino em andamento (saiu da tela no meio) */}
+        {phase === "idle" && (!!daySession || hasSavedProgress) ? (
+          <div className="rounded-2xl border border-success/40 bg-success/[0.07] p-4">
+            <p className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-success">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+              </span>
+              Treino em andamento
+            </p>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              {daySession
+                ? "Sua sessão continua rolando. Volte para a tela do treino em tempo real."
+                : "Achamos seu progresso salvo. Volte de onde parou."}
+            </p>
+            <button
+              type="button"
+              onClick={resumeSession}
+              className="tactile mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-success py-3 text-[13px] font-black text-black"
+            >
+              <Play className="h-4 w-4 fill-current" /> Continuar treino
+            </button>
+          </div>
+        ) : null}
 
         {/* 2. MEU TREINO — rotação por slots (A, B, C...), sem dia fixo.
             Faltou quarta? Faz na quinta: o sugerido é o próximo da rotação,
@@ -1290,7 +1391,7 @@ export default function TreinoHomePage() {
             if (!demo && user?.id && profile?.gym_id) {
               void supabaseBrowser()
                 .from("checkins")
-                .insert({ gym_id: profile.gym_id, student_id: user.id, type: "entrada", source: "senha" } as never)
+                .insert({ gym_id: profile.gym_id, student_id: user.id, type: "entrada", source: "app" } as never)
                 .then(() => {}, () => {});
             }
             toast.success("Treino liberado! Toque em Iniciar.");

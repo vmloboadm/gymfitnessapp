@@ -23,10 +23,13 @@ export function useNotifications(userId?: string) {
   const [items, setItems] = useState<Notifications[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
+    setLoading(true);
+    setError(null);
 
     supabaseBrowser()
       .from("notifications")
@@ -35,7 +38,12 @@ export function useNotifications(userId?: string) {
       .order("created_at", { ascending: false })
       .limit(30)
       .then(({ data, error }) => {
-        if (cancelled || error) return;
+        if (cancelled) return;
+        if (error) {
+          setError(error.message);
+          setLoading(false);
+          return;
+        }
         setItems(data as Notifications[]);
         setUnread(data?.filter((n) => !n.read_at).length ?? 0);
         setLoading(false);
@@ -69,13 +77,34 @@ export function useNotifications(userId?: string) {
 
   const markAllRead = async () => {
     if (!userId) return;
+    const now = new Date().toISOString();
+    setItems((prev) => prev.map((n) => (n.read_at ? n : { ...n, read_at: now })));
+    setUnread(0);
     await supabaseBrowser()
       .from("notifications")
-      .update({ read_at: new Date().toISOString() })
+      .update({ read_at: now })
       .eq("user_id", userId)
       .is("read_at", null);
-    setUnread(0);
   };
 
-  return { items, unread, loading, markAllRead };
+  const refetch = async () => {
+    if (!userId) return;
+    setLoading(true);
+    setError(null);
+    const { data, error } = await supabaseBrowser()
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) {
+      setError(error.message);
+    } else {
+      setItems((data ?? []) as Notifications[]);
+      setUnread((data ?? []).filter((n) => !n.read_at).length ?? 0);
+    }
+    setLoading(false);
+  };
+
+  return { items, unread, loading, error, markAllRead, refetch };
 }
