@@ -43,6 +43,7 @@ import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { ProvisionalTemplates } from "~/components/training/ProvisionalTemplates";
+import { CardioQuickAdd } from "~/components/training/CardioQuickAdd";
 import { fetchMyAssignedPlans } from "~/lib/gym-api";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
@@ -1214,6 +1215,9 @@ export default function TreinoHomePage() {
             ))}
           </div>
         </div>
+
+        {/* CARDIO: registro rápido de tempo + intensidade (trilha própria) */}
+        <CardioQuickAdd />
 
         {/* 5. HISTÓRICO RECENTE, accordion fechado por padrão */}
         <HistoryList logs={data.logs} />

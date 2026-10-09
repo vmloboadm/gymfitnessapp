@@ -151,6 +151,10 @@ export interface Database {
         Args: { p_gym_id: string };
         Returns: Array<{ student_id: string; sessions: number; load_kg: number; points: number }>;
       };
+      cardio_weekly: {
+        Args: { p_gym_id: string };
+        Returns: Array<{ student_id: string; minutes: number }>;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

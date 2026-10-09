@@ -70,6 +70,7 @@ export default function RankingPage() {
     rows: RankRow[];
     mine: RankRow | null;
     streakById: Record<string, number>;
+    cardioTop: Array<{ student_id: string; minutes: number }>;
   }>(
     async () => {
       if (demo) {
@@ -95,6 +96,7 @@ export default function RankingPage() {
             rows,
             mine: rows.find((r) => r.student_id === ME) ?? null,
             streakById: Object.fromEntries(rows.map((r) => [r.student_id, r.streak])),
+            cardioTop: [],
           },
           error: null,
         };
@@ -177,8 +179,14 @@ export default function RankingPage() {
             b.points - a.points || (a.student?.name ?? "").localeCompare(b.student?.name ?? "")
         );
       const mine = rows.find((r) => r.student_id === user.id) ?? null;
+      // destaque do cardio na semana (top 3 em minutos)
+      let cardioTop: Array<{ student_id: string; minutes: number }> = [];
+      const cq = await supabase.rpc("cardio_weekly", { p_gym_id: profile.gym_id });
+      if (!cq.error && Array.isArray(cq.data)) {
+        cardioTop = ((cq.data ?? []) as Array<{ student_id: string; minutes: number }>).slice(0, 3);
+      }
       return {
-        data: { rows, mine, streakById },
+        data: { rows, mine, streakById, cardioTop },
         error: null,
       };
     },
@@ -362,6 +370,38 @@ export default function RankingPage() {
                       <span className="gf-hero-num text-base">{formatNumber(row.points)}</span>
                     </div>
                   </Link>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Cardio da semana: top 3 em minutos, incentivo visível */}
+        {!loading && !error && data && data.cardioTop.length > 0 ? (
+          <div className="gf-rise rounded-[20px] border border-border bg-card/40 p-4" style={{ animationDelay: "150ms" }}>
+            <p className="gf-section mb-3">Cardio da semana</p>
+            <div className="space-y-2">
+              {data.cardioTop.map((c, i) => {
+                const mate = data.rows.find((r) => r.student_id === c.student_id)?.student;
+                return (
+                  <div key={c.student_id} className="flex items-center gap-2.5">
+                    <span className="w-5 shrink-0 text-center font-display text-sm font-black text-muted-foreground">
+                      {i + 1}
+                    </span>
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={mate?.avatar_url ?? undefined} alt={mate?.name ?? "Atleta"} />
+                      <AvatarFallback className="bg-secondary text-[10px] text-secondary-foreground">
+                        {(mate?.name?.[0] ?? "?").toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <p className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-foreground">
+                      {displayName(mate?.name)}
+                      {c.student_id === (user?.id ?? ME) ? <span className="ml-1 text-[10px] text-brand">(você)</span> : null}
+                    </p>
+                    <span className="shrink-0 text-[12px] font-black tabular-nums text-foreground">
+                      {c.minutes}<span className="ml-0.5 text-[10px] font-semibold text-muted-foreground">min</span>
+                    </span>
+                  </div>
                 );
               })}
             </div>
