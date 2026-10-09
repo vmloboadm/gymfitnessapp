@@ -288,6 +288,25 @@ export default function TreinoHomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demo, user?.id, profile?.gym_id]);
 
+  // Checks dos slots do plano ativo (hook no topo: nunca após early return)
+  const activeProgramId = planActive[0]?.id ?? null;
+  const { data: slotChecks } = useAsyncQuery<Array<{ slot: string; checked_at: string }>>(
+    async () => {
+      if (demo || !user || !profile?.gym_id || !activeProgramId) return { data: [], error: null };
+      const { data: rows, error } = await supabaseBrowser()
+        .from("slot_checks")
+        .select("slot, checked_at")
+        .eq("student_id", user.id)
+        .eq("program_id", activeProgramId)
+        .order("checked_at", { ascending: false })
+        .limit(60);
+      if (error) return { data: null, error };
+      return { data: (rows ?? []) as Array<{ slot: string; checked_at: string }>, error: null };
+    },
+    [demo, user?.id, profile?.gym_id, activeProgramId],
+    { enabled: !loading && !!user }
+  );
+
   const programRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (loading) return;
@@ -693,22 +712,6 @@ export default function TreinoHomePage() {
   const splitType = plan?.plan?.splitType ?? "ABCDEF".slice(0, Math.min(Math.max(dias.length, 2), 6));
   const diaSlot = (d: { slot?: string }, i: number) => d.slot ?? "ABCDEF"[i] ?? String(i + 1);
 
-  const { data: slotChecks } = useAsyncQuery<Array<{ slot: string; checked_at: string }>>(
-    async () => {
-      if (demo || !user || !profile?.gym_id || !plan?.id) return { data: [], error: null };
-      const { data: rows, error } = await supabaseBrowser()
-        .from("slot_checks")
-        .select("slot, checked_at")
-        .eq("student_id", user.id)
-        .eq("program_id", plan.id)
-        .order("checked_at", { ascending: false })
-        .limit(60);
-      if (error) return { data: null, error };
-      return { data: (rows ?? []) as Array<{ slot: string; checked_at: string }>, error: null };
-    },
-    [demo, user?.id, profile?.gym_id, plan?.id],
-    { enabled: !loading && !!user }
-  );
   const lastBySlot: Record<string, string> = {};
   (slotChecks ?? []).forEach((c) => {
     if (!lastBySlot[c.slot]) lastBySlot[c.slot] = c.checked_at;

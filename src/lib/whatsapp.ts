@@ -21,7 +21,7 @@ export function waLink(phone: string, text: string): string {
  */
 export function normalizeBRPhone(raw?: string | null): string | null {
   if (!raw) return null;
-  let d = raw.replace(/\D/g, "").replace(/^0+/, "");
+  const d = raw.replace(/\D/g, "").replace(/^0+/, "");
   if (d.startsWith("55") && (d.length === 12 || d.length === 13)) return d;
   if ((d.length === 10 || d.length === 11) && !d.startsWith("55")) return `55${d}`;
   return null;

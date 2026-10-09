@@ -42,8 +42,6 @@ export function ChatList({ basePath, title }: { basePath: string; title: string 
       if (convErr) return { data: null, error: convErr };
       const list = (convs ?? []) as Array<{ id: string; student_id: string; staff_id: string; updated_at: string }>;
       if (list.length === 0) return { data: [], error: null };
-
-      const otherIds = [...new Set(list.map((c) => (c.student_id === user.id ? c.staff_id : c.student_id)))];
       const rpc = await supabase.rpc("gym_roster", { p_gym_id: profile.gym_id });
       const roster = (!rpc.error && Array.isArray(rpc.data) ? rpc.data : []) as Array<{
         id: string;

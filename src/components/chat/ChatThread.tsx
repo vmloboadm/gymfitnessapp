@@ -114,6 +114,7 @@ export function ChatThread({
       )
       .subscribe();
     return () => {
+      cancelled = true;
       supabase.removeChannel(channel);
     };
   }, [authLoading, user, profile, conversationId]);
