@@ -29,7 +29,9 @@ import {
   completeStaleSessions,
   getLastSessionNeedingFeedback,
   getActiveWorkoutSession,
+  type ActiveSession,
   type StudentSession,
+  type SessionMeta,
 } from "~/lib/supabase/workout-session";
 import WorkoutFeedbackSheet from "~/components/student/WorkoutFeedbackSheet";
 import { TopBar } from "~/components/layout/TopBar";
@@ -280,6 +282,12 @@ export default function TreinoHomePage() {
   const [planExerciseMap, setPlanExerciseMap] = useState<Record<string, { workoutId: string; exerciseId: string; reps: string; rpe: number | null }>>({});
   const [planTodayActive, setPlanTodayActive] = useState(false);
   const [activeSlot, setActiveSlot] = useState<string | null>(null);
+  // Sessão DB ativa que barrou um início: em vez de toast sem saída, abre
+  // retomada (continuar de onde parou ou encerrar e começar o novo).
+  const [blockedSession, setBlockedSession] = useState<ActiveSession | null>(null);
+  const pendingStartRef = useRef<
+    { kind: "plan"; dayIdx: number } | { kind: "template"; tpl: TemplateInput } | null
+  >(null);
   useEffect(() => {
     if (demo || !user || !profile?.gym_id) return;
     fetchMyAssignedPlans(user.id, profile.gym_id)
@@ -520,6 +528,31 @@ export default function TreinoHomePage() {
     if (plan && dias.length > 0) {
       void startPlanSession(suggestedIdx);
     }
+  };
+
+  // Retomada de sessão DB ativa: continua de onde parou (meta gravada no
+  // início) ou encerra a anterior e começa a nova. Nunca beco sem saída.
+  const continueBlocked = async () => {
+    const meta = (blockedSession?.meta ?? {}) as SessionMeta;
+    setBlockedSession(null);
+    const tplDay = (meta as { templateDay?: TemplateInput["days"][number] }).templateDay;
+    if (meta.kind === "template" && tplDay) {
+      await startTemplateSession({ name: "Provisório", days: [tplDay] }, { force: true });
+    } else if (meta.kind === "plan" && typeof meta.dayIdx === "number" && plan && dias.length > 0) {
+      await startPlanSession(meta.dayIdx, { force: true });
+    } else if (plan && dias.length > 0) {
+      await startPlanSession(suggestedIdx, { force: true });
+    }
+  };
+
+  const discardAndStart = async () => {
+    if (user?.id) await completeWorkoutSession(user.id).catch(() => {});
+    const pending = pendingStartRef.current;
+    pendingStartRef.current = null;
+    setBlockedSession(null);
+    if (!pending) return;
+    if (pending.kind === "template") await startTemplateSession(pending.tpl, { force: true });
+    else await startPlanSession(pending.dayIdx, { force: true });
   };
 
   // Finaliza de qualquer lugar (barra fixa, nudge dos 45min)
@@ -799,13 +832,14 @@ export default function TreinoHomePage() {
   // TREINO PROVISÓRIO: modelo de referência para quem ainda não tem plano.
   // Nunca atribui na ficha (sem student_workouts): só executa e registra
   // no histórico como provisório. Nomes exatos da biblioteca, resolução total.
-  async function startTemplateSession(tpl: {
+  type TemplateInput = {
     name: string;
     days: Array<{
       nome: string;
       exercicios: Array<{ exercicio: string; series: number; reps: string; descanso: string; rpe?: number | null; dica?: string | null }>;
     }>;
-  }) {
+  };
+  async function startTemplateSession(tpl: TemplateInput, opts?: { force?: boolean }) {
     const day = tpl.days?.[0];
     if (!day || day.exercicios.length === 0) return;
     // Gate: sem check-in do dia o treino fica borrado (igual ao plano)
@@ -813,13 +847,12 @@ export default function TreinoHomePage() {
       setUnlockOpen(true);
       return;
     }
-    // Trava: só um treino por vez
-    if (!demo && user?.id) {
+    // Trava: só um treino por vez (com retomada, nunca beco sem saída)
+    if (!demo && !opts?.force && user?.id) {
       const active = await getActiveWorkoutSession(user.id);
       if (active) {
-        toast.info("Você já tem um treino em andamento", {
-          description: "Finalize o treino atual antes de começar outro.",
-        });
+        pendingStartRef.current = { kind: "template", tpl };
+        setBlockedSession(active);
         return;
       }
     }
@@ -882,12 +915,12 @@ export default function TreinoHomePage() {
     } catch { /* provisório não marca slot */ }
     startDaySession();
     if (!demo && user?.id && profile?.gym_id) {
-      void startWorkoutSession(profile.gym_id, user.id, null);
+      void startWorkoutSession(profile.gym_id, user.id, null, { kind: "template", templateDay: day });
     }
     setPhase("active");
   };
 
-  const startPlanSession = async (dayIdx?: number) => {
+  const startPlanSession = async (dayIdx?: number, opts?: { force?: boolean }) => {
     if (!plan?.plan?.dias || plan.plan.dias.length === 0) return;
     const idx = dayIdx ?? suggestedIdx;
     // Gate: sem check-in do dia (QR/NFC/senha) o treino fica borrado
@@ -895,13 +928,12 @@ export default function TreinoHomePage() {
       setUnlockOpen(true);
       return;
     }
-    // Trava: só um treino por vez — finalize o anterior antes de começar outro
-    if (!demo && user?.id) {
+    // Trava: só um treino por vez (com retomada, nunca beco sem saída)
+    if (!demo && !opts?.force && user?.id) {
       const active = await getActiveWorkoutSession(user.id);
       if (active) {
-        toast.info("Você já tem um treino em andamento", {
-          description: "Finalize o treino atual antes de começar outro.",
-        });
+        pendingStartRef.current = { kind: "plan", dayIdx: idx };
+        setBlockedSession(active);
         return;
       }
     }
@@ -987,7 +1019,12 @@ export default function TreinoHomePage() {
     setPlanTodayActive(true);
     startDaySession();
     if (!demo && user?.id && profile?.gym_id) {
-      void startWorkoutSession(profile.gym_id, user.id, plan?.id ?? null);
+      void startWorkoutSession(profile.gym_id, user.id, plan?.id ?? null, {
+        kind: "plan",
+        slot: diaSlot(day, idx % plan.plan.dias.length),
+        dayIdx: idx,
+        programId: plan?.id ?? null,
+      });
     }
     setPhase("active");
   };
@@ -1397,6 +1434,44 @@ export default function TreinoHomePage() {
             toast.success("Treino liberado! Toque em Iniciar.");
           }}
         />
+      ) : null}
+      {/* Retomada: treino em andamento (continuar ou encerrar e começar outro) */}
+      {blockedSession ? (
+        <BottomSheet
+          open
+          onClose={() => {
+            setBlockedSession(null);
+            pendingStartRef.current = null;
+          }}
+        >
+          <div className="space-y-3">
+            <div>
+              <p className="text-base font-bold text-foreground">Treino em andamento</p>
+              <p className="text-[11px] text-muted-foreground">
+                Começou há{" "}
+                {Math.max(
+                  1,
+                  Math.round((Date.now() - new Date(blockedSession.started_at).getTime()) / 60000)
+                )}{" "}
+                min. Volte para ele ou encerre e comece outro.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void continueBlocked()}
+              className="tactile flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand text-[13px] font-black text-brand-foreground shadow-lg shadow-brand/25"
+            >
+              <Play className="h-4 w-4 fill-current" /> Continuar treino
+            </button>
+            <button
+              type="button"
+              onClick={() => void discardAndStart()}
+              className="tactile w-full rounded-2xl border border-white/[0.08] py-3 text-[12px] font-bold text-muted-foreground"
+            >
+              Encerrar anterior e começar este
+            </button>
+          </div>
+        </BottomSheet>
       ) : null}
       {/* Feedback do treino anterior (sessão concluída sem feedback) */}
       <WorkoutFeedbackSheet

@@ -201,15 +201,32 @@ export default function RankingPage() {
   const myRank = data?.rows.findIndex((r) => r.student_id === (user?.id ?? ME)) ?? -1;
   const weekStart = startOfWeek();
   const periodLabel = PERIODS.find((p) => p.id === period)?.label ?? "Semana";
+  const players = data?.rows.length ?? 0;
+  const weekSessions = (data?.rows ?? []).reduce((a, r) => a + (r.sessions ?? 0), 0);
+  const onFire = (data?.rows ?? []).filter((r) => (data?.streakById[r.student_id] ?? 0) >= 2).length;
 
   // minutos pra reset (só a semana zera na segunda)
   const resetMins = useResetCountdown(weekStart);
 
   return (
     <>
-      <TopBar title="Comunidade" subtitle={`Ranking ${periodLabel.toLowerCase()} · competição saudável`} />
+      <TopBar title="Comunidade" subtitle={`Ranking ${periodLabel.toLowerCase()} · ${players} atletas na disputa`} />
 
       <div className="space-y-6 p-4">
+        {/* Pulso da academia no período */}
+        <div className="gf-rise flex items-center justify-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-2" style={{ animationDelay: "30ms" }}>
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#4ADE80] opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#4ADE80]" />
+          </span>
+          <p className="text-[11px] font-semibold text-[#B8C4D8]">
+            <span className="font-black text-[#F4F6FB]">{weekSessions} treinos</span>
+            {onFire > 0 ? (
+              <> · <span className="font-black text-[#FF9A5C]">{onFire} em sequência</span> <Flame className="inline h-3 w-3 text-[#FF9A5C]" aria-hidden /></>
+            ) : null}
+          </p>
+        </div>
+
         {/* Abas de período */}
         <div className="gf-rise flex gap-1.5" role="tablist" aria-label="Período do ranking">
           {PERIODS.map((p) => {
@@ -361,13 +378,16 @@ export default function RankingPage() {
                     ) : null}
                     <div
                       className={cn(
-                        "flex w-full items-start justify-center rounded-t-xl border-t border-x pt-2",
+                        "flex w-full flex-col items-center rounded-t-xl border-t border-x pt-2",
                         height,
                         pos === 0 ? "bg-gradient-to-b from-[#FBBF24]/20 to-transparent" : pos === 1 ? "bg-gradient-to-b from-[#E5E7EB]/15 to-transparent" : "bg-gradient-to-b from-[#D97706]/20 to-transparent"
                       )}
                       style={{ borderColor: `${medalColor}88`, boxShadow: `inset 0 12px 24px -12px ${medalColor}55` }}
                     >
                       <span className="gf-hero-num text-base">{formatNumber(row.points)}</span>
+                      <span className="pb-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+                        {row.sessions} {row.sessions === 1 ? "treino" : "treinos"}
+                      </span>
                     </div>
                   </Link>
                 );
@@ -438,7 +458,7 @@ export default function RankingPage() {
             </Badge>
           </div>
           <p className="mb-2 text-[10px] text-muted-foreground">
-            4º lugar em diante · mesma liga, ordenado por pontos
+            4º lugar em diante · todo mundo aparece, mesmo zerado
           </p>
 
           {loading ? (
@@ -447,8 +467,8 @@ export default function RankingPage() {
             <ErrorState message={error} onRetry={refetch} />
           ) : data?.rows.length === 0 ? (
             <EmptyState
-              title="Ranking vazio esta semana"
-              description="As posições são calculadas pela carga total dos treinos da semana."
+              title="Ninguém por aqui ainda"
+              description="Quando os cadastros forem aprovados, todo mundo aparece com bolinha."
               icon={Users}
             />
           ) : (
@@ -485,7 +505,11 @@ export default function RankingPage() {
                         <Flame className="h-3 w-3" aria-hidden /> {streak}
                       </span>
                     ) : null}
-                    <span className="gf-hero-num shrink-0 text-sm text-foreground">{formatNumber(row.points)}<span className="text-[10px] text-muted-foreground"> pts</span></span>
+                    <span className="shrink-0 text-right">
+                      <span className="gf-hero-num block text-sm text-foreground">{formatNumber(row.points)}<span className="text-[10px] text-muted-foreground"> pts</span></span>
+                      <span className="block text-[9px] font-semibold text-muted-foreground">{row.sessions} {row.sessions === 1 ? "treino" : "treinos"}</span>
+                    </span>
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" aria-hidden />
                   </Link>
                 );
               })}

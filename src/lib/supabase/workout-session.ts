@@ -5,19 +5,31 @@ import { supabaseBrowser } from "~/lib/supabase/client";
  * no dashboard "Na academia agora" e pode encerrar pelo painel.
  */
 
-export async function getActiveWorkoutSession(studentId: string): Promise<{ id: string } | null> {
+export type ActiveSession = {
+  id: string;
+  started_at: string;
+  workout_id: string | null;
+  meta: SessionMeta | null;
+};
+
+export async function getActiveWorkoutSession(studentId: string): Promise<ActiveSession | null> {
   const sb = supabaseBrowser();
   const { data } = await sb
     .from("workout_sessions")
-    .select("id")
+    .select("id, started_at, workout_id, meta")
     .eq("student_id", studentId)
     .eq("status", "active")
     .maybeSingle();
-  return (data as { id: string } | null) ?? null;
+  return (data as ActiveSession | null) ?? null;
 }
 
 /** Inicia (ou reusa) a sessão de treino ativa do aluno. Falha silenciosa. */
-export async function startWorkoutSession(gymId: string, studentId: string, workoutId?: string | null): Promise<void> {
+export async function startWorkoutSession(
+  gymId: string,
+  studentId: string,
+  workoutId?: string | null,
+  meta?: { slot?: string | null; dayIdx?: number | null; programId?: string | null; kind?: string | null; templateDay?: unknown } | null
+): Promise<void> {
   try {
     const existing = await getActiveWorkoutSession(studentId);
     if (existing) return;
@@ -28,6 +40,10 @@ export async function startWorkoutSession(gymId: string, studentId: string, work
       workout_id: workoutId ?? null,
       status: "active",
       started_at: new Date().toISOString(),
+      meta: {
+        ...(meta ?? {}),
+        workout_name: (meta as { workout_name?: string } | null)?.workout_name ?? null,
+      },
     } as never);
   } catch {
     /* sessão de treino é observabilidade — nunca bloqueia o treino */
@@ -56,6 +72,12 @@ export type SessionMeta = {
   finished_by?: "student" | "staff" | "auto" | null;
   auto_finished?: boolean | null;
   workout_name?: string | null;
+  /** retomada: de onde continuar (slot da rotação ou snapshot do provisório) */
+  slot?: string | null;
+  dayIdx?: number | null;
+  programId?: string | null;
+  kind?: "plan" | "template" | null;
+  templateDay?: unknown;
 };
 
 export type StudentSession = {
