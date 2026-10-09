@@ -2,6 +2,7 @@
 
 import { Crown, Medal, Trophy, Users, Flame, TrendingUp, ChevronRight, Gem, Award } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { m } from "framer-motion";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -12,7 +13,7 @@ import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncS
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import { startOfWeek } from "~/lib/utils/calculations";
-import { formatNumber, formatDate } from "~/lib/utils/format";
+import { formatNumber, formatDate, displayName } from "~/lib/utils/format";
 import { LEAGUES, leagueFor } from "~/lib/utils/leagues";
 import { cn } from "~/lib/utils";
 import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
@@ -44,13 +45,30 @@ function LeagueGlyph({ id, className, size = 16 }: { id: string; className?: str
   return <Icon className={className} style={{ color: glyph.color, width: size, height: size }} aria-hidden />;
 }
 
+const PERIODS = [
+  { id: "week", label: "Semana" },
+  { id: "month", label: "Mês" },
+  { id: "quarter", label: "90 dias" },
+  { id: "all", label: "Geral" },
+] as const;
+type PeriodId = (typeof PERIODS)[number]["id"];
+
+type RankRow = {
+  student_id: string;
+  points: number;
+  sessions: number;
+  streak: number;
+  student: Profiles | null;
+};
+
 export default function RankingPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const demo = isDemoMode();
+  const [period, setPeriod] = useState<PeriodId>("week");
 
   const { data, loading, error, refetch } = useAsyncQuery<{
-    rows: (Leaderboard & { student: Profiles | null })[];
-    mine: Leaderboard | null;
+    rows: RankRow[];
+    mine: RankRow | null;
     streakById: Record<string, number>;
   }>(
     async () => {
@@ -62,65 +80,109 @@ export default function RankingPage() {
         if (meIdx === -1) {
           ranks.unshift({
             id: "rk-me", gym_id: "1", week_start: "2026-08-10",
-            student_id: ME, rank_type: "load", points: 1980, load_kg: 15200, sessions: 10,
+            student_id: ME, rank_type: "load", points: 1980, load_kg: 15200, sessions: 10, streak: 8,
           });
         }
+        const rows: RankRow[] = ranks.map((r) => ({
+          student_id: r.student_id,
+          points: r.points,
+          sessions: r.sessions,
+          streak: r.streak ?? 0,
+          student: profiles.find((p) => p.id === r.student_id) ?? (r.student_id === ME ? { id: ME, name: "Atleta Demo" } as any : null),
+        }));
         return {
           data: {
-            rows: ranks.map((r) => ({
-              ...r,
-              student: profiles.find((p) => p.id === r.student_id) ?? (r.student_id === ME ? { id: ME, name: "Atleta Demo" } as any : null),
-            })),
-            mine: ranks.find((r) => r.student_id === ME) ?? null,
-            streakById: { [ME]: 8 } as Record<string, number>,
+            rows,
+            mine: rows.find((r) => r.student_id === ME) ?? null,
+            streakById: Object.fromEntries(rows.map((r) => [r.student_id, r.streak])),
           },
           error: null,
         };
       }
       const supabase = supabaseBrowser();
       if (!user || !profile) return { data: null, error: { message: "Sessão indisponível" } };
-      const weekStart = startOfWeek().toISOString().slice(0, 10);
-      const { data: rows, error } = await supabase
-        .from("leaderboard")
-        .select("*")
-        .eq("gym_id", profile.gym_id)
-        .eq("week_start", weekStart)
-        .eq("rank_type", "load")
-        .order("points", { ascending: false })
-        .limit(20);
-      if (error) return { data: null, error };
-      const list = (rows ?? []) as Leaderboard[];
-      const ids = [...new Set(list.map((r) => r.student_id))];
-      // ficha pública mínima (nome + foto) via função do banco; RLS de
-      // profiles é fechada entre alunos, então a leitura direta esconderia
-      // todo mundo como "Aluno". Fallback para leitura direta se o rpc falhar.
-      let students: Profiles[] = [];
-      if (ids.length) {
-        const rpcRes = await supabase.rpc("gym_roster", { p_gym_id: profile.gym_id });
-        if (!rpcRes.error && Array.isArray(rpcRes.data)) {
-          students = ((rpcRes.data as Profiles[]).filter((s) => ids.includes(s.id)) ?? []) as Profiles[];
-        } else {
-          const sRes = await supabase.from("profiles").select("id, name, avatar_url").in("id", ids);
-          if (!sRes.error) students = (sRes.data ?? []) as Profiles[];
+      // roster: todos os alunos aprovados entram com bolinha, mesmo sem
+      // histórico (0 pts no fim da lista). É o que puxa para o pódio.
+      const rpcRes = await supabase.rpc("gym_roster", { p_gym_id: profile.gym_id });
+      if (rpcRes.error) return { data: null, error: rpcRes.error };
+      const mates = ((rpcRes.data ?? []) as Array<Profiles & { role?: string }>).filter(
+        (m) => (m.role ?? "student") === "student"
+      );
+      // linhas do período (90 dias agrega sob demanda, resto lê o placar)
+      type Board = { student_id: string; points: number; sessions: number; streak?: number | null };
+      let board: Board[] = [];
+      if (period === "quarter") {
+        const q = await supabase.rpc("ranking_90d", { p_gym_id: profile.gym_id });
+        if (q.error) return { data: null, error: q.error };
+        board = ((q.data ?? []) as Array<{ student_id: string; sessions: number; points: number }>).map((r) => ({
+          ...r,
+          streak: 0,
+        }));
+      } else {
+        const start =
+          period === "week"
+            ? startOfWeek().toISOString().slice(0, 10)
+            : period === "month"
+              ? (() => {
+                  const n = new Date();
+                  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-01`;
+                })()
+              : "2000-01-01";
+        const { data: rows, error } = await supabase
+          .from("leaderboard")
+          .select("student_id, points, sessions, streak")
+          .eq("gym_id", profile.gym_id)
+          .eq("period", period)
+          .eq("week_start", start)
+          .eq("rank_type", "load")
+          .order("points", { ascending: false })
+          .limit(60);
+        if (error) return { data: null, error };
+        board = (rows ?? []) as Board[];
+      }
+      // chamas: sequência atual vem das linhas da semana (vale para as 4 abas)
+      let streakById: Record<string, number> = {};
+      if (period === "week") {
+        streakById = Object.fromEntries(board.map((r) => [r.student_id, r.streak ?? 0]));
+      } else {
+        const ws = startOfWeek().toISOString().slice(0, 10);
+        const wq = await supabase
+          .from("leaderboard")
+          .select("student_id, streak")
+          .eq("gym_id", profile.gym_id)
+          .eq("period", "week")
+          .eq("week_start", ws)
+          .eq("rank_type", "load")
+          .limit(60);
+        if (!wq.error) {
+          streakById = Object.fromEntries(
+            ((wq.data ?? []) as Board[]).map((r) => [r.student_id, r.streak ?? 0])
+          );
         }
       }
-      // chamas da semana: sequência de cada ranqueado vem da própria linha
-      // do leaderboard (alunos não leem logs uns dos outros por RLS).
-      // Só aparece a chama de quem tem 2+ dias seguidos, de forma sutil.
-      const streakById: Record<string, number> = Object.fromEntries(
-        list.map((r) => [r.student_id, r.streak ?? 0])
-      );
-      const mine = list.find((r) => r.student_id === user.id) ?? null;
+      const byId = new Map(board.map((r) => [r.student_id, r]));
+      const rows: RankRow[] = mates
+        .map((m) => {
+          const b = byId.get(m.id);
+          return {
+            student_id: m.id,
+            points: b?.points ?? 0,
+            sessions: b?.sessions ?? 0,
+            streak: streakById[m.id] ?? b?.streak ?? 0,
+            student: m as Profiles,
+          };
+        })
+        .sort(
+          (a, b) =>
+            b.points - a.points || (a.student?.name ?? "").localeCompare(b.student?.name ?? "")
+        );
+      const mine = rows.find((r) => r.student_id === user.id) ?? null;
       return {
-        data: {
-          rows: list.map((r) => ({ ...r, student: students.find((s) => s.id === r.student_id) ?? null })),
-          mine,
-          streakById,
-        },
+        data: { rows, mine, streakById },
         error: null,
       };
     },
-    [user?.id, profile?.id, demo],
+    [user?.id, profile?.id, demo, period],
     { enabled: !authLoading && !!user }
   );
 
@@ -130,15 +192,39 @@ export default function RankingPage() {
   const myLeague = leagueFor(mine?.points ?? 0);
   const myRank = data?.rows.findIndex((r) => r.student_id === (user?.id ?? ME)) ?? -1;
   const weekStart = startOfWeek();
+  const periodLabel = PERIODS.find((p) => p.id === period)?.label ?? "Semana";
 
-  // minutos pra reset
+  // minutos pra reset (só a semana zera na segunda)
   const resetMins = useResetCountdown(weekStart);
 
   return (
     <>
-      <TopBar title="Ranking" subtitle="Liga da semana · competição saudável" />
+      <TopBar title="Comunidade" subtitle={`Ranking ${periodLabel.toLowerCase()} · competição saudável`} />
 
       <div className="space-y-6 p-4">
+        {/* Abas de período */}
+        <div className="gf-rise flex gap-1.5" role="tablist" aria-label="Período do ranking">
+          {PERIODS.map((p) => {
+            const on = period === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => setPeriod(p.id)}
+                className={cn(
+                  "tactile flex-1 rounded-xl border py-2 text-[11.5px] font-black transition-colors",
+                  on
+                    ? "border-brand bg-brand/15 text-brand"
+                    : "border-white/[0.07] bg-white/[0.03] text-muted-foreground"
+                )}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
         {/* Minha liga + reset */}
         <div className="gf-rise relative overflow-hidden rounded-[20px] border border-brand/40 bg-gradient-to-br from-brand/20 via-card to-card p-5 shadow-[0_20px_40px_-20px_rgba(244,113,30,0.4)]">
           <div
@@ -153,16 +239,24 @@ export default function RankingPage() {
                 {myLeague.label}
               </p>
               <p className="gf-hero-num text-sm text-foreground">
-                {mine ? `${formatNumber(mine.points)} pts · ${myRank + 1}º` : "Sem pontos esta semana"}
+                {mine && mine.points > 0 ? `${formatNumber(mine.points)} pts · ${myRank + 1}º` : "Sem pontos ainda · bora treinar"}
               </p>
             </div>
             <div className="text-right">
-              <p className="flex items-center justify-end gap-1 text-[11px] font-semibold text-warning">
-                <span className="hero-live-dot" /> reset em {resetMins}m
-              </p>
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                próximos: {LEAGUES[(LEAGUES.findIndex((l) => l.id === myLeague.id) + 1) % LEAGUES.length].label}
-              </p>
+              {period === "week" ? (
+                <>
+                  <p className="flex items-center justify-end gap-1 text-[11px] font-semibold text-warning">
+                    <span className="hero-live-dot" /> reset em {resetMins}m
+                  </p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    próximos: {LEAGUES[(LEAGUES.findIndex((l) => l.id === myLeague.id) + 1) % LEAGUES.length].label}
+                  </p>
+                </>
+              ) : (
+                <p className="text-[11px] font-semibold text-muted-foreground">
+                  {(data?.rows.length ?? 0)} na disputa
+                </p>
+              )}
             </div>
           </div>
           {/* progresso até próxima liga */}
@@ -224,7 +318,7 @@ export default function RankingPage() {
                 const streak = data.streakById[row.student_id] ?? 0;
                 return (
                   <Link
-                    key={row.id}
+                    key={row.student_id}
                     href={`/perfil/${row.student_id}`}
                     className="group flex flex-col items-center gap-1.5"
                     role="listitem"
@@ -249,7 +343,7 @@ export default function RankingPage() {
                       </AvatarFallback>
                     </Avatar>
                     <p className="max-w-full truncate text-[11px] font-semibold text-foreground group-hover:text-brand">
-                      {row.student?.name?.split(" ")[0] ?? "Aluno"}
+                      {displayName(row.student?.name)}
                       {row.student_id === (user?.id ?? ME) ? " (você)" : ""}
                     </p>
                     {streak >= 2 ? (
@@ -325,7 +419,7 @@ export default function RankingPage() {
                 const streak = data?.streakById[row.student_id] ?? 0;
                 return (
                   <Link
-                    key={row.id}
+                    key={row.student_id}
                     href={`/perfil/${row.student_id}`}
                     className={cn(
                       "gf-rise relative flex items-center gap-3 overflow-hidden rounded-xl border border-border bg-card/40 p-3",
@@ -343,7 +437,7 @@ export default function RankingPage() {
                       </AvatarFallback>
                     </Avatar>
                     <p className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
-                      {row.student?.name ?? "Aluno"}
+                      {displayName(row.student?.name)}
                       {row.student_id === (user?.id ?? ME) ? <span className="ml-1 text-xs text-brand">(você)</span> : null}
                     </p>
                     {streak >= 2 ? (

@@ -11,7 +11,7 @@ import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { startOfWeek } from "~/lib/utils/calculations";
-import { formatNumber } from "~/lib/utils/format";
+import { formatNumber, displayName } from "~/lib/utils/format";
 import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
 import type { Leaderboard, Profiles } from "~/lib/types/models";
 
@@ -115,7 +115,7 @@ export default function PerfilAtletaPage() {
                 </AvatarFallback>
               </Avatar>
               <div>
-                <p className="text-lg font-black text-foreground">{data.mate.name}</p>
+                <p className="text-lg font-black text-foreground">{displayName(data.mate.name)}</p>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {ROLE_LABEL[data.mate.role ?? "student"] ?? "Aluno"} · GymFitness
                 </p>

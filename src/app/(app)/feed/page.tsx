@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, ThumbsUp, MessageSquare, Send, GraduationCap, Pin } from "lucide-react";
+import { Plus, ThumbsUp, Flame, Hand, MessageSquare, Send, GraduationCap, Pin } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { useFeedRealtime } from "~/hooks/useRealtimeSubscriptions";
@@ -12,7 +12,7 @@ import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { cn } from "~/lib/utils";
-import { formatRelative } from "~/lib/utils/format";
+import { formatRelative, displayName } from "~/lib/utils/format";
 import { toast } from "sonner";
 import { isDemoMode, demoFeedData, demoFallback } from "~/lib/demo-bridge";
 import {
@@ -39,8 +39,16 @@ type PostRow = FeedPosts & {
   author: Profiles | null;
   likesCount: number;
   likedByMe: boolean;
+  reactions: Record<string, number>;
+  myReaction: string | null;
   comments: CommentRow[];
 };
+
+const REACTIONS = [
+  { id: "like", label: "Curtir", Icon: ThumbsUp },
+  { id: "fire", label: "Fogo", Icon: Flame },
+  { id: "clap", label: "Palmas", Icon: Hand },
+] as const;
 
 /**
  * Feed social do aluno (blueprint feed): posts do gym + curtir + comentar.
@@ -90,6 +98,8 @@ export default function FeedPage() {
               author: profiles.find((x) => x.id === p.author_id) ?? null,
               likesCount: likes.filter((l: any) => l.post_id === p.id).length,
               likedByMe: false,
+              reactions: {},
+              myReaction: null,
               comments: comments
                 .filter((c: any) => c.post_id === p.id)
                 .map((c: any) => ({ ...c, user: profiles.find((x) => x.id === c.user_id) ?? null }))
@@ -133,7 +143,7 @@ export default function FeedPage() {
           return supabase.from("profiles").select("id, name, avatar_url, role").in("id", authorIds);
         })(),
         postIds.length
-          ? supabase.from("feed_likes").select("id, post_id, user_id").in("post_id", postIds).limit(500)
+          ? supabase.from("feed_likes").select("id, post_id, user_id, reaction").in("post_id", postIds).limit(500)
           : Promise.resolve({ data: [], error: null }),
         postIds.length
           ? supabase.from("feed_comments").select("id, post_id, user_id, body, created_at").in("post_id", postIds).order("created_at", { ascending: true }).limit(500)
@@ -159,15 +169,25 @@ export default function FeedPage() {
       }
 
       return {
-        data: posts.map((p) => ({
-          ...p,
-          author: authors.find((a) => a.id === p.author_id) ?? null,
-          likesCount: likes.filter((l) => l.post_id === p.id).length,
-          likedByMe: likes.some((l) => l.post_id === p.id && l.user_id === user.id),
-          comments: comments
-            .filter((c) => c.post_id === p.id)
-            .map((c) => ({ ...c, user: authors.find((a) => a.id === c.user_id) ?? null })),
-        })),
+        data: posts.map((p) => {
+          const postLikes = likes.filter((l) => l.post_id === p.id);
+          const reactions: Record<string, number> = {};
+          for (const l of postLikes) {
+            const k = (l as FeedLikes).reaction ?? "like";
+            reactions[k] = (reactions[k] ?? 0) + 1;
+          }
+          return {
+            ...p,
+            author: authors.find((a) => a.id === p.author_id) ?? null,
+            likesCount: postLikes.length,
+            likedByMe: postLikes.some((l) => l.post_id === p.id && l.user_id === user.id),
+            reactions,
+            myReaction: (postLikes.find((l) => l.user_id === user.id) as FeedLikes | undefined)?.reaction ?? null,
+            comments: comments
+              .filter((c) => c.post_id === p.id)
+              .map((c) => ({ ...c, user: authors.find((a) => a.id === c.user_id) ?? null })),
+          };
+        }),
         error: null,
       };
     },
@@ -202,6 +222,8 @@ export default function FeedPage() {
         author: { id: user?.id ?? ME_DEMO, name: profile?.name ?? "Você", role: (profile?.role ?? "student") as Profiles["role"] } as Profiles,
         likesCount: 0,
         likedByMe: false,
+        reactions: {},
+        myReaction: null,
         comments: [],
       };
       feedLocalAddPost(newPost as FeedPostLocal);
@@ -234,7 +256,8 @@ export default function FeedPage() {
     refetch();
   };
 
-  const toggleLike = async (post: PostRow) => {
+  /** Reações (curtir, fogo, palmas): toca de novo para tirar, troca atualiza. */
+  const react = async (post: PostRow, kind: string) => {
     navigator.vibrate?.(20);
     if (demo) {
       feedLocalToggleLike(post.id);
@@ -244,18 +267,23 @@ export default function FeedPage() {
     if (!user || !profile) return;
     const supabase = supabaseBrowser();
     try {
-      if (post.likedByMe) {
+      if (post.myReaction === kind) {
         const { error } = await supabase.from("feed_likes").delete().eq("post_id", post.id).eq("user_id", user.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("feed_likes").insert({ gym_id: profile.gym_id, post_id: post.id, user_id: user.id } as never);
+        const { error } = await supabase.from("feed_likes").upsert(
+          { gym_id: profile.gym_id, post_id: post.id, user_id: user.id, reaction: kind } as never,
+          { onConflict: "post_id,user_id" }
+        );
         if (error) throw error;
       }
       refetch();
     } catch {
-      toast.error("Não deu curtir agora. Tente de novo.");
+      toast.error("Não deu reagir agora. Tente de novo.");
     }
   };
+
+  const toggleLike = async (post: PostRow) => react(post, "like");
 
   const addComment = async (postId: string) => {
     if (!commentDraft.trim()) return;
@@ -351,7 +379,6 @@ export default function FeedPage() {
           <div className="space-y-3">
             {sorted.map((post, i) => {
               const liked = post.likedByMe || !!demoLikes[post.id];
-              const likes = post.likesCount + (demoLikes[post.id] ? 1 : 0);
               const comments = [...post.comments, ...(demoComments[post.id] ?? [])];
               return (
                 <div
@@ -373,7 +400,7 @@ export default function FeedPage() {
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-foreground">
-                        {post.author?.name ?? "Membro"}
+                        {displayName(post.author?.name)}
                         {post.author?.role === "trainer" || post.author?.role === "manager" ? (
                           <span className={cn("ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide", post.author.role === "trainer" ? "bg-brand/15 text-brand" : "bg-warning/15 text-warning")}>
                             {post.author.role === "trainer" ? "Personal" : "Gestão"}
@@ -393,17 +420,30 @@ export default function FeedPage() {
 
                   <p className="mt-3 text-sm leading-relaxed text-foreground">{post.body}</p>
 
-                  <div className="mt-3 flex items-center gap-2 border-t border-border/60 pt-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={cn(liked ? "text-brand" : "text-muted-foreground")}
-                      onClick={() => toggleLike(post)}
-                      aria-pressed={liked}
-                    >
-                      <ThumbsUp className={cn("mr-1.5 h-3.5 w-3.5", liked && "fill-current")} />
-                      {likes}
-                    </Button>
+                  <div className="mt-3 flex items-center gap-1.5 border-t border-border/60 pt-3">
+                    {REACTIONS.map(({ id, label, Icon }) => {
+                      const active = (post.myReaction ?? (liked ? "like" : null)) === id;
+                      const count = post.reactions[id] ?? 0;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => react(post, id)}
+                          aria-pressed={active}
+                          aria-label={`${label} (${count})`}
+                          title={label}
+                          className={cn(
+                            "tactile flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] font-bold transition-all active:scale-125",
+                            active
+                              ? "border-brand/60 bg-brand/15 text-brand"
+                              : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                          )}
+                        >
+                          <Icon className={cn("h-3.5 w-3.5", active && "fill-current")} />
+                          {count > 0 ? <span className="tabular-nums">{count}</span> : null}
+                        </button>
+                      );
+                    })}
                     <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setCommentingId(commentingId === post.id ? null : post.id)}>
                       <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
                       {comments.length > 0 ? comments.length : "Comentar"}
@@ -425,7 +465,7 @@ export default function FeedPage() {
                           </span>
                           <div className="min-w-0">
                             <p className="text-[11px] font-semibold text-foreground">
-                              {c.user?.name ?? "Membro"}
+                              {displayName(c.user?.name)}
                               <span className="ml-1.5 font-normal text-muted-foreground">{formatRelative(c.created_at)}</span>
                             </p>
                             <p className="text-[12px] leading-snug text-muted-foreground">{c.body}</p>

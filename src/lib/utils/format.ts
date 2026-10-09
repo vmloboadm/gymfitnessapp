@@ -80,3 +80,16 @@ export function formatLoad(weightKg: number, reps: number): string {
 export function cap(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
+
+/**
+ * Nome social: primeiro nome + inicial do último sobrenome ("Marília S.").
+ * Usado em todas as telas sociais (comunidade, perfis, feed): nunca expõe
+ * o nome completo do aluno.
+ */
+export function displayName(full?: string | null): string {
+  const parts = (full ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "Aluno";
+  if (parts.length === 1) return parts[0];
+  const lastInitial = parts[parts.length - 1][0]?.toUpperCase() ?? "";
+  return lastInitial ? `${parts[0]} ${lastInitial}.` : parts[0];
+}

@@ -39,7 +39,6 @@ import {
 } from "~/lib/demo-bridge";
 import {
   inferGender,
-  monthlyScore,
   nextWorkoutFromLogs,
 } from "~/components/dashboard/mocks";
 import type { WorkoutLogs, Leaderboard } from "~/lib/types/models";
@@ -362,7 +361,6 @@ export default function HomePage() {
 
   const myLeague = leagueFor(data?.points ?? 0);
   const myRank = data?.rank ?? 0;
-  const titulo = titleFor(inferGender(profile?.name), monthlyScore.checkins, streak);
 
   const streakCount = useCountUp(streak);
   const exCount = useCountUp(data?.detailCount ?? 0);
@@ -375,6 +373,8 @@ export default function HomePage() {
   const focusResume = twSingleton ? twSingleton.resume : nextWorkoutFromLogs(logs).resume;
   const todayLabel = `Treino do dia · ${focusLabel}`;
   const activeDays = monthDays.days.filter((d) => d.level > 0).length;
+  // Título pelo dado REAL do mês (dias treinados), não mock.
+  const titulo = titleFor(inferGender(profile?.name), activeDays, streak);
   // Meta da semana = dias que o próprio aluno marcou no cadastro (ex.: 5).
   // O anel mostra X/meta e atualiza a cada treino gravado.
   const weeklyGoal =

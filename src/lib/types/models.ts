@@ -288,6 +288,7 @@ export type FeedLikes = {
   post_id: string;
   user_id: string;
   created_at: string;
+  reaction?: string | null;
 };
 
 export type FeedComments = {
@@ -357,6 +358,7 @@ export type Leaderboard = {
   load_kg: number;
   sessions: number;
   streak?: number | null;
+  period?: string | null;
 };
 
 export type Notifications = {

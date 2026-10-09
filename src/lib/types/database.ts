@@ -147,6 +147,10 @@ export interface Database {
         Args: { p_text?: string };
         Returns: void;
       };
+      ranking_90d: {
+        Args: { p_gym_id: string };
+        Returns: Array<{ student_id: string; sessions: number; load_kg: number; points: number }>;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
