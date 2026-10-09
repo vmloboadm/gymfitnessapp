@@ -42,6 +42,7 @@ import { ImageLightbox } from "~/components/common/ImageLightbox";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
+import { ProvisionalTemplates } from "~/components/training/ProvisionalTemplates";
 import { fetchMyAssignedPlans } from "~/lib/gym-api";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";
@@ -419,16 +420,16 @@ export default function TreinoHomePage() {
               }
               return null;
             };
-            const rows = ids.flatMap((id) => {
-              const m = planExerciseMap?.[id];
-              const s = sessList.find((x) => x.id === id);
-              const exerciseId = m?.exerciseId ?? detailIds[id] ?? (s ? findId(s.name) : null);
-              if (!exerciseId) return [];
-              return [{
-                gym_id: profile.gym_id,
-                student_id: user.id,
-                workout_id: m?.workoutId ?? null,
-                exercise_id: exerciseId,
+              const rows = ids.flatMap((id) => {
+                const m = planExerciseMap?.[id];
+                const s = sessList.find((x) => x.id === id);
+                const exerciseId = m?.exerciseId ?? detailIds[id] ?? (s ? findId(s.name) : null);
+                if (!exerciseId) return [];
+                return [{
+                  gym_id: profile.gym_id,
+                  student_id: user.id,
+                  workout_id: m?.workoutId || null,
+                  exercise_id: exerciseId,
                 date: new Date().toISOString(),
                 reps: m?.reps ? parseReps(m.reps) : parseReps(s?.reps ?? "0"),
                 rpe: m?.rpe ?? null,
@@ -610,6 +611,7 @@ export default function TreinoHomePage() {
             }
             icon={Dumbbell}
           />
+          {profile?.approved_at ? <ProvisionalTemplates onStart={startTemplateSession} /> : null}
         </div>
         <AiCoach />
       </>
@@ -688,6 +690,93 @@ export default function TreinoHomePage() {
         ? { day: plan.plan.dias[todayIdx % plan.plan.dias.length], isRest: false }
         : { day: null, isRest: true }
       : null;
+  // TREINO PROVISÓRIO: modelo de referência para quem ainda não tem plano.
+  // Nunca atribui na ficha (sem student_workouts): só executa e registra
+  // no histórico como provisório. Nomes exatos da biblioteca, resolução total.
+  async function startTemplateSession(tpl: {
+    name: string;
+    days: Array<{
+      nome: string;
+      exercicios: Array<{ exercicio: string; series: number; reps: string; descanso: string; rpe?: number | null; dica?: string | null }>;
+    }>;
+  }) {
+    const day = tpl.days?.[0];
+    if (!day || day.exercicios.length === 0) return;
+    // Gate: sem check-in do dia o treino fica borrado (igual ao plano)
+    if (!demo && !unlockedToday) {
+      setUnlockOpen(true);
+      return;
+    }
+    // Trava: só um treino por vez
+    if (!demo && user?.id) {
+      const active = await getActiveWorkoutSession(user.id);
+      if (active) {
+        toast.info("Você já tem um treino em andamento", {
+          description: "Finalize o treino atual antes de começar outro.",
+        });
+        return;
+      }
+    }
+    const exList = day.exercicios.map((e, i) => {
+      const lib = libraryMatch(e.exercicio);
+      const cur = lib ? null : findInDatabase(e.exercicio);
+      return {
+        id: `tmp-${i}`,
+        name: e.exercicio,
+        sets: e.series,
+        reps: e.reps,
+        rest: parseInt(e.descanso) || 60,
+        info: e.dica || null,
+        tips: null,
+        imageUrl: lib?.imageUrl ?? cur?.thumbUrl ?? null,
+        videoUrl: lib?.videoUrl ?? cur?.youtubeUrl ?? null,
+        thumbUrl: lib?.imageUrl ?? cur?.thumbUrl ?? null,
+        videoUrlMale: null,
+        videoUrlFemale: null,
+      };
+    }) as typeof DEFAULT_DEMO_EX;
+    // Resolve ids (nomes exatos: ilike acerta tudo; details não existe aqui)
+    const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "");
+    if (!demo && user && profile?.gym_id) {
+      void (async () => {
+        try {
+          const supabase = supabaseBrowser();
+          const names = day.exercicios.map((e) => e.exercicio);
+          const orFilter = names.map((n) => `name.ilike.%${n.replace(/[%_,]/g, "")}%`).join(",");
+          const { data: found } = await supabase
+            .from("exercises")
+            .select("id, name")
+            .or(orFilter)
+            .limit(names.length * 2);
+          const rows = (found ?? []) as { id: string; name: string }[];
+          const map: Record<string, { workoutId: string; exerciseId: string; reps: string; rpe: number | null }> = {};
+          day.exercicios.forEach((e, i) => {
+            const hit = rows.find((r) => norm(r.name) === norm(e.exercicio))
+              ?? rows.find((r) => norm(r.name).includes(norm(e.exercicio).split(" ").slice(0, 2).join(" ")) || norm(e.exercicio).includes(norm(r.name)));
+            if (hit) {
+              map[`tmp-${i}`] = {
+                workoutId: "",
+                exerciseId: hit.id,
+                reps: e.reps,
+                rpe: e.rpe ?? null,
+              };
+            }
+          });
+          setPlanExerciseMap(map);
+        } catch {
+          /* conclude tenta de novo pelo nome */
+        }
+      })();
+    }
+    setSession(exList);
+    setPlanTodayActive(false);
+    startDaySession();
+    if (!demo && user?.id && profile?.gym_id) {
+      void startWorkoutSession(profile.gym_id, user.id, null);
+    }
+    setPhase("active");
+  }
+
   const startPlanSession = async () => {
     if (!plan?.plan?.dias || plan.plan.dias.length === 0 || todayIdx < 0) return;
     // Gate: sem check-in do dia (QR/NFC/senha) o treino fica borrado

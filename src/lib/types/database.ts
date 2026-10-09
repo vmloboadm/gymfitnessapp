@@ -143,6 +143,10 @@ export interface Database {
         Args: { p_gym_id: string };
         Returns: Array<{ id: string; name: string; avatar_url: string | null; role: string }>;
       };
+      notify_my_trainer: {
+        Args: { p_text?: string };
+        Returns: void;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
