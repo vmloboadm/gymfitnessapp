@@ -26,6 +26,8 @@ export type PlanDay = {
   aquecimento: string[];
   exercicios: PlanExercise[];
   finalizador: string;
+  /** Letra do slot na divisão (A..F): rotação sem dia fixo */
+  slot?: string;
 };
 
 export type WorkoutPlan = {
@@ -33,6 +35,8 @@ export type WorkoutPlan = {
   frequencia: string;
   /** Dias da semana escolhidos pelo aluno ("Seg", "Qua"...), na ordem semanal */
   daysSelected?: string[];
+  /** Divisão por slots escolhida pelo personal (AB, ABC, ABCD, ABCDE, ABCDEF) */
+  splitType?: string;
   nivel: string;
   objetivo: string;
   observacao_geral: string;

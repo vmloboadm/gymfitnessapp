@@ -86,6 +86,15 @@ const FOCO_OPTS: FocoOption[] = [
 
 type RestricaoOption = { label: string; sub: string; value: string | null };
 
+/** Divisão por slots (rotação A, B, C... sem dia fixo): o personal escolhe. */
+const SPLIT_OPTS = [
+  { id: "AB", label: "AB", sub: "2 treinos em rotação" },
+  { id: "ABC", label: "ABC", sub: "3 treinos em rotação" },
+  { id: "ABCD", label: "ABCD", sub: "4 treinos em rotação" },
+  { id: "ABCDE", label: "ABCDE", sub: "5 treinos em rotação" },
+  { id: "ABCDEF", label: "ABCDEF", sub: "6 treinos em rotação" },
+] as const;
+
 const RESTRICAO_OPTS: RestricaoOption[] = [
   { label: "Nenhuma", sub: "pode tudo", value: null },
   { label: "Ombro", sub: "problema ou lesão", value: "Cuidado com ombro" },
@@ -225,6 +234,7 @@ function PersonalTreinosContent() {
   const [ansObjetivo, setAnsObjetivo] = useState<string | null>(null);
   const [ansFoco, setAnsFoco] = useState<string[]>([]); // ids do FOCO_OPTS — pode marcar vários (ex.: braços + ombros)
   const [focoDone, setFocoDone] = useState(false);
+  const [ansSplit, setAnsSplit] = useState<string | null>(null); // id do SPLIT_OPTS (AB..ABCDEF)
   const [ansRestricoes, setAnsRestricoes] = useState<string[]>([]); // valores "Cuidado com ..."
   const [restDone, setRestDone] = useState(false);
 
@@ -234,6 +244,7 @@ function PersonalTreinosContent() {
     setAnsObjetivo(null);
     setAnsFoco([]);
     setFocoDone(false);
+    setAnsSplit(null);
     setAnsRestricoes([]);
     setRestDone(false);
   }, [targetId]);
@@ -267,6 +278,15 @@ function PersonalTreinosContent() {
   const toggleFoco = (id: string) =>
     setAnsFoco((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const guidedReady = !!ansNivel && !!ansObjetivo && focoDone && ansFoco.length > 0 && restDone;
+  // Divisão sugerida pela quantidade de dias marcados; o personal pode trocar.
+  const splitSug =
+    daysSelected.size <= 2 ? "AB"
+    : daysSelected.size === 3 ? "ABC"
+    : daysSelected.size === 4 ? "ABCD"
+    : daysSelected.size === 5 ? "ABCDE"
+    : "ABCDEF";
+  const split = ansSplit ?? (daysSelected.size > 0 ? splitSug : "ABC");
+  const splitLen = split.length; // "ABCDE".length = 5 treinos (slots A..E)
 
   // Pré-seleciona os dias do aluno (disponibilidade do onboarding) ao abrir o modo atribuição
   useEffect(() => {
@@ -406,7 +426,8 @@ function PersonalTreinosContent() {
       .slice(0, 60);
   }, [dbExercises, swapQuery]);
 
-  /** Troca o exercício mantendo séries/reps/RPE/dica do original. */
+  /** Troca o exercício mantendo séries/reps/RPE/dica do original.
+   *  Com exIdx -1, ADICIONA um exercício avulso no dia (3x10-12 padrão). */
   const swapExercise = (newName: string) => {
     if (!plan || !swapTarget) return;
     setPlan({
@@ -415,9 +436,15 @@ function PersonalTreinosContent() {
         di === swapTarget.dayIdx
           ? {
               ...d,
-              exercicios: d.exercicios.map((x, xi) =>
-                xi === swapTarget.exIdx ? { ...x, exercicio: newName } : x
-              ),
+              exercicios:
+                swapTarget.exIdx === -1
+                  ? [
+                      ...d.exercicios,
+                      { exercicio: newName, series: 3, reps: "10-12", descanso: "60s", rpe: 7, dica: "" },
+                    ]
+                  : d.exercicios.map((x, xi) =>
+                      xi === swapTarget.exIdx ? { ...x, exercicio: newName } : x
+                    ),
             }
           : d
       ),
@@ -426,12 +453,27 @@ function PersonalTreinosContent() {
     setSwapQuery("");
   };
 
+  /** Exercícios equivalentes (mesma categoria) ao que está sendo trocado. */
+  const swapEquivalents = (() => {
+    if (!swapTarget || swapTarget.exIdx === -1 || !plan) return [];
+    const current = plan.dias[swapTarget.dayIdx]?.exercicios[swapTarget.exIdx]?.exercicio;
+    if (!current) return [];
+    const norm = (s: string) => s.toLowerCase().trim();
+    const cat = dbExercises.find((e) => norm(e.name) === norm(current))?.category;
+    if (!cat) return [];
+    return dbExercises
+      .filter((e) => e.category === cat && norm(e.name) !== norm(current) && e.name.toLowerCase() !== "registro livre")
+      .slice(0, 6);
+  })();
+
   /** Monta a frase estruturada a partir das respostas do assistente + observações livres. */
   const buildGuidedRequest = (obs: string): string => {
+    const slots = split.split("").join(", ");
     const parts = [
       `Plano ${ansNivel} para ${target?.name ?? "o aluno"}.`,
       `Objetivo: ${ansObjetivo}.`,
       `Foco: ${focoLabel}.`,
+      `Divisão ${split} em rotação (sem dia fixo): gere exatamente ${splitLen} ${splitLen === 1 ? "treino" : "treinos"} (slots ${slots}). Nomeie cada dia começando pela letra do slot, ex.: "A · Peito e Tríceps".`,
     ];
     if (ansRestricoes.length) parts.push(`Restrições e lesões a respeitar: ${ansRestricoes.join(", ")}.`);
     if (obs) parts.push(`Observações do personal: ${obs}`);
@@ -516,13 +558,10 @@ function PersonalTreinosContent() {
               : {}),
             ...(isAdjust && plan
               ? { "Quantidade exata de dias do plano": String(plan.dias.length) }
-              : daysArr.length > 0 || (target.available_days?.length ?? 0) > 0
-                ? {
-                    "Quantidade exata de dias do plano": String(
-                      daysArr.length > 0 ? daysArr.length : target.available_days?.length ?? 0
-                    ),
-                  }
-                : {}),
+              : {
+                  // a divisão manda: ABCDE gera 5 dias (slots A..E)
+                  "Quantidade exata de dias do plano": String(splitLen),
+                }),
           },
         }),
       });
@@ -582,7 +621,12 @@ function PersonalTreinosContent() {
           gymId: profile.gym_id,
           trainerId: user.id,
           student: target,
-          plan: { ...plan, daysSelected: [...daysSelected] },
+          plan: {
+            ...plan,
+            daysSelected: [...daysSelected],
+            splitType: split,
+            dias: plan.dias.map((d, i) => ({ ...d, slot: split[i] ?? String(i + 1) })),
+          },
           notes: notes.trim() || null,
         });
         // edição/ajuste em produção: conclui o plano anterior (vira histórico)
@@ -890,6 +934,7 @@ function PersonalTreinosContent() {
                   setAnsObjetivo(null);
                   setAnsFoco([]);
                   setFocoDone(false);
+                  setAnsSplit(null);
                   setAnsRestricoes([]);
                   setRestDone(false);
                 }}
@@ -931,6 +976,39 @@ function PersonalTreinosContent() {
                 );
               })}
             </div>
+          </div>
+
+          {/* divisão por slots (rotação sem dia fixo) */}
+          <div className="mt-3">
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Divisão do treino
+            </p>
+            <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="Divisão do treino">
+              {SPLIT_OPTS.map((s) => {
+                const on = split === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setAnsSplit(s.id)}
+                    aria-pressed={on}
+                    title={s.sub}
+                    className={cn(
+                      "shrink-0 rounded-xl border px-3 py-1.5 text-left transition-colors",
+                      on ? "border-brand bg-brand/10" : "border-white/[0.08] bg-white/[0.04] hover:border-brand/40"
+                    )}
+                  >
+                    <span className={cn("block text-[11px] font-black tracking-wide", on ? "text-brand" : "text-foreground")}>
+                      {s.label}
+                    </span>
+                    <span className="block text-[8.5px] leading-tight text-muted-foreground">{s.sub}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1 text-[9.5px] leading-snug text-muted-foreground">
+              Rotação {split.split("").join(" · ")}: o aluno faz na ordem, em qualquer dia.
+            </p>
           </div>
 
           {/* observações livres do personal */}
@@ -1170,6 +1248,17 @@ function PersonalTreinosContent() {
                   ))}
                 </div>
 
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSwapTarget({ dayIdx: activeDay, exIdx: -1 });
+                    setSwapQuery("");
+                  }}
+                  className="tactile flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/40 bg-brand/[0.04] py-2.5 text-[11.5px] font-bold text-brand transition-colors hover:bg-brand/10"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Adicionar exercício avulso
+                </button>
+
                 {day.finalizador ? (
                   <p className="rounded-xl border border-brand/20 bg-brand/[0.06] p-2.5 text-[10.5px] leading-snug text-brand">
                     Finalizador: {day.finalizador}
@@ -1207,13 +1296,19 @@ function PersonalTreinosContent() {
           ) : null}
         </AnimatePresence>
 
-        {/* Trocar exercício: picker da biblioteca */}
+        {/* Trocar ou adicionar exercício: picker da biblioteca */}
         <BottomSheet open={!!swapTarget} onClose={() => setSwapTarget(null)}>
           <div className="space-y-3">
             <div>
-              <p className="text-base font-bold text-foreground">Trocar exercício</p>
+              <p className="text-base font-bold text-foreground">
+                {swapTarget?.exIdx === -1 ? "Adicionar exercício" : "Trocar exercício"}
+              </p>
               <p className="text-[11px] text-muted-foreground">
-                {swapTarget && plan ? `Substituindo "${plan.dias[swapTarget.dayIdx]?.exercicios[swapTarget.exIdx]?.exercicio}". Mantém séries, reps e RPE.` : "Escolha um exercício da biblioteca."}
+                {swapTarget?.exIdx === -1
+                  ? "Exercício avulso no dia, com 3x10-12 padrão. Ajuste séries e reps depois."
+                  : swapTarget && plan
+                    ? `Substituindo "${plan.dias[swapTarget.dayIdx]?.exercicios[swapTarget.exIdx]?.exercicio}". Mantém séries, reps e RPE.`
+                    : "Escolha um exercício da biblioteca."}
               </p>
             </div>
             <div className="relative">
@@ -1222,10 +1317,35 @@ function PersonalTreinosContent() {
                 value={swapQuery}
                 onChange={(e) => setSwapQuery(e.target.value)}
                 placeholder="Buscar exercício..."
-                aria-label="Buscar exercício para trocar"
+                aria-label="Buscar exercício na biblioteca"
                 className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
               />
             </div>
+            {swapEquivalents.length > 0 && !swapQuery.trim() ? (
+              <div>
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Equivalentes (mesmo grupo muscular)
+                </p>
+                <ul className="space-y-1.5">
+                  {swapEquivalents.map((ex) => (
+                    <li key={ex.id}>
+                      <button
+                        onClick={() => swapExercise(ex.name)}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-brand/25 bg-brand/[0.05] p-2.5 text-left transition-colors hover:border-brand/50"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
+                          <Dumbbell className="h-3.5 w-3.5 text-brand" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-semibold text-foreground">{ex.name}</p>
+                          <p className="text-[10px] capitalize text-muted-foreground">{ex.category}</p>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <ul className="max-h-[46vh] space-y-1.5 overflow-y-auto">
               {swapList.length === 0 ? (
                 <li className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 text-center text-[12px] text-muted-foreground">

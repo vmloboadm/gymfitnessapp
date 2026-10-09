@@ -349,14 +349,23 @@ export async function fetchMyAssignedPlans(
       const prog = r.workout_programs!;
       const days = [...(prog.workout_days ?? [])].sort((a, b) => a.day_order - b.day_order);
       let daysSelected: string[] | undefined;
+      let splitType: string | undefined;
+      let draftDias: Array<{ slot?: string }> | undefined;
       try {
-        const draft = prog.ai_draft ? (JSON.parse(prog.ai_draft) as { daysSelected?: string[] }) : null;
+        const draft = prog.ai_draft
+          ? (JSON.parse(prog.ai_draft) as { daysSelected?: string[]; splitType?: string; dias?: Array<{ slot?: string }> })
+          : null;
         daysSelected = draft?.daysSelected;
+        splitType = draft?.splitType;
+        draftDias = draft?.dias;
       } catch {
         daysSelected = undefined;
       }
       if (!daysSelected?.length) {
         daysSelected = ["Seg", "Ter", "Qua", "Qui", "Sex"].slice(0, Math.min(days.length, 5));
+      }
+      if (!splitType) {
+        splitType = "ABCDEF".slice(0, Math.min(Math.max(days.length, 2), 6));
       }
       return {
         id: r.id,
@@ -374,9 +383,11 @@ export async function fetchMyAssignedPlans(
           objetivo: prog.objective ?? "Treino",
           observacao_geral: "",
           daysSelected,
-          dias: days.map((d) => ({
+          splitType,
+          dias: days.map((d, di) => ({
             nome: d.name,
             foco: d.name,
+            slot: draftDias?.[di]?.slot ?? "ABCDEF"[di] ?? String(di + 1),
             aquecimento: [],
             exercicios: d.workout_exercises
               .sort((a, b) => a.ord - b.ord)

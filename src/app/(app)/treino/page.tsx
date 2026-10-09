@@ -278,6 +278,7 @@ export default function TreinoHomePage() {
   const [planActive, setPlanActive] = useState<Awaited<ReturnType<typeof fetchMyAssignedPlans>>> ([]);
   const [planExerciseMap, setPlanExerciseMap] = useState<Record<string, { workoutId: string; exerciseId: string; reps: string; rpe: number | null }>>({});
   const [planTodayActive, setPlanTodayActive] = useState(false);
+  const [activeSlot, setActiveSlot] = useState<string | null>(null);
   useEffect(() => {
     if (demo || !user || !profile?.gym_id) return;
     fetchMyAssignedPlans(user.id, profile.gym_id)
@@ -443,7 +444,17 @@ export default function TreinoHomePage() {
             }
             if (rows.length > 0) {
               const { error: logErr } = await supabase.from("workout_logs").insert(rows as never);
-              if (logErr) toast.error("Falha ao registrar treino", { description: "Tente novamente." });
+              if (logErr) {
+                toast.error("Falha ao registrar treino", { description: "Tente novamente." });
+              } else if (activeSlot && planActive[0]?.id) {
+                // check do slot na rotação (sem zerar: histórico contínuo)
+                await supabase.from("slot_checks").insert({
+                  gym_id: profile.gym_id,
+                  student_id: user.id,
+                  program_id: planActive[0].id,
+                  slot: activeSlot,
+                } as never).then(() => {});
+              }
             }
           } catch {
             /* treino segue mesmo se o log falhar */
@@ -670,26 +681,48 @@ export default function TreinoHomePage() {
     );
   }
 
-  // PLANO DO PERSONAL: dia de hoje correspondente ao dia da semana
+  // PLANO DO PERSONAL: rotação por slots (A, B, C...) sem dia fixo.
+  // Faltou quarta? Faz na quinta: cada slot tem check contínuo (slot_checks)
+  // e o sugerido de hoje é o próximo da rotação após o último concluído.
   const WEEK_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const plan = planActive[0] ?? null;
   const daysSel = plan?.plan?.daysSelected ?? [];
-  const dow = new Date().getDay();
-  const todayLabel = WEEK_PT[dow];
-  const orderedDays = daysSel.length
-    ? ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].filter((d) => daysSel.includes(d))
-    : [];
-  const todayIdx = orderedDays.length ? orderedDays.indexOf(todayLabel) : -1;
-  // Dia de hoje do plano: se o dia da semana está na pauta, SEMPRE mostra um
-  // treino (cicla pelos dias cadastrados). Só é descanso quando o dia não
-  // está na pauta — antes, planos com menos dias que a pauta caiam em
-  // "Hoje é descanso" na sexta (todayIdx >= dias.length).
-  const planToday =
-    plan?.plan?.dias && plan.plan.dias.length > 0
-      ? todayIdx >= 0
-        ? { day: plan.plan.dias[todayIdx % plan.plan.dias.length], isRest: false }
-        : { day: null, isRest: true }
-      : null;
+  const todayLabel = WEEK_PT[new Date().getDay()];
+  const dias = plan?.plan?.dias ?? [];
+  const splitType = plan?.plan?.splitType ?? "ABCDEF".slice(0, Math.min(Math.max(dias.length, 2), 6));
+  const diaSlot = (d: { slot?: string }, i: number) => d.slot ?? "ABCDEF"[i] ?? String(i + 1);
+
+  const { data: slotChecks } = useAsyncQuery<Array<{ slot: string; checked_at: string }>>(
+    async () => {
+      if (demo || !user || !profile?.gym_id || !plan?.id) return { data: [], error: null };
+      const { data: rows, error } = await supabaseBrowser()
+        .from("slot_checks")
+        .select("slot, checked_at")
+        .eq("student_id", user.id)
+        .eq("program_id", plan.id)
+        .order("checked_at", { ascending: false })
+        .limit(60);
+      if (error) return { data: null, error };
+      return { data: (rows ?? []) as Array<{ slot: string; checked_at: string }>, error: null };
+    },
+    [demo, user?.id, profile?.gym_id, plan?.id],
+    { enabled: !loading && !!user }
+  );
+  const lastBySlot: Record<string, string> = {};
+  (slotChecks ?? []).forEach((c) => {
+    if (!lastBySlot[c.slot]) lastBySlot[c.slot] = c.checked_at;
+  });
+  // próximo da rotação após o último concluído; sem histórico, começa no A
+  let suggestedIdx = 0;
+  const lastCheck = (slotChecks ?? [])[0] ?? null;
+  if (lastCheck && dias.length > 0) {
+    const lastIdx = dias.findIndex((d, i) => diaSlot(d, i) === lastCheck.slot);
+    suggestedIdx = lastIdx >= 0 ? (lastIdx + 1) % dias.length : 0;
+  }
+  const sugDay = dias.length > 0 ? dias[suggestedIdx] ?? dias[0] : null;
+  const sugSlot = sugDay ? diaSlot(sugDay, suggestedIdx) : "";
+  const fmtSlotDay = (iso?: string | null) =>
+    iso ? new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "";
   // TREINO PROVISÓRIO: modelo de referência para quem ainda não tem plano.
   // Nunca atribui na ficha (sem student_workouts): só executa e registra
   // no histórico como provisório. Nomes exatos da biblioteca, resolução total.
@@ -777,8 +810,9 @@ export default function TreinoHomePage() {
     setPhase("active");
   }
 
-  const startPlanSession = async () => {
-    if (!plan?.plan?.dias || plan.plan.dias.length === 0 || todayIdx < 0) return;
+  const startPlanSession = async (dayIdx?: number) => {
+    if (!plan?.plan?.dias || plan.plan.dias.length === 0) return;
+    const idx = dayIdx ?? suggestedIdx;
     // Gate: sem check-in do dia (QR/NFC/senha) o treino fica borrado
     if (!demo && !unlockedToday) {
       setUnlockOpen(true);
@@ -794,7 +828,8 @@ export default function TreinoHomePage() {
         return;
       }
     }
-    const day = plan.plan.dias[todayIdx % plan.plan.dias.length];
+    const day = plan.plan.dias[idx % plan.plan.dias.length];
+    setActiveSlot(diaSlot(day, idx % plan.plan.dias.length));
     // Fotos/vídeos da BIBLIOTECA (mesma fonte do catálogo) por nome; curado como fallback
     const exList = day.exercicios.map((e, i) => {
       const lib = libraryMatch(e.exercicio);
@@ -922,50 +957,43 @@ export default function TreinoHomePage() {
         {/* 1.5 TREINOS ENVIADOS PELO PERSONAL */}
         <PersonalWorkouts />
 
-        {/* 2. TREINO DE HOJE — do plano do Personal quando existe */}
-        {plan && planToday && (planToday.isRest || planToday.day) ? (
-          planToday.isRest || !planToday.day ? (
-            <div className="gf-card gf-glass !p-5 text-center">
-              <p className="text-sm font-bold text-foreground">Hoje é descanso</p>
-              <p className="mt-1 text-[11.5px] text-muted-foreground">
-                Seu plano pauta {daysSel.join(", ")} · o próximo treino é {orderedDays[(todayIdx + 1) % orderedDays.length] ?? "a definir"}.
-              </p>
-              <button
-                onClick={() => document.getElementById("personal-workouts-title")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                className="tactile mt-3 inline-flex items-center gap-1.5 rounded-xl border border-brand/30 bg-brand/10 px-4 py-2.5 text-[12px] font-black text-brand"
-              >
-                <Dumbbell className="h-4 w-4" /> Ver meus planos
-              </button>
-            </div>
-          ) : (
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-foreground">Treino de hoje</h2>
-                <div className="flex shrink-0 items-center gap-2">
-                  <Link href="/equipamento" aria-label="Catálogo de aparelhos e exercícios" className="gf-touch flex h-6 items-center gap-1 rounded-full border border-border px-2.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:border-brand/40 hover:text-brand">
-                    <Dumbbell className="h-3 w-3" /> Catálogo
-                  </Link>
-                  <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand">
-                    {todayLabel} · {plan.name}
-                  </span>
-                </div>
+        {/* 2. MEU TREINO — rotação por slots (A, B, C...), sem dia fixo.
+            Faltou quarta? Faz na quinta: o sugerido é o próximo da rotação,
+            e qualquer slot pode ser feito a qualquer dia. */}
+        {plan && dias.length > 0 && sugDay ? (
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-foreground">Meu treino</h2>
+              <div className="flex shrink-0 items-center gap-2">
+                <Link href="/equipamento" aria-label="Catálogo de aparelhos e exercícios" className="gf-touch flex h-6 items-center gap-1 rounded-full border border-border px-2.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:border-brand/40 hover:text-brand">
+                  <Dumbbell className="h-3 w-3" /> Catálogo
+                </Link>
+                <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand">
+                  Divisão {splitType}
+                </span>
               </div>
-              <div className="relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-card/60">
-                <div className="space-y-3 p-4">
-                  <div className={needsCheckin ? "blur-[7px] select-none" : ""} aria-hidden={needsCheckin}>
-                    <div>
-                      <p className="font-display text-lg font-black text-foreground">{planToday.day.nome}</p>
+            </div>
+            <div className="relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-card/60">
+              <div className="space-y-3 p-4">
+                <div className={needsCheckin ? "blur-[7px] select-none" : ""} aria-hidden={needsCheckin}>
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand font-display text-lg font-black text-brand-foreground">
+                      {sugSlot}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-display text-lg font-black text-foreground">{sugDay.nome}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {planToday.day.foco} · {planToday.day.exercicios.length} exercícios
+                        {sugDay.foco} · {sugDay.exercicios.length} exercícios
                       </p>
                     </div>
-                    {planToday.day.aquecimento?.length ? (
+                  </div>
+                    {sugDay.aquecimento?.length ? (
                       <p className="rounded-xl border border-[#4ADE80]/20 bg-[#4ADE80]/[0.06] p-2.5 text-[10.5px] leading-snug text-[#4ADE80]">
-                        Aquecimento: {planToday.day.aquecimento.join(" · ")}
+                        Aquecimento: {sugDay.aquecimento.join(" · ")}
                       </p>
                     ) : null}
                     <ul className="divide-y divide-white/[0.05] rounded-xl border border-white/[0.06] bg-white/[0.02]">
-                      {planToday.day.exercicios.map((e, i) => (
+                      {sugDay.exercicios.map((e, i) => (
                         <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-[12.5px] font-semibold text-foreground">
@@ -979,9 +1007,9 @@ export default function TreinoHomePage() {
                         </li>
                       ))}
                     </ul>
-                    {planToday.day.finalizador ? (
+                    {sugDay.finalizador ? (
                       <p className="rounded-xl border border-brand/20 bg-brand/[0.06] p-2.5 text-[10.5px] leading-snug text-brand">
-                        Finalizador: {planToday.day.finalizador}
+                        Finalizador: {sugDay.finalizador}
                       </p>
                     ) : null}
                   </div>
@@ -991,7 +1019,7 @@ export default function TreinoHomePage() {
                     </p>
                   ) : null}
                   <m.button
-                    onClick={startPlanSession}
+                    onClick={() => startPlanSession(suggestedIdx)}
                     whileHover={{ scale: 1.015 }}
                     whileTap={{ scale: 0.97 }}
                     className="gf-touch relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-brand py-3.5 text-[15px] font-black text-brand-foreground shadow-lg shadow-brand/35"
@@ -1007,13 +1035,51 @@ export default function TreinoHomePage() {
                     {needsCheckin ? (
                       <><Lock className="relative h-5 w-5" /> <span className="relative">Check-in para liberar</span></>
                     ) : (
-                      <><Play className="relative h-5 w-5 fill-current" /> <span className="relative">Iniciar treino de hoje</span></>
+                      <><Play className="relative h-5 w-5 fill-current" /> <span className="relative">Iniciar treino {sugSlot}</span></>
                     )}
                   </m.button>
                 </div>
               </div>
-            </div>
-          )
+            {/* demais slots da rotação: qualquer um pode ser feito hoje */}
+            {dias.length > 1 ? (
+              <div className="mt-2 space-y-1.5">
+                {dias.map((d, i) => {
+                  if (i === suggestedIdx) return null;
+                  const slot = diaSlot(d, i);
+                  const doneAt = lastBySlot[slot];
+                  return (
+                    <div
+                      key={`${slot}-${i}`}
+                      className="flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] font-display text-sm font-black text-muted-foreground">
+                        {slot}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[12.5px] font-bold text-foreground">{d.nome}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {doneAt ? `feito em ${fmtSlotDay(doneAt)}` : "ainda não feito"} · {d.exercicios.length} exercícios
+                        </p>
+                      </div>
+                      {doneAt ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#4ADE80]" /> : null}
+                      <button
+                        type="button"
+                        onClick={() => startPlanSession(i)}
+                        className="tactile shrink-0 rounded-lg border border-brand/30 bg-brand/10 px-3 py-1.5 text-[11px] font-black text-brand"
+                      >
+                        Fazer
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+            {daysSel.length > 0 && !daysSel.includes(todayLabel) ? (
+              <p className="mt-2 text-center text-[10px] text-muted-foreground">
+                Hoje não está nos seus dias ({daysSel.join(", ")}), mas a rotação segue valendo.
+              </p>
+            ) : null}
+          </div>
         ) : (
           <div>
           <div className="mb-2 flex items-center justify-between gap-2">
