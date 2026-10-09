@@ -130,8 +130,17 @@ export default function ProgressoPage() {
   }, [data?.logs]);
 
   const weekVolume = useMemo(() => totalVolume((data?.logs ?? []).filter((l) => l.date >= new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10))), [data?.logs]);
-  const streak = useMemo(() => calcStreak((data?.checkins ?? []).map((c) => c.checked_at)), [data?.checkins]);
-  const sessionsThisWeek = useMemo(() => new Set((data?.checkins ?? []).map((c) => c.checked_at.slice(0, 10))).size, [data?.checkins]);
+  // FONTE ÚNICA com a home: sequência e sessões contam dias TREINADOS
+  // (workout_logs), não visitas. Mesma regra em todo o app.
+  const allLogDates = useMemo(
+    () => [...(data?.logs ?? []), ...(data?.prevLogs ?? [])].map((l) => l.date),
+    [data?.logs, data?.prevLogs]
+  );
+  const streak = useMemo(() => calcStreak(allLogDates), [allLogDates]);
+  const sessionsThisWeek = useMemo(
+    () => new Set(allLogDates.filter((d) => d >= new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10))).size,
+    [allLogDates]
+  );
   const freq = useMemo(
     () => buildFrequencySeries((data?.checkins ?? []) as Array<{ checked_at: string }>),
     [data?.checkins]
@@ -468,7 +477,7 @@ function ReportRequestCard({
           <p className="gf-section">Relatório de evolução</p>
           <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
             {left > 0
-              ? `Último pedido há pouco — novo relatório liberado em ${left} dia${left === 1 ? "" : "s"}.`
+              ? `Último pedido há pouco, novo relatório liberado em ${left} dia${left === 1 ? "" : "s"}.`
               : "Análise detalhada dos seus últimos 15 dias, preparada pelo seu personal."}
           </p>
         </div>

@@ -337,6 +337,7 @@ export default function FeedPage() {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="O que está acontecendo no treino?"
+            aria-label="Escrever publicação no feed"
             rows={2}
             className="resize-none"
           />
@@ -481,6 +482,7 @@ export default function FeedPage() {
                         value={commentDraft}
                         onChange={(e) => setCommentDraft(e.target.value)}
                         placeholder="Escreva um comentário..."
+                        aria-label="Escrever comentário"
                         rows={1}
                         className="min-h-[36px] resize-none text-sm"
                       />

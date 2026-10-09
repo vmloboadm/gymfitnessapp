@@ -97,6 +97,7 @@ export default function PersonalDashboardPage() {
   // Treinos prescritos hoje (student_workouts reais) + aprovações pendentes reais
   const [assignedTodayIds, setAssignedTodayIds] = useState<Set<string>>(new Set());
   const [prescribedTodayCount, setPrescribedTodayCount] = useState(0);
+  const [prescribedYesterdayCount, setPrescribedYesterdayCount] = useState(0);
   const [approvalsPending, setApprovalsPending] = useState(0);
   const [sheetStudent, setSheetStudent] = useState<PersonalStudent | null>(null);
   const [queueOpen, setQueueOpen] = useState(false);
@@ -130,10 +131,13 @@ export default function PersonalDashboardPage() {
       try {
         const sb = supabaseBrowser();
         const today = new Date().toISOString().slice(0, 10);
-        const [ck, eq, sw, req] = await Promise.all([
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        const threeHoursAgo = new Date(Date.now() - 3 * 3600000).toISOString();
+        const [ck, eq, sw, swY, req] = await Promise.all([
           sb.from("checkins").select("student_id").eq("gym_id", gymId).gte("checked_at", `${today}T00:00:00`).limit(200),
-          sb.from("equipment_sessions").select("student_id").eq("gym_id", gymId).eq("status", "active").limit(200),
+          sb.from("equipment_sessions").select("student_id").eq("gym_id", gymId).eq("status", "active").gte("started_at", threeHoursAgo).limit(200),
           sb.from("student_workouts").select("student_id, assigned_at").eq("gym_id", gymId).gte("assigned_at", `${today}T00:00:00`).limit(200),
+          sb.from("student_workouts").select("student_id").eq("gym_id", gymId).gte("assigned_at", `${yesterday}T00:00:00`).lt("assigned_at", `${today}T00:00:00`).limit(200),
           getRequests(gymId).catch(() => []),
         ]);
         if (!alive) return;
@@ -144,6 +148,7 @@ export default function PersonalDashboardPage() {
         const swRows = (sw.data ?? []) as Array<{ student_id: string }>;
         setAssignedTodayIds(new Set(swRows.map((r) => r.student_id)));
         setPrescribedTodayCount(swRows.length);
+        setPrescribedYesterdayCount(((swY.data ?? []) as Array<{ student_id: string }>).length);
         setApprovalsPending(req.filter((r) => r.status === "pendente").length);
       } catch { /* mantém zeros */ }
     })();
@@ -155,10 +160,10 @@ export default function PersonalDashboardPage() {
       activeStudents: students.filter((s) => s.lastTrainingDaysAgo <= 2).length,
       totalStudents: students.length,
       prescribedToday: prescribedTodayCount,
-      prescribedYesterday: 0,
+      prescribedYesterday: prescribedYesterdayCount,
       missesWeek: students.filter((s) => s.lastTrainingDaysAgo >= 3).length,
     };
-  }, [students, prescribedTodayCount]);
+  }, [students, prescribedTodayCount, prescribedYesterdayCount]);
 
   // Fila de Hoje: ações acionáveis derivadas do estado real
   const queue = useMemo(() => {
