@@ -37,6 +37,8 @@ async function findUser(email) {
 async function cleanup(ids) {
   await admin.from("notifications").delete().in("user_id", ids);
   await admin.from("notifications").delete().like("body", "%E2E Game%");
+  await admin.from("feed_posts").delete().in("author_id", ids);
+  await admin.from("student_achievements").delete().in("student_id", ids);
   await admin.from("workout_logs").delete().in("student_id", ids);
   await admin.from("leaderboard").delete().in("student_id", ids);
   for (const email of [A1.email, A2.email]) {
