@@ -6,6 +6,7 @@
  */
 
 import type { PersonalStudent } from "~/lib/personal-data";
+import { normalizeBRPhone } from "~/lib/whatsapp";
 
 export type QueueItemTone = "red" | "amber" | "green";
 
@@ -22,11 +23,9 @@ export type QueueItem = {
   action: QueueAction;
 };
 
-/** wa.me com o número salvo no perfil (55 + DDD + número). */
+/** wa.me normalizado (55 + DDD + número, sem duplicar). Null se inválido. */
 function wa(phone: string | null): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  return digits.startsWith("55") ? digits : `55${digits}`;
+  return normalizeBRPhone(phone);
 }
 
 /**

@@ -14,6 +14,26 @@ export function waLink(phone: string, text: string): string {
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
 
+/**
+ * Normaliza telefone BR para wa.me: DDI 55 + DDD + número, sem duplicar.
+ * Aceita "(22) 99800-9275", "22998009275" ou "5522998009275".
+ * Devolve null quando não dá para montar um número válido (sem DDD etc.).
+ */
+export function normalizeBRPhone(raw?: string | null): string | null {
+  if (!raw) return null;
+  let d = raw.replace(/\D/g, "").replace(/^0+/, "");
+  if (d.startsWith("55") && (d.length === 12 || d.length === 13)) return d;
+  if ((d.length === 10 || d.length === 11) && !d.startsWith("55")) return `55${d}`;
+  return null;
+}
+
+/** Link wa.me para aluno com mensagem pré-preenchida. Null se número inválido. */
+export function waStudentLink(phone: string | null | undefined, text: string): string | null {
+  const normalized = normalizeBRPhone(phone);
+  if (!normalized) return null;
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
+}
+
 /** Link de suporte: falar com a academia. */
 export function gymSupportLink(context?: string): string {
   if (!GYM_WHATSAPP) return "";

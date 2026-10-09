@@ -21,6 +21,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
 import { ImageCropModal } from "~/components/common/ImageCropModal";
+import { normalizeBRPhone } from "~/lib/whatsapp";
 
 import { apiPath } from "~/lib/api-path";
 const OBJETIVOS: Array<{ id: NonNullable<ProfileEdits["objetivo"]>; label: string }> = [
@@ -32,11 +33,15 @@ const OBJETIVOS: Array<{ id: NonNullable<ProfileEdits["objetivo"]>; label: strin
 
 export default function ConfiguracoesPage() {
   const router = useRouter();
-  const { refreshProfile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const [edits, setEdits] = useState<ProfileEdits>({});
   const [bio, setBio] = useState("");
   const [objetivo, setObjetivo] = useState<ProfileEdits["objetivo"]>("hipertrofia");
   const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [nascimento, setNascimento] = useState("");
+  const [nivel, setNivel] = useState("");
+  const [diasSemana, setDiasSemana] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [notifs, setNotifs] = useState<{ treino: boolean; conquistas: boolean; Ranking: boolean }>(() => {
     try {
@@ -57,6 +62,15 @@ export default function ConfiguracoesPage() {
     setBio(e.bio ?? "");
     setObjetivo(e.objetivo ?? "hipertrofia");
   }, []);
+
+  // valores do servidor (fonte da verdade para os campos novos)
+  useEffect(() => {
+    if (!profile) return;
+    setTelefone((v) => v || profile.phone || "");
+    setNascimento((v) => v || profile.birth_date || "");
+    setNivel((v) => v || profile.experience_level || "");
+    setDiasSemana((v) => (v.length > 0 ? v : profile.available_days ?? []));
+  }, [profile]);
 
   useEffect(() => {
     try { localStorage.setItem("gf-notifs", JSON.stringify(notifs)); } catch { /* ok */ }
@@ -107,6 +121,12 @@ export default function ConfiguracoesPage() {
   };
 
   const salvar = async () => {
+    // telefone validado no formato wa.me (55 + DDD + número)
+    const phoneNorm = telefone.trim() ? normalizeBRPhone(telefone) : null;
+    if (telefone.trim() && !phoneNorm) {
+      toast.error("WhatsApp inválido", { description: "Use DDD + número, ex.: 22998009275." });
+      return;
+    }
     setSaving(true);
     // Salva localmente (demo/cache)
     const next = saveProfileEdits({ name: nome.trim(), bio: bio.trim(), objetivo });
@@ -119,6 +139,10 @@ export default function ConfiguracoesPage() {
         p_bio: bio.trim() || null,
         p_goal: null,
         p_objetivo: objetivo || null,
+        p_phone: phoneNorm,
+        p_birth_date: nascimento || null,
+        p_experience_level: nivel || null,
+        p_available_days: diasSemana.length > 0 ? diasSemana : null,
       });
       if (error) throw error;
       // Atualiza o profile no contexto global para refletir mudanças imediatamente
@@ -216,6 +240,78 @@ export default function ConfiguracoesPage() {
                 {o.label}
               </button>
             ))}
+          </div>
+
+          {/* whatsapp */}
+          <label className="mt-3 block">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">WhatsApp</span>
+            <input
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+              inputMode="tel"
+              placeholder="DDD + número, ex.: 22998009275"
+              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand"
+            />
+          </label>
+
+          {/* nascimento */}
+          <label className="mt-3 block">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Nascimento</span>
+            <input
+              type="date"
+              value={nascimento}
+              onChange={(e) => setNascimento(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand"
+            />
+          </label>
+
+          {/* nível */}
+          <span className="mt-3 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            Nível
+          </span>
+          <div className="mt-1.5 grid grid-cols-3 gap-2">
+            {["Iniciante", "Intermediário", "Avançado"].map((n) => (
+              <button
+                key={n}
+                onClick={() => setNivel(n)}
+                aria-pressed={nivel === n}
+                className={cn(
+                  "gf-touch rounded-xl border px-3 py-2.5 text-xs font-bold transition-colors",
+                  nivel === n
+                    ? "border-brand bg-brand/15 text-brand"
+                    : "border-border bg-card/40 text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+
+          {/* dias disponíveis */}
+          <span className="mt-3 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            Dias que treino
+          </span>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((d) => {
+              const on = diasSemana.includes(d);
+              return (
+                <button
+                  key={d}
+                  onClick={() =>
+                    setDiasSemana((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))
+                  }
+                  aria-pressed={on}
+                  className={cn(
+                    "gf-touch rounded-full border px-3.5 py-2 text-xs font-bold transition-colors",
+                    on
+                      ? "border-brand bg-brand/15 text-brand"
+                      : "border-border bg-card/40 text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {d}
+                </button>
+              );
+            })}
           </div>
 
           <button

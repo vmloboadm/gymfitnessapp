@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { MessageCircle, ClipboardList, Flame, Dumbbell, Plus, Activity, Sparkles, Clock3, Feather } from "lucide-react";
 import { insightOffline } from "~/lib/ai/local-gen";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -20,6 +21,7 @@ import {
   TRAINER_WORKOUTS_EVENT,
 } from "~/lib/trainer-store";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { waStudentLink } from "~/lib/whatsapp";
 import { cn } from "~/lib/utils";
 
 const TONE = {
@@ -74,6 +76,30 @@ export function StudentSheet({
   }, []);
 
   const status = student ? studentStatus(student) : null;
+
+  // Nível editável pelo personal (só leitura para os dados clínicos)
+  const [levelEdit, setLevelEdit] = useState<string | null>(null);
+  const [savingLevel, setSavingLevel] = useState(false);
+  useEffect(() => {
+    if (student) setLevelEdit(student.experience_level ?? null);
+  }, [student?.id]);
+  const saveLevel = async (v: string) => {
+    if (!student || savingLevel || v === levelEdit) return;
+    setSavingLevel(true);
+    try {
+      const { error } = await supabaseBrowser().rpc("staff_update_student", {
+        p_student_id: student.id,
+        p_experience_level: v,
+      });
+      if (error) throw new Error(error.message);
+      setLevelEdit(v);
+      toast.success("Nível atualizado", { description: `${student.name.split(" ")[0]} agora é ${v}.` });
+    } catch (e) {
+      toast.error("Não deu atualizar agora", { description: String(e instanceof Error ? e.message : e).slice(0, 80) });
+    } finally {
+      setSavingLevel(false);
+    }
+  };
 
   // Métricas e histórico REAIS do aluno (body_metrics + workout_logs).
   // Séries mockadas saíram de produção: davam pesos/históricos inconsistentes.
@@ -290,7 +316,31 @@ export function StudentSheet({
                 </div>
               ) : null}
               <InfoRow label="Objetivo" value={student.goal} />
-              <InfoRow label="Nível" value={student.experience_level} />
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">Nível (editável)</span>
+                  {savingLevel ? <span className="text-[9px] text-muted-foreground">salvando…</span> : null}
+                </div>
+                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                  {["Iniciante", "Intermediário", "Avançado"].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      disabled={savingLevel}
+                      onClick={() => saveLevel(n)}
+                      aria-pressed={levelEdit === n}
+                      className={cn(
+                        "rounded-lg border px-2 py-1.5 text-[10.5px] font-bold transition-colors disabled:opacity-50",
+                        levelEdit === n
+                          ? "border-brand bg-brand/15 text-brand"
+                          : "border-white/[0.08] text-muted-foreground"
+                      )}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <InfoRow label="Sexo" value={student.sex === "M" ? "Masculino" : student.sex === "F" ? "Feminino" : student.sex} />
               <InfoRow label="Frequência" value={student.daily_intake ? `${student.daily_intake}× semana` : null} />
               {student.available_days?.length ? (
@@ -422,24 +472,30 @@ export function StudentSheet({
 
           {/* ações rápidas */}
           <div className="grid grid-cols-3 gap-2">
-            {student.whatsapp_consent && student.phone ? (
-              <a
-                href={`https://wa.me/${student.phone}?text=${encodeURIComponent(
-                  `Oi ${student.name.split(" ")[0]}! Passando pra acompanhar seu treino. Bora evoluir hoje?`
-                )}`}
-                target="_blank"
-                rel="noreferrer"
-                className="tactile flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#25D366]/15 text-[10.5px] font-bold text-[#4ADE80] ring-1 ring-[#25D366]/30 transition-transform active:scale-[0.97]"
-              >
-                <MessageCircle className="h-4 w-4" />
-                WhatsApp
-              </a>
-            ) : (
-              <span className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-white/[0.04] text-[10px] font-medium text-muted-foreground ring-1 ring-white/[0.06]">
-                <MessageCircle className="h-4 w-4" />
-                Sem ok
-              </span>
-            )}
+            {(() => {
+              const waHref = student.whatsapp_consent
+                ? waStudentLink(
+                    student.phone,
+                    `Oi ${student.name.split(" ")[0]}! Passando pra acompanhar seu treino. Bora evoluir hoje?`
+                  )
+                : null;
+              return waHref ? (
+                <a
+                  href={waHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="tactile flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#25D366]/15 text-[10.5px] font-bold text-[#4ADE80] ring-1 ring-[#25D366]/30 transition-transform active:scale-[0.97]"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  WhatsApp
+                </a>
+              ) : (
+                <span className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-white/[0.04] text-[10px] font-medium text-muted-foreground ring-1 ring-white/[0.06]">
+                  <MessageCircle className="h-4 w-4" />
+                  Sem ok
+                </span>
+              );
+            })()}
             {latestWorkoutId ? (
               <Link
                 href={`/personal/treinos?aluno=${student.id}&edit=${latestWorkoutId}`}

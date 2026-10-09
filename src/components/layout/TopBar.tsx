@@ -41,7 +41,7 @@ export function TopBar({
         </div>
 
         <div className="flex items-center gap-2">
-          <OnlineCounter gymId={profile?.gym_id} className="hidden sm:flex" />
+          <OnlineCounter gymId={profile?.gym_id} />
           <Link
             href="/notificacoes"
             className={cn(

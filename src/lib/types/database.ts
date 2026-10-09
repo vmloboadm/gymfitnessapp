@@ -106,6 +106,10 @@ export interface Database {
           p_bio?: string | null;
           p_goal?: string | null;
           p_objetivo?: string | null;
+          p_phone?: string | null;
+          p_birth_date?: string | null;
+          p_experience_level?: string | null;
+          p_available_days?: string[] | null;
         };
         Returns: void;
       };
@@ -145,6 +149,10 @@ export interface Database {
       };
       notify_my_trainer: {
         Args: { p_text?: string };
+        Returns: void;
+      };
+      staff_update_student: {
+        Args: { p_student_id: string; p_experience_level?: string | null; p_goal?: string | null; p_objetivo?: string | null; p_available_days?: string[] | null };
         Returns: void;
       };
       ranking_90d: {

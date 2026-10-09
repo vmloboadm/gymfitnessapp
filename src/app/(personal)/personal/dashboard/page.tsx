@@ -35,6 +35,7 @@ import type { PersonalStudent } from "~/lib/personal-data";
 import { getGymStudents, getRequests } from "~/lib/gym-api";
 import { briefingOffline } from "~/lib/ai/local-gen";
 import { computeQueue, type QueueItem } from "~/lib/personal-queue";
+import { normalizeBRPhone } from "~/lib/whatsapp";
 import {
   TRAINER_WORKOUTS_EVENT,
   TRAINER_APPROVALS_EVENT,
@@ -77,7 +78,8 @@ const WEEKDAY_PATTERN: Record<number, number[]> = {
 };
 
 function waHref(phone: string, text: string) {
-  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+  const normalized = normalizeBRPhone(phone) ?? phone.replace(/\D/g, "");
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
 }
 
 /**

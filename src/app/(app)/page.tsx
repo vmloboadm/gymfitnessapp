@@ -5,9 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence,m, type Variants } from "framer-motion";
-import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLine } from "lucide-react";
+import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLine, Bell } from "lucide-react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useAuth } from "~/hooks/useAuth";
+import { useNotifications } from "~/hooks/useNotifications";
+import { useOnlineCount } from "~/hooks/useOnlineCount";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { useWorkoutLogsRealtime, useGymMotivationRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { assetPath } from "~/lib/asset-path";
@@ -26,6 +28,7 @@ import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { StreakFlame, FlameStageHint } from "~/components/dashboard/StreakFlame";
 import { PerformanceRing } from "~/components/dashboard/PerformanceRing";
 import { HeroWorkout } from "~/components/dashboard/HeroWorkout";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { titleFor } from "~/components/dashboard/TitlePoints";
 import PartnerCarousel from "~/components/dashboard/PartnerCarousel";
@@ -351,13 +354,18 @@ export default function HomePage() {
   const destaques = demo ? demoDestaquesAcademia() : [];
   const destaque = destaques[new Date().getDate() % Math.max(1, destaques.length)];
   const mundo = (demo ? demoMundoFit() : [])[0];
-  const online = demo ? demoOnlineAgora() : 0;
+  // Treinando agora em tempo real (sessões ativas; demo usa mock local)
+  const { count: onlineLive } = useOnlineCount(demo ? undefined : profile?.gym_id);
+  const online = demo ? demoOnlineAgora() : onlineLive;
+  const { unread } = useNotifications(demo ? undefined : user?.id);
   const structuredTip = TIPS_STRUCTURED[new Date().getDate() % TIPS_STRUCTURED.length];
 
   const hour = today.getHours();
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
   const profileEdits = typeof window !== "undefined" ? getProfileEdits() : { name: "" };
   const name = (profileEdits.name || profile?.name || "Atleta").split(" ")[0];
+  const avatarUrl = profileEdits.avatar_url || profile?.avatar_url || null;
+  const initials = (profileEdits.name || profile?.name || "Atleta").trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
   const myLeague = leagueFor(data?.points ?? 0);
   const myRank = data?.rank ?? 0;
@@ -494,18 +502,42 @@ export default function HomePage() {
               </p>
             </div>
           </div>
-          <div className="mt-4">
-            <p className="pm-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8B95A9]" suppressHydrationWarning>
-              {greeting}
-            </p>
-            <m.h1
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15, duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
-              className="mt-1 truncate bg-gradient-to-r from-[#F4F6FB] via-[#D6DCEC] to-[#B8C4D8] bg-clip-text font-display text-[30px] font-black leading-none tracking-tight text-transparent"
-            >
-              {name}
-            </m.h1>
+          <div className="mt-4 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <p className="pm-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8B95A9]" suppressHydrationWarning>
+                {greeting}
+              </p>
+              <m.h1
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15, duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+                className="mt-1 truncate bg-gradient-to-r from-[#F4F6FB] via-[#D6DCEC] to-[#B8C4D8] bg-clip-text font-display text-[30px] font-black leading-none tracking-tight text-transparent"
+              >
+                {name}
+              </m.h1>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 pb-0.5">
+              <Link href="/perfil" aria-label="Meu perfil" className="tactile block">
+                <Avatar className="h-10 w-10 border border-white/15">
+                  {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} /> : null}
+                  <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+              <Link
+                href="/notificacoes"
+                aria-label={unread > 0 ? `Notificações (${unread} não lidas)` : "Notificações"}
+                className="tactile relative flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card/60 text-muted-foreground"
+              >
+                <Bell className="h-[18px] w-[18px]" />
+                {unread > 0 ? (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-black text-brand-foreground">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                ) : null}
+              </Link>
+            </div>
           </div>
         </m.div>
 
