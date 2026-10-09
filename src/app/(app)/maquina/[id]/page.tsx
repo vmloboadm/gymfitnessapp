@@ -265,7 +265,53 @@ function LogHistorySheet({ machine, isCardio, gymId, userId, userName, onClose, 
         meta,
       } as never);
       if (error) throw new Error(error.message);
-      toast.success("Histórico salvo!", { description: `${machine.name} · ${mins} min` });
+      // Ponte para o histórico: cardio soma minutos; musculação conta o dia
+      // treinado (streak, meta, ranking) via primeiro exercício do aparelho.
+      try {
+        if (isCardio) {
+          const n = machine.name.toLowerCase();
+          const modality = n.includes("esteira")
+            ? "esteira"
+            : n.includes("bike") || n.includes("spinning")
+              ? "bike"
+              : n.includes("nata") || n.includes("piscina")
+                ? "natacao"
+                : n.includes("corri")
+                  ? "corrida"
+                  : "outros";
+          await sb.from("cardio_logs").insert({
+            gym_id: gymId,
+            student_id: userId,
+            modality,
+            minutes: mins,
+            intensity: null,
+          } as never);
+        } else {
+          const { data: linked } = await sb
+            .from("exercises")
+            .select("id")
+            .eq("equipment_id", machine.id)
+            .limit(1)
+            .maybeSingle();
+          const exerciseId = (linked as { id?: string } | null)?.id ?? null;
+          if (exerciseId) {
+            const kg = Number(String(load).replace(",", "."));
+            await sb.from("workout_logs").insert({
+              gym_id: gymId,
+              student_id: userId,
+              workout_id: null,
+              exercise_id: exerciseId,
+              date: now.toISOString(),
+              weight_kg: kg > 0 ? kg : 0,
+              reps: 0,
+              rpe: null,
+            } as never);
+          }
+        }
+      } catch {
+        /* equipamento já salvo; o histórico extra é bônus */
+      }
+      toast.success("Histórico salvo!", { description: `${machine.name} · ${mins} min · valeu no seu dia` });
       navigator.vibrate?.([40, 30, 60]);
       onSaved();
     } catch (e) {
