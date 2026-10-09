@@ -19,6 +19,7 @@ import { supabaseBrowser } from "~/lib/supabase/client";
 import { getRecentSessions, type StudentSession } from "~/lib/supabase/workout-session";
 import { requestEvolutionReport, getLastReportRequest, reportCooldownLeft } from "~/lib/gym-api";
 import { TopBar } from "~/components/layout/TopBar";
+import { ProgressPhotos } from "~/components/training/ProgressPhotos";
 import { ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { StatCard } from "~/components/common/StatCard";
 import { GlossaryCard } from "~/components/common/Glossary";
@@ -304,6 +305,9 @@ export default function ProgressoPage() {
             </div>
           )}
         </div>
+
+        {/* Fotos de evolução (antes/depois) */}
+        <ProgressPhotos />
 
         {/* Programa de evolução de carga, opt-in, fora do topo */}
         <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "300ms" }}>

@@ -163,6 +163,10 @@ export interface Database {
         Args: { p_gym_id: string };
         Returns: Array<{ student_id: string; minutes: number }>;
       };
+      get_or_create_conversation: {
+        Args: { p_other_id: string };
+        Returns: string;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

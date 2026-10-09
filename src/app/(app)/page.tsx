@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence,m, type Variants } from "framer-motion";
-import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLine, Bell } from "lucide-react";
+import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLine, Bell, MessageCircle } from "lucide-react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
@@ -692,6 +692,19 @@ export default function HomePage() {
 
         {showMore ? (
           <>
+          <Link
+            href="/conversas"
+            className="tactile pm-surface flex items-center gap-3 !p-4"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/15">
+              <MessageCircle className="h-5 w-5 text-brand" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13.5px] font-bold text-foreground">Conversas</span>
+              <span className="block truncate text-[11px] text-muted-foreground">Fale direto com seu personal</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Link>
         <m.section variants={item} className="pm-surface p-6">
           <div className="flex items-end justify-between">
             <div>

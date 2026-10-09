@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MessageCircle, ClipboardList, Flame, Dumbbell, Plus, Activity, Sparkles, Clock3, Feather } from "lucide-react";
 import { insightOffline } from "~/lib/ai/local-gen";
@@ -35,6 +36,7 @@ const TABS = [
   { id: "anamnese", label: "Anamnese" },
   { id: "treinos", label: "Treinos" },
   { id: "metricas", label: "Métricas" },
+  { id: "fotos", label: "Fotos" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -61,6 +63,7 @@ export function StudentSheet({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<TabId>("resumo");
+  const router = useRouter();
 
   // reseta pra aba Resumo a cada aluno aberto
   useEffect(() => {
@@ -76,6 +79,43 @@ export function StudentSheet({
   }, []);
 
   const status = student ? studentStatus(student) : null;
+
+  // Fotos de evolução liberadas pelo aluno (só leitura aqui)
+  const [progressPhotos, setProgressPhotos] = useState<Array<{ id: string; url: string; angle: string; phase: string; taken_at: string }> | null>(null);
+  useEffect(() => {
+    if (!student?.id || tab !== "fotos") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabaseBrowser()
+          .from("progress_photos")
+          .select("id, url, angle, phase, taken_at")
+          .eq("student_id", student.id)
+          .order("taken_at", { ascending: false })
+          .limit(12);
+        if (!cancelled) setProgressPhotos(error ? [] : (data ?? []));
+      } catch {
+        if (!cancelled) setProgressPhotos([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [student?.id, tab]);
+
+  const openChat = async () => {
+    if (!student) return;
+    try {
+      const { data, error } = await supabaseBrowser().rpc("get_or_create_conversation", {
+        p_other_id: student.id,
+      });
+      if (error) throw new Error(error.message);
+      onClose();
+      router.push(`/personal/conversas/${data as string}`);
+    } catch (e) {
+      toast.error("Não deu abrir a conversa", { description: String(e instanceof Error ? e.message : e).slice(0, 80) });
+    }
+  };
 
   // Nível editável pelo personal (só leitura para os dados clínicos)
   const [levelEdit, setLevelEdit] = useState<string | null>(null);
@@ -470,6 +510,32 @@ export function StudentSheet({
             </div>
           ) : null}
 
+          {tab === "fotos" ? (
+            <div className="space-y-2">
+              <p className="text-[10.5px] leading-snug text-muted-foreground">
+                Só aparecem as fotos que o aluno liberou para você.
+              </p>
+              {progressPhotos === null ? (
+                <p className="py-4 text-center text-[11px] text-muted-foreground">Carregando fotos…</p>
+              ) : progressPhotos.length === 0 ? (
+                <p className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 text-center text-[11px] text-muted-foreground">
+                  Nenhuma foto liberada ainda. Peça ao aluno na conversa.
+                </p>
+              ) : (
+                <div className="grid grid-cols-3 gap-1.5">
+                  {progressPhotos.map((p) => (
+                    <figure key={p.id} className="overflow-hidden rounded-xl border border-white/[0.07]">
+                      <img src={p.url} alt={`${p.phase} · ${p.angle}`} className="aspect-[3/4] w-full object-cover" loading="lazy" />
+                      <figcaption className="bg-white/[0.03] px-1 py-1 text-center text-[9px] font-bold capitalize text-muted-foreground">
+                        {p.phase} · {p.angle}
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
+
           {/* ações rápidas */}
           <div className="grid grid-cols-3 gap-2">
             {(() => {
@@ -505,6 +571,14 @@ export function StudentSheet({
                 Editar Treino
               </Link>
             ) : null}
+            <button
+              type="button"
+              onClick={openChat}
+              className="tactile flex h-11 items-center justify-center gap-1.5 rounded-xl bg-white/[0.06] text-[10.5px] font-bold text-foreground ring-1 ring-white/[0.08] transition-transform active:scale-[0.97]"
+            >
+              <Feather className="h-4 w-4" />
+              Conversar
+            </button>
             <Link
               href={`/personal/treinos?aluno=${student.id}`}
               className="tactile flex h-11 items-center justify-center gap-1.5 rounded-xl bg-brand text-[10.5px] font-bold text-brand-foreground transition-transform active:scale-[0.97]"
