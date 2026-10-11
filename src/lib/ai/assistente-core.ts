@@ -420,10 +420,16 @@ export async function handleAssistente(request: Request) {
   };
 
   const controllers = new Map<string, AbortController>();
-  const tasks = modelChain().map((m) => {
+  const tasks = modelChain().map((m, i) => {
     const ctrl = new AbortController();
     controllers.set(m, ctrl);
-    return runCandidate(m, ctrl.signal);
+    // largada escalonada (~0.8s entre candidatos): evita rajada simultânea
+    // que dispara rate limit da conta no tier free
+    const start = (async () => {
+      if (i > 0) await new Promise((r) => setTimeout(r, i * 800));
+      return runCandidate(m, ctrl.signal);
+    })();
+    return start;
   });
 
   try {
