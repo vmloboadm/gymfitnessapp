@@ -601,11 +601,11 @@ endWorkoutSession();
           <div className="mt-3 grid grid-cols-2 gap-2.5">
             <div className="rounded-xl border border-border bg-card/40 p-3">
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Entrada</p>
-              <p className="pm-num mt-1 text-xl font-black text-foreground">{sessionMetrics.entradaHora ?? "—"}</p>
+              <p className="pm-num mt-1 text-xl font-black text-foreground">{sessionMetrics.entradaHora ?? "·"}</p>
             </div>
             <div className="rounded-xl border border-border bg-card/40 p-3">
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Tempo na academia</p>
-              <p className="pm-num mt-1 text-xl font-black tabular-nums text-brand">{sessionMetrics.tempoNa ?? "—"}</p>
+              <p className="pm-num mt-1 text-xl font-black tabular-nums text-brand">{sessionMetrics.tempoNa ?? "·"}</p>
             </div>
             <div className="rounded-xl border border-border bg-card/40 p-3">
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Treino de hoje</p>

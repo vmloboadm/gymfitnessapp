@@ -421,7 +421,7 @@ export default function FeedPage() {
 
                   <p className="mt-3 text-sm leading-relaxed text-foreground">{post.body}</p>
 
-                  <div className="mt-3 flex items-center gap-1.5 border-t border-border/60 pt-3">
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-3">
                     {REACTIONS.map(({ id, label, Icon }) => {
                       const active = (post.myReaction ?? (liked ? "like" : null)) === id;
                       const count = post.reactions[id] ?? 0;

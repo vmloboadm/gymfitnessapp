@@ -128,7 +128,7 @@ function CtaButton({ sponsor: s, revealed, onReveal }: { sponsor: Sponsor; revea
         rel="noreferrer"
         className="tactile mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] py-3 text-[13px] font-black text-black shadow-lg"
       >
-        <MessageCircle className="h-4 w-4" /> Sou aluno GymFitness — pedir desconto
+        <MessageCircle className="h-4 w-4" /> Sou aluno GymFitness: pedir desconto
       </a>
     );
   }
@@ -138,7 +138,7 @@ function CtaButton({ sponsor: s, revealed, onReveal }: { sponsor: Sponsor; revea
       disabled={revealed && !s.cta_value}
       className="tactile mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3 text-[13px] font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-60"
     >
-      <Ticket className="h-4 w-4" /> Sou aluno GymFitness — ver desconto
+          <Ticket className="h-4 w-4" /> Sou aluno GymFitness: ver desconto
     </button>
   );
 }

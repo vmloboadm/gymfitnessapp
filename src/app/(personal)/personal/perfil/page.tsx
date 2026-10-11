@@ -480,7 +480,7 @@ export default function PersonalPerfilPage() {
               <p className="text-[10px] font-semibold text-muted-foreground">Alunos ativos</p>
             </div>
             <div className="gf-card gf-glass !rounded-2xl !p-4 text-center">
-              <p className="font-display text-2xl font-black text-[#4ADE80]">{todayCount ?? "—"}</p>
+              <p className="font-display text-2xl font-black text-[#4ADE80]">{todayCount ?? 0}</p>
               <p className="text-[10px] font-semibold text-muted-foreground">Check-ins hoje</p>
             </div>
           </div>

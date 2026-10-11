@@ -251,7 +251,7 @@ export default function PersonalAlunosPage() {
           <li className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 text-center text-xs text-muted-foreground">
             {approved.length === 0
               ? pending.length > 0
-                ? "Nenhum aluno aprovado ainda — aprove os novos acima."
+                ? "Nenhum aluno aprovado ainda. Aprove os novos acima."
                 : "Nenhum aluno matriculado na academia ainda."
               : `Nenhum aluno encontrado para "${q}".`}
           </li>

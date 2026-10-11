@@ -65,7 +65,7 @@ export default function MirrorPage() {
 
   const shareText = useMemo(() => {
     const parts = [`🔥 Treino concluído na GymFitness!`];
-    if ((weekCount ?? 0) > 0) parts.push(`${weekCount}x esta semana — rumo à meta`);
+    if ((weekCount ?? 0) > 0) parts.push(`${weekCount}x esta semana, rumo à meta`);
     if ((todayMin ?? 0) > 0) parts.push(`${todayMin} min · ~${kcal} kcal`);
     parts.push(HASHTAG);
     return parts.join("\n");

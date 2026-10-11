@@ -631,3 +631,8 @@ body.session-active {
     animation: none !important;
   }
 }
+
+/* Âncoras não escondem sob o TopBar fixo */
+html {
+  scroll-padding-top: 64px;
+}

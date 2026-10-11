@@ -804,14 +804,14 @@ function PersonalTreinosContent() {
           ) : null}
           {guidedReady && !plan && !loading ? (
             <p className="mb-3 text-center text-[10.5px] text-muted-foreground">
-              {ansNivel} · {ansObjetivo} · {focoLabel} · {split} — ou ajuste nas perguntas abaixo
+              {ansNivel} · {ansObjetivo} · {focoLabel} · {split}, ou ajuste nas perguntas abaixo
             </p>
           ) : null}
           {adjustSwId && plan ? (
             <div className="mb-3 rounded-2xl border border-[#FFC24D]/25 bg-[#FFC24D]/[0.07] p-3">
               <p className="text-[11.5px] leading-snug text-foreground">
                 Ajustando <strong>“{plan.nome}”</strong>. Descreva a mudança nas observações abaixo
-                (ex.: trocar supino por crucifixo, subir volume de pernas) e gere — o aluno recebe a v2 e a anterior vira histórico.
+                (ex.: trocar supino por crucifixo, subir volume de pernas) e gere. O aluno recebe a v2 e a anterior vira histórico.
               </p>
             </div>
           ) : null}

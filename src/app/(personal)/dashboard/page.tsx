@@ -539,7 +539,7 @@ export default function DashboardPage() {
             })}
             {data.sessions.some((s) => (Date.now() - new Date(s.started_at).getTime()) / 60000 >= 120) ? (
               <p className="px-1 text-[10px] font-semibold text-destructive">
-                ⚠ Sessão aberta há mais de 2h — verificar ocorrência
+                ⚠ Sessão aberta há mais de 2h, verificar ocorrência
               </p>
             ) : null}
           </div>
@@ -552,7 +552,7 @@ export default function DashboardPage() {
           <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
             <AlarmClock className="h-3.5 w-3.5 text-brand" /> Ocupação por horário
           </p>
-          <Badge variant="outline" className="text-[10px]">pico {pico?.hora ?? "—"}</Badge>
+          <Badge variant="outline" className="text-[10px]">pico {pico?.hora ?? "·"}</Badge>
         </div>
         <div className="h-32">
           <OcupacaoBarChart data={data.ocupacao} />

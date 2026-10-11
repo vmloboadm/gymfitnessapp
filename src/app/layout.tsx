@@ -26,9 +26,30 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://gymfitnesscampos.com.br"),
   title: "GymFitness",
   description: "App de academia com check-in NFC e métrica real",
   manifest: "/app/manifest.json",
+  openGraph: {
+    title: "GymFitness",
+    description: "Treine. Evolua. Apareça. Check-in, treinos do personal e ranking da academia.",
+    url: "https://gymfitnesscampos.com.br/app",
+    type: "website",
+    images: [
+      {
+        url: "/app/og-gymfitness.png",
+        width: 1200,
+        height: 630,
+        alt: "GymFitness",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "GymFitness",
+    description: "Treine. Evolua. Apareça.",
+    images: ["/app/og-gymfitness.png"],
+  },
 };
 
 export const viewport = {

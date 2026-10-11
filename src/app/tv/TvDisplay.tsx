@@ -14,7 +14,7 @@ type Slide = {
 
 const DEFAULT_SLIDES: Slide[] = [
   { kind: "motivation", title: "Bom treino!", body: "Constância vence intensidade. 1% melhor a cada dia.", durationSec: 20 },
-  { kind: "tip", title: "Dica do dia", body: "Beba água entre as séries — hidratação mantém a performance.", durationSec: 20 },
+  { kind: "tip", title: "Dica do dia", body: "Beba água entre as séries. Hidratação mantém a performance.", durationSec: 20 },
   { kind: "motivation", title: "GymFitness Campos", body: "Escaneie o QR das máquinas e veja todos os exercícios possíveis.", durationSec: 20 },
 ];
 
