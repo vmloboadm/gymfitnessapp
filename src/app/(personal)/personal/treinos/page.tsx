@@ -50,6 +50,7 @@ import { supabaseBrowser } from "~/lib/supabase/client";
 import { useAuth } from "~/hooks/useAuth";
 import {
   approvePlan,
+  assignExistingPlan,
   deleteAssignedWorkout,
   getGymStudents,
   listAssignedWorkouts,
@@ -222,6 +223,7 @@ function PersonalTreinosContent() {
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [activeDay, setActiveDay] = useState(0);
+  const [expandAll, setExpandAll] = useState(false);
   const [notes, setNotes] = useState("");
   const [daysSelected, setDaysSelected] = useState<Set<string>>(new Set());
   const [assigned, setAssigned] = useState<GymAssignedPlan[]>([]);
@@ -430,6 +432,11 @@ function PersonalTreinosContent() {
   // ===== Trocar exercício por outro da biblioteca (na revisão) =====
   const [swapTarget, setSwapTarget] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [swapQuery, setSwapQuery] = useState("");
+  // Repetir plano para outros alunos (mesmo programa, sem gerar de novo)
+  const [repeatSheet, setRepeatSheet] = useState<{ programId: string; planName: string; excludeId?: string } | null>(null);
+  const [repeatSelected, setRepeatSelected] = useState<Set<string>>(new Set());
+  const [repeatQuery, setRepeatQuery] = useState("");
+  const [repeatSaving, setRepeatSaving] = useState(false);
 
   const swapList = useMemo(() => {
     const q = swapQuery.trim().toLowerCase();
@@ -605,6 +612,38 @@ function PersonalTreinosContent() {
     }
   };
 
+  // Repetir o mesmo programa para outros alunos (sem gerar de novo)
+  const confirmRepeat = async () => {
+    if (!repeatSheet || repeatSelected.size === 0 || !profile || repeatSaving) return;
+    setRepeatSaving(true);
+    try {
+      const targets = [...repeatSelected]
+        .map((sid) => students.find((s) => s.id === sid))
+        .filter((s): s is PersonalStudent => !!s)
+        .map((s) => ({ id: s.id, name: s.name }));
+      const res = await assignExistingPlan({
+        gymId: profile.gym_id,
+        programId: repeatSheet.programId,
+        targets,
+      });
+      if (res.failed.length > 0) {
+        toast.error(`Falha ao enviar para ${res.failed.join(", ")}`);
+      }
+      if (res.ok > 0) {
+        toast.success("Plano repetido!", {
+          description: `"${repeatSheet.planName}" enviado para ${res.ok} aluno${res.ok === 1 ? "" : "s"}.`,
+        });
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não deu repetir agora. Tente de novo.");
+    } finally {
+      setRepeatSaving(false);
+      setRepeatSheet(null);
+      setRepeatSelected(new Set());
+      refresh();
+    }
+  };
+
   const updateDay = (dayIdx: number, patch: Partial<WorkoutPlan["dias"][number]>) => {
     if (!plan) return;
     setPlan({
@@ -632,8 +671,9 @@ function PersonalTreinosContent() {
         description: `${target.name} recebeu a nova versão com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
       });
     } else {
+      let newProgramId: string | null = null;
       try {
-        await approvePlan({
+        newProgramId = await approvePlan({
           gymId: profile.gym_id,
           trainerId: user.id,
           student: target,
@@ -657,6 +697,11 @@ function PersonalTreinosContent() {
       toast.success(adjustSwId ? "Plano ajustado com sucesso!" : editId ? "Plano atualizado com sucesso!" : "Plano enviado com sucesso!", {
         description: `${target.name} recebeu "${plan.nome}" com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
       });
+      if (newProgramId) {
+        setRepeatSheet({ programId: newProgramId, planName: plan.nome, excludeId: target.id });
+        setRepeatSelected(new Set());
+        setRepeatQuery("");
+      }
     }
     setPlan(null);
     setPrompt("");
@@ -735,6 +780,15 @@ function PersonalTreinosContent() {
             <p className="text-[13px] font-semibold text-foreground">
               {adjustSwId ? "Ajustar plano com IA · gera a v2" : `Assistente GF · montando o plano de ${target.name.split(" ")[0]} com você`}
             </p>
+          </div>
+          {/* contexto do aluno na hora de gerar: sequência, último treino, RPE, meta */}
+          <div className="mb-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[10.5px] text-muted-foreground">
+            <span className="flex items-center gap-1 font-bold text-[#FF9A5C]">
+              <Flame className="h-3 w-3" aria-hidden /> {target.streak}d sequência
+            </span>
+            <span>último treino há {target.lastTrainingDaysAgo}d</span>
+            {target.lastRpe != null ? <span>último RPE {target.lastRpe}</span> : null}
+            <span>meta {target.freq ?? splitLen}x/sem</span>
           </div>
           {/* 1 toque: respostas já vieram da ficha, gera direto sem clicar nas perguntas */}
           {guidedReady && !plan && !loading ? (
@@ -1151,7 +1205,7 @@ function PersonalTreinosContent() {
                 {plan.observacao_geral}
               </p>
 
-              {/* tabs de dias */}
+              {/* tabs de dias + expandir tudo */}
               {plan.dias.length > 1 ? (
                 <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Dias do plano">
                   {plan.dias.map((d, i) => (
@@ -1169,6 +1223,79 @@ function PersonalTreinosContent() {
                     >
                       {d.nome}
                     </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* ver tudo de uma vez (revisão rápida sem trocar de aba) */}
+              {plan.dias.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setExpandAll((v) => !v)}
+                  aria-expanded={expandAll}
+                  className="tactile w-full rounded-xl border border-white/[0.06] bg-white/[0.03] py-2 text-[11px] font-bold text-muted-foreground transition-colors hover:text-brand"
+                >
+                  {expandAll ? "Recolher dias" : `Expandir todos os dias (${plan.dias.length})`}
+                </button>
+              ) : null}
+              {expandAll ? (
+                <div className="space-y-2">
+                  {plan.dias.map((dd, di) => (
+                    <div key={`exp-${di}`} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveDay(di);
+                          setExpandAll(false);
+                        }}
+                        className="flex w-full items-center justify-between gap-2 text-left"
+                      >
+                        <span className="truncate text-[12px] font-black text-brand">{dd.nome}</span>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">
+                          {dd.exercicios.length} ex · editar
+                        </span>
+                      </button>
+                      <ul className="mt-1.5 space-y-1">
+                        {dd.exercicios.map((e, i) => (
+                          <li key={i} className="flex items-center gap-2 rounded-lg bg-white/[0.02] px-2 py-1.5">
+                            <span className="min-w-0 flex-1 truncate text-[11.5px] text-foreground">
+                              {e.exercicio}
+                              <span className="ml-1.5 text-[10px] tabular-nums text-muted-foreground">
+                                {e.series}x{e.reps}
+                              </span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSwapTarget({ dayIdx: di, exIdx: i })}
+                              aria-label={`Trocar ${e.exercicio}`}
+                              className="tactile flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-brand"
+                            >
+                              <ArrowLeftRight className="h-3 w-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateDay(di, { exercicios: dd.exercicios.filter((_, xi) => xi !== i) })
+                              }
+                              aria-label={`Remover ${e.exercicio}`}
+                              className="tactile flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-[#F87171]"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSwapTarget({ dayIdx: di, exIdx: -1 });
+                          setSwapQuery("");
+                        }}
+                        className="tactile mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-brand/40 py-1.5 text-[10.5px] font-bold text-brand"
+                      >
+                        <Plus className="h-3 w-3" /> Adicionar aqui
+                      </button>
+                    </div>
                   ))}
                 </div>
               ) : null}
@@ -1345,6 +1472,84 @@ function PersonalTreinosContent() {
           ) : null}
         </AnimatePresence>
 
+        {/* Repetir plano para outros alunos (mesmo programa, sem gerar de novo) */}
+        <BottomSheet
+          open={!!repeatSheet}
+          onClose={() => {
+            setRepeatSheet(null);
+            setRepeatSelected(new Set());
+          }}
+        >
+          <div className="space-y-3">
+            <div>
+              <p className="text-base font-bold text-foreground">Repetir plano</p>
+              <p className="text-[11px] text-muted-foreground">
+                {repeatSheet ? `“${repeatSheet.planName}” vai igualzinho para quem você marcar. Cada um recebe o sino.` : ""}
+              </p>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={repeatQuery}
+                onChange={(e) => setRepeatQuery(e.target.value)}
+                placeholder="Buscar aluno..."
+                aria-label="Buscar aluno para repetir o plano"
+                className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+              />
+            </div>
+            <ul className="max-h-[40vh] space-y-1.5 overflow-y-auto">
+              {students
+                .filter((s) => s.id !== repeatSheet?.excludeId)
+                .filter((s) => !repeatQuery.trim() || s.name.toLowerCase().includes(repeatQuery.trim().toLowerCase()))
+                .map((s) => {
+                  const on = repeatSelected.has(s.id);
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRepeatSelected((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(s.id)) next.delete(s.id);
+                            else next.add(s.id);
+                            return next;
+                          })
+                        }
+                        aria-pressed={on}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-2xl border p-2.5 text-left transition-colors",
+                          on ? "border-brand bg-brand/10" : "border-white/[0.06] bg-white/[0.03]"
+                        )}
+                      >
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={s.avatar ?? undefined} alt="" />
+                          <AvatarFallback className="bg-secondary text-[10px] text-secondary-foreground">
+                            {(s.name[0] ?? "?").toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className={cn("min-w-0 flex-1 truncate text-[13px] font-semibold", on ? "text-brand" : "text-foreground")}>
+                          {s.name}
+                        </span>
+                        {on ? <Check className="h-4 w-4 shrink-0 text-brand" /> : null}
+                      </button>
+                    </li>
+                  );
+                })}
+            </ul>
+            <button
+              type="button"
+              onClick={confirmRepeat}
+              disabled={repeatSelected.size === 0 || repeatSaving}
+              className="tactile flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand text-[13px] font-black text-brand-foreground disabled:opacity-40"
+            >
+              {repeatSaving ? (
+                "Enviando..."
+              ) : (
+                <>Repetir para {repeatSelected.size} aluno{repeatSelected.size === 1 ? "" : "s"}</>
+              )}
+            </button>
+          </div>
+        </BottomSheet>
         {/* Trocar ou adicionar exercício: picker da biblioteca */}
         <BottomSheet open={!!swapTarget} onClose={() => setSwapTarget(null)}>
           <div className="space-y-3">
@@ -1539,6 +1744,20 @@ function PersonalTreinosContent() {
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
+                {w.programId ? (
+                  <button
+                    onClick={() => {
+                      setRepeatSheet({ programId: w.programId, planName: w.name, excludeId: w.studentId });
+                      setRepeatSelected(new Set());
+                      setRepeatQuery("");
+                    }}
+                    aria-label={`Repetir ${w.name} para outros alunos`}
+                    title="Repetir para outros alunos"
+                    className="tactile flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] text-muted-foreground transition-colors hover:text-brand"
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
                 <button
                   onClick={async () => {
                     if (!window.confirm(`Remover "${w.name}" de ${w.studentName}? O aluno perde o acesso ao treino.`)) return;

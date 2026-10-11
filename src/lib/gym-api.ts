@@ -128,7 +128,7 @@ async function assignReal(
   student: PersonalStudent,
   plan: WorkoutPlan,
   _notes: string | null
-): Promise<void> {
+): Promise<string> {
   const sb = supabaseBrowser();
 
   const { data: prog, error: progErr } = await sb
@@ -189,16 +189,17 @@ async function assignReal(
     status: "active",
   } as never));
   if (swErr) throw new Error(swErr.message);
+  return programId;
 }
 
-/** Aprovar plano do Co-Pilot: demo → local; produção → banco. */
+/** Aprovar plano do Co-Pilot: demo → local; produção → banco. Devolve o id do programa (null no demo). */
 export async function approvePlan(opts: {
   gymId: string;
   trainerId: string;
   student: PersonalStudent;
   plan: WorkoutPlan;
   notes: string | null;
-}): Promise<void> {
+}): Promise<string | null> {
   if (isDemoMode()) {
     saveAssignedWorkout({
       studentId: opts.student.id,
@@ -213,9 +214,9 @@ export async function approvePlan(opts: {
       plan: opts.plan,
       source: "ia",
     });
-    return;
+    return null;
   }
-  await assignReal(opts.gymId, opts.trainerId, opts.student, opts.plan, opts.notes);
+  return assignReal(opts.gymId, opts.trainerId, opts.student, opts.plan, opts.notes);
 }
 
 /** Marca um student_workout como concluído (ao gerar v2 ajustada). */
@@ -226,6 +227,40 @@ export async function completeStudentWorkout(workoutId: string): Promise<void> {
     .from("student_workouts")
     .update({ status: "completed", completed_at: new Date().toISOString() } as never)
     .eq("id", workoutId);
+}
+
+/**
+ * Repete um plano existente para outros alunos (mesmo programa, novas
+ * linhas em student_workouts). Cada aluno recebe o sino de plano novo.
+ * Devolve quantos deram certo + nomes dos que falharam.
+ */
+export async function assignExistingPlan(opts: {
+  gymId: string;
+  programId: string;
+  targets: Array<{ id: string; name: string }>;
+}): Promise<{ ok: number; failed: string[] }> {
+  if (isDemoMode()) {
+    const existing = listAssignedWorkouts().find((w) => w.studentId && w.plan);
+    if (!existing) throw new Error("Sem plano para repetir no modo demo.");
+    for (const t of opts.targets) {
+      saveAssignedWorkout({ ...existing, studentId: t.id, studentName: t.name });
+    }
+    return { ok: opts.targets.length, failed: [] };
+  }
+  const sb = supabaseBrowser();
+  const failed: string[] = [];
+  let ok = 0;
+  for (const t of opts.targets) {
+    const { error } = await sb.from("student_workouts").insert({
+      gym_id: opts.gymId,
+      student_id: t.id,
+      program_id: opts.programId,
+      status: "active",
+    } as never);
+    if (error) failed.push(t.name.split(" ")[0]);
+    else ok++;
+  }
+  return { ok, failed };
 }
 
 export type GymAssignedPlan = {
