@@ -235,8 +235,21 @@ function PersonalTreinosContent() {
   const [ansFoco, setAnsFoco] = useState<string[]>([]); // ids do FOCO_OPTS — pode marcar vários (ex.: braços + ombros)
   const [focoDone, setFocoDone] = useState(false);
   const [ansSplit, setAnsSplit] = useState<string | null>(null); // id do SPLIT_OPTS (AB..ABCDEF)
+  const [usedFallback, setUsedFallback] = useState(false); // IA falhou: plano local
+  const [genElapsed, setGenElapsed] = useState(0);
   const [ansRestricoes, setAnsRestricoes] = useState<string[]>([]); // valores "Cuidado com ..."
   const [restDone, setRestDone] = useState(false);
+
+  // cronômetro da geração (a IA pode levar ~30-50s; mostra honestamente)
+  useEffect(() => {
+    if (!loading) {
+      setGenElapsed(0);
+      return;
+    }
+    const t0 = Date.now();
+    const t = setInterval(() => setGenElapsed(Math.floor((Date.now() - t0) / 1000)), 500);
+    return () => clearInterval(t);
+  }, [loading]);
 
   // zera as respostas ao trocar de aluno
   useEffect(() => {
@@ -502,6 +515,7 @@ function PersonalTreinosContent() {
       ? `Pedido do personal: ${obs || "otimizar o plano"}.\nPlano atual em JSON (devolva COMPLETO, mudando somente o pedido):\n${JSON.stringify(plan)}`
       : guidedRequest;
     setLoading(true);
+    setUsedFallback(false);
     const daysArr = [...daysSelected];
     const daysMeta = {
       nivel: ansNivel,
@@ -577,6 +591,7 @@ function PersonalTreinosContent() {
       } else {
         toast.error(data.error ?? "O Assistente está offline no momento. Tente novamente.");
         toast.info("Montei com o gerador local do app. Revise antes de enviar.");
+        setUsedFallback(true);
         setPlan(fallback);
       }
       setActiveDay(0);
@@ -584,6 +599,7 @@ function PersonalTreinosContent() {
     } catch {
       setLoading(false);
       toast.error("O Assistente está offline no momento. Tente novamente.");
+      setUsedFallback(true);
       setPlan(fallback);
       setActiveDay(0);
     }
@@ -720,6 +736,23 @@ function PersonalTreinosContent() {
               {adjustSwId ? "Ajustar plano com IA · gera a v2" : `Assistente GF · montando o plano de ${target.name.split(" ")[0]} com você`}
             </p>
           </div>
+          {/* 1 toque: respostas já vieram da ficha, gera direto sem clicar nas perguntas */}
+          {guidedReady && !plan && !loading ? (
+            <button
+              type="button"
+              onClick={run}
+              disabled={!libReady}
+              className="tactile mb-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 text-[13.5px] font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-50"
+            >
+              <Send className="h-4 w-4" />
+              {!libReady ? "Carregando biblioteca..." : "Gerar treino com dados da ficha"}
+            </button>
+          ) : null}
+          {guidedReady && !plan && !loading ? (
+            <p className="mb-3 text-center text-[10.5px] text-muted-foreground">
+              {ansNivel} · {ansObjetivo} · {focoLabel} · {split} — ou ajuste nas perguntas abaixo
+            </p>
+          ) : null}
           {adjustSwId && plan ? (
             <div className="mb-3 rounded-2xl border border-[#FFC24D]/25 bg-[#FFC24D]/[0.07] p-3">
               <p className="text-[11.5px] leading-snug text-foreground">
@@ -1027,7 +1060,7 @@ function PersonalTreinosContent() {
             </p>
             <Button onClick={run} disabled={loading || !guidedReady || !libReady} size="sm" className="rounded-xl">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              {!libReady ? "Carregando biblioteca..." : adjustSwId ? "Gerar ajuste (v2)" : "Gerar plano completo"}
+              {loading ? `Gerando... ${genElapsed}s` : !libReady ? "Carregando biblioteca..." : adjustSwId ? "Gerar ajuste (v2)" : "Gerar plano completo"}
             </Button>
           </div>
         </section>
@@ -1069,6 +1102,22 @@ function PersonalTreinosContent() {
               className="gf-card gf-glass space-y-3 !p-4"
               aria-label="Plano de treino editável"
             >
+              {usedFallback ? (
+                <div className="rounded-2xl border border-[#FFC24D]/30 bg-[#FFC24D]/[0.07] p-3">
+                  <p className="text-[11.5px] font-bold text-[#FFC24D]">IA indisponível, plano montado local</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                    Usei a biblioteca da academia para montar. Revise, ajuste e envie. Ou tente a IA de novo.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={run}
+                    disabled={loading}
+                    className="tactile mt-2 w-full rounded-xl border border-brand/40 bg-brand/10 py-2 text-[11.5px] font-black text-brand disabled:opacity-50"
+                  >
+                    {loading ? `Tentando IA... ${genElapsed}s` : "Tentar IA de novo"}
+                  </button>
+                </div>
+              ) : null}
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
                   <Sparkles className="h-4 w-4 text-brand" />
