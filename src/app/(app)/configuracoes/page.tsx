@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { cn } from "~/lib/utils";
 import { ImageCropModal } from "~/components/common/ImageCropModal";
 import { normalizeBRPhone } from "~/lib/whatsapp";
+import { ensureUploadableImage } from "~/lib/image-upload";
 
 import { apiPath } from "~/lib/api-path";
 const OBJETIVOS: Array<{ id: NonNullable<ProfileEdits["objetivo"]>; label: string }> = [
@@ -78,8 +79,15 @@ export default function ConfiguracoesPage() {
 
   const avatarSrc = useMemo(() => edits.avatar_url ?? null, [edits.avatar_url]);
 
-  const handleFoto = (file: File) => {
-    const url = URL.createObjectURL(file);
+  const handleFoto = async (file: File) => {
+    let ready = file;
+    try {
+      ready = await ensureUploadableImage(file);
+    } catch {
+      toast.error("Foto inválida", { description: "Escolha um JPG ou PNG da galeria." });
+      return;
+    }
+    const url = URL.createObjectURL(ready);
     setCropSrc(url);
     setCropOpen(true);
   };

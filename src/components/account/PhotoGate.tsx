@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import { ImageCropModal } from "~/components/common/ImageCropModal";
+import { ensureUploadableImage } from "~/lib/image-upload";
 import { apiPath } from "~/lib/api-path";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { useAuth } from "~/hooks/useAuth";
@@ -27,15 +28,22 @@ export function PhotoGate({ children }: { children: React.ReactNode }) {
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const pickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const pickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
+    let ready = file;
+    try {
+      ready = await ensureUploadableImage(file);
+    } catch {
+      toast.error("Foto inválida", { description: "Escolha um JPG ou PNG da galeria." });
+      return;
+    }
+    if (ready.size > 8 * 1024 * 1024) {
       toast.error("Foto muito grande", { description: "Escolha uma de até 8 MB." });
       return;
     }
-    setCropSrc(URL.createObjectURL(file));
+    setCropSrc(URL.createObjectURL(ready));
     setCropOpen(true);
   };
 

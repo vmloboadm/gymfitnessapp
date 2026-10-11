@@ -35,11 +35,35 @@ const PHASES = [
  * Privacidade: só o aluno vê por padrão; ele pode liberar para o personal.
  */
 export function ProgressPhotos() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [angle, setAngle] = useState("frente");
   const [phase, setPhase] = useState("antes");
   const [uploading, setUploading] = useState(false);
+
+  // personal vinculado (para mostrar para quem a liberação vale)
+  const { data: linkedName } = useAsyncQuery<string | null>(
+    async () => {
+      if (!user || !profile?.gym_id) return { data: null, error: null };
+      const supabase = supabaseBrowser();
+      const { data: link } = await supabase
+        .from("student_trainers")
+        .select("trainer_id")
+        .eq("student_id", user.id)
+        .limit(1)
+        .maybeSingle();
+      const tid = (link as { trainer_id?: string } | null)?.trainer_id;
+      if (!tid) return { data: null, error: null };
+      const rpc = await supabase.rpc("gym_roster", { p_gym_id: profile.gym_id });
+      const found = (!rpc.error && Array.isArray(rpc.data)
+        ? (rpc.data as Array<{ id: string; name: string | null }>)
+        : []
+      ).find((m) => m.id === tid);
+      return { data: found?.name?.split(" ")[0] ?? "Personal", error: null };
+    },
+    [user?.id, profile?.gym_id],
+    { enabled: !authLoading && !!user }
+  );
 
   const { data, loading, error, refetch } = useAsyncQuery<Photo[]>(
     async () => {
@@ -57,15 +81,23 @@ export function ProgressPhotos() {
     { enabled: !authLoading && !!user }
   );
 
-  const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || uploading) return;
-    if (file.size > 8 * 1024 * 1024) {
+    let ready = file;
+    try {
+      const { ensureUploadableImage } = await import("~/lib/image-upload");
+      ready = await ensureUploadableImage(file);
+    } catch {
+      toast.error("Foto inválida", { description: "Escolha um JPG ou PNG da galeria." });
+      return;
+    }
+    if (ready.size > 8 * 1024 * 1024) {
       toast.error("Foto muito grande", { description: "Escolha uma de até 8 MB." });
       return;
     }
-    void upload(file);
+    void upload(ready);
   };
 
   const upload = async (file: File) => {
@@ -131,7 +163,12 @@ export function ProgressPhotos() {
     <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "270ms" }}>
       <p className="gf-section">Fotos de evolução</p>
       <p className="mt-0.5 text-[12px] text-muted-foreground">
-        Antes e depois, só suas por padrão. Libere para o personal se quiser.
+        Antes e depois, só suas por padrão.{" "}
+        {linkedName ? (
+          <>Liberando, <strong className="text-foreground">{linkedName}</strong> pode ver.</>
+        ) : (
+          <>Sem personal vinculado: a liberação vale quando você escolher um.</>
+        )}
       </p>
 
       {loading ? (

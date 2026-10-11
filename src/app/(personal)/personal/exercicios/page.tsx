@@ -8,6 +8,8 @@ import {
   MoreVertical,
   Play,
   Pencil,
+  Plus,
+  Trash2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +17,9 @@ import { Badge } from "~/components/ui/badge";
 import { AnimatePresence,m } from "framer-motion";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import { isDemoMode, demoLib } from "~/lib/demo-bridge";
+import { useAuth } from "~/hooks/useAuth";
+import { supabaseBrowser } from "~/lib/supabase/client";
+import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { assetPath } from "~/lib/asset-path";
 import { curatedSearch } from "~/lib/exercises-database";
 import { readLibraryEdits, saveLibraryEdit } from "~/lib/trainer-store";
@@ -37,7 +42,22 @@ type LibExercise = {
   imageUrl: string | null;
   tips: string[] | null;
   muscles: string[] | null;
+  dbId?: string | null;
+  ownGym?: boolean;
 };
+
+const GYM_CATEGORIES = [
+  "peito",
+  "costas",
+  "ombro",
+  "biceps",
+  "triceps",
+  "perna",
+  "gluteo",
+  "core",
+  "cardio",
+  "panturrilha",
+] as const;
 
 /**
  * Biblioteca de exercícios do Personal, na mesma organização do aluno:
@@ -45,17 +65,109 @@ type LibExercise = {
  */
 export default function PersonalExerciciosPage() {
   const demo = isDemoMode();
+  const { user, profile, loading: authLoading } = useAuth();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [detail, setDetail] = useState<LibExercise | null>(null);
   const [renaming, setRenaming] = useState("");
   const [editingName, setEditingName] = useState(false);
   const [version, setVersion] = useState(0); // re-render após editar (localStorage)
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newCat, setNewCat] = useState<string>("peito");
+  const [newMuscles, setNewMuscles] = useState("");
+  const [newTip, setNewTip] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Exercícios criados pela academia (banco): entram na lista, no picker,
+  // nos equivalentes e na IA, e ficam salvos para os próximos treinos.
+  const { data: gymRows, refetch: refetchGym } = useAsyncQuery<
+    Array<{ id: string; name: string; category: string; muscles: string[] | null; tips: string[] | null }>
+  >(
+    async () => {
+      if (demo || !profile?.gym_id) return { data: [], error: null };
+      const { data, error } = await supabaseBrowser()
+        .from("exercises")
+        .select("id, name, category, muscles, tips")
+        .eq("gym_id", profile.gym_id)
+        .order("name");
+      if (error) return { data: null, error };
+      return { data: (data ?? []) as Array<{ id: string; name: string; category: string; muscles: string[] | null; tips: string[] | null }>, error: null };
+    },
+    [demo, profile?.gym_id],
+    { enabled: !authLoading && !!user }
+  );
+
+  const createExercise = async () => {
+    const name = newName.trim();
+    if (!name || !profile?.gym_id || saving) return;
+    setSaving(true);
+    try {
+      const muscles = newMuscles.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 6);
+      const { error } = await supabaseBrowser()
+        .from("exercises")
+        .insert({
+          gym_id: profile.gym_id,
+          name,
+          category: newCat,
+          muscles,
+          tips: newTip.trim() ? [newTip.trim()] : [],
+        } as never);
+      if (error) throw new Error(error.message);
+      toast.success("Exercício criado", { description: `${name} já vale na biblioteca, no picker e na IA.` });
+      setNewName("");
+      setNewMuscles("");
+      setNewTip("");
+      setNewCat("peito");
+      setCreating(false);
+      refetchGym();
+    } catch (e) {
+      toast.error("Não deu criar agora", { description: String(e instanceof Error ? e.message : e).slice(0, 80) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteGymExercise = async (id: string, name: string) => {
+    try {
+      const { error } = await supabaseBrowser().from("exercises").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Exercício apagado", { description: name });
+      setDetail(null);
+      refetchGym();
+    } catch (e) {
+      const msg = String((e as { message?: string })?.message ?? e);
+      toast.error(
+        /foreign key|violates/i.test(msg) ? "Em uso em um treino" : "Não deu apagar",
+        /foreign key|violates/i.test(msg)
+          ? { description: "Ele está em um plano ativo e não pode sair agora." }
+          : { description: msg.slice(0, 80) }
+      );
+    }
+  };
+
+  const renameGymExercise = async (id: string, name: string) => {
+    const next = renaming.trim();
+    if (!next || next === name) {
+      setEditingName(false);
+      return;
+    }
+    try {
+      const { error } = await supabaseBrowser().from("exercises").update({ name: next } as never).eq("id", id);
+      if (error) throw new Error(error.message);
+      toast.success("Exercício renomeado");
+      setEditingName(false);
+      setDetail(null);
+      refetchGym();
+    } catch (e) {
+      toast.error("Não deu renomear", { description: String(e instanceof Error ? e.message : e).slice(0, 80) });
+    }
+  };
 
   const all = useMemo<LibExercise[]>(() => {
     void version;
     const edits = demo ? readLibraryEdits() : {};
-    return demoLib
+    const curated = demoLib
       .flatMap((c) =>
         c.subs.flatMap((sub) =>
           sub.exercises.map((e) => ({
@@ -68,9 +180,22 @@ export default function PersonalExerciciosPage() {
             muscles: e.tags ?? null,
           }))
         )
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [demo, version]);
+      );
+    const gym = demo
+      ? []
+      : ((gymRows ?? []).map((g) => ({
+          id: `gym-${g.id}`,
+          name: g.name,
+          category: g.category,
+          group: "Da academia",
+          imageUrl: null,
+          tips: g.tips,
+          muscles: g.muscles,
+          dbId: g.id,
+          ownGym: true,
+        })) as LibExercise[]);
+    return [...gym, ...curated].sort((a, b) => a.name.localeCompare(b.name));
+  }, [demo, version, gymRows]);
 
   const cats = useMemo(
     () => [...demoLib].sort((a, b) => a.name.localeCompare(b.name)),
@@ -79,7 +204,7 @@ export default function PersonalExerciciosPage() {
 
   const filtered = all.filter((e) => {
     const matchQ = !q || e.name.toLowerCase().includes(q.trim().toLowerCase());
-    const matchCat = cat === "all" || e.category === cat;
+    const matchCat = cat === "all" ? true : cat === "academia" ? !!e.ownGym : e.category === cat;
     return matchQ && matchCat;
   });
 
@@ -99,7 +224,90 @@ export default function PersonalExerciciosPage() {
         <p className="text-[11px] text-muted-foreground">
           {all.length} exercícios · mesma biblioteca do aluno
         </p>
+        {!demo ? (
+          <button
+            type="button"
+            onClick={() => setCreating((v) => !v)}
+            aria-expanded={creating}
+            className="tactile mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-brand/40 bg-brand/[0.04] py-3 text-[13px] font-black text-brand"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} /> Novo exercício da academia
+          </button>
+        ) : null}
       </header>
+
+      {/* Criar exercício com o nome que preferir: salva na academia e vale
+          na biblioteca, no picker, nos equivalentes e na IA */}
+      {!demo && creating ? (
+        <div className="space-y-2.5 rounded-2xl border border-brand/30 bg-brand/[0.05] p-4">
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Nome do exercício
+            </span>
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Ex.: Remada serrote no banco"
+              aria-label="Nome do novo exercício"
+              maxLength={80}
+              className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Grupo
+              </span>
+              <select
+                value={newCat}
+                onChange={(e) => setNewCat(e.target.value)}
+                aria-label="Grupo muscular"
+                className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+              >
+                {GYM_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c[0].toUpperCase() + c.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Dica (opcional)
+              </span>
+              <input
+                value={newTip}
+                onChange={(e) => setNewTip(e.target.value)}
+                placeholder="Ex.: sem balanço"
+                aria-label="Dica de execução"
+                maxLength={120}
+                className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+              />
+            </label>
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Músculos (opcional, separados por vírgula)
+            </span>
+            <input
+              value={newMuscles}
+              onChange={(e) => setNewMuscles(e.target.value)}
+              placeholder="Ex.: grande dorsal, bíceps"
+              aria-label="Músculos trabalhados"
+              maxLength={120}
+              className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={createExercise}
+            disabled={saving || !newName.trim()}
+            className="tactile flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand text-[13px] font-black text-brand-foreground disabled:opacity-40"
+          >
+            {saving ? "Salvando..." : "Salvar na biblioteca"}
+          </button>
+        </div>
+      ) : null}
 
       {/* Busca */}
       <div className="relative">
@@ -119,7 +327,7 @@ export default function PersonalExerciciosPage() {
         role="tablist"
         aria-label="Filtrar por grupo muscular"
       >
-        {[{ id: "all", name: "Todos" }, ...cats].map((c) => (
+        {[{ id: "all", name: "Todos" }, { id: "academia", name: "Da academia" }, ...cats].map((c) => (
           <button
             key={c.id}
             role="tab"
@@ -279,6 +487,10 @@ export default function PersonalExerciciosPage() {
                       />
                       <button
                         onClick={() => {
+                          if (detail.ownGym && detail.dbId) {
+                            void renameGymExercise(detail.dbId, detail.name);
+                            return;
+                          }
                           if (renaming.trim() && renaming.trim() !== detail.name) {
                             saveLibraryEdit(detail.id, { name: renaming.trim() });
                             setVersion((v) => v + 1);
@@ -301,6 +513,15 @@ export default function PersonalExerciciosPage() {
                       Editar Exercício
                     </button>
                   )}
+                  {detail.ownGym && detail.dbId && !demo ? (
+                    <button
+                      onClick={() => deleteGymExercise(detail.dbId as string, detail.name)}
+                      className="tactile flex h-12 items-center justify-center gap-2 rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.06] text-[13px] font-bold text-[#F87171] transition-transform active:scale-[0.97]"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Apagar da biblioteca
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </m.div>
