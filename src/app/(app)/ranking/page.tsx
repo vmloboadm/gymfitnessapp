@@ -540,9 +540,9 @@ export default function RankingPage() {
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-card">
                     <m.div
-                      className="h-full rounded-full bg-gradient-to-r from-brand to-warning"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${pct}%` }}
+                      className="h-full w-full origin-left rounded-full bg-gradient-to-r from-brand to-warning"
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: pct / 100 }}
                       transition={{ duration: 0.9, ease: [0.2, 0.8, 0.2, 1] }}
                     />
                   </div>

@@ -434,7 +434,7 @@ export default function FeedPage() {
                           aria-label={`${label} (${count})`}
                           title={label}
                           className={cn(
-                            "tactile flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] font-bold transition-all active:scale-125",
+                            "tactile flex min-h-[36px] items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] font-bold transition-all active:scale-125",
                             active
                               ? "border-brand/60 bg-brand/15 text-brand"
                               : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"

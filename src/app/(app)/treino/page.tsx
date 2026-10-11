@@ -1207,7 +1207,7 @@ export default function TreinoHomePage() {
                       <button
                         type="button"
                         onClick={() => startPlanSession(i)}
-                        className="tactile shrink-0 rounded-lg border border-brand/30 bg-brand/10 px-3 py-1.5 text-[11px] font-black text-brand"
+                        className="tactile min-h-[36px] shrink-0 rounded-lg border border-brand/30 bg-brand/10 px-3 py-1.5 text-[11px] font-black text-brand"
                       >
                         Fazer
                       </button>
@@ -1270,9 +1270,9 @@ export default function TreinoHomePage() {
                   </div>
                   <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/15">
                     <m.div
-                      className="h-full rounded-full bg-[#FF7A2F]"
+                      className="h-full w-full origin-left rounded-full bg-[#FF7A2F]"
                       initial={false}
-                      animate={{ width: `${Math.min(100, ((demo ? doneCount : Math.max(todayLogs, doneCount)) / Math.max(totalToday, 1)) * 100)}%` }}
+                      animate={{ scaleX: Math.min(1, (demo ? doneCount : Math.max(todayLogs, doneCount)) / Math.max(totalToday, 1)) }}
                       transition={{ duration: 0.4 }}
                     />
                   </div>

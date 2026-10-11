@@ -70,11 +70,11 @@ export function BottomNav() {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex min-w-0 flex-1 shrink-0 snap-start flex-col items-center justify-center gap-1 px-2 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[10px] transition-colors active:scale-[0.94]",
+                  "relative flex min-w-0 flex-1 shrink-0 snap-start flex-col items-center justify-center gap-0.5 px-1 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[9px] transition-colors active:scale-[0.94]",
                   active ? "text-brand" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <span className="relative flex h-7 w-11 items-center justify-center rounded-xl">
+                <span className="relative flex h-6 w-10 items-center justify-center rounded-xl">
                   {active && (
                     <m.span
                       layoutId="nav-indicator"

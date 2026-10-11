@@ -105,9 +105,9 @@ export default function ConquistasPage() {
           </div>
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-card/60">
             <m.div
-              className="h-full rounded-full bg-gradient-to-r from-brand to-warning"
-              initial={{ width: 0 }}
-              animate={{ width: `${data?.progress ?? 0}%` }}
+              className="h-full w-full origin-left rounded-full bg-gradient-to-r from-brand to-warning"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: (data?.progress ?? 0) / 100 }}
               transition={{ duration: 0.7, ease: "easeOut" }}
             />
           </div>

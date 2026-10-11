@@ -583,10 +583,10 @@ export default function PersonalPerfilPage() {
             <p className="mt-1 font-display text-xl font-black text-foreground">{avgStreak} dias</p>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.06]">
               <m.div
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, (avgStreak / 10) * 100)}%` }}
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: Math.min(1, avgStreak / 10) }}
                 transition={{ duration: 0.9, ease: [0.2, 0.8, 0.2, 1] }}
-                className="h-full rounded-full bg-gradient-to-r from-brand to-[#FF8A3C]"
+                className="h-full w-full origin-left rounded-full bg-gradient-to-r from-brand to-[#FF8A3C]"
               />
             </div>
           </div>

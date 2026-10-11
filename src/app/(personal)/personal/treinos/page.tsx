@@ -1215,7 +1215,7 @@ function PersonalTreinosContent() {
                       aria-selected={activeDay === i}
                       onClick={() => setActiveDay(i)}
                       className={cn(
-                        "shrink-0 rounded-full border px-3 py-1 text-[10.5px] font-bold transition-colors",
+                        "shrink-0 rounded-full border px-3 py-2 text-[10.5px] font-bold transition-colors",
                         activeDay === i
                           ? "border-brand bg-brand text-brand-foreground"
                           : "border-white/[0.06] bg-white/[0.03] text-muted-foreground"
@@ -1268,7 +1268,7 @@ function PersonalTreinosContent() {
                               type="button"
                               onClick={() => setSwapTarget({ dayIdx: di, exIdx: i })}
                               aria-label={`Trocar ${e.exercicio}`}
-                              className="tactile flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-brand"
+                              className="tactile relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md before:absolute before:-inset-2 before:content-[''] text-muted-foreground hover:text-brand"
                             >
                               <ArrowLeftRight className="h-3 w-3" />
                             </button>
@@ -1278,7 +1278,7 @@ function PersonalTreinosContent() {
                                 updateDay(di, { exercicios: dd.exercicios.filter((_, xi) => xi !== i) })
                               }
                               aria-label={`Remover ${e.exercicio}`}
-                              className="tactile flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-[#F87171]"
+                              className="tactile relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md before:absolute before:-inset-2 before:content-[''] text-muted-foreground hover:text-[#F87171]"
                             >
                               <Trash2 className="h-3 w-3" />
                             </button>
@@ -1367,7 +1367,7 @@ function PersonalTreinosContent() {
                             setSwapQuery("");
                           }}
                           aria-label={`Trocar ${e.exercicio} por outro exercício`}
-                          className="tactile flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-brand"
+                          className="tactile relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg before:absolute before:-inset-2 before:content-[''] text-muted-foreground transition-colors hover:text-brand"
                         >
                           <ArrowLeftRight className="h-3.5 w-3.5" />
                         </button>
@@ -1378,7 +1378,7 @@ function PersonalTreinosContent() {
                             })
                           }
                           aria-label={`Remover ${e.exercicio}`}
-                          className="tactile flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-[#F87171]"
+                          className="tactile relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg before:absolute before:-inset-2 before:content-[''] text-muted-foreground transition-colors hover:text-[#F87171]"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

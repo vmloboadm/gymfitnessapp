@@ -82,7 +82,7 @@ export function CardioQuickAdd() {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="flex items-center gap-1.5 text-sm font-bold text-foreground">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
           <Bike className="h-4 w-4 text-brand" /> Cardio
         </h2>
         {(weekMin ?? 0) > 0 ? (

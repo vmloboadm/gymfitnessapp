@@ -621,3 +621,13 @@ body.session-active {
 *::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Movimento reduzido: utilitários infinitos do Tailwind viram estáticos */
+@media (prefers-reduced-motion: reduce) {
+  .animate-ping,
+  .animate-pulse,
+  .animate-spin,
+  .animate-bounce {
+    animation: none !important;
+  }
+}
