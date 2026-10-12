@@ -66,6 +66,10 @@ import { apiPath } from "~/lib/api-path";
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 
+/** Busca sem acento nem maiúscula ("biceps" acha "Bíceps", "marilia" acha "Marília"). */
+const normBusca = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
+
 /* ------------------------------------------------------------------ */
 /* Assistente guiado: a IA faz perguntas (nível, objetivo, foco,        */
 /* restrições) antes de gerar, em vez de uma frase livre.              */
@@ -233,7 +237,8 @@ function PersonalTreinosContent() {
 
   // ===== Assistente guiado (a IA faz perguntas antes de gerar) =====
   const [ansNivel, setAnsNivel] = useState<string | null>(null);
-  const [ansObjetivo, setAnsObjetivo] = useState<string | null>(null);
+  const [ansObjetivo, setAnsObjetivo] = useState<string[]>([]); // pode marcar vários (ex.: hipertrofia + condicionamento)
+  const [objetivoDone, setObjetivoDone] = useState(false);
   const [ansFoco, setAnsFoco] = useState<string[]>([]); // ids do FOCO_OPTS — pode marcar vários (ex.: braços + ombros)
   const [focoDone, setFocoDone] = useState(false);
   const [ansSplit, setAnsSplit] = useState<string | null>(null); // id do SPLIT_OPTS (AB..ABCDEF)
@@ -256,7 +261,8 @@ function PersonalTreinosContent() {
   // zera as respostas ao trocar de aluno
   useEffect(() => {
     setAnsNivel(null);
-    setAnsObjetivo(null);
+    setAnsObjetivo([]);
+    setObjetivoDone(false);
     setAnsFoco([]);
     setFocoDone(false);
     setAnsSplit(null);
@@ -272,13 +278,17 @@ function PersonalTreinosContent() {
     const n = normNivel(st.experience_level);
     const o = normObjetivo(st.goal ?? st.activeWorkout);
     if (n) setAnsNivel((prev) => prev ?? n);
-    if (o) setAnsObjetivo((prev) => prev ?? o);
+    // pré-preenchido conta como confirmado (1 toque continua valendo)
+    if (o) {
+      setAnsObjetivo((prev) => (prev.length > 0 ? prev : [o]));
+      setObjetivoDone(true);
+    }
   }, [targetId, students]);
 
   // passo atual do assistente: 0 nível, 1 objetivo, 2 foco, 3 restrições, 4 resumo
   const askStep = !ansNivel
     ? 0
-    : !ansObjetivo
+    : !objetivoDone
       ? 1
       : !focoDone
         ? 2
@@ -286,13 +296,17 @@ function PersonalTreinosContent() {
           ? 3
           : 4;
 
+  const objetivoLabel = ansObjetivo.length > 0 ? ansObjetivo.join(", ") : "Condicionamento";
+  const toggleObjetivo = (o: string) =>
+    setAnsObjetivo((prev) => (prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o]));
+
   const focoSels = FOCO_OPTS.filter((f) => ansFoco.includes(f.id));
   const focoLabel = focoSels.length
     ? focoSels.map((f) => f.label).join(", ")
     : "Corpo inteiro";
   const toggleFoco = (id: string) =>
     setAnsFoco((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  const guidedReady = !!ansNivel && !!ansObjetivo && focoDone && ansFoco.length > 0 && restDone;
+  const guidedReady = !!ansNivel && objetivoDone && ansObjetivo.length > 0 && focoDone && ansFoco.length > 0 && restDone;
   // Divisão sugerida pela quantidade de dias marcados; o personal pode trocar.
   const splitSug =
     daysSelected.size <= 2 ? "AB"
@@ -318,6 +332,8 @@ function PersonalTreinosContent() {
   const [dbEquipment, setDbEquipment] = useState<DBEquipment[]>([]);
   // Biblioteca carregada? Sem ela a IA inventa nomes fora do catálogo.
   const [libReady, setLibReady] = useState(false);
+  const [libError, setLibError] = useState(false);
+  const [libTick, setLibTick] = useState(0);
 
   const refresh = () => {
     if (!gymId) {
@@ -343,7 +359,7 @@ function PersonalTreinosContent() {
     getGymStudents(gymId).then(setStudents).catch(() => setStudents([]));
   }, [gymId]);
 
-  // Busca exercícios e equipamentos reais do banco
+  // Busca exercícios e equipamentos reais do banco (com retry visível se falhar)
   useEffect(() => {
     if (!gymId) return;
     const sb = supabaseBrowser();
@@ -353,9 +369,10 @@ function PersonalTreinosContent() {
     ]).then(([exRes, eqRes]) => {
       if (exRes.data) setDbExercises(exRes.data as DBExercise[]);
       if (eqRes.data) setDbEquipment(eqRes.data as DBEquipment[]);
+      setLibError(!exRes.data || exRes.data.length === 0);
       setLibReady(true);
-    }).catch(() => { setLibReady(true); });
-  }, [gymId]);
+    }).catch(() => { setLibError(true); setLibReady(true); });
+  }, [gymId, libTick]);
 
   // modo edição/ajuste: carrega o plano (demo via localStorage, produção via banco)
   const adjustId = params.get("adjust") ?? "";
@@ -439,10 +456,10 @@ function PersonalTreinosContent() {
   const [repeatSaving, setRepeatSaving] = useState(false);
 
   const swapList = useMemo(() => {
-    const q = swapQuery.trim().toLowerCase();
+    const q = normBusca(swapQuery);
     return dbExercises
       .filter((e) => e.name.toLowerCase() !== "registro livre")
-      .filter((e) => !q || e.name.toLowerCase().includes(q))
+      .filter((e) => !q || normBusca(e.name).includes(q))
       .slice(0, 60);
   }, [dbExercises, swapQuery]);
 
@@ -491,7 +508,7 @@ function PersonalTreinosContent() {
     const slots = split.split("").join(", ");
     const parts = [
       `Plano ${ansNivel} para ${target?.name ?? "o aluno"}.`,
-      `Objetivo: ${ansObjetivo}.`,
+      `Objetivo: ${objetivoLabel}.`,
       `Foco: ${focoLabel}.`,
       `Divisão ${split} em rotação (sem dia fixo): gere exatamente ${splitLen} ${splitLen === 1 ? "treino" : "treinos"} (slots ${slots}). Nomeie cada dia começando pela letra do slot, ex.: "A · Peito e Tríceps".`,
     ];
@@ -526,7 +543,7 @@ function PersonalTreinosContent() {
     const daysArr = [...daysSelected];
     const daysMeta = {
       nivel: ansNivel,
-      objetivo: ansObjetivo,
+      objetivo: objetivoLabel,
       focus: focoSels.length ? [...new Set(focoSels.flatMap((f) => f.focus))] : ["Corpo inteiro"],
       restricoes: ansRestricoes,
       observacoes: obs || null,
@@ -555,7 +572,7 @@ function PersonalTreinosContent() {
         body: JSON.stringify({
           message: buildWorkoutPrompt({
             studentName: target.name,
-            goal: ansObjetivo,
+            goal: objetivoLabel,
             level: ansNivel,
             frequency: fallback.frequencia,
             days: daysArr.length > 0 ? daysArr : target.available_days ?? [],
@@ -790,6 +807,26 @@ function PersonalTreinosContent() {
             {target.lastRpe != null ? <span>último RPE {target.lastRpe}</span> : null}
             <span>meta {target.freq ?? splitLen}x/sem</span>
           </div>
+          {/* biblioteca falhou: erro explícito com retry, nunca tela morta */}
+          {libError && dbExercises.length === 0 && libReady ? (
+            <div className="mb-3 rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.07] p-3">
+              <p className="text-[11.5px] font-bold text-[#F87171]">Biblioteca não carregou</p>
+              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                Sem ela não dá gerar nem trocar exercícios. Tente de novo.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setLibReady(false);
+                  setLibError(false);
+                  setLibTick((t) => t + 1);
+                }}
+                className="tactile mt-2 w-full rounded-xl border border-brand/40 bg-brand/10 py-2 text-[11.5px] font-black text-brand"
+              >
+                Carregar biblioteca de novo
+              </button>
+            </div>
+          ) : null}
           {/* 1 toque: respostas já vieram da ficha, gera direto sem clicar nas perguntas */}
           {guidedReady && !plan && !loading ? (
             <button
@@ -804,7 +841,7 @@ function PersonalTreinosContent() {
           ) : null}
           {guidedReady && !plan && !loading ? (
             <p className="mb-3 text-center text-[10.5px] text-muted-foreground">
-              {ansNivel} · {ansObjetivo} · {focoLabel} · {split}, ou ajuste nas perguntas abaixo
+              {ansNivel} · {objetivoLabel} · {focoLabel} · {split}, ou ajuste nas perguntas abaixo
             </p>
           ) : null}
           {adjustSwId && plan ? (
@@ -851,32 +888,46 @@ function PersonalTreinosContent() {
           {askStep >= 1 ? (
             <>
               <div className="mb-2.5 mt-1 max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground">
-                E qual o objetivo principal?
+                Quais os objetivos? Toque em quantos quiser.
               </div>
-              {askStep > 1 && ansObjetivo ? (
+              {askStep > 1 && ansObjetivo.length > 0 ? (
                 <div className="mb-2.5 flex justify-end">
                   <span className="rounded-2xl rounded-tr-sm bg-brand px-3 py-2 text-[12px] font-bold text-brand-foreground">
-                    {ansObjetivo}
+                    {objetivoLabel}
                   </span>
                 </div>
               ) : null}
-              {askStep === 1 ? (
+              {!objetivoDone ? (
                 <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Objetivo do plano">
-                  {OBJETIVO_OPTS.map((o) => (
-                    <button
-                      key={o}
-                      type="button"
-                      onClick={() => setAnsObjetivo(o)}
-                      className={cn(
-                        "rounded-full border px-3.5 py-2 text-[11.5px] font-bold transition-colors",
-                        ansObjetivo === o
-                          ? "border-brand bg-brand text-brand-foreground"
-                          : "border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:border-brand/40 hover:text-foreground"
-                      )}
-                    >
-                      {o}
-                    </button>
-                  ))}
+                  {OBJETIVO_OPTS.map((o) => {
+                    const on = ansObjetivo.includes(o);
+                    return (
+                      <button
+                        key={o}
+                        type="button"
+                        onClick={() => toggleObjetivo(o)}
+                        aria-pressed={on}
+                        className={cn(
+                          "rounded-full border px-3.5 py-2 text-[11.5px] font-bold transition-colors",
+                          on
+                            ? "border-brand bg-brand text-brand-foreground"
+                            : "border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:border-brand/40 hover:text-foreground"
+                        )}
+                      >
+                        {o}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setObjetivoDone(true)}
+                    disabled={ansObjetivo.length === 0}
+                    className="tactile w-full rounded-xl border border-brand/40 bg-brand/10 py-2.5 text-[12px] font-bold text-brand transition-colors hover:bg-brand/20 disabled:cursor-not-allowed disabled:border-white/[0.06] disabled:bg-white/[0.03] disabled:text-muted-foreground/60"
+                  >
+                    {ansObjetivo.length === 0
+                      ? "Escolha ao menos um objetivo"
+                      : `Confirmar objetivo (${ansObjetivo.length})`}
+                  </button>
                 </div>
               ) : null}
             </>
@@ -1007,7 +1058,7 @@ function PersonalTreinosContent() {
                 Resumo para gerar
               </p>
               <p className="text-[11.5px] leading-relaxed text-foreground">
-                <strong>{ansNivel}</strong> · <strong>{ansObjetivo}</strong> · <strong>{focoLabel}</strong>
+                <strong>{ansNivel}</strong> · <strong>{objetivoLabel}</strong> · <strong>{focoLabel}</strong>
                 {ansRestricoes.length ? (
                   <span className="text-[#FFC24D]"> · {ansRestricoes.join(", ")}</span>
                 ) : (
@@ -1018,7 +1069,8 @@ function PersonalTreinosContent() {
                 type="button"
                 onClick={() => {
                   setAnsNivel(null);
-                  setAnsObjetivo(null);
+                  setAnsObjetivo([]);
+                  setObjetivoDone(false);
                   setAnsFoco([]);
                   setFocoDone(false);
                   setAnsSplit(null);
@@ -1500,7 +1552,7 @@ function PersonalTreinosContent() {
             <ul className="max-h-[40vh] space-y-1.5 overflow-y-auto">
               {students
                 .filter((s) => s.id !== repeatSheet?.excludeId)
-                .filter((s) => !repeatQuery.trim() || s.name.toLowerCase().includes(repeatQuery.trim().toLowerCase()))
+                .filter((s) => !repeatQuery.trim() || normBusca(s.name).includes(normBusca(repeatQuery)))
                 .map((s) => {
                   const on = repeatSelected.has(s.id);
                   return (
@@ -1805,7 +1857,7 @@ function PersonalTreinosContent() {
           </div>
           <ul className="space-y-1.5">
             {students
-              .filter((s) => s.name.toLowerCase().includes(pickerQuery.trim().toLowerCase()))
+              .filter((s) => normBusca(s.name).includes(normBusca(pickerQuery)))
               .map((s) => (
                 <li key={s.id}>
                   <button

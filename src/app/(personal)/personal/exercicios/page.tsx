@@ -203,7 +203,8 @@ export default function PersonalExerciciosPage() {
   );
 
   const filtered = all.filter((e) => {
-    const matchQ = !q || e.name.toLowerCase().includes(q.trim().toLowerCase());
+    const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
+    const matchQ = !q || norm(e.name).includes(norm(q));
     const matchCat = cat === "all" ? true : cat === "academia" ? !!e.ownGym : e.category === cat;
     return matchQ && matchCat;
   });
