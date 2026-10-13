@@ -182,13 +182,19 @@ async function assignReal(
     }
   }
 
-  const { error: swErr } = await sb.from("student_workouts").insert(({
+  const { data: swRow, error: swErr } = await sb.from("student_workouts").insert(({
     gym_id: gymId,
     student_id: student.id,
     program_id: programId,
     status: "active",
-  } as never));
-  if (swErr) throw new Error(swErr.message);
+  } as never)).select("id").single();
+  if (swErr || !swRow) throw new Error(swErr?.message ?? "falha ao atribuir");
+  // um plano ativo por aluno: aposenta os anteriores (vira histórico)
+  await sb.from("student_workouts")
+    .update({ status: "completed", completed_at: new Date().toISOString() } as never)
+    .eq("student_id", student.id)
+    .eq("status", "active")
+    .neq("id", (swRow as { id: string }).id);
   return programId;
 }
 
@@ -251,14 +257,23 @@ export async function assignExistingPlan(opts: {
   const failed: string[] = [];
   let ok = 0;
   for (const t of opts.targets) {
-    const { error } = await sb.from("student_workouts").insert({
+    const { data: swRow, error } = await sb.from("student_workouts").insert({
       gym_id: opts.gymId,
       student_id: t.id,
       program_id: opts.programId,
       status: "active",
-    } as never);
-    if (error) failed.push(t.name.split(" ")[0]);
-    else ok++;
+    } as never).select("id").single();
+    if (error || !swRow) {
+      failed.push(t.name.split(" ")[0]);
+      continue;
+    }
+    ok++;
+    // um plano ativo por aluno: aposenta os anteriores
+    await sb.from("student_workouts")
+      .update({ status: "completed", completed_at: new Date().toISOString() } as never)
+      .eq("student_id", t.id)
+      .eq("status", "active")
+      .neq("id", (swRow as { id: string }).id);
   }
   return { ok, failed };
 }
