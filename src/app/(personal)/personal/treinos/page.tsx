@@ -42,7 +42,6 @@ import {
 } from "~/lib/ai/local-gen";
 import { demoLib } from "~/lib/demo-bridge";
 import {
-  demoTemplates,
   type PersonalStudent,
   type WorkoutTemplate,
 } from "~/lib/personal-data";
@@ -210,8 +209,8 @@ function PersonalTreinosContent() {
             });
           } catch { /* pula plano ilegível */ }
         }
-        setModelos(real.length > 0 ? real : demoTemplates());
-      } catch { if (alive) setModelos(demoTemplates()); }
+        setModelos(real.length > 0 ? real : []);
+      } catch { if (alive) setModelos([]); }
     })();
     return () => { alive = false; };
   }, [gymId]);
@@ -1599,6 +1598,11 @@ function PersonalTreinosContent() {
                     </li>
                   );
                 })}
+              {students.filter((s) => s.id !== repeatSheet?.excludeId).length === 0 ? (
+                <li className="rounded-2xl border border-dashed border-white/[0.1] p-4 text-center text-[12px] text-muted-foreground">
+                  Sem outros alunos para repetir.
+                </li>
+              ) : null}
             </ul>
             <button
               type="button"
@@ -1741,6 +1745,13 @@ function PersonalTreinosContent() {
                 <div className="skeleton-line h-9 w-full" />
               </div>
             ))
+          ) : templates.length === 0 ? (
+            <div className="w-full shrink-0 rounded-2xl border border-dashed border-white/[0.1] p-4 text-center">
+              <p className="text-[12px] font-semibold text-foreground">Sem modelos ainda</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Gere o primeiro plano acima e ele vira modelo para aplicar em massa.
+              </p>
+            </div>
           ) : (
           templates.map((t) => (
             <article key={t.id} className="gf-card gf-glass w-[240px] shrink-0 snap-start space-y-2 !p-4">
@@ -1897,6 +1908,13 @@ function PersonalTreinosContent() {
                 </li>
               ))}
           </ul>
+          {students.filter((s) => normBusca(s.name).includes(normBusca(pickerQuery))).length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-white/[0.1] p-4 text-center text-[12px] text-muted-foreground">
+              {students.length === 0
+                ? "Nenhum aluno na academia ainda."
+                : "Nenhum aluno com esse nome. Ajuste a busca."}
+            </p>
+          ) : null}
         </div>
       </BottomSheet>
 
@@ -1911,6 +1929,11 @@ function PersonalTreinosContent() {
               </p>
             </div>
             <ul className="max-h-[40vh] space-y-1.5 overflow-y-auto">
+              {students.length === 0 ? (
+                <li className="rounded-2xl border border-dashed border-white/[0.1] p-4 text-center text-[12px] text-muted-foreground">
+                  Nenhum aluno na academia ainda.
+                </li>
+              ) : null}
               {students.map((s) => {
                 const on = massSelected.has(s.id);
                 return (
