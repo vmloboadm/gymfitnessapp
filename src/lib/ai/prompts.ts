@@ -279,6 +279,8 @@ export function buildWorkoutPrompt(ctx: {
 
   lines.push("");
   lines.push(`Pedido do personal: ${ctx.request}`);
+  lines.push("");
+  lines.push("Lembrete final: use APENAS nomes exatos da lista EXERCÍCIOS VÁLIDOS do contexto. Não invente nomes.");
 
   return lines.filter(Boolean).join("\n");
 }

@@ -106,6 +106,105 @@ async function validatePlanReply(text: string, extras?: Record<string, string>):
   return errors;
 }
 
+/**
+ * Reparo automático: troca nomes inventados pela IA por nomes EXATOS da
+ * biblioteca (igual, contém, primeira palavra) ou, no pior caso, por um
+ * exercício do foco do dia. Evita o 502 que travava a personal: o plano
+ * reparado volta utilizável e ela ajusta o resto na revisão.
+ * Devolve o JSON corrigido ou null se a estrutura estiver quebrada.
+ */
+async function tryRepairPlanReply(
+  text: string,
+  extras?: Record<string, string>
+): Promise<{ text: string; fixed: number } | null> {
+  const { extractJson, validateWorkoutPlan } = await import("~/lib/ai/validate");
+  const libKey = Object.keys(extras ?? {}).find((k) => /biblioteca de exerc/i.test(k));
+  const libRaw = (libKey && extras![libKey]) || "";
+  const library = libRaw
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (library.length === 0) return null;
+  const parsed = extractJson(text) as {
+    dias?: Array<{ foco?: string; exercicios?: Array<{ exercicio?: unknown }> }>;
+  } | null;
+  if (!parsed || !Array.isArray(parsed.dias) || parsed.dias.length === 0) return null;
+
+  const norm = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
+  const libNorm = library.map((n) => ({ raw: n, n: norm(n) }));
+  const findClose = (name: string): string | null => {
+    const ln = norm(name);
+    if (!ln) return null;
+    const exact = libNorm.find((e) => e.n === ln);
+    if (exact) return exact.raw;
+    const partial = libNorm.find((e) => e.n.includes(ln) || ln.includes(e.n));
+    if (partial) return partial.raw;
+    const first = ln.split(" ").filter(Boolean)[0] ?? "";
+    if (first.length >= 4) {
+      const fw = libNorm.find((e) => e.n.startsWith(first) || e.n.split(" ").includes(first));
+      if (fw) return fw.raw;
+    }
+    return null;
+  };
+  const findByFoco = (foco: string): string | null => {
+    // nomes da biblioteca são movimentos (supino, remada), não músculos
+    // (peito, costas): mapa direto palavra do foco -> trechos de nomes
+    const map: Array<[string, string[]]> = [
+      ["peito", ["supino", "crucifixo", "flexao", "voador", "peck", "deck", "crossover"]],
+      ["costas", ["remada", "puxada", "pulldown", "barra fixa", "serrote", "cavalinho"]],
+      ["dorsal", ["remada", "puxada", "pulldown", "barra fixa"]],
+      ["perna", ["agachamento", "leg press", "cadeira", "stiff", "terra", "afundo", "hack", "smith", "extensora", "flexora"]],
+      ["quadriceps", ["agachamento", "leg press", "cadeira extensora", "hack", "smith"]],
+      ["posterior", ["stiff", "cadeira flexora", "terra", "flexora"]],
+      ["ombro", ["desenvolvimento", "elevacao", "militar", "frontal", "lateral"]],
+      ["deltoide", ["desenvolvimento", "elevacao", "militar"]],
+      ["biceps", ["rosca"]],
+      ["triceps", ["triceps", "mergulho", "frances", "testa", "corda", "polia"]],
+      ["gluteo", ["gluteo", "hip thrust", "pelvica", "afundo", "coice", "ponte", "elevação pélvica"]],
+      ["core", ["abdominal", "prancha", "crunch", "pernas"]],
+      ["abdomen", ["abdominal", "prancha", "crunch"]],
+      ["panturrilha", ["panturrilha"]],
+      ["antebraco", ["rosca martelo", "rosca inversa"]],
+      ["trapezio", ["remada", "levantamento terra", "encolhimento"]],
+      ["cardio", ["esteira", "bike", "eliptico", "remo", "corda", "spinning"]],
+    ];
+    const words = norm(foco).split(" ").filter((w) => w.length >= 3);
+    for (const w of words) {
+      for (const [key, parts] of map) {
+        if (w.includes(key) || key.includes(w)) {
+          const hit = libNorm.find((e) => parts.some((p) => e.n.includes(p)));
+          if (hit) return hit.raw;
+        }
+      }
+      const direct = libNorm.find((e) => e.n.includes(w));
+      if (direct) return direct.raw;
+    }
+    return null;
+  };
+
+  let fixed = 0;
+  let unfixable = 0;
+  for (const d of parsed.dias) {
+    if (!Array.isArray(d.exercicios)) return null;
+    for (const e of d.exercicios) {
+      const name = typeof e.exercicio === "string" ? e.exercicio : "";
+      if (libNorm.some((l) => l.n === norm(name))) continue;
+      const close =
+        findClose(name) ?? findByFoco(typeof d.foco === "string" ? d.foco : "");
+      if (close) {
+        (e as { exercicio: string }).exercicio = close;
+        fixed++;
+      } else {
+        unfixable++;
+      }
+    }
+  }
+  if (unfixable > 0 || fixed === 0) return null;
+  if (!validateWorkoutPlan(parsed).ok) return null;
+  return { text: JSON.stringify(parsed), fixed };
+}
+
 /** Respostas que vazam raciocínio/regras do sistema = descarta e cai pro próximo modelo. */
 function isLeaky(text: string): boolean {
   return (
@@ -336,7 +435,7 @@ export async function handleAssistente(request: Request) {
   const runCandidate = async (
     model: string,
     cancel: AbortSignal
-  ): Promise<{ reply: string; model: string; attempt: number }> => {
+  ): Promise<{ reply: string; model: string; attempt: number; repaired?: boolean }> => {
     const msgs: ChatMessage[] = [...messages];
     for (let attempt = 0; attempt < 2; attempt++) {
       const remaining = deadline - Date.now();
@@ -353,10 +452,25 @@ export async function handleAssistente(request: Request) {
         if (!reply) throw new Error("reply vazio"); // reasoning esgotou o budget
         if (isLeaky(reply)) throw new Error("vazou o system prompt");
 
-        // validação estruturada (personal/edit): erro vira feedback e reescreve
+        // validação estruturada (personal/edit): tenta reparar nomes antes
+        // de pedir reescrita — reparo evita o 502 e a personal ajusta o resto
         if (structured) {
           const errors = await validatePlanReply(reply, extras);
           if (errors.length > 0) {
+            const repaired = await tryRepairPlanReply(reply, extras);
+            if (repaired) {
+              console.log(JSON.stringify({
+                audit: true,
+                purpose: context === "edit" ? "edit_workout" : "generate_workout",
+                model,
+                attempt,
+                latency_ms: Date.now() - t0,
+                reply_len: repaired.text.length,
+                is_json: true,
+                repaired: repaired.fixed,
+              }));
+              return { reply: repaired.text, model, attempt, repaired: true };
+            }
             lastErrors = errors;
             lastReply = reply;
             console.log(JSON.stringify({
@@ -401,7 +515,7 @@ export async function handleAssistente(request: Request) {
         } catch {
           // audit é best-effort
         }
-        return { reply, model, attempt };
+        return { reply, model, attempt, repaired: false };
       } catch (e) {
         if (!(e instanceof Error && /REJEITADA|validação insistiu/.test(e.message))) {
           console.log(JSON.stringify({
@@ -437,7 +551,7 @@ export async function handleAssistente(request: Request) {
     for (const [m, ctrl] of controllers) {
       if (m !== winner.model) ctrl.abort();
     }
-    return NextResponse.json({ ok: true, model: winner.model, text: winner.reply, corrections: winner.attempt });
+    return NextResponse.json({ ok: true, model: winner.model, text: winner.reply, corrections: winner.attempt, repaired: (winner as { repaired?: boolean }).repaired === true });
   } catch {
     // Todos os modelos falharam: se houve reply com erros conhecidos,
     // devolve o detalhe; senão o aviso genérico (front cai no gerador local).

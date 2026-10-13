@@ -603,13 +603,18 @@ function PersonalTreinosContent() {
           },
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; text?: string; error?: string };
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; text?: string; error?: string; repaired?: boolean };
       setLoading(false);
       if (data.ok && data.text) {
         let parsed = parsePlanFromLLM(data.text, fallback);
         // Valida e corrige nomes de exercícios contra o banco
         if (dbExercises.length > 0) {
           parsed = validateAndFixExercises(parsed, dbExercises);
+        }
+        if (data.repaired) {
+          toast.info("Ajustei nomes para a biblioteca da academia.", {
+            description: "Confira na revisão e troque o que precisar.",
+          });
         }
         setPlan(parsed);
       } else {
