@@ -422,10 +422,15 @@ function PersonalTreinosContent() {
           setNotes(w.notes ?? "");
           if (adjustId) setAdjustSwId(adjustId);
           if (w.plan.daysSelected?.length) setDaysSelected(new Set(w.plan.daysSelected));
-          // pré-preenche o assistente a partir do plano carregado (com fallback seguro)
+          // pré-preenche o assistente a partir do plano carregado (com fallback seguro).
+          // Formato atual é multi-seleção: nível/objetivo/foco entram confirmados
+          // para a edição/ajuste não travar o botão de gerar.
           setAnsNivel((p) => p ?? normNivel(w.plan!.nivel) ?? "Intermediário");
-          setAnsObjetivo((p) => p ?? normObjetivo(w.plan!.objetivo) ?? "Hipertrofia");
-          setAnsFoco((p) => p ?? "full");
+          const loadedObj = normObjetivo(w.plan!.objetivo);
+          setAnsObjetivo((prev) => (prev.length > 0 ? prev : loadedObj ? [loadedObj] : []));
+          if (loadedObj) setObjetivoDone(true);
+          setAnsFoco([]);
+          setFocoDone(true);
           setRestDone(true);
         }
       })
@@ -527,7 +532,9 @@ function PersonalTreinosContent() {
       toast.error("Catálogo vazio", { description: "Não achei exercícios no banco. Gere de novo em instantes." });
       return;
     }
-    if (!guidedReady) {
+    // modo ajuste (v2) não depende das perguntas: o pedido + plano atual bastam
+    const isAdjustMode = !!adjustSwId && !!plan;
+    if (!guidedReady && !isAdjustMode) {
       toast.info("Responda as perguntas do assistente para gerar o plano.");
       return;
     }
@@ -1169,7 +1176,7 @@ function PersonalTreinosContent() {
             <p className="mr-auto text-[9.5px] text-muted-foreground">
               Dias, aparelhos e ficha do aluno entram automaticamente.
             </p>
-            <Button onClick={run} disabled={loading || !guidedReady || !libReady} size="sm" className="rounded-xl">
+            <Button onClick={run} disabled={loading || (!guidedReady && !(adjustSwId && plan)) || !libReady} size="sm" className="rounded-xl">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               {loading ? `Gerando... ${genElapsed}s` : !libReady ? "Carregando biblioteca..." : adjustSwId ? "Gerar ajuste (v2)" : "Gerar plano completo"}
             </Button>
@@ -1903,7 +1910,7 @@ function PersonalTreinosContent() {
                 Selecione os alunos que vão receber este plano
               </p>
             </div>
-            <ul className="space-y-1.5">
+            <ul className="max-h-[40vh] space-y-1.5 overflow-y-auto">
               {students.map((s) => {
                 const on = massSelected.has(s.id);
                 return (
