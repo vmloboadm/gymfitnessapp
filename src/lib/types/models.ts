@@ -180,6 +180,8 @@ export type Exercises = {
   muscles: MUSCLE_GROUP[];
   equipment_id: string | null;
   photo_url: string | null;
+  /** Apelidos de busca (nomes da ficha que apontam para este exercício). */
+  aliases?: string[] | null;
   /** Link de vídeo de execução (YouTube embed/watch). */
   video_url: string | null;
   /** Miniatura da execução (usada nas listas do treino). */

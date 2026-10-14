@@ -42,6 +42,7 @@ type LibExercise = {
   imageUrl: string | null;
   tips: string[] | null;
   muscles: string[] | null;
+  aliases?: string[] | null;
   dbId?: string | null;
   ownGym?: boolean;
 };
@@ -82,17 +83,17 @@ export default function PersonalExerciciosPage() {
   // Exercícios criados pela academia (banco): entram na lista, no picker,
   // nos equivalentes e na IA, e ficam salvos para os próximos treinos.
   const { data: gymRows, refetch: refetchGym } = useAsyncQuery<
-    Array<{ id: string; name: string; category: string; muscles: string[] | null; tips: string[] | null }>
+    Array<{ id: string; name: string; category: string; muscles: string[] | null; tips: string[] | null; aliases: string[] | null }>
   >(
     async () => {
       if (demo || !profile?.gym_id) return { data: [], error: null };
       const { data, error } = await supabaseBrowser()
         .from("exercises")
-        .select("id, name, category, muscles, tips")
+        .select("id, name, category, muscles, tips, aliases")
         .eq("gym_id", profile.gym_id)
         .order("name");
       if (error) return { data: null, error };
-      return { data: (data ?? []) as Array<{ id: string; name: string; category: string; muscles: string[] | null; tips: string[] | null }>, error: null };
+      return { data: (data ?? []) as Array<{ id: string; name: string; category: string; muscles: string[] | null; tips: string[] | null; aliases: string[] | null }>, error: null };
     },
     [demo, profile?.gym_id],
     { enabled: !authLoading && !!user }
@@ -191,6 +192,7 @@ export default function PersonalExerciciosPage() {
           imageUrl: null,
           tips: g.tips,
           muscles: g.muscles,
+          aliases: (g as { aliases?: string[] | null }).aliases ?? null,
           dbId: g.id,
           ownGym: true,
         })) as LibExercise[]);
@@ -204,7 +206,13 @@ export default function PersonalExerciciosPage() {
 
   const filtered = all.filter((e) => {
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
-    const matchQ = !q || norm(e.name).includes(norm(q));
+    const nq = norm(q);
+    const matchQ =
+      !nq ||
+      norm(e.name).includes(nq) ||
+      norm(e.category).includes(nq) ||
+      (e.muscles ?? []).some((m) => norm(m).includes(nq)) ||
+      (e.aliases ?? []).some((a) => norm(a).includes(nq));
     const matchCat = cat === "all" ? true : cat === "academia" ? !!e.ownGym : e.category === cat;
     return matchQ && matchCat;
   });
@@ -453,6 +461,11 @@ export default function PersonalExerciciosPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-display text-base font-bold leading-tight text-foreground">{detail.name}</p>
+                    {detail.aliases?.length ? (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Também chamado de: {detail.aliases.join(", ")}
+                      </p>
+                    ) : null}
                     <Badge variant="outline" className="mt-1 text-[10px]">
                       {detail.group}
                     </Badge>

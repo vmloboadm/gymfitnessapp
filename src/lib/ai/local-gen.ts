@@ -53,6 +53,7 @@ export type DBExercise = {
   equipment_id?: string | null;
   photo_url?: string | null;
   tips?: string[] | null;
+  aliases?: string[] | null;
 };
 
 /** Equipamento vindo do banco (tabela equipment). */

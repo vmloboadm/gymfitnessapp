@@ -365,7 +365,7 @@ function PersonalTreinosContent() {
     if (!gymId) return;
     const sb = supabaseBrowser();
     Promise.all([
-      sb.from("exercises").select("id, name, category, muscles, equipment_id, photo_url, tips").or(`gym_id.is.null,gym_id.eq.${gymId}`),
+      sb.from("exercises").select("id, name, category, muscles, equipment_id, photo_url, tips, aliases").or(`gym_id.is.null,gym_id.eq.${gymId}`),
       sb.from("equipment").select("id, name, category").eq("gym_id", gymId).neq("status", "pending"),
     ]).then(([exRes, eqRes]) => {
       if (exRes.data) setDbExercises(exRes.data as DBExercise[]);
@@ -472,10 +472,16 @@ function PersonalTreinosContent() {
 
   const swapList = useMemo(() => {
     const q = normBusca(swapQuery);
+    const matches = (e: DBExercise) =>
+      !q ||
+      normBusca(e.name).includes(q) ||
+      normBusca(e.category).includes(q) ||
+      (e.muscles ?? []).some((m) => normBusca(m).includes(q)) ||
+      (e.aliases ?? []).some((a) => normBusca(a).includes(q));
     return dbExercises
       .filter((e) => e.name.toLowerCase() !== "registro livre")
-      .filter((e) => !q || normBusca(e.name).includes(q))
-      .slice(0, 60);
+      .filter(matches)
+      .slice(0, 120);
   }, [dbExercises, swapQuery]);
 
   /** Troca o exercício mantendo séries/reps/RPE/dica do original.
