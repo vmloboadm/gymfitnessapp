@@ -41,8 +41,13 @@ export function ProgressPhotos() {
   const [phase, setPhase] = useState("antes");
   const [uploading, setUploading] = useState(false);
 
-  // personal vinculado (para mostrar para quem a liberação vale)
-  const { data: linkedName } = useAsyncQuery<string | null>(
+  // personal vinculado (para mostrar para quem a liberação vale).
+  // Sem vínculo, ninguém além do aluno vê mesmo liberando: oferece escolher aqui.
+  const { data: trainerInfo, refetch: refetchTrainer } = useAsyncQuery<{
+    linkedId: string | null;
+    linkedName: string | null;
+    trainers: Array<{ id: string; name: string; avatar_url: string | null }>;
+  }>(
     async () => {
       if (!user || !profile?.gym_id) return { data: null, error: null };
       const supabase = supabaseBrowser();
@@ -52,18 +57,46 @@ export function ProgressPhotos() {
         .eq("student_id", user.id)
         .limit(1)
         .maybeSingle();
-      const tid = (link as { trainer_id?: string } | null)?.trainer_id;
-      if (!tid) return { data: null, error: null };
-      const rpc = await supabase.rpc("gym_roster", { p_gym_id: profile.gym_id });
-      const found = (!rpc.error && Array.isArray(rpc.data)
-        ? (rpc.data as Array<{ id: string; name: string | null }>)
-        : []
-      ).find((m) => m.id === tid);
-      return { data: found?.name?.split(" ")[0] ?? "Personal", error: null };
+      const tid = (link as { trainer_id?: string } | null)?.trainer_id ?? null;
+      const rpc = await supabase.rpc("list_my_gym_trainers");
+      const trainers = (!rpc.error && Array.isArray(rpc.data)
+        ? (rpc.data as Array<{ id: string; name: string; avatar_url: string | null }>)
+        : []);
+      const found = trainers.find((m) => m.id === tid);
+      return {
+        data: {
+          linkedId: tid,
+          linkedName: found?.name?.split(" ")[0] ?? (tid ? "Personal" : null),
+          trainers,
+        },
+        error: null,
+      };
     },
     [user?.id, profile?.gym_id],
     { enabled: !authLoading && !!user }
   );
+  const linkedName = trainerInfo?.linkedName ?? null;
+
+  const [choosing, setChoosing] = useState(false);
+  const chooseTrainer = async (trainerId: string) => {
+    setChoosing(true);
+    try {
+      const { error } = await supabaseBrowser().rpc("choose_personal", {
+        p_trainer_id: trainerId,
+      });
+      if (error) throw new Error(error.message);
+      toast.success("Personal vinculado", {
+        description: "Suas fotos liberadas agora chegam até ele.",
+      });
+      refetchTrainer();
+    } catch (e) {
+      toast.error("Não deu vincular agora", {
+        description: String(e instanceof Error ? e.message : e).slice(0, 80),
+      });
+    } finally {
+      setChoosing(false);
+    }
+  };
 
   const { data, loading, error, refetch } = useAsyncQuery<Photo[]>(
     async () => {
@@ -167,9 +200,34 @@ export function ProgressPhotos() {
         {linkedName ? (
           <>Liberando, <strong className="text-foreground">{linkedName}</strong> pode ver.</>
         ) : (
-          <>Sem personal vinculado: a liberação vale quando você escolher um.</>
+          <>Sem personal vinculado: escolha um para a liberação valer.</>
         )}
       </p>
+
+      {!linkedName && (trainerInfo?.trainers ?? []).length > 0 ? (
+        <div className="mt-2.5 space-y-1.5 rounded-2xl border border-brand/30 bg-brand/[0.05] p-3">
+          <p className="text-[11px] font-bold text-foreground">Quem acompanha sua evolução?</p>
+          {(trainerInfo?.trainers ?? []).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => chooseTrainer(t.id)}
+              disabled={choosing}
+              className="tactile flex w-full items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.03] p-2 text-left disabled:opacity-50"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-dark text-[11px] font-black text-brand-foreground">
+                {(t.name?.[0] ?? "?").toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-foreground">
+                {t.name}
+              </span>
+              <span className="shrink-0 text-[10.5px] font-black text-brand">
+                {choosing ? "..." : "Escolher"}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="mt-3"><SkeletonList rows={2} /></div>
