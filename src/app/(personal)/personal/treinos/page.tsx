@@ -15,6 +15,8 @@ import {
   Plus,
   ChevronUp,
   ChevronDown,
+  ChevronRight,
+  Library,
   Trash2,
   Search,
   UserRoundPlus,
@@ -453,11 +455,20 @@ function PersonalTreinosContent() {
   // ===== Trocar exercício por outro da biblioteca (na revisão) =====
   const [swapTarget, setSwapTarget] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [swapQuery, setSwapQuery] = useState("");
+  // Criar exercício do zero dentro do picker (nome, grupo, músculos, dica)
+  const [creatingEx, setCreatingEx] = useState(false);
+  const [newExName, setNewExName] = useState("");
+  const [newExCat, setNewExCat] = useState<string>("peito");
+  const [newExMuscles, setNewExMuscles] = useState("");
+  const [newExTip, setNewExTip] = useState("");
+  const [exSaving, setExSaving] = useState(false);
+  const [catOpen, setCatOpen] = useState<string | null>(null);
   // Repetir plano para outros alunos (mesmo programa, sem gerar de novo)
   const [repeatSheet, setRepeatSheet] = useState<{ programId: string; planName: string; excludeId?: string } | null>(null);
   const [repeatSelected, setRepeatSelected] = useState<Set<string>>(new Set());
   const [repeatQuery, setRepeatQuery] = useState("");
   const [repeatSaving, setRepeatSaving] = useState(false);
+  const [manualPick, setManualPick] = useState(false);
 
   const swapList = useMemo(() => {
     const q = normBusca(swapQuery);
@@ -492,6 +503,66 @@ function PersonalTreinosContent() {
     });
     setSwapTarget(null);
     setSwapQuery("");
+  };
+
+  const CAT_ORDER = ["peito", "costas", "ombro", "biceps", "triceps", "perna", "gluteo", "core", "panturrilha", "cardio"];
+  const catLabel = (c: string) => c.charAt(0).toUpperCase() + c.slice(1);
+
+  /** Salva o exercício novo na academia e já seleciona no dia. */
+  const saveNewExercise = async () => {
+    const name = newExName.trim();
+    if (!name || !profile?.gym_id || exSaving) return;
+    setExSaving(true);
+    try {
+      const muscles = newExMuscles.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 6);
+      const { error } = await supabaseBrowser()
+        .from("exercises")
+        .insert({
+          gym_id: profile.gym_id,
+          name,
+          category: newExCat,
+          muscles,
+          tips: newExTip.trim() ? [newExTip.trim()] : [],
+        } as never);
+      if (error) throw new Error(error.message);
+      toast.success("Exercício criado", { description: `${name} entrou na biblioteca e já vale aqui.` });
+      setNewExName("");
+      setNewExMuscles("");
+      setNewExTip("");
+      setNewExCat("peito");
+      setCreatingEx(false);
+      setLibTick((t) => t + 1);
+      swapExercise(name);
+    } catch (e) {
+      toast.error("Não deu criar agora", { description: String(e instanceof Error ? e.message : e).slice(0, 80) });
+    } finally {
+      setExSaving(false);
+    }
+  };
+
+  /** Linha de exercício do picker (reuso na busca, nos equivalentes e nas categorias). */
+  const exRow = (ex: { id: string; name: string; category: string }) => {
+    const current = swapTarget && plan ? plan.dias[swapTarget.dayIdx]?.exercicios[swapTarget.exIdx]?.exercicio === ex.name : false;
+    return (
+      <li key={ex.id}>
+        <button
+          onClick={() => swapExercise(ex.name)}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-2xl border p-2.5 text-left transition-colors",
+            current ? "border-brand/40 bg-brand/10" : "border-white/[0.06] bg-white/[0.03] hover:border-brand/30"
+          )}
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
+            <Dumbbell className="h-3.5 w-3.5 text-brand" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold text-foreground">{ex.name}</p>
+            <p className="text-[10px] capitalize text-muted-foreground">{ex.category}</p>
+          </div>
+          {current ? <Check className="h-4 w-4 shrink-0 text-brand" /> : null}
+        </button>
+      </li>
+    );
   };
 
   /** Exercícios equivalentes (mesma categoria) ao que está sendo trocado. */
@@ -672,6 +743,37 @@ function PersonalTreinosContent() {
     }
   };
 
+  // Montar manualmente (sem IA): dias vazios da divisão para encher no picker.
+  // Mesmo caminho de revisão e aprovação do plano gerado.
+  const startManualPlan = (splitId: string) => {
+    if (!target) return;
+    const letters = splitId.split("");
+    setPlan({
+      nome: `Treino ${target.name.split(" ")[0]}`,
+      frequencia: `${letters.length}x semana`,
+      nivel: ansNivel ?? target.experience_level ?? "Intermediário",
+      objetivo: objetivoLabel,
+      observacao_geral: "",
+      daysSelected: [...daysSelected],
+      splitType: splitId,
+      dias: letters.map((L) => ({
+        nome: `${L} · Novo treino`,
+        foco: "",
+        aquecimento: [],
+        exercicios: [],
+        finalizador: "",
+        slot: L,
+      })),
+      cardio: "",
+    });
+    setActiveDay(0);
+    setManualPick(false);
+    setUsedFallback(false);
+    toast.success("Monte os dias abaixo", {
+      description: "Toque em Adicionar em cada dia e busque na biblioteca.",
+    });
+  };
+
   const updateDay = (dayIdx: number, patch: Partial<WorkoutPlan["dias"][number]>) => {
     if (!plan) return;
     setPlan({
@@ -683,6 +785,16 @@ function PersonalTreinosContent() {
   // ===== PASSO 5: aprovar e atribuir (ou salvar edição / ajuste v2) =====
   const approve = async () => {
     if (!plan || !target || !profile || !user) return;
+    const emptyDays = plan.dias
+      .map((d, i) => ({ d, i }))
+      .filter(({ d }) => d.exercicios.length === 0)
+      .map(({ d, i }) => d.nome || `Dia ${i + 1}`);
+    if (emptyDays.length > 0) {
+      toast.error("Faltam exercícios", {
+        description: `Complete antes de enviar: ${emptyDays.join(", ")}.`,
+      });
+      return;
+    }
     const flat = plan.dias.flatMap((d) =>
       d.exercicios.map((e) => ({ name: e.exercicio, sets: e.series, reps: e.reps, rest: e.descanso }))
     );
@@ -854,6 +966,32 @@ function PersonalTreinosContent() {
             <p className="mb-3 text-center text-[10.5px] text-muted-foreground">
               {ansNivel} · {objetivoLabel} · {focoLabel} · {split}, ou ajuste nas perguntas abaixo
             </p>
+          ) : null}
+          {!plan && !loading ? (
+            <div className="mb-3">
+              <button
+                type="button"
+                onClick={() => setManualPick((v) => !v)}
+                aria-expanded={manualPick}
+                className="tactile w-full rounded-xl border border-white/[0.08] bg-white/[0.03] py-2.5 text-[12px] font-bold text-muted-foreground transition-colors hover:text-brand"
+              >
+                Montar manualmente (sem IA)
+              </button>
+              {manualPick ? (
+                <div className="mt-2 grid grid-cols-5 gap-1.5" role="group" aria-label="Divisão do plano manual">
+                  {SPLIT_OPTS.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => startManualPlan(s.id)}
+                      className="tactile rounded-xl border border-brand/40 bg-brand/10 py-2.5 text-[12px] font-black text-brand"
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           ) : null}
           {adjustSwId && plan ? (
             <div className="mb-3 rounded-2xl border border-[#FFC24D]/25 bg-[#FFC24D]/[0.07] p-3">
@@ -1643,62 +1781,137 @@ function PersonalTreinosContent() {
                 className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
               />
             </div>
+            <button
+              type="button"
+              onClick={() => setCreatingEx((v) => !v)}
+              aria-expanded={creatingEx}
+              className="tactile flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/40 bg-brand/[0.04] py-2.5 text-[12px] font-black text-brand"
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={2.5} /> Criar exercício do zero
+            </button>
+            {creatingEx ? (
+              <div className="space-y-2 rounded-2xl border border-brand/30 bg-brand/[0.05] p-3">
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Nome do exercício
+                  </span>
+                  <input
+                    value={newExName}
+                    onChange={(e) => setNewExName(e.target.value)}
+                    placeholder="Ex.: Remada serrote no banco"
+                    aria-label="Nome do novo exercício"
+                    maxLength={80}
+                    className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Grupo
+                    </span>
+                    <select
+                      value={newExCat}
+                      onChange={(e) => setNewExCat(e.target.value)}
+                      aria-label="Grupo muscular"
+                      className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                    >
+                      {CAT_ORDER.map((c) => (
+                        <option key={c} value={c}>
+                          {catLabel(c)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Dica (opcional)
+                    </span>
+                    <input
+                      value={newExTip}
+                      onChange={(e) => setNewExTip(e.target.value)}
+                      placeholder="Ex.: sem balanço"
+                      aria-label="Dica de execução"
+                      maxLength={120}
+                      className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                    />
+                  </label>
+                </div>
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Músculos (opcional, vírgula)
+                  </span>
+                  <input
+                    value={newExMuscles}
+                    onChange={(e) => setNewExMuscles(e.target.value)}
+                    placeholder="Ex.: grande dorsal, bíceps"
+                    aria-label="Músculos trabalhados"
+                    maxLength={120}
+                    className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={saveNewExercise}
+                  disabled={exSaving || !newExName.trim()}
+                  className="tactile flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-brand text-[12.5px] font-black text-brand-foreground disabled:opacity-40"
+                >
+                  {exSaving ? "Salvando..." : "Salvar e usar no treino"}
+                </button>
+                <p className="text-center text-[10px] text-muted-foreground">
+                  Entra na biblioteca da academia e vale na IA e nos próximos treinos.
+                </p>
+              </div>
+            ) : null}
             {swapEquivalents.length > 0 && !swapQuery.trim() ? (
               <div>
                 <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   Equivalentes (mesmo grupo muscular)
                 </p>
                 <ul className="space-y-1.5">
-                  {swapEquivalents.map((ex) => (
-                    <li key={ex.id}>
-                      <button
-                        onClick={() => swapExercise(ex.name)}
-                        className="flex w-full items-center gap-3 rounded-2xl border border-brand/25 bg-brand/[0.05] p-2.5 text-left transition-colors hover:border-brand/50"
-                      >
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
-                          <Dumbbell className="h-3.5 w-3.5 text-brand" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[13px] font-semibold text-foreground">{ex.name}</p>
-                          <p className="text-[10px] capitalize text-muted-foreground">{ex.category}</p>
-                        </div>
-                      </button>
-                    </li>
-                  ))}
+                  {swapEquivalents.map((ex) => exRow(ex))}
                 </ul>
               </div>
             ) : null}
-            <ul className="max-h-[46vh] space-y-1.5 overflow-y-auto">
-              {swapList.length === 0 ? (
-                <li className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 text-center text-[12px] text-muted-foreground">
-                  Nenhum exercício encontrado para essa busca.
-                </li>
-              ) : (
-                swapList.map((ex) => {
-                  const current = swapTarget && plan ? plan.dias[swapTarget.dayIdx]?.exercicios[swapTarget.exIdx]?.exercicio === ex.name : false;
+            {swapQuery.trim() ? (
+              <ul className="max-h-[46vh] space-y-1.5 overflow-y-auto">
+                {swapList.length === 0 ? (
+                  <li className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 text-center text-[12px] text-muted-foreground">
+                    Nenhum exercício encontrado para essa busca.
+                  </li>
+                ) : (
+                  swapList.map((ex) => exRow(ex))
+                )}
+              </ul>
+            ) : (
+              <div className="max-h-[46vh] space-y-1.5 overflow-y-auto">
+                {CAT_ORDER.map((cat) => {
+                  const items = swapList.filter((e) => e.category === cat);
+                  if (items.length === 0) return null;
+                  const open = catOpen === cat;
                   return (
-                    <li key={ex.id}>
+                    <div key={cat} className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]">
                       <button
-                        onClick={() => swapExercise(ex.name)}
-                        className={cn(
-                          "flex w-full items-center gap-3 rounded-2xl border p-2.5 text-left transition-colors",
-                          current ? "border-brand/40 bg-brand/10" : "border-white/[0.06] bg-white/[0.03] hover:border-brand/30"
-                        )}
+                        type="button"
+                        onClick={() => setCatOpen(open ? null : cat)}
+                        aria-expanded={open}
+                        className="tactile flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
                       >
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
-                          <Dumbbell className="h-3.5 w-3.5 text-brand" />
+                        <span className="text-[12px] font-black text-foreground">{catLabel(cat)}</span>
+                        <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                          {items.length}
+                          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[13px] font-semibold text-foreground">{ex.name}</p>
-                          <p className="text-[10px] capitalize text-muted-foreground">{ex.category}</p>
-                        </div>
-                        {current ? <Check className="h-4 w-4 shrink-0 text-brand" /> : null}
                       </button>
-                    </li>
+                      {open ? (
+                        <ul className="space-y-1.5 px-2 pb-2">
+                          {items.map((ex) => exRow(ex))}
+                        </ul>
+                      ) : null}
+                    </div>
                   );
-                })
-              )}
-            </ul>
+                })}
+              </div>
+            )}
           </div>
         </BottomSheet>
       </div>
@@ -1729,6 +1942,22 @@ function PersonalTreinosContent() {
           </p>
         </div>
         <UserRoundPlus className="h-4.5 w-4.5 text-brand" />
+      </button>
+
+      <button
+        onClick={() => router.push("/personal/exercicios")}
+        className="gf-card gf-glass flex w-full items-center gap-3 !rounded-2xl !p-4 text-left transition-transform active:scale-[0.985]"
+      >
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-brand/25 bg-brand/10">
+          <Library className="h-5 w-5 text-brand" />
+        </span>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-foreground">Biblioteca de Exercícios</p>
+          <p className="text-[11px] text-muted-foreground">
+            Ver todos por categoria e criar novos
+          </p>
+        </div>
+        <ChevronRight className="h-4.5 w-4.5 text-brand" />
       </button>
 
       <section aria-labelledby="tpl-title">
