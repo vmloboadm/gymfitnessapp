@@ -32,7 +32,7 @@ export function LiveWorkoutBar() {
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: 60, opacity: 0, scale: 0.95 }}
           transition={{ type: "spring", stiffness: 350, damping: 28 }}
-          onClick={() => router.push("/treino")}
+          onClick={() => router.push("/treino?resume=1")}
           aria-label="Treino em andamento, voltar para a sessão"
           data-testid="live-workout-bar"
           className={cn(

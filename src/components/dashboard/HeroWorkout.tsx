@@ -16,6 +16,8 @@ interface HeroWorkoutProps {
   ready: boolean;
   /** Aviso complementar (ex: retomada de treino pendente / fadiga de músculo). */
   notice?: string;
+  /** Destino do toque (padrão: treino de hoje). */
+  href?: string;
 }
 
 /** Hero do treino de hoje, imagem de fundo + overlay de leitura forte + CTA glow.
@@ -29,11 +31,12 @@ export function HeroWorkout({
   sessionLabel,
   ready,
   notice,
+  href,
 }: HeroWorkoutProps) {
   return (
     <m.div variants={item} whileTap={{ scale: 0.985 }}>
       <Link
-        href="/treino?ir=hoje"
+        href={href ?? "/treino?ir=hoje"}
         aria-label={`Treino de hoje: ${title}`}
         className="pm-surface tactile block"
       >

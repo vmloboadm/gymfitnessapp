@@ -726,6 +726,7 @@ export default function HomePage() {
             exerciseCount={heroPlan?.count ?? exCount}
             estMin={45}
             sessionsWeek={sessionsWeek}
+            href={isCheckedInToday ? "/treino?resume=1" : undefined}
             sessionLabel={
               isCheckedInToday
                 ? "Continuar treino"

@@ -298,7 +298,7 @@ export default function TreinoHomePage() {
 
   // Checks dos slots do plano ativo (hook no topo: nunca após early return)
   const activeProgramId = planActive[0]?.id ?? null;
-  const { data: slotChecks } = useAsyncQuery<Array<{ slot: string; checked_at: string }>>(
+  const { data: slotChecks, refetch: refetchSlotChecks } = useAsyncQuery<Array<{ slot: string; checked_at: string }>>(
     async () => {
       if (demo || !user || !profile?.gym_id || !activeProgramId) return { data: [], error: null };
       const { data: rows, error } = await supabaseBrowser()
@@ -325,6 +325,22 @@ export default function TreinoHomePage() {
       return () => clearTimeout(to);
     }
   }, [loading]);
+
+  // Retorno em 1 toque (?resume=1 da barrinha viva e da home): volta sozinho
+  // ao treino em andamento, sem pedir nada.
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (loading || resumedRef.current || typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("resume") !== "1") return;
+    resumedRef.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    if (phase !== "idle") return;
+    try {
+      const saved = readSessionProgress();
+      if (daySession || (saved?.exercises ?? []).length > 0) resumeSession();
+    } catch { /* fica no idle */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, daySession]);
 
   const todayKey = new Date().toISOString().slice(0, 10);
   // MESMA FONTE da home, nunca diverge
@@ -588,6 +604,12 @@ export default function TreinoHomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daySession]);
 
+  // Ao concluir, atualiza os checks para a rotação sugerir o próximo na hora
+  useEffect(() => {
+    if (phase === "done") refetchSlotChecks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   // Conclusões desta sessão (otimista, local): alimenta contador e reordenação
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const doneCount = doneIds.size;
@@ -677,8 +699,8 @@ export default function TreinoHomePage() {
   const sessionBar = daySession ? (
     <div className="sticky top-[56px] z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
       <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-4 py-2">
-        <div className="flex items-center gap-2.5">
-          <span className="relative flex h-2 w-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="relative flex h-2 w-2 shrink-0">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
           </span>
@@ -686,27 +708,48 @@ export default function TreinoHomePage() {
             startedAt={daySession.startedAt}
             fast={demo}
             onFinish={() => {
-              setSummarySeconds(elapsedSeconds(daySession.startedAt, Date.now()));
-              void conclude([...completedRef.current]);
-              endDaySession();
-              setPhase("done");
+              finishNow();
             }}
           />
+          {(() => {
+            try {
+              const saved = readSessionProgress();
+              const ids = Object.keys(saved?.progress ?? {});
+              if (ids.length === 0) return null;
+              const done = ids.filter((id) =>
+                (saved!.progress[id].sets ?? []).length > 0 &&
+                (saved!.progress[id].sets ?? []).every((s) => s.done)
+              ).length;
+              return (
+                <span className="truncate text-[10px] font-bold tabular-nums text-muted-foreground">
+                  {done}/{ids.length} concluídos
+                </span>
+              );
+            } catch {
+              return null;
+            }
+          })()}
         </div>
-        <button
-          data-testid="finalizar-treino"
-          onClick={() => {
-            navigator.vibrate?.([60, 40, 60]);
-            setSummarySeconds(elapsedSeconds(daySession.startedAt, Date.now()));
-            void conclude([...completedRef.current]);
-            endDaySession();
-            toast.success("Sessão finalizada. Registre como foi!");
-            setPhase("done");
-          }}
-          className="tactile rounded-full bg-success px-4 py-1.5 text-[11px] font-black text-black transition-transform active:scale-95"
-        >
-          Finalizar Treino
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {phase !== "active" ? (
+            <button
+              type="button"
+              onClick={resumeSession}
+              className="tactile rounded-full bg-brand px-4 py-1.5 text-[11px] font-black text-brand-foreground transition-transform active:scale-95"
+            >
+              Continuar
+            </button>
+          ) : null}
+          <button
+            data-testid="finalizar-treino"
+            onClick={() => {
+              finishNow();
+            }}
+            className="tactile rounded-full bg-success px-4 py-1.5 text-[11px] font-black text-black transition-transform active:scale-95"
+          >
+            Finalizar Treino
+          </button>
+        </div>
       </div>
     </div>
   ) : null;
