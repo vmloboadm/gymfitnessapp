@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { NewExerciseForm } from "~/components/training/NewExerciseForm";
 
 import { buildWorkoutPrompt } from "~/lib/ai/prompts";
 import {
@@ -455,13 +456,9 @@ function PersonalTreinosContent() {
   // ===== Trocar exercício por outro da biblioteca (na revisão) =====
   const [swapTarget, setSwapTarget] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [swapQuery, setSwapQuery] = useState("");
-  // Criar exercício do zero dentro do picker (nome, grupo, músculos, dica)
+  // Criar exercício do zero dentro do picker ou da geração
   const [creatingEx, setCreatingEx] = useState(false);
-  const [newExName, setNewExName] = useState("");
-  const [newExCat, setNewExCat] = useState<string>("peito");
-  const [newExMuscles, setNewExMuscles] = useState("");
-  const [newExTip, setNewExTip] = useState("");
-  const [exSaving, setExSaving] = useState(false);
+  const [genCreatingEx, setGenCreatingEx] = useState(false);
   const [catOpen, setCatOpen] = useState<string | null>(null);
   // Repetir plano para outros alunos (mesmo programa, sem gerar de novo)
   const [repeatSheet, setRepeatSheet] = useState<{ programId: string; planName: string; excludeId?: string } | null>(null);
@@ -514,36 +511,11 @@ function PersonalTreinosContent() {
   const CAT_ORDER = ["peito", "costas", "ombro", "biceps", "triceps", "perna", "gluteo", "core", "panturrilha", "cardio"];
   const catLabel = (c: string) => c.charAt(0).toUpperCase() + c.slice(1);
 
-  /** Salva o exercício novo na academia e já seleciona no dia. */
-  const saveNewExercise = async () => {
-    const name = newExName.trim();
-    if (!name || !profile?.gym_id || exSaving) return;
-    setExSaving(true);
-    try {
-      const muscles = newExMuscles.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 6);
-      const { error } = await supabaseBrowser()
-        .from("exercises")
-        .insert({
-          gym_id: profile.gym_id,
-          name,
-          category: newExCat,
-          muscles,
-          tips: newExTip.trim() ? [newExTip.trim()] : [],
-        } as never);
-      if (error) throw new Error(error.message);
-      toast.success("Exercício criado", { description: `${name} entrou na biblioteca e já vale aqui.` });
-      setNewExName("");
-      setNewExMuscles("");
-      setNewExTip("");
-      setNewExCat("peito");
-      setCreatingEx(false);
-      setLibTick((t) => t + 1);
-      swapExercise(name);
-    } catch (e) {
-      toast.error("Não deu criar agora", { description: String(e instanceof Error ? e.message : e).slice(0, 80) });
-    } finally {
-      setExSaving(false);
-    }
+  /** Novo exercício salvo no picker: fecha, atualiza biblioteca e seleciona. */
+  const onPickerExerciseSaved = (name: string) => {
+    setCreatingEx(false);
+    setLibTick((t) => t + 1);
+    swapExercise(name);
   };
 
   /** Linha de exercício do picker (reuso na busca, nos equivalentes e nas categorias). */
@@ -995,6 +967,28 @@ function PersonalTreinosContent() {
                       {s.label}
                     </button>
                   ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {!plan && !loading ? (
+            <div className="mb-3">
+              <button
+                type="button"
+                onClick={() => setGenCreatingEx((v) => !v)}
+                aria-expanded={genCreatingEx}
+                className="tactile flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/40 bg-brand/[0.04] py-2.5 text-[12px] font-black text-brand"
+              >
+                <Plus className="h-3.5 w-3.5" strokeWidth={2.5} /> Novo exercício da academia
+              </button>
+              {genCreatingEx ? (
+                <div className="mt-2">
+                  <NewExerciseForm
+                    onSaved={() => {
+                      setGenCreatingEx(false);
+                      setLibTick((t) => t + 1);
+                    }}
+                  />
                 </div>
               ) : null}
             </div>
@@ -1796,77 +1790,7 @@ function PersonalTreinosContent() {
               <Plus className="h-3.5 w-3.5" strokeWidth={2.5} /> Criar exercício do zero
             </button>
             {creatingEx ? (
-              <div className="space-y-2 rounded-2xl border border-brand/30 bg-brand/[0.05] p-3">
-                <label className="block">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Nome do exercício
-                  </span>
-                  <input
-                    value={newExName}
-                    onChange={(e) => setNewExName(e.target.value)}
-                    placeholder="Ex.: Remada serrote no banco"
-                    aria-label="Nome do novo exercício"
-                    maxLength={80}
-                    className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-                  />
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="block">
-                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Grupo
-                    </span>
-                    <select
-                      value={newExCat}
-                      onChange={(e) => setNewExCat(e.target.value)}
-                      aria-label="Grupo muscular"
-                      className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-                    >
-                      {CAT_ORDER.map((c) => (
-                        <option key={c} value={c}>
-                          {catLabel(c)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Dica (opcional)
-                    </span>
-                    <input
-                      value={newExTip}
-                      onChange={(e) => setNewExTip(e.target.value)}
-                      placeholder="Ex.: sem balanço"
-                      aria-label="Dica de execução"
-                      maxLength={120}
-                      className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-                    />
-                  </label>
-                </div>
-                <label className="block">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Músculos (opcional, vírgula)
-                  </span>
-                  <input
-                    value={newExMuscles}
-                    onChange={(e) => setNewExMuscles(e.target.value)}
-                    placeholder="Ex.: grande dorsal, bíceps"
-                    aria-label="Músculos trabalhados"
-                    maxLength={120}
-                    className="h-11 w-full rounded-2xl border border-white/[0.08] bg-white/[0.05] px-3.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={saveNewExercise}
-                  disabled={exSaving || !newExName.trim()}
-                  className="tactile flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-brand text-[12.5px] font-black text-brand-foreground disabled:opacity-40"
-                >
-                  {exSaving ? "Salvando..." : "Salvar e usar no treino"}
-                </button>
-                <p className="text-center text-[10px] text-muted-foreground">
-                  Entra na biblioteca da academia e vale na IA e nos próximos treinos.
-                </p>
-              </div>
+              <NewExerciseForm onSaved={onPickerExerciseSaved} />
             ) : null}
             {swapEquivalents.length > 0 && !swapQuery.trim() ? (
               <div>
