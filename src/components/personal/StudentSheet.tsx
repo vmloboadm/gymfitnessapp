@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { MessageCircle, ClipboardList, Flame, Dumbbell, Plus, Activity, Sparkles, Clock3, Feather } from "lucide-react";
+import { MessageCircle, ClipboardList, Flame, Dumbbell, Plus, Activity, Sparkles, Clock3, Feather, Link2 } from "lucide-react";
 import { insightOffline } from "~/lib/ai/local-gen";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
@@ -22,6 +22,7 @@ import {
   TRAINER_WORKOUTS_EVENT,
 } from "~/lib/trainer-store";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { useAuth } from "~/hooks/useAuth";
 import { waStudentLink } from "~/lib/whatsapp";
 import { cn } from "~/lib/utils";
 
@@ -64,6 +65,59 @@ export function StudentSheet({
 }) {
   const [tab, setTab] = useState<TabId>("resumo");
   const router = useRouter();
+  const { user: me, profile: myProfile } = useAuth();
+
+  // Vínculo comigo: sem ele, fotos liberadas e outras visões do personal
+  // não alcançam este aluno. O botão abaixo resolve em 1 toque.
+  const [linkedToMe, setLinkedToMe] = useState<boolean | null>(null);
+  const [linking, setLinking] = useState(false);
+  useEffect(() => {
+    if (!student?.id || !me?.id) {
+      setLinkedToMe(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabaseBrowser()
+          .from("student_trainers")
+          .select("id")
+          .eq("student_id", student.id)
+          .eq("trainer_id", me.id)
+          .limit(1)
+          .maybeSingle();
+        if (!cancelled) setLinkedToMe(!!data);
+      } catch {
+        if (!cancelled) setLinkedToMe(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [student?.id, me?.id]);
+
+  const linkMe = async () => {
+    if (!student || !me || !myProfile?.gym_id || linking) return;
+    setLinking(true);
+    try {
+      const { error } = await supabaseBrowser().from("student_trainers").insert({
+        gym_id: myProfile.gym_id,
+        student_id: student.id,
+        trainer_id: me.id,
+      } as never);
+      if (error) throw new Error(error.message);
+      setLinkedToMe(true);
+      toast.success("Aluno vinculado a você", {
+        description: "Fotos liberadas e acompanhamento passam a chegar.",
+      });
+    } catch (e) {
+      toast.error("Não deu vincular agora", {
+        description: String(e instanceof Error ? e.message : e).slice(0, 80),
+      });
+    } finally {
+      setLinking(false);
+    }
+  };
 
   // reseta pra aba Resumo a cada aluno aberto
   useEffect(() => {
@@ -254,6 +308,17 @@ export function StudentSheet({
           </div>
 
           {/* abas */}
+          {linkedToMe === false ? (
+            <button
+              type="button"
+              onClick={linkMe}
+              disabled={linking}
+              className="tactile flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-brand/40 bg-brand/[0.04] py-2.5 text-[12px] font-black text-brand disabled:opacity-50"
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              {linking ? "Vinculando..." : "Vincular a mim"}
+            </button>
+          ) : null}
           <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-white/[0.03] p-1" role="tablist">
             {TABS.map((t) => (
               <button
