@@ -241,7 +241,8 @@ async function callModel(
   messages: ChatMessage[],
   stream: boolean,
   timeoutMs?: number,
-  cancel?: AbortSignal
+  cancel?: AbortSignal,
+  jsonMode?: boolean
 ): Promise<Response> {
   const timeout = AbortSignal.timeout(timeoutMs ?? (stream ? 45000 : 30000));
   return fetch(`${AI_URL}/chat/completions`, {
@@ -255,6 +256,10 @@ async function callModel(
       messages,
       stream,
       temperature: 0.7,
+      // DeepSeek: thinking desligado (padrão ligado queimaria o budget em
+      // raciocínio); json_object no modo estruturado (planos sempre válidos)
+      thinking: { type: "disabled" },
+      ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
       // reasoning consome budget fora do content: 10k cobre reasoning + plano
       max_tokens: stream ? 900 : 10000,
     }),
@@ -442,7 +447,7 @@ export async function handleAssistente(request: Request) {
       if (remaining < MIN_SLACK) throw new Error("sem orçamento");
       const t0 = Date.now();
       try {
-        const res = await callModel(model, msgs, false, Math.min(50_000, remaining - 1_500), cancel);
+        const res = await callModel(model, msgs, false, Math.min(50_000, remaining - 1_500), cancel, structured);
         if (!res.ok) throw new Error(`http ${res.status}`); // 429/outro → candidato fora
         const data = (await res.json()) as {
           choices?: Array<{ message?: { content?: string } }>;
