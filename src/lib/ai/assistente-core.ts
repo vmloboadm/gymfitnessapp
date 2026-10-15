@@ -26,13 +26,41 @@ const AI_URL = (process.env.AI_API_URL ?? process.env.OPENAI_BASE_URL ?? "").rep
 const AI_KEY = process.env.AI_API_KEY ?? process.env.OPENAI_API_KEY ?? "";
 
 /** Cadeia de modelos: primário + fallbacks. */
-function modelChain(): string[] {
+type Provider = { url: string; key: string };
+type ChainEntry = { provider: Provider; model: string };
+
+function mainProvider(): Provider {
+  return { url: AI_URL, key: AI_KEY };
+}
+
+/** Provedor reserva (ex.: OpenRouter free) quando o principal cai. */
+function fallbackProvider(): Provider | null {
+  const url = (process.env.AI_FALLBACK_URL ?? "").replace(/\/$/, "");
+  const key = process.env.AI_FALLBACK_KEY ?? "";
+  return url && key ? { url, key } : null;
+}
+
+function modelChain(): ChainEntry[] {
+  const main = mainProvider();
   const primary = process.env.AI_MODEL ?? process.env.OPENAI_MODEL ?? "testev1";
   const fallbacks = (process.env.AI_MODEL_FALLBACKS ?? "")
     .split(",")
     .map((m) => m.trim())
     .filter(Boolean);
-  return [primary, ...fallbacks].filter((m, i, arr) => arr.indexOf(m) === i);
+  const chain: ChainEntry[] = [primary, ...fallbacks]
+    .filter((m, i, arr) => arr.indexOf(m) === i)
+    .map((model) => ({ provider: main, model }));
+  const fb = fallbackProvider();
+  if (fb) {
+    const fbModels = (process.env.AI_FALLBACK_MODELS ?? "")
+      .split(",")
+      .map((m) => m.trim())
+      .filter(Boolean);
+    for (const model of fbModels) {
+      if (!chain.some((c) => c.model === model)) chain.push({ provider: fb, model });
+    }
+  }
+  return chain;
 }
 
 /** System prompt por contexto (fonte única: lib/ai/prompts). */
@@ -237,7 +265,7 @@ function stripThinking(text: string): string {
 }
 
 async function callModel(
-  model: string,
+  entry: ChainEntry,
   messages: ChatMessage[],
   stream: boolean,
   timeoutMs?: number,
@@ -245,21 +273,23 @@ async function callModel(
   jsonMode?: boolean
 ): Promise<Response> {
   const timeout = AbortSignal.timeout(timeoutMs ?? (stream ? 45000 : 30000));
-  return fetch(`${AI_URL}/chat/completions`, {
+  const isDeepSeek = entry.provider.url.includes("deepseek");
+  return fetch(`${entry.provider.url}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${AI_KEY}`,
+      Authorization: `Bearer ${entry.provider.key}`,
     },
     body: JSON.stringify({
-      model,
+      model: entry.model,
       messages,
       stream,
       temperature: 0.7,
       // DeepSeek: thinking desligado (padrão ligado queimaria o budget em
-      // raciocínio); json_object no modo estruturado (planos sempre válidos)
-      thinking: { type: "disabled" },
-      ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+      // raciocínio); json_object no modo estruturado (planos sempre válidos).
+      // Outros provedores: corpo legado (já validado com eles).
+      ...(isDeepSeek ? { thinking: { type: "disabled" } } : {}),
+      ...(isDeepSeek && jsonMode ? { response_format: { type: "json_object" } } : {}),
       // reasoning consome budget fora do content: 10k cobre reasoning + plano
       max_tokens: stream ? 900 : 10000,
     }),
@@ -321,9 +351,9 @@ export async function handleAssistente(request: Request) {
 
   // ===== MODO STREAM: proxy do SSE token a token =====
   if (stream) {
-    for (const model of modelChain()) {
+    for (const entry of modelChain()) {
       try {
-        const upstream = await callModel(model, messages, true);
+        const upstream = await callModel(entry, messages, true);
         if (!upstream.ok || !upstream.body) continue;
 
         const encoder = new TextEncoder();
@@ -417,7 +447,7 @@ export async function handleAssistente(request: Request) {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
             "Cache-Control": "no-cache",
-            "X-Model": model,
+            "X-Model": entry.model,
           },
         });
       } catch {
@@ -438,16 +468,17 @@ export async function handleAssistente(request: Request) {
   let lastReply = "";
 
   const runCandidate = async (
-    model: string,
+    entry: ChainEntry,
     cancel: AbortSignal
   ): Promise<{ reply: string; model: string; attempt: number; repaired?: boolean }> => {
+    const model = entry.model;
     const msgs: ChatMessage[] = [...messages];
     for (let attempt = 0; attempt < 2; attempt++) {
       const remaining = deadline - Date.now();
       if (remaining < MIN_SLACK) throw new Error("sem orçamento");
       const t0 = Date.now();
       try {
-        const res = await callModel(model, msgs, false, Math.min(50_000, remaining - 1_500), cancel, structured);
+        const res = await callModel(entry, msgs, false, Math.min(50_000, remaining - 1_500), cancel, structured);
         if (!res.ok) throw new Error(`http ${res.status}`); // 429/outro → candidato fora
         const data = (await res.json()) as {
           choices?: Array<{ message?: { content?: string } }>;
@@ -539,14 +570,14 @@ export async function handleAssistente(request: Request) {
   };
 
   const controllers = new Map<string, AbortController>();
-  const tasks = modelChain().map((m, i) => {
+  const tasks = modelChain().map((entry, i) => {
     const ctrl = new AbortController();
-    controllers.set(m, ctrl);
+    controllers.set(entry.model, ctrl);
     // largada escalonada (~0.8s entre candidatos): evita rajada simultânea
     // que dispara rate limit da conta no tier free
     const start = (async () => {
       if (i > 0) await new Promise((r) => setTimeout(r, i * 800));
-      return runCandidate(m, ctrl.signal);
+      return runCandidate(entry, ctrl.signal);
     })();
     return start;
   });
