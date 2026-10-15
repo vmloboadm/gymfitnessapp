@@ -83,6 +83,16 @@ export default function PersonalPerfilPage() {
   // Equipe REAL: staff do gym + check-ins de hoje (sem mock)
   const [staff, setStaff] = useState<Array<{ id: string; name: string; role: string; avatar: string | null }>>([]);
   const [todayCount, setTodayCount] = useState<number | null>(null);
+  const [week, setWeek] = useState<{
+    trainings: number;
+    trainingsToday: number;
+    cardioMin: number;
+    withPlan: number;
+    noPlan: number;
+    pending: number;
+    newcomers: number;
+    avgStreak: number;
+  } | null>(null);
   useEffect(() => {
     if (!profile?.gym_id) return;
     let alive = true;
@@ -90,15 +100,46 @@ export default function PersonalPerfilPage() {
       try {
         const sb = supabaseBrowser();
         const today = new Date().toISOString().slice(0, 10);
-        const [stRes, ckRes] = await Promise.all([
+        const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+        const monday = (() => {
+          const d = new Date();
+          const day = d.getDay();
+          d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+          return d.toISOString().slice(0, 10);
+        })();
+        const [stRes, ckRes, logsRes, cardioRes, swRes, profRes, lbRes] = await Promise.all([
           sb.from("profiles").select("id, name, role, avatar_url").eq("gym_id", profile.gym_id).in("role", ["trainer", "manager", "admin"]).order("name"),
           sb.from("checkins").select("id").eq("gym_id", profile.gym_id).gte("checked_at", today),
+          sb.from("workout_logs").select("student_id, date").eq("gym_id", profile.gym_id).gte("date", weekAgo).limit(2000),
+          sb.from("cardio_logs").select("minutes").eq("gym_id", profile.gym_id).gte("date", weekAgo).limit(2000),
+          sb.from("student_workouts").select("student_id").eq("gym_id", profile.gym_id).eq("status", "active").limit(500),
+          sb.from("profiles").select("id, approved_at, created_at").eq("gym_id", profile.gym_id).eq("role", "student"),
+          sb.from("leaderboard").select("streak").eq("gym_id", profile.gym_id).eq("period", "week").eq("week_start", monday).eq("rank_type", "load").limit(100),
         ]);
         if (!alive) return;
         setStaff(((stRes.data ?? []) as Array<{ id: string; name: string; role: string; avatar_url: string | null }>).map((s) => ({
           id: s.id, name: s.name, role: s.role, avatar: s.avatar_url,
         })));
         setTodayCount((ckRes.data ?? []).length);
+        const logs = (logsRes.data ?? []) as Array<{ student_id: string; date: string }>;
+        const days = new Set(logs.map((l) => l.date.slice(0, 10)));
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const withPlanIds = new Set(((swRes.data ?? []) as Array<{ student_id: string }>).map((r) => r.student_id));
+        const students = (profRes.data ?? []) as Array<{ id: string; approved_at: string | null; created_at: string }>;
+        const approved = students.filter((s) => s.approved_at);
+        const streaks = ((lbRes.data ?? []) as Array<{ streak: number | null }>).map((r) => r.streak ?? 0);
+        setWeek({
+          trainings: days.size,
+          trainingsToday: new Set(
+            logs.filter((l) => l.date.slice(0, 10) === todayStr).map((l) => l.student_id)
+          ).size,
+          cardioMin: ((cardioRes.data ?? []) as Array<{ minutes: number }>).reduce((a, r) => a + (r.minutes ?? 0), 0),
+          withPlan: approved.filter((s) => withPlanIds.has(s.id)).length,
+          noPlan: approved.filter((s) => !withPlanIds.has(s.id)).length,
+          pending: students.filter((s) => !s.approved_at).length,
+          newcomers: students.filter((s) => (s.created_at ?? "").slice(0, 10) >= weekAgo).length,
+          avgStreak: streaks.length ? Math.round((streaks.reduce((a, b) => a + b, 0) / streaks.length) * 10) / 10 : 0,
+        });
       } catch { /* mantém vazio */ }
     })();
     return () => { alive = false; };
@@ -483,6 +524,50 @@ export default function PersonalPerfilPage() {
               <p className="font-display text-2xl font-black text-[#4ADE80]">{todayCount ?? 0}</p>
               <p className="text-[10px] font-semibold text-muted-foreground">Check-ins hoje</p>
             </div>
+          </div>
+          <div className="gf-card gf-glass !rounded-2xl !p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Métricas da semana</p>
+            {week ? (
+              <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
+                <div className="text-center">
+                  <p className="font-display text-xl font-black text-foreground">{week.trainings}</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">dias com treino</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-display text-xl font-black text-foreground">{week.trainingsToday}</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">treinando hoje</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-display text-xl font-black text-foreground">{week.cardioMin}</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">min de cardio</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-display text-xl font-black text-foreground">{week.avgStreak}</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">sequência média</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-display text-xl font-black text-[#4ADE80]">{week.withPlan}</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">com plano ativo</p>
+                </div>
+                <div className="text-center">
+                  <p className={`font-display text-xl font-black ${week.noPlan > 0 ? "text-[#FFC24D]" : "text-foreground"}`}>{week.noPlan}</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">sem plano (fila)</p>
+                </div>
+                <div className="text-center">
+                  <p className={`font-display text-xl font-black ${week.pending > 0 ? "text-[#FFC24D]" : "text-foreground"}`}>{week.pending}</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">aguardando aprovação</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-display text-xl font-black text-foreground">{week.newcomers}</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">novos em 7 dias</p>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 space-y-2">
+                <div className="skeleton-line h-8 w-full" />
+                <div className="skeleton-line h-8 w-full" />
+              </div>
+            )}
           </div>
         </div>
       ) : tab === "config" && hasRole(profile?.role, "manager") ? (
