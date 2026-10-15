@@ -478,7 +478,7 @@ function PersonalTreinosContent() {
     return dbExercises
       .filter((e) => e.name.toLowerCase() !== "registro livre")
       .filter(matches)
-      .slice(0, 120);
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [dbExercises, swapQuery]);
 
   /** Troca o exercício mantendo séries/reps/RPE/dica do original.
@@ -1809,7 +1809,7 @@ function PersonalTreinosContent() {
                     Nenhum exercício encontrado para essa busca.
                   </li>
                 ) : (
-                  swapList.map((ex) => exRow(ex))
+                  swapList.slice(0, 80).map((ex) => exRow(ex))
                 )}
               </ul>
             ) : (
