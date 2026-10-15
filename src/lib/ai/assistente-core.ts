@@ -264,6 +264,66 @@ function stripThinking(text: string): string {
   return out.trim();
 }
 
+/** Stream acumulado: lê o SSE até [DONE] e devolve o texto completo.
+ *  Usado no DeepSeek (o modo non-stream oscila em incidente; o stream segue
+ *  fluindo). Ignora reasoning_content, junta só o content final. */
+async function accumulateStream(
+  entry: ChainEntry,
+  messages: ChatMessage[],
+  timeoutMs: number,
+  cancel: AbortSignal,
+  jsonMode?: boolean
+): Promise<string> {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const res = await fetch(`${entry.provider.url}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${entry.provider.key}`,
+    },
+    body: JSON.stringify({
+      model: entry.model,
+      messages,
+      stream: true,
+      temperature: 0.7,
+      ...(entry.provider.url.includes("deepseek") ? { thinking: { type: "disabled" } } : {}),
+      ...(entry.provider.url.includes("deepseek") && jsonMode
+        ? { response_format: { type: "json_object" } }
+        : {}),
+      max_tokens: 10000,
+    }),
+    signal: AbortSignal.any([timeout, cancel]),
+  });
+  if (!res.ok || !res.body) throw new Error(`http ${res.status}`);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let out = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        const json = JSON.parse(payload) as {
+          choices?: Array<{ delta?: { content?: string } }>;
+        };
+        const token = json.choices?.[0]?.delta?.content;
+        if (token) out += token;
+      } catch {
+        // linha parcial: ignora, o restante vem no próximo chunk
+      }
+    }
+  }
+  return out.trim();
+}
+
 async function callModel(
   entry: ChainEntry,
   messages: ChatMessage[],
@@ -478,13 +538,20 @@ export async function handleAssistente(request: Request) {
       if (remaining < MIN_SLACK) throw new Error("sem orçamento");
       const t0 = Date.now();
       try {
-        const res = await callModel(entry, msgs, false, Math.min(50_000, remaining - 1_500), cancel, structured);
-        if (!res.ok) throw new Error(`http ${res.status}`); // 429/outro → candidato fora
-        const data = (await res.json()) as {
-          choices?: Array<{ message?: { content?: string } }>;
-        };
-        let reply = data.choices?.[0]?.message?.content?.trim() ?? "";
-        reply = stripThinking(reply);
+        const useStreamAcc = entry.provider.url.includes("deepseek");
+        let reply: string;
+        if (useStreamAcc) {
+          reply = stripThinking(
+            await accumulateStream(entry, msgs, Math.min(50_000, remaining - 1_500), cancel, structured)
+          );
+        } else {
+          const res = await callModel(entry, msgs, false, Math.min(50_000, remaining - 1_500), cancel, structured);
+          if (!res.ok) throw new Error(`http ${res.status}`); // 429/outro → candidato fora
+          const data = (await res.json()) as {
+            choices?: Array<{ message?: { content?: string } }>;
+          };
+          reply = stripThinking(data.choices?.[0]?.message?.content?.trim() ?? "");
+        }
         if (!reply) throw new Error("reply vazio"); // reasoning esgotou o budget
         if (isLeaky(reply)) throw new Error("vazou o system prompt");
 
