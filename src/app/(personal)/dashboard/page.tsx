@@ -13,6 +13,11 @@ import {
   UserRound,
   BarChart3,
   ShieldCheck,
+  Trophy,
+  Newspaper,
+  Library,
+  Wallet,
+  UserCog,
 } from "lucide-react";
 import { OcupacaoBarChart } from "~/components/charts";
 import { toast } from "sonner";
@@ -688,23 +693,27 @@ export default function DashboardPage() {
       ) : null}
 
       {/* Ações rápidas */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {[
-          { href: "/matriculas", label: "Nova matrícula", emoji: "📋" },
-          { href: "/personal/treinos", label: "Criar treino", emoji: "🧩" },
-          { href: "/personal/exercicios", label: "Biblioteca de exercícios", emoji: "📚" },
-          { href: "/personal/perfil", label: "Frase motivacional", emoji: "💬" },
-          { href: "/relatorios", label: "Relatórios", emoji: "📊" },
-          { href: "/feed-moderacao", label: "Moderar feed", emoji: "🛡️" },
+          { href: "/matriculas", label: "Nova matrícula", Icon: ClipboardCheck },
+          { href: "/personal/treinos", label: "Criar treino", Icon: ClipboardList },
+          { href: "/personal/exercicios", label: "Exercícios", Icon: Library },
+          { href: "/personal/ranking", label: "Ranking", Icon: Trophy },
+          { href: "/feed", label: "Feed", Icon: Newspaper },
+          { href: "/financeiro", label: "Financeiro", Icon: Wallet },
+          { href: "/personais", label: "Personais", Icon: UserCog },
+          { href: "/relatorios", label: "Relatórios", Icon: BarChart3 },
+          { href: "/feed-moderacao", label: "Moderar feed", Icon: ShieldCheck },
         ].map((a) => (
           <Link
             key={a.href}
             href={a.href}
-            className="tactile flex items-center gap-2 rounded-xl border border-border bg-card/40 p-3.5"
+            className="tactile flex items-center gap-2 rounded-xl border border-border bg-card/40 p-3"
           >
-            <span className="text-lg">{a.emoji}</span>
-            <span className="text-xs font-semibold text-foreground">{a.label}</span>
-            <ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <a.Icon className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 text-[11.5px] font-semibold leading-tight text-foreground">{a.label}</span>
           </Link>
         ))}
       </div>

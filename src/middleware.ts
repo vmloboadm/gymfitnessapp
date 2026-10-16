@@ -68,6 +68,7 @@ const HOME_BY_ROLE: Record<string, string> = {
   student: STUDENT_PATHS[0],
   trainer: "/personal/dashboard",
   manager: "/dashboard",
+  admin: "/dashboard",
 };
 
 function pathAllowed(role: string | undefined, pathname: string): string | null {

@@ -14,6 +14,7 @@ import {
   Users,
   ClipboardList,
   LayoutDashboard,
+  Inbox,
 } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { cn } from "~/lib/utils";
@@ -32,16 +33,18 @@ const TRAINER_NAV = [
   { href: "/personal/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/personal/alunos", label: "Alunos", icon: Users },
   { href: "/personal/treinos", label: "Treinos", icon: ClipboardList },
-  { href: "/feed", label: "Feed", icon: Newspaper },
-  { href: "/ranking", label: "Ranking", icon: Trophy },
+  { href: "/personal/aprovacoes", label: "Aprovações", icon: Inbox },
+  { href: "/personal/ranking", label: "Ranking", icon: Trophy },
+  { href: "/personal/perfil", label: "Perfil", icon: User },
 ];
 
 const MANAGER_NAV = [
   { href: "/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/personal/alunos", label: "Alunos", icon: Users },
   { href: "/personal/treinos", label: "Treinos", icon: ClipboardList },
-  { href: "/feed", label: "Feed", icon: Newspaper },
-  { href: "/personais", label: "Personais", icon: Users },
+  { href: "/personal/aprovacoes", label: "Aprovações", icon: Inbox },
+  { href: "/personal/ranking", label: "Ranking", icon: Trophy },
+  { href: "/personal/perfil", label: "Perfil", icon: User },
 ];
 
 export function BottomNav() {
