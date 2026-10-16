@@ -125,8 +125,10 @@ export function buildSkeleton(opts: {
   objetivo: string;
   focoIds: string[];
   studentName: string;
+  sex?: string | null;
 }): SkeletonDay[] {
-  const { split, level, objetivo, focoIds } = opts;
+  const { split, level, objetivo, focoIds, sex } = opts;
+  const isFemale = sex === "F";
   const n = Math.max(1, split.length);
   const lowerFocus = focoIds.includes("lower");
   const gluteFocus = focoIds.includes("lower");
@@ -145,7 +147,20 @@ export function buildSkeleton(opts: {
     if (gluteFocus && cats.includes("gluteo") && !cats.slice(0, 2).includes("gluteo")) {
       cats = ["gluteo", ...cats.filter((c) => c !== "gluteo")];
     }
+    // perfil feminino: glúteo e perna à frente nos dias de perna
+    if (isFemale && cats.includes("gluteo")) {
+      cats = ["gluteo", "perna", ...cats.filter((c) => c !== "gluteo" && c !== "perna")];
+    }
     const alvo = distribute(cats, total);
+    // perfil feminino: garante ao menos 2 de glúteo nos dias que têm glúteo
+    if (isFemale) {
+      const g = alvo.find((a) => a.categoria === "gluteo");
+      if (g && g.qtd < 2) {
+        const donor = alvo.find((a) => (a.categoria === "core" || a.categoria === "panturrilha") && a.qtd > 1);
+        if (donor) donor.qtd -= 1;
+        g.qtd += 1;
+      }
+    }
     if (addCardio && !alvo.some((a) => a.categoria === "cardio")) {
       alvo.push({ categoria: "cardio", qtd: 1 });
     }

@@ -16,6 +16,7 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Library,
   Trash2,
   Search,
@@ -34,6 +35,7 @@ import { Button } from "~/components/ui/button";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { NewExerciseForm } from "~/components/training/NewExerciseForm";
+import { TreinoGuide } from "~/components/personal/TreinoGuide";
 
 import { buildWorkoutPrompt } from "~/lib/ai/prompts";
 import {
@@ -467,6 +469,7 @@ function PersonalTreinosContent() {
   const [entry, setEntry] = useState<"choose" | "ia" | "manual" | "copy" | null>(null);
   const [copyQuery, setCopyQuery] = useState("");
   const [copySaving, setCopySaving] = useState(false);
+  const [discardAsk, setDiscardAsk] = useState(false);
   // Picker de MÚLTIPLA escolha por categoria (modo esqueleto guiado)
   const [pickSheet, setPickSheet] = useState<{ dayIdx: number } | null>(null);
   const [pickSel, setPickSel] = useState<Set<string>>(new Set());
@@ -809,6 +812,7 @@ function PersonalTreinosContent() {
       objetivo: objetivoLabel,
       focoIds: ansFoco,
       studentName: target.name,
+      sex: target.sex,
     });
     setPlan({
       nome: `Treino ${target.name.split(" ")[0]}`,
@@ -1009,6 +1013,7 @@ function PersonalTreinosContent() {
     const day = plan?.dias[Math.min(activeDay, (plan?.dias.length ?? 1) - 1)];
     return (
       <div className="space-y-5">
+        <TreinoGuide />
         {/* Passo 2: aluno fixo */}
         <header className="gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-4">
           <Avatar className="h-11 w-11 border-2 border-brand/60">
@@ -1118,9 +1123,9 @@ function PersonalTreinosContent() {
                 <button
                   type="button"
                   onClick={() => setEntry(null)}
-                  className="tactile mb-2 text-[11px] font-bold text-muted-foreground hover:text-brand"
+                  className="tactile mb-2 flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-brand"
                 >
-                  ← Trocar opção
+                  <ChevronLeft className="h-3.5 w-3.5" /> Voltar
                 </button>
               )}
 
@@ -1301,6 +1306,15 @@ function PersonalTreinosContent() {
           {/* Pergunta 2: objetivo */}
           {askStep >= 1 ? (
             <>
+              {askStep === 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setAnsNivel(null)}
+                  className="tactile mb-2 flex items-center gap-1 text-[10.5px] font-bold text-muted-foreground hover:text-brand"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Voltar ao nível
+                </button>
+              ) : null}
               <div className="mb-2.5 mt-1 max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground">
                 Quais os objetivos? Toque em quantos quiser.
               </div>
@@ -1350,6 +1364,15 @@ function PersonalTreinosContent() {
           {/* Pergunta 3: foco (pode marcar mais de um) */}
           {askStep >= 2 ? (
             <>
+              {askStep === 2 ? (
+                <button
+                  type="button"
+                  onClick={() => setObjetivoDone(false)}
+                  className="tactile mb-2 flex items-center gap-1 text-[10.5px] font-bold text-muted-foreground hover:text-brand"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Voltar aos objetivos
+                </button>
+              ) : null}
               <div className="mb-2.5 mt-1 max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground">
                 Qual o foco do plano? Toque em quantos quiser.
               </div>
@@ -1402,6 +1425,15 @@ function PersonalTreinosContent() {
           {/* Pergunta 4: restrições */}
           {askStep >= 3 ? (
             <>
+              {askStep === 3 ? (
+                <button
+                  type="button"
+                  onClick={() => setFocoDone(false)}
+                  className="tactile mb-2 flex items-center gap-1 text-[10.5px] font-bold text-muted-foreground hover:text-brand"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Voltar ao foco
+                </button>
+              ) : null}
               <div className="mb-2.5 mt-1 max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground">
                 {target.name.split(" ")[0]} tem alguma restrição ou lesão? Toque em quantas precisar.
               </div>
@@ -1468,6 +1500,13 @@ function PersonalTreinosContent() {
           {/* Resumo + observações + dias */}
           {askStep >= 4 ? (
             <div className="mt-2 rounded-2xl border border-brand/25 bg-brand/[0.05] p-3">
+              <button
+                type="button"
+                onClick={() => setRestDone(false)}
+                className="tactile mb-2 flex items-center gap-1 text-[10.5px] font-bold text-muted-foreground hover:text-brand"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" /> Voltar às restrições
+              </button>
               <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Resumo para gerar
               </p>
@@ -1624,6 +1663,38 @@ function PersonalTreinosContent() {
               className="gf-card gf-glass space-y-3 !p-4"
               aria-label="Plano de treino editável"
             >
+              {discardAsk ? (
+                <div className="flex items-center gap-2 rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.07] p-3">
+                  <p className="min-w-0 flex-1 text-[11.5px] font-semibold text-foreground">Descartar este treino e voltar?</p>
+                  <button
+                    type="button"
+                    onClick={() => setDiscardAsk(false)}
+                    className="tactile rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[11.5px] font-bold text-muted-foreground"
+                  >
+                    Não
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlan(null);
+                      setEntry(null);
+                      setDiscardAsk(false);
+                      router.replace("/personal/treinos");
+                    }}
+                    className="tactile rounded-xl bg-[#F87171] px-3 py-2 text-[11.5px] font-black text-white"
+                  >
+                    Descartar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDiscardAsk(true)}
+                  className="tactile flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-brand"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Voltar
+                </button>
+              )}
               {usedFallback ? (
                 <div className="rounded-2xl border border-[#FFC24D]/30 bg-[#FFC24D]/[0.07] p-3">
                   <p className="text-[11.5px] font-bold text-[#FFC24D]">IA indisponível, plano montado local</p>
@@ -1786,41 +1857,86 @@ function PersonalTreinosContent() {
                   </p>
                 ) : null}
 
-                {/* esqueleto guiado: alvos por categoria + progresso */}
-                {day.alvo?.length ? (() => {
+                {/* esqueleto guiado: alvos por categoria + progresso (editável) */}
+                {plan.modo === "esqueleto" ? (() => {
                   const catOf = new Map(dbExercises.map((e) => [normBusca(e.name), e.category]));
                   const counts: Record<string, number> = {};
                   for (const e of day.exercicios) {
                     const c = catOf.get(normBusca(e.exercicio));
                     if (c) counts[c] = (counts[c] ?? 0) + 1;
                   }
-                  const totalAlvo = day.alvo.reduce((a, x) => a + x.qtd, 0);
+                  const alvo = day.alvo ?? [];
+                  const totalAlvo = alvo.reduce((a, x) => a + x.qtd, 0);
                   const totalHave = day.exercicios.length;
+                  const missing = CAT_ORDER.filter((c) => c !== "cardio" && !alvo.some((a) => a.categoria === c));
+                  const setAlvo = (next: { categoria: string; qtd: number }[]) => updateDay(activeDay, { alvo: next });
                   return (
                     <div className="rounded-2xl border border-brand/25 bg-brand/[0.05] p-3">
                       <div className="mb-2 flex items-center justify-between gap-2">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-brand">Estrutura do dia</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-brand">Estrutura do dia (editável)</p>
                         <span className={cn("text-[10px] font-bold tabular-nums", totalHave >= totalAlvo ? "text-[#4ADE80]" : "text-muted-foreground")}>
-                          {totalHave}/{totalAlvo} exercícios
+                          {totalHave}/{totalAlvo}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {day.alvo.map((a) => {
+                      <div className="space-y-1.5">
+                        {alvo.map((a, ai) => {
                           const have = counts[a.categoria] ?? 0;
                           const ok = have >= a.qtd;
                           return (
-                            <span
-                              key={a.categoria}
-                              className={cn(
-                                "rounded-full border px-2 py-1 text-[10px] font-bold",
-                                ok ? "border-[#4ADE80]/40 bg-[#4ADE80]/10 text-[#4ADE80]" : "border-white/[0.08] bg-white/[0.04] text-muted-foreground"
-                              )}
-                            >
-                              {catLabel(a.categoria)} {have}/{a.qtd}
-                            </span>
+                            <div key={a.categoria} className="flex items-center gap-1.5">
+                              <span
+                                className={cn(
+                                  "min-w-0 flex-1 truncate rounded-full border px-2 py-1 text-[10.5px] font-bold",
+                                  ok ? "border-[#4ADE80]/40 bg-[#4ADE80]/10 text-[#4ADE80]" : "border-white/[0.08] bg-white/[0.04] text-muted-foreground"
+                                )}
+                              >
+                                {catLabel(a.categoria)} <span className="tabular-nums">{have}/{a.qtd}</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setAlvo(alvo.map((x, xi) => (xi === ai ? { ...x, qtd: Math.max(1, x.qtd - 1) } : x)))}
+                                aria-label={`Menos ${a.categoria}`}
+                                className="tactile flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-[13px] font-bold text-foreground"
+                              >
+                                −
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setAlvo(alvo.map((x, xi) => (xi === ai ? { ...x, qtd: Math.min(8, x.qtd + 1) } : x)))}
+                                aria-label={`Mais ${a.categoria}`}
+                                className="tactile flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-[13px] font-bold text-foreground"
+                              >
+                                +
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setAlvo(alvo.filter((_, xi) => xi !== ai))}
+                                aria-label={`Remover ${a.categoria}`}
+                                className="tactile flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-[#F87171]"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
+                      {missing.length ? (
+                        <div className="mt-2">
+                          <p className="mb-1 text-[9.5px] font-semibold text-muted-foreground">Adicionar grupo:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {missing.map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => setAlvo([...alvo, { categoria: c, qtd: 1 }])}
+                                className="tactile rounded-full border border-dashed border-brand/40 px-2 py-0.5 text-[9.5px] font-bold text-brand"
+                              >
+                                + {catLabel(c)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => openPick(activeDay)}
