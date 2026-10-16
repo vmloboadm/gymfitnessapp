@@ -222,8 +222,11 @@ export default function HomePage() {
 
   useEffect(() => {
     if (loading) return;
-    // Gestor vai para o painel de gestão; Personal tem dashboard próprio abaixo.
-    if (profile?.role === "manager" || profile?.role === "admin") router.replace("/dashboard");
+    // Gestor e personal caem no MESMO dashboard vivo (Início). O Painel de
+    // gestão fica a um toque, pelo item "Painel" da barra inferior.
+    if (profile?.role === "manager" || profile?.role === "admin" || profile?.role === "trainer") {
+      router.replace("/personal/dashboard");
+    }
   }, [profile?.role, loading, router]);
 
 
