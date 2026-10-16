@@ -27,6 +27,7 @@ import {
   Target,
   ArrowLeftRight,
   Dumbbell,
+  ListChecks,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
@@ -44,6 +45,7 @@ import {
   type DBEquipment,
 } from "~/lib/ai/local-gen";
 import { demoLib } from "~/lib/demo-bridge";
+import { buildSkeleton, defaultPrescription } from "~/lib/ai/skeleton";
 import {
   type PersonalStudent,
   type WorkoutTemplate,
@@ -456,6 +458,11 @@ function PersonalTreinosContent() {
   // ===== Trocar exercício por outro da biblioteca (na revisão) =====
   const [swapTarget, setSwapTarget] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [swapQuery, setSwapQuery] = useState("");
+  // Picker de MÚLTIPLA escolha por categoria (modo esqueleto guiado)
+  const [pickSheet, setPickSheet] = useState<{ dayIdx: number } | null>(null);
+  const [pickSel, setPickSel] = useState<Set<string>>(new Set());
+  const [pickQuery, setPickQuery] = useState("");
+  const [pickCatOpen, setPickCatOpen] = useState<string | null>(null);
   // Criar exercício do zero dentro do picker ou da geração
   const [creatingEx, setCreatingEx] = useState(false);
   const [genCreatingEx, setGenCreatingEx] = useState(false);
@@ -538,6 +545,30 @@ function PersonalTreinosContent() {
             <p className="text-[10px] capitalize text-muted-foreground">{ex.category}</p>
           </div>
           {current ? <Check className="h-4 w-4 shrink-0 text-brand" /> : null}
+        </button>
+      </li>
+    );
+  };
+
+  /** Linha do picker de MÚLTIPLA escolha (checkbox por exercício). */
+  const pickRow = (ex: { id: string; name: string; category: string }) => {
+    const on = pickSel.has(ex.id);
+    return (
+      <li key={ex.id}>
+        <button
+          type="button"
+          onClick={() => togglePick(ex.id)}
+          aria-pressed={on}
+          className={cn(
+            "flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition-colors",
+            on ? "border-brand bg-brand/10" : "border-white/[0.06] bg-white/[0.02] hover:border-brand/30"
+          )}
+        >
+          <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-md border", on ? "border-brand bg-brand text-brand-foreground" : "border-white/20")}>
+            {on ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-foreground">{ex.name}</span>
+          <span className="shrink-0 text-[9.5px] capitalize text-muted-foreground">{ex.category}</span>
         </button>
       </li>
     );
@@ -760,6 +791,85 @@ function PersonalTreinosContent() {
     });
   };
 
+  // Esqueleto guiado: a estrutura (grupos + quantos exercícios) vem das
+  // respostas do assistente; o personal escolhe os exercícios por categoria.
+  const startSkeletonPlan = () => {
+    if (!target) return;
+    const skeleton = buildSkeleton({
+      split,
+      level: ansNivel ?? target.experience_level ?? "Intermediário",
+      objetivo: objetivoLabel,
+      focoIds: ansFoco,
+      studentName: target.name,
+    });
+    setPlan({
+      nome: `Treino ${target.name.split(" ")[0]}`,
+      frequencia: `${skeleton.length}x semana`,
+      nivel: ansNivel ?? target.experience_level ?? "Intermediário",
+      objetivo: objetivoLabel,
+      observacao_geral: "Estrutura montada pelo esqueleto guiado. Exercícios escolhidos pelo personal.",
+      daysSelected: [...daysSelected],
+      splitType: split,
+      modo: "esqueleto",
+      dias: skeleton.map((d) => ({
+        nome: d.nome,
+        foco: d.foco,
+        aquecimento: d.aquecimento,
+        exercicios: [],
+        finalizador: d.finalizador,
+        slot: d.slot,
+        alvo: d.alvo,
+      })),
+      cardio: /emagrec|condic/i.test(objetivoLabel) ? "Cardio 2-3x na semana" : "",
+    });
+    setActiveDay(0);
+    setUsedFallback(false);
+    toast.success("Estrutura pronta", {
+      description: "Toque em “Escolher exercícios” em cada dia e marque os que quiser.",
+    });
+  };
+
+  const openPick = (dayIdx: number) => {
+    setPickSheet({ dayIdx });
+    setPickSel(new Set());
+    setPickQuery("");
+    setPickCatOpen(plan?.dias[dayIdx]?.alvo?.[0]?.categoria ?? null);
+  };
+
+  const togglePick = (name: string) =>
+    setPickSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+
+  const addPickedToDay = () => {
+    if (!plan || !pickSheet || pickSel.size === 0) return;
+    const rx = defaultPrescription(plan.nivel, plan.objetivo);
+    const novos = dbExercises
+      .filter((e) => pickSel.has(e.id))
+      .map((e) => ({
+        exercicio: e.name,
+        series: rx.series,
+        reps: rx.reps,
+        descanso: rx.descanso,
+        rpe: rx.rpe,
+        dica: "",
+      }));
+    if (novos.length === 0) return;
+    const di = pickSheet.dayIdx;
+    setPlan({
+      ...plan,
+      dias: plan.dias.map((d, i) => (i === di ? { ...d, exercicios: [...d.exercicios, ...novos] } : d)),
+    });
+    toast.success(`${novos.length} exercício${novos.length === 1 ? "" : "s"} adicionado${novos.length === 1 ? "" : "s"}`, {
+      description: plan.dias[di]?.nome,
+    });
+    setPickSheet(null);
+    setPickSel(new Set());
+  };
+
   // ===== PASSO 5: aprovar e atribuir (ou salvar edição / ajuste v2) =====
   const approve = async () => {
     if (!plan || !target || !profile || !user) return;
@@ -944,6 +1054,17 @@ function PersonalTreinosContent() {
             <p className="mb-3 text-center text-[10.5px] text-muted-foreground">
               {ansNivel} · {objetivoLabel} · {focoLabel} · {split}, ou ajuste nas perguntas abaixo
             </p>
+          ) : null}
+          {guidedReady && !plan && !loading ? (
+            <button
+              type="button"
+              onClick={startSkeletonPlan}
+              disabled={!libReady}
+              className="tactile mb-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-brand/40 bg-brand/[0.06] py-3 text-[12.5px] font-black text-brand disabled:opacity-50"
+            >
+              <ListChecks className="h-4 w-4" />
+              Montar estrutura e escolher exercícios
+            </button>
           ) : null}
           {!plan && !loading ? (
             <div className="mb-3">
@@ -1519,6 +1640,52 @@ function PersonalTreinosContent() {
                   </p>
                 ) : null}
 
+                {/* esqueleto guiado: alvos por categoria + progresso */}
+                {day.alvo?.length ? (() => {
+                  const catOf = new Map(dbExercises.map((e) => [normBusca(e.name), e.category]));
+                  const counts: Record<string, number> = {};
+                  for (const e of day.exercicios) {
+                    const c = catOf.get(normBusca(e.exercicio));
+                    if (c) counts[c] = (counts[c] ?? 0) + 1;
+                  }
+                  const totalAlvo = day.alvo.reduce((a, x) => a + x.qtd, 0);
+                  const totalHave = day.exercicios.length;
+                  return (
+                    <div className="rounded-2xl border border-brand/25 bg-brand/[0.05] p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-brand">Estrutura do dia</p>
+                        <span className={cn("text-[10px] font-bold tabular-nums", totalHave >= totalAlvo ? "text-[#4ADE80]" : "text-muted-foreground")}>
+                          {totalHave}/{totalAlvo} exercícios
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {day.alvo.map((a) => {
+                          const have = counts[a.categoria] ?? 0;
+                          const ok = have >= a.qtd;
+                          return (
+                            <span
+                              key={a.categoria}
+                              className={cn(
+                                "rounded-full border px-2 py-1 text-[10px] font-bold",
+                                ok ? "border-[#4ADE80]/40 bg-[#4ADE80]/10 text-[#4ADE80]" : "border-white/[0.08] bg-white/[0.04] text-muted-foreground"
+                              )}
+                            >
+                              {catLabel(a.categoria)} {have}/{a.qtd}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openPick(activeDay)}
+                        className="tactile mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-2.5 text-[12px] font-black text-brand-foreground"
+                      >
+                        <ListChecks className="h-3.5 w-3.5" /> Escolher exercícios por categoria
+                      </button>
+                    </div>
+                  );
+                })() : null}
+
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Use as setas para reordenar · troque ou edite direto no card
                 </p>
@@ -1842,6 +2009,119 @@ function PersonalTreinosContent() {
                 })}
               </div>
             )}
+          </div>
+        </BottomSheet>
+
+        {/* Picker de múltipla escolha por categoria (modo esqueleto guiado) */}
+        <BottomSheet
+          open={!!pickSheet}
+          onClose={() => {
+            setPickSheet(null);
+            setPickSel(new Set());
+          }}
+        >
+          <div className="space-y-3">
+            <div>
+              <p className="text-base font-bold text-foreground">Escolher exercícios</p>
+              <p className="text-[11px] text-muted-foreground">
+                {pickSheet ? `${plan?.dias[pickSheet.dayIdx]?.nome ?? ""} · marque quantos quiser por categoria.` : ""}
+              </p>
+            </div>
+            {pickSheet && (plan?.dias[pickSheet.dayIdx]?.alvo?.length ?? 0) > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {plan?.dias[pickSheet.dayIdx]?.alvo?.map((a) => (
+                  <span key={a.categoria} className="rounded-full border border-brand/30 bg-brand/10 px-2 py-0.5 text-[9.5px] font-bold text-brand">
+                    {catLabel(a.categoria)} · alvo {a.qtd}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={pickQuery}
+                onChange={(e) => setPickQuery(e.target.value)}
+                placeholder="Buscar exercício..."
+                aria-label="Buscar exercício na biblioteca"
+                className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+              />
+            </div>
+            {(() => {
+              const targetCats = pickSheet ? plan?.dias[pickSheet.dayIdx]?.alvo?.map((a) => a.categoria) ?? [] : [];
+              const catsOrdered = [...targetCats, ...CAT_ORDER.filter((c) => !targetCats.includes(c))];
+              const q = normBusca(pickQuery);
+              const list = dbExercises
+                .filter((e) => e.name.toLowerCase() !== "registro livre")
+                .filter(
+                  (e) =>
+                    !q ||
+                    normBusca(e.name).includes(q) ||
+                    normBusca(e.category).includes(q) ||
+                    (e.muscles ?? []).some((m) => normBusca(m).includes(q)) ||
+                    (e.aliases ?? []).some((a) => normBusca(a).includes(q))
+                )
+                .sort((a, b) => a.name.localeCompare(b.name));
+              const searching = !!pickQuery.trim();
+              return (
+                <div className="max-h-[52vh] space-y-1.5 overflow-y-auto">
+                  {searching ? (
+                    <ul className="space-y-1.5">
+                      {list.length === 0 ? (
+                        <li className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 text-center text-[12px] text-muted-foreground">
+                          Nenhum exercício encontrado para essa busca.
+                        </li>
+                      ) : (
+                        list.slice(0, 100).map((ex) => pickRow(ex))
+                      )}
+                    </ul>
+                  ) : (
+                    catsOrdered.map((cat) => {
+                      const items = list.filter((e) => e.category === cat);
+                      if (items.length === 0) return null;
+                      const open = pickCatOpen === cat;
+                      const isTarget = targetCats.includes(cat);
+                      const qtdSel = items.filter((e) => pickSel.has(e.id)).length;
+                      return (
+                        <div
+                          key={cat}
+                          className={cn(
+                            "overflow-hidden rounded-2xl border",
+                            isTarget ? "border-brand/25 bg-brand/[0.03]" : "border-white/[0.06] bg-white/[0.02]"
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setPickCatOpen(open ? null : cat)}
+                            aria-expanded={open}
+                            className="tactile flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
+                          >
+                            <span className="text-[12px] font-black text-foreground">
+                              {catLabel(cat)}
+                              {isTarget ? <span className="ml-1.5 text-[9px] font-bold uppercase text-brand">alvo</span> : null}
+                            </span>
+                            <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                              {qtdSel > 0 ? <span className="text-brand">{qtdSel}/</span> : null}
+                              {items.length}
+                              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+                            </span>
+                          </button>
+                          {open ? <ul className="space-y-1 px-2 pb-2">{items.map((ex) => pickRow(ex))}</ul> : null}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              );
+            })()}
+            <button
+              type="button"
+              onClick={addPickedToDay}
+              disabled={pickSel.size === 0}
+              className="tactile flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand text-[13px] font-black text-brand-foreground disabled:opacity-40"
+            >
+              <Check className="h-4 w-4" strokeWidth={3} />
+              {pickSel.size > 0 ? `Adicionar ${pickSel.size} ao treino` : "Marque os exercícios"}
+            </button>
           </div>
         </BottomSheet>
       </div>

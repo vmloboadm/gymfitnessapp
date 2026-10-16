@@ -20,6 +20,8 @@ export type PlanExercise = {
   dica: string;
 };
 
+export type PlanTarget = { categoria: string; qtd: number };
+
 export type PlanDay = {
   nome: string;
   foco: string;
@@ -28,6 +30,11 @@ export type PlanDay = {
   finalizador: string;
   /** Letra do slot na divisão (A..F): rotação sem dia fixo */
   slot?: string;
+  /**
+   * Esqueleto: categorias-alvo e quantos exercícios o personal deve
+   * escolher em cada grupo. Presente só no modo "esqueleto guiado".
+   */
+  alvo?: PlanTarget[];
 };
 
 export type WorkoutPlan = {
@@ -42,6 +49,8 @@ export type WorkoutPlan = {
   observacao_geral: string;
   dias: PlanDay[];
   cardio: string;
+  /** Como o plano foi montado: IA completa, esqueleto guiado ou manual */
+  modo?: "ia" | "esqueleto" | "manual";
 };
 
 /** Exercício vindo do banco (tabela exercises). */
