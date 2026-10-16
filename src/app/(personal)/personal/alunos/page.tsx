@@ -8,13 +8,14 @@ import {
   UserCheck,
   Sparkles,
   CalendarClock,
+  Dumbbell,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { StudentSheet } from "~/components/personal/StudentSheet";
 import { useAuth } from "~/hooks/useAuth";
-import { studentStatus, type PersonalStudent } from "~/lib/personal-data";
+import { studentStatus, needsWorkout, type PersonalStudent } from "~/lib/personal-data";
 import { getGymStudents } from "~/lib/gym-api";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { cn } from "~/lib/utils";
@@ -81,6 +82,7 @@ export default function PersonalAlunosPage() {
 
   const pending = students.filter((s) => !s.approved_at);
   const approved = students.filter((s) => !!s.approved_at);
+  const awaiting = approved.filter(needsWorkout);
 
   const filtered = approved.filter((s) =>
     s.name.toLowerCase().includes(q.trim().toLowerCase())
@@ -179,6 +181,46 @@ export default function PersonalAlunosPage() {
               >
                 <Sparkles className="h-4 w-4" />
                 {approvingId === s.id ? "Aprovando..." : "Aprovar e criar treino"}
+              </button>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {/* Aguardando treino: aprovado sem treino criado, botão para criar */}
+      {!loading && awaiting.length > 0 ? (
+        <section aria-labelledby="awaiting-title" className="space-y-2">
+          <h2 id="awaiting-title" className="flex items-center gap-2 text-sm font-bold text-foreground">
+            <Dumbbell className="h-4 w-4 text-[#FFC24D]" />
+            Aguardando treino
+            <span className="rounded-full bg-[#FFC24D] px-2 py-0.5 text-[10px] font-black text-black">
+              {awaiting.length}
+            </span>
+          </h2>
+          <p className="text-[11px] text-muted-foreground">
+            Alunos aprovados ainda sem treino criado. Crie o treino para liberar no app deles.
+          </p>
+          {awaiting.map((s) => (
+            <div key={s.id} className="gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-3.5">
+              <Avatar className="h-10 w-10 shrink-0 border border-white/[0.08]">
+                <AvatarImage src={s.avatar ?? undefined} alt="" />
+                <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
+                  {s.name[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-bold text-foreground">{s.name}</p>
+                <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                  {s.goal ?? "Objetivo a definir"}
+                  {s.experience_level ? ` · ${s.experience_level}` : ""}
+                  {s.sex ? ` · ${s.sex === "F" ? "Fem" : "Masc"}` : ""}
+                </p>
+              </div>
+              <button
+                onClick={() => router.push(`/personal/treinos?aluno=${s.id}`)}
+                className="tactile flex shrink-0 items-center gap-1.5 rounded-xl bg-brand px-3 py-2 text-[11.5px] font-black text-brand-foreground shadow-lg shadow-brand/25"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> Criar treino
               </button>
             </div>
           ))}

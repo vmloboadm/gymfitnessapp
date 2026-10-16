@@ -58,6 +58,18 @@ export function computeQueue(
     const first = st.name.split(" ")[0];
     const waNumber = wa(st.phone);
 
+    // Aprovado e ainda sem treino: pendência clara, resolve criando o treino.
+    if (st.approved_at && !st.activeWorkout) {
+      items.push({
+        id: `queue-needs-workout-${st.id}`,
+        tone: "amber",
+        text: `${first} está aguardando treino`,
+        detail: "Aprovado e sem treino criado. Monte o treino para liberar no app.",
+        action: { kind: "link", label: "Criar treino", href: `/personal/treinos?aluno=${st.id}` },
+      });
+      continue;
+    }
+
     if (st.lastTrainingDaysAgo >= 3) {
       if (assignedTodayStudentIds.has(st.id)) {
         items.push({

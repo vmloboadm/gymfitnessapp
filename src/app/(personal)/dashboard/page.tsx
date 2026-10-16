@@ -85,6 +85,7 @@ type DashboardData = {
   fluxoSemana: { label: string; n: number }[];
   ocupacao: { hora: string; alunos: number }[];
   pendentes: PendingRequest[];
+  awaitingWorkout: number;
 };
 
 /** Presença expira depois de 4h sem saída (aluno esqueceu o checkout). */
@@ -166,6 +167,7 @@ export default function DashboardPage() {
           presenca: [],          fluxoSemana: [],
           ocupacao: demoOcupacaoHorario(),
           pendentes: [],
+          awaitingWorkout: 0,
         },
         error: null,
       };
@@ -179,7 +181,7 @@ export default function DashboardPage() {
     start7.setDate(start7.getDate() - 6);
     start7.setHours(0, 0, 0, 0);
 
-    const [sRes, eRes, ePendRes, sessRes, ckRes, wsRes, pendRes] = await Promise.all([
+    const [sRes, eRes, ePendRes, sessRes, ckRes, wsRes, pendRes, approvedRes, activeWsRes] = await Promise.all([
       sb.from("profiles").select("id", { count: "exact", head: true }).eq("gym_id", gym).eq("role", "student"),
       sb.from("equipment").select("id", { count: "exact", head: true }).eq("gym_id", gym).neq("status", "pending"),
       sb.from("equipment").select("id", { count: "exact", head: true }).eq("gym_id", gym).eq("status", "pending"),
@@ -209,6 +211,8 @@ export default function DashboardPage() {
         .eq("status", "pending")
         .order("created_at", { ascending: false })
         .limit(3) as unknown as Promise<{ data: PendingRequest[] | null; error: { message: string } | null }>,
+      sb.from("profiles").select("id").eq("gym_id", gym).eq("role", "student").not("approved_at", "is", null).limit(1000),
+      sb.from("student_workouts").select("student_id").eq("gym_id", gym).eq("status", "active").limit(1000),
     ]);
     if (sRes.error || eRes.error || ePendRes.error || sessRes.error || ckRes.error || wsRes.error || pendRes.error) {
       return { data: null, error: { message: "Erro ao carregar dados do dashboard" } };
@@ -283,6 +287,11 @@ export default function DashboardPage() {
       return { label: DIAS[d.getDay()], n };
     });
 
+    // Alunos aprovados que ainda não têm treino ativo (aguardando treino)
+    const approvedIds = new Set(((approvedRes.data ?? []) as Array<{ id: string }>).map((r) => r.id));
+    for (const r of ((activeWsRes.data ?? []) as Array<{ student_id: string }>)) approvedIds.delete(r.student_id);
+    const awaitingWorkout = approvedIds.size;
+
     return {
       data: {
         students: sRes.count ?? 0,
@@ -295,6 +304,7 @@ export default function DashboardPage() {
         fluxoSemana,
         ocupacao: counts.map((n, i) => ({ hora: `${i + 6}h`, alunos: n })),
         pendentes: (pendRes.data ?? []) as unknown as PendingRequest[],
+        awaitingWorkout,
       },
       error: null,
     };
@@ -398,6 +408,25 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Alerta: alunos aguardando treino */}
+      {data.awaitingWorkout > 0 ? (
+        <Link
+          href="/personal/alunos"
+          className="flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/[0.06] p-3.5 transition-colors hover:border-warning/60"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-warning/30 bg-warning/10 text-warning">
+            <Dumbbell className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[12.5px] font-bold text-foreground">
+              {data.awaitingWorkout} aluno{data.awaitingWorkout === 1 ? "" : "s"} aguardando treino
+            </span>
+            <span className="block text-[10.5px] text-muted-foreground">Crie o treino para liberar no app</span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+      ) : null}
 
       {/* NA ACADEMIA AGORA — presença real + encerrar treino */}
       <div className="rounded-2xl border border-border bg-card/50 p-4">

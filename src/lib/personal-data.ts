@@ -180,9 +180,15 @@ export function demoPersonalStudents(): PersonalStudent[] {
 }
 
 export function studentStatus(s: PersonalStudent): { label: string; tone: "green" | "red" | "amber" } {
+  if (s.approved_at && !s.activeWorkout) return { label: "Aguardando treino", tone: "amber" };
   if (s.lastTrainingDaysAgo === 0) return { label: "Treinou hoje", tone: "green" };
   if (s.lastTrainingDaysAgo <= 2) return { label: `Ativo, ${s.lastTrainingDaysAgo}d sem treinar`, tone: "amber" };
   return { label: `Inativo, ${s.lastTrainingDaysAgo} dias`, tone: "red" };
+}
+
+/** Aluno aprovado que ainda não tem treino ativo criado. */
+export function needsWorkout(s: PersonalStudent): boolean {
+  return !!s.approved_at && !s.activeWorkout;
 }
 
 export function demoTemplates(): WorkoutTemplate[] {
