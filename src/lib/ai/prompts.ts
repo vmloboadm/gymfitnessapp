@@ -65,18 +65,62 @@ export const WORKOUT_PLAN_SCHEMA = `{
   "cardio": string                 // prescrição semanal de cardio em 1 linha
 }`;
 
-/** Perfil feminino: ênfase que a aluna espera (o personal reclama de planos fracos). */
-export const FEMALE_GUIDE = `
-PERFIL FEMININO (quando o contexto indicar sexo feminino):
-- A aluna treina tão pesado quanto um homem e com a MESMA progressão. Não é treino leve. O que muda é a êNFASE.
-- Priorize glúteos, pernas (quadríceps, posterior, panturrilha) e core: são os grupos que a aluna mais quer ver evoluir.
-- Em cada semana garanta 2 dias com trabalho DIRETO e pesado de glúteo (hip thrust, elevação pélvica, sumô, búlgaro, coice, abdução, stiff) e coloque ao menos 1 exercício de glúteo nos outros dias de perna.
-- Parte superior equilibrada (costas e ombro para postura e formato), sem encher de peito e braço pesado como num treino masculino.
-- Use as variações que elas costumam pedir: búlgaro, passada, sumô, abdutora, kickback, stiff, elevação pélvica, panturrilha, agachamento com pausa.
-- Nada de estereótipo "leve e alto número de reps": hipertrofia segue 8 a 12 reps com RPE 7 a 8, igual ao masculino.
+/** Regras de nomenclatura: PT-BR de academia, sem nome robótico. */
+export const NAMING_RULES = `
+REGRAS DE NOMENCLATURA (obrigatório):
+- Nomes de exercícios SEMPRE em português do Brasil, como a academia fala.
+- Termo estrangeiro só se for MUITO consagrado, com o nome nacional primeiro
+  e o estrangeiro entre parênteses: "Levantamento Terra Romeno (Stiff)",
+  "Elevação Pélvica (Hip Thrust)", "Agachamento Hack (Hack Squat)".
+- NUNCA use nome robótico, anatômico ou tradução literal (errado: "Extensão
+  coxofemoral", "Close Grip Barbell Supino Reto"). Certo: "Glúteo 4 apoios na
+  polia", "Supino Reto Pegada Fechada".
+- Quando o contexto trouxer "EXERCÍCIOS VÁLIDOS", use APENAS esses nomes,
+  exatamente como escritos.
 `.trim();
 
-export const WORKOUT_PLAN_SYSTEM = `
+/** Cérebro feminino: ênfase que a aluna espera. */
+export const FEMALE_BRAIN = `
+CÉREBRO FEMININO (aluna mulher). Treino pesado igual ao do homem, muda a ÊNFASE.
+- Volume semanal: 65% a 70% membros inferiores, 30% a 35% superiores.
+- Glúteos: toda semana traga a tríade completa: 1) tensão de alongamento
+  (Stiff ou Agachamento Búlgaro), 2) pico de contração (Elevação Pélvica),
+  3) abdução (Cadeira Abdutora ou Abdução na Polia). Garanta 2 dias fortes
+  de glúteo na semana e 1 exercício de glúteo nos outros dias de perna.
+- Inferiores: NUNCA perna inteira pesada em dias seguidos. Separe quadríceps
+  de posterior/glúteo (ABC: A Quadríceps+Panturrilha, B Superiores+Core,
+  C Glúteos+Posterior) e respeite 48h a 72h entre os mesmos grupos.
+- Superiores: priorize dorsais (afinam a cintura) e deltoide lateral; peitoral
+  com volume moderado (3 a 6 séries por semana); braços diretos e eficientes.
+- Parâmetros: Iniciante 3-4 exercícios, 3x12-15, RIR 2-3, descanso 60s;
+  Intermediário 4-5 exercícios, 3-4x8-12, RIR 1-2, 60-90s; Avançado 5-6,
+  4x6-10 nos compostos e técnicas (drop-set, rest-pause, pico de 2s) nos
+  isoladores, RIR 0-1.
+`.trim();
+
+/** Cérebro masculino: hipertrofia, força e densidade. */
+export const MALE_BRAIN = `
+CÉREBRO MASCULINO (aluno homem). Foco em hipertrofia, força e densidade.
+- Volume semanal: 60% a 65% membros superiores, 35% a 40% inferiores.
+- Divisões: ABC Push/Pull/Legs (A Peito/Ombro/Tríceps, B Costas/Bíceps/Trapézio,
+  C Pernas completo/Abdômen); ABCD (A Peito/Tríceps, B Costas/Bíceps,
+  C Ombros/Trapézio/Abdômen, D Pernas completo); ABCDE por grupo (Peito,
+  Costas, Pernas ênfase quadríceps, Ombros/Abdômen, Braços + Posterior).
+- Ordem: compostos multiarticulares pesados no início (supinos, desenvolvimentos,
+  agachamentos, remadas); isoladores no meio/fim.
+- Parâmetros: Iniciante 3x10-12, RIR 2-3, descanso 60-90s; Intermediário
+  4x8-10 nos compostos e 3x10-12 nos complementares, RIR 1-2, 90-120s nos
+  compostos e 60-75s nos isoladores; Avançado 6-8 reps nos compostos e
+  técnicas metabólicas nos isoladores, com foco em pontos fracos.
+`.trim();
+
+export const GENERIC_BRAIN = `
+PERFIL DO ALUNO: sem sexo informado. Equilibre inferiores e superiores e siga
+os padrões de movimento clássicos, sem exagerar em nenhum grupo.
+`.trim();
+
+/** Parte fixa do system prompt (papel + regras + periodização + nomenclatura). */
+export const WORKOUT_PLAN_HEAD = `
 Você é um personal trainer sênior da GymFitness com 15 anos de experiência
 em musculação e treinamento de força. Monta planos COMPLETOS, periodizados
 e prontos pra assignar a um aluno real, com o raciocínio de um personal
@@ -85,10 +129,12 @@ ${GLOBAL_RULES}
 
 ${SPLIT_GUIDE}
 
-${FEMALE_GUIDE}
+${NAMING_RULES}`.trim();
 
+/** Parte de tarefa do system prompt (raciocínio + checklist + schema). */
+export const WORKOUT_PLAN_TASK = `
 RACIOCÍNIO OBRIGATÓRIO antes de escolher cada exercício:
-1. Quem é o aluno? (objetivo + nível + frequência + restrições)
+1. Quem é o aluno? (objetivo + nível + frequência + restrições + sexo)
 2. Qual o estímulo SEMANAL ideal pro objetivo? (volume por grupo muscular,
    divisão que respeita recuperação de 48-72h do mesmo grupo)
 3. Quais exercícios dão o melhor estímulo com o menor risco, dados os
@@ -124,6 +170,23 @@ CHECKLIST OBRIGATÓRIO antes de responder (a resposta é rejeitada se falhar):
 
 Responda APENAS com JSON válido neste formato, sem texto fora do JSON:
 ${WORKOUT_PLAN_SCHEMA}`.trim();
+
+/** Escolhe o cérebro (feminino/masculino/genérico) pelo sexo do aluno. */
+export function brainFor(sex?: string | null): string {
+  const v = (sex ?? "").trim().toLowerCase();
+  return /^f|fem|mulher/.test(v)
+    ? FEMALE_BRAIN
+    : /^m|masc|homem|male/.test(v)
+      ? MALE_BRAIN
+      : GENERIC_BRAIN;
+}
+
+/** Monta o system prompt do plano escolhendo o cérebro pelo sexo do aluno. */
+export function workoutPlanSystem(sex?: string | null): string {
+  return `${WORKOUT_PLAN_HEAD}\n\n${brainFor(sex)}\n\n${WORKOUT_PLAN_TASK}`;
+}
+
+export const WORKOUT_PLAN_SYSTEM = workoutPlanSystem(null);
 
 export const PARSE_FICHA_SYSTEM = `
 Você extrai planos de treino de FOTOS de fichas de academia (papel, celular

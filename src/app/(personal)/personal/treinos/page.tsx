@@ -250,6 +250,7 @@ function PersonalTreinosContent() {
 
   // ===== Assistente guiado (a IA faz perguntas antes de gerar) =====
   const [ansNivel, setAnsNivel] = useState<string | null>(null);
+  const [ansSexo, setAnsSexo] = useState<string | null>(null); // "F" ou "M" — define o cérebro da IA
   const [ansObjetivo, setAnsObjetivo] = useState<string[]>([]); // pode marcar vários (ex.: hipertrofia + condicionamento)
   const [objetivoDone, setObjetivoDone] = useState(false);
   const [ansFoco, setAnsFoco] = useState<string[]>([]); // ids do FOCO_OPTS — pode marcar vários (ex.: braços + ombros)
@@ -291,6 +292,7 @@ function PersonalTreinosContent() {
     const n = normNivel(st.experience_level);
     const o = normObjetivo(st.goal ?? st.activeWorkout);
     if (n) setAnsNivel((prev) => prev ?? n);
+    if (st.sex) setAnsSexo((prev) => prev ?? (st.sex === "F" ? "F" : st.sex === "M" ? "M" : null));
     // pré-preenchido conta como confirmado (1 toque continua valendo)
     if (o) {
       setAnsObjetivo((prev) => (prev.length > 0 ? prev : [o]));
@@ -319,7 +321,7 @@ function PersonalTreinosContent() {
     : "Corpo inteiro";
   const toggleFoco = (id: string) =>
     setAnsFoco((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  const guidedReady = !!ansNivel && objetivoDone && ansObjetivo.length > 0 && focoDone && ansFoco.length > 0 && restDone;
+  const guidedReady = !!ansNivel && !!ansSexo && objetivoDone && ansObjetivo.length > 0 && focoDone && ansFoco.length > 0 && restDone;
   // Divisão sugerida pela quantidade de dias marcados; o personal pode trocar.
   const splitSug =
     daysSelected.size <= 2 ? "AB"
@@ -686,11 +688,12 @@ function PersonalTreinosContent() {
             available_days: target.available_days,
           }),
           context: isAdjust ? "edit" : "personal",
+          sex: ansSexo,
           extras: {
             ...(validExerciseNames.length > 0
               ? {
                   "Biblioteca de exercícios (use APENAS estes nomes, exatamente como escritos)":
-                    validExerciseNames.slice(0, 200).join(" | "),
+                    validExerciseNames.join(" | "),
                 }
               : {}),
             ...(isAdjust && plan
@@ -1274,6 +1277,30 @@ function PersonalTreinosContent() {
           {/* Perguntas guiadas (só no modo IA ou ajuste) */}
           {entry === "ia" || adjustSwId ? (
             <>
+          {/* Sexo: define o cérebro da IA (ênfase feminina x masculina) */}
+          <div className="mb-2.5">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Sexo (define a estratégia do treino)
+            </p>
+            <div className="flex gap-1.5" role="group" aria-label="Sexo do aluno">
+              {[{ v: "F", l: "Mulher" }, { v: "M", l: "Homem" }].map((o) => (
+                <button
+                  key={o.v}
+                  type="button"
+                  onClick={() => setAnsSexo(o.v)}
+                  aria-pressed={ansSexo === o.v}
+                  className={cn(
+                    "rounded-full border px-3.5 py-2 text-[11.5px] font-bold transition-colors",
+                    ansSexo === o.v
+                      ? "border-brand bg-brand text-brand-foreground"
+                      : "border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:border-brand/40 hover:text-foreground"
+                  )}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </div>
           {/* Pergunta 1: nível */}
           <div className="mb-2.5 max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground">
             Qual o nível de {target.name.split(" ")[0]} hoje?

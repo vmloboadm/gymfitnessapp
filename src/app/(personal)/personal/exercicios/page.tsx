@@ -60,6 +60,19 @@ const GYM_CATEGORIES = [
   "panturrilha",
 ] as const;
 
+const CAT_LABEL: Record<string, string> = {
+  peito: "Peito",
+  costas: "Costas",
+  ombro: "Ombro",
+  biceps: "Bíceps",
+  triceps: "Tríceps",
+  perna: "Pernas",
+  gluteo: "Glúteos",
+  core: "Core",
+  cardio: "Cardio",
+  panturrilha: "Panturrilha",
+};
+
 /**
  * Biblioteca de exercícios do Personal, na mesma organização do aluno:
  * chips de grupo com scroll-snap, busca, thumbs idênticas e ações de gestão.
@@ -80,20 +93,40 @@ export default function PersonalExerciciosPage() {
   const [newTip, setNewTip] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Exercícios criados pela academia (banco): entram na lista, no picker,
-  // nos equivalentes e na IA, e ficam salvos para os próximos treinos.
+  // Biblioteca ÚNICA (banco): globais + exercícios da academia, na mesma lista.
   const { data: gymRows, refetch: refetchGym } = useAsyncQuery<
-    Array<{ id: string; name: string; category: string; muscles: string[] | null; tips: string[] | null; aliases: string[] | null }>
+    Array<{
+      id: string;
+      name: string;
+      category: string;
+      muscles: string[] | null;
+      tips: string[] | null;
+      aliases: string[] | null;
+      photo_url: string | null;
+      gym_id: string | null;
+    }>
   >(
     async () => {
       if (demo || !profile?.gym_id) return { data: [], error: null };
       const { data, error } = await supabaseBrowser()
         .from("exercises")
-        .select("id, name, category, muscles, tips, aliases")
-        .eq("gym_id", profile.gym_id)
+        .select("id, name, category, muscles, tips, aliases, photo_url, gym_id")
+        .or(`gym_id.is.null,gym_id.eq.${profile.gym_id}`)
         .order("name");
       if (error) return { data: null, error };
-      return { data: (data ?? []) as Array<{ id: string; name: string; category: string; muscles: string[] | null; tips: string[] | null; aliases: string[] | null }>, error: null };
+      return {
+        data: (data ?? []) as Array<{
+          id: string;
+          name: string;
+          category: string;
+          muscles: string[] | null;
+          tips: string[] | null;
+          aliases: string[] | null;
+          photo_url: string | null;
+          gym_id: string | null;
+        }>,
+        error: null,
+      };
     },
     [demo, profile?.gym_id],
     { enabled: !authLoading && !!user }
@@ -167,41 +200,46 @@ export default function PersonalExerciciosPage() {
 
   const all = useMemo<LibExercise[]>(() => {
     void version;
-    const edits = demo ? readLibraryEdits() : {};
-    const curated = demoLib
-      .flatMap((c) =>
-        c.subs.flatMap((sub) =>
-          sub.exercises.map((e) => ({
-            id: e.id,
-            name: edits[e.id]?.name ?? e.name,
-            category: c.id,
-            group: c.name,
-            imageUrl: (e as { imageUrl?: string | null }).imageUrl ?? null,
-            tips: e.info ? [e.info] : null,
-            muscles: e.tags ?? null,
-          }))
+    if (demo) {
+      const edits = readLibraryEdits();
+      return demoLib
+        .flatMap((c) =>
+          c.subs.flatMap((sub) =>
+            sub.exercises.map((e) => ({
+              id: e.id,
+              name: edits[e.id]?.name ?? e.name,
+              category: c.id,
+              group: c.name,
+              imageUrl: (e as { imageUrl?: string | null }).imageUrl ?? null,
+              tips: e.info ? [e.info] : null,
+              muscles: e.tags ?? null,
+            }))
+          )
         )
-      );
-    const gym = demo
-      ? []
-      : ((gymRows ?? []).map((g) => ({
-          id: `gym-${g.id}`,
-          name: g.name,
-          category: g.category,
-          group: "Da academia",
-          imageUrl: null,
-          tips: g.tips,
-          muscles: g.muscles,
-          aliases: (g as { aliases?: string[] | null }).aliases ?? null,
-          dbId: g.id,
-          ownGym: true,
-        })) as LibExercise[]);
-    return [...gym, ...curated].sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return (gymRows ?? [])
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        category: g.category,
+        group: CAT_LABEL[g.category] ?? g.category,
+        imageUrl: g.photo_url,
+        tips: g.tips,
+        muscles: g.muscles,
+        aliases: g.aliases,
+        dbId: g.id,
+        ownGym: !!g.gym_id,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [demo, version, gymRows]);
 
   const cats = useMemo(
-    () => [...demoLib].sort((a, b) => a.name.localeCompare(b.name)),
-    []
+    () =>
+      demo
+        ? [...demoLib].map((c) => ({ id: c.id, name: c.name })).sort((a, b) => a.name.localeCompare(b.name))
+        : GYM_CATEGORIES.map((c) => ({ id: c, name: CAT_LABEL[c] ?? c })),
+    [demo]
   );
 
   const filtered = all.filter((e) => {
@@ -518,7 +556,7 @@ export default function PersonalExerciciosPage() {
                         Salvar
                       </button>
                     </div>
-                  ) : (
+                  ) : detail.ownGym && detail.dbId && !demo ? (
                     <button
                       onClick={() => setEditingName(true)}
                       className="tactile flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] text-[13px] font-bold text-foreground transition-transform active:scale-[0.97]"
@@ -526,6 +564,10 @@ export default function PersonalExerciciosPage() {
                       <Pencil className="h-4 w-4 text-brand" />
                       Editar Exercício
                     </button>
+                  ) : (
+                    <p className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-center text-[10.5px] text-muted-foreground">
+                      Exercício oficial da biblioteca. Para um nome só da sua academia, crie um novo.
+                    </p>
                   )}
                   {detail.ownGym && detail.dbId && !demo ? (
                     <button

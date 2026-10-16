@@ -64,7 +64,7 @@ function modelChain(): ChainEntry[] {
 }
 
 /** System prompt por contexto (fonte única: lib/ai/prompts). */
-async function systemFor(context: string, extras?: Record<string, string>): Promise<string> {
+async function systemFor(context: string, extras?: Record<string, string>, sex?: string | null): Promise<string> {
   const extra = extras
     ? Object.entries(extras)
         .filter(([, v]) => v)
@@ -73,12 +73,14 @@ async function systemFor(context: string, extras?: Record<string, string>): Prom
     : "";
 
   if (context === "personal") {
-    const { WORKOUT_PLAN_SYSTEM } = await import("~/lib/ai/prompts");
-    return extra ? `${WORKOUT_PLAN_SYSTEM}\n\nContexto do aluno recebido:\n${extra}` : WORKOUT_PLAN_SYSTEM;
+    const { workoutPlanSystem } = await import("~/lib/ai/prompts");
+    const base = workoutPlanSystem(sex);
+    return extra ? `${base}\n\nContexto do aluno recebido:\n${extra}` : base;
   }
   if (context === "edit") {
-    const { EDIT_WORKOUT_SYSTEM } = await import("~/lib/ai/prompts");
-    return extra ? `${EDIT_WORKOUT_SYSTEM}\n\nContexto recebido:\n${extra}` : EDIT_WORKOUT_SYSTEM;
+    const { EDIT_WORKOUT_SYSTEM, NAMING_RULES, brainFor } = await import("~/lib/ai/prompts");
+    const base = `${EDIT_WORKOUT_SYSTEM}\n\n${NAMING_RULES}\n\n${brainFor(sex)}`;
+    return extra ? `${base}\n\nContexto recebido:\n${extra}` : base;
   }
   const { COACH_SYSTEM } = await import("~/lib/ai/prompts");
   return extra ? `${COACH_SYSTEM}\n\nDados do aluno (use para personalizar suas respostas):\n${extra}` : COACH_SYSTEM;
@@ -374,6 +376,7 @@ export async function handleAssistente(request: Request) {
     history?: unknown;
     extras?: unknown;
     stream?: unknown;
+    sex?: unknown;
   };
   try {
     body = await request.json();
@@ -385,6 +388,7 @@ export async function handleAssistente(request: Request) {
   const context = body.context === "personal" ? "personal" : body.context === "edit" ? "edit" : "aluno";
   const structured = context === "personal" || context === "edit";
   const stream = body.stream === true;
+  const sex = typeof body.sex === "string" ? body.sex : null;
   const extras =
     body.extras && typeof body.extras === "object" && !Array.isArray(body.extras)
       ? (body.extras as Record<string, string>)
@@ -402,7 +406,7 @@ export async function handleAssistente(request: Request) {
         .map((m) => ({ role: m.role as "user" | "assistant", content: (m.content as string).slice(0, 1000) }))
     : [];
 
-  const system = await systemFor(context, extras);
+  const system = await systemFor(context, extras, sex);
   const messages: ChatMessage[] = [
     { role: "system", content: system },
     ...history,
