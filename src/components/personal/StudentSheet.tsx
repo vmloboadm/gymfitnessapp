@@ -23,7 +23,7 @@ import {
 } from "~/lib/trainer-store";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { useAuth } from "~/hooks/useAuth";
-import { waStudentLink } from "~/lib/whatsapp";
+import { waStudentLink, buildQuickMessage } from "~/lib/whatsapp";
 import { cn } from "~/lib/utils";
 
 const TONE = {
@@ -335,6 +335,30 @@ export function StudentSheet({
               </button>
             ))}
           </div>
+
+          {/* Ações rápidas de WhatsApp (mensagens prontas, 1 toque) */}
+          {student.whatsapp_consent && student.phone ? (
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { k: "sumido", label: "Está sumido" },
+                { k: "cobrar", label: "Cobrar treino" },
+                { k: "parabens", label: "Parabéns" },
+                { k: "incentivo", label: "Incentivo" },
+                { k: "vencido", label: "Vencido" },
+                { k: "avaliacao", label: "Avaliação" },
+              ].map((a) => (
+                <a
+                  key={a.k}
+                  href={waStudentLink(student.phone, buildQuickMessage(a.k, student.name)) ?? "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="tactile inline-flex items-center gap-1 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-2.5 py-1.5 text-[10.5px] font-bold text-[#4ADE80]"
+                >
+                  <MessageCircle className="h-3 w-3" /> {a.label}
+                </a>
+              ))}
+            </div>
+          ) : null}
 
           {/* conteúdo da aba */}
           {tab === "resumo" ? (

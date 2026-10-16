@@ -29,6 +29,7 @@ import {
   ArrowLeftRight,
   Dumbbell,
   ListChecks,
+  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
@@ -36,6 +37,7 @@ import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { NewExerciseForm } from "~/components/training/NewExerciseForm";
 import { TreinoGuide } from "~/components/personal/TreinoGuide";
+import { waStudentLink, buildPlanWhatsMessage } from "~/lib/whatsapp";
 
 import { buildWorkoutPrompt } from "~/lib/ai/prompts";
 import {
@@ -2093,6 +2095,23 @@ function PersonalTreinosContent() {
                   className="w-full resize-none rounded-xl border border-white/[0.06] bg-white/[0.05] p-2.5 text-[12px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
                 />
               </div>
+
+              {target.phone && target.whatsapp_consent ? (
+                <a
+                  href={waStudentLink(target.phone, buildPlanWhatsMessage({ studentName: target.name, plan })) ?? "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="tactile flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-[#25D366]/40 bg-[#25D366]/10 text-[12.5px] font-black text-[#4ADE80]"
+                >
+                  <MessageCircle className="h-4 w-4" /> Avisar aluno no WhatsApp
+                </a>
+              ) : (
+                <p className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-center text-[10.5px] text-muted-foreground">
+                  {target.phone
+                    ? "Aluno sem consentimento de WhatsApp. Combine na recepção."
+                    : "Aluno sem telefone cadastrado."}
+                </p>
+              )}
 
               <Button onClick={approve} size="lg" className="h-12 w-full rounded-2xl text-[13px] font-bold">
                 <ClipboardCheck className="mr-2 h-4.5 w-4.5" />

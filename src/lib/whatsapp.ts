@@ -50,3 +50,58 @@ export function partnerLink(): string {
   if (!phone) return "mailto:contato@gymfitnesscampos.com.br?subject=" + encodeURIComponent("Quero ser parceiro · GymFitness");
   return waLink(phone, "Olá! Vim pelo QR code da academia e quero saber mais sobre as parcerias do GymFitness.");
 }
+
+/** Resumo do plano para a mensagem de WhatsApp. */
+export type PlanWhatsSummary = {
+  nome: string;
+  dias: Array<{ nome: string; exercicios: Array<{ exercicio: string; series: number; reps: string }> }>;
+};
+
+/**
+ * Mensagem completa personal → aluno pronta para o WhatsApp: treino
+ * liberado no app, pedido de check-in e o resumo dos dias/exercícios.
+ */
+export function buildPlanWhatsMessage(opts: {
+  studentName: string;
+  plan: PlanWhatsSummary;
+}): string {
+  const first = opts.studentName.split(" ")[0];
+  const totalEx = opts.plan.dias.reduce((a, d) => a + d.exercicios.length, 0);
+  const lines: string[] = [
+    `Oi ${first}! Seu treino novo ja esta disponivel no app.`,
+    "",
+    `${opts.plan.nome} · ${opts.plan.dias.length} ${opts.plan.dias.length === 1 ? "dia" : "dias"} · ${totalEx} exercicios`,
+  ];
+  for (const d of opts.plan.dias) {
+    lines.push("");
+    lines.push(`*${d.nome}*`);
+    d.exercicios.forEach((e, i) => lines.push(`${i + 1}. ${e.exercicio} · ${e.series}x${e.reps}`));
+  }
+  lines.push("");
+  lines.push("Abra o app, faca o check-in na academia e bora treinar. Qualquer duvida me chama!");
+  return lines.join("\n");
+}
+
+/** Mensagem curta pronta para ações rápidas do personal sobre um aluno. */
+export function buildQuickMessage(kind: string, studentName: string): string {
+  const first = studentName.split(" ")[0];
+  switch (kind) {
+    case "sumido":
+      return `Oi ${first}! Sentindo sua falta por aqui. Bora retomar os treinos essa semana? Te espero!`;
+    case "vencido":
+      return `Oi ${first}! Sua matricula esta vencendo. Quer renovar para nao perder o ritmo dos treinos?`;
+    case "cobrar":
+      return `Oi ${first}! Ja fez o treino de hoje? Registra no app que eu vejo seu progresso. Bora!`;
+    case "parabens":
+      return `Parabens, ${first}! Vi sua constancia no app, seu esforco esta aparecendo. Continue assim!`;
+    case "incentivo":
+      return `Bora, ${first}! Cada treino conta. Hoje e um otimo dia para evoluir mais um pouco.`;
+    case "avaliacao":
+      return `Oi ${first}! Vamos marcar sua avaliacao fisica e atualizar seus treinos? Me diz o melhor horario.`;
+    case "aniversario":
+      return `Feliz aniversario, ${first}! Que seja um ano de muita saude e treinos. Comemore com a gente!`;
+    default:
+      return `Oi ${first}! Tudo bem? Vamos falar sobre seus treinos?`;
+  }
+}
+
