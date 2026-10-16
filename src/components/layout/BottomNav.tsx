@@ -15,6 +15,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   Inbox,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { cn } from "~/lib/utils";
@@ -39,11 +40,12 @@ const TRAINER_NAV = [
 ];
 
 const MANAGER_NAV = [
-  { href: "/dashboard", label: "Início", icon: LayoutDashboard },
+  { href: "/personal/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/personal/alunos", label: "Alunos", icon: Users },
   { href: "/personal/treinos", label: "Treinos", icon: ClipboardList },
   { href: "/personal/aprovacoes", label: "Aprovações", icon: Inbox },
   { href: "/personal/ranking", label: "Ranking", icon: Trophy },
+  { href: "/dashboard", label: "Painel", icon: BarChart3 },
   { href: "/personal/perfil", label: "Perfil", icon: User },
 ];
 

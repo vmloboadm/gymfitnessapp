@@ -15,6 +15,7 @@ import {
   Inbox,
   UserRound,
   Trophy,
+  BarChart3,
 } from "lucide-react";
 
 /** Nav do personal: itens fixos, Aprovações com badge de pendentes. */
@@ -27,13 +28,14 @@ const TRAINER_NAV = [
   { href: "/personal/perfil", label: "Perfil", icon: UserRound },
 ] as const;
 
-/** Nav do gestor (mesma estética, rotas de gestão). */
+/** Nav do gestor: mesmo Início (dashboard vivo) + Painel de gestão. */
 const MANAGER_NAV = [
-  { href: "/dashboard", label: "Início", icon: LayoutDashboard },
+  { href: "/personal/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/personal/alunos", label: "Alunos", icon: Users },
   { href: "/personal/treinos", label: "Treinos", icon: ClipboardList },
   { href: "/personal/aprovacoes", label: "Aprovações", icon: Inbox, badge: true },
   { href: "/personal/ranking", label: "Ranking", icon: Trophy },
+  { href: "/dashboard", label: "Painel", icon: BarChart3 },
   { href: "/personal/perfil", label: "Perfil", icon: UserRound },
 ] as const;
 
