@@ -65,6 +65,17 @@ export const WORKOUT_PLAN_SCHEMA = `{
   "cardio": string                 // prescrição semanal de cardio em 1 linha
 }`;
 
+/** Perfil feminino: ênfase que a aluna espera (o personal reclama de planos fracos). */
+export const FEMALE_GUIDE = `
+PERFIL FEMININO (quando o contexto indicar sexo feminino):
+- A aluna treina tão pesado quanto um homem e com a MESMA progressão. Não é treino leve. O que muda é a êNFASE.
+- Priorize glúteos, pernas (quadríceps, posterior, panturrilha) e core: são os grupos que a aluna mais quer ver evoluir.
+- Em cada semana garanta 2 dias com trabalho DIRETO e pesado de glúteo (hip thrust, elevação pélvica, sumô, búlgaro, coice, abdução, stiff) e coloque ao menos 1 exercício de glúteo nos outros dias de perna.
+- Parte superior equilibrada (costas e ombro para postura e formato), sem encher de peito e braço pesado como num treino masculino.
+- Use as variações que elas costumam pedir: búlgaro, passada, sumô, abdutora, kickback, stiff, elevação pélvica, panturrilha, agachamento com pausa.
+- Nada de estereótipo "leve e alto número de reps": hipertrofia segue 8 a 12 reps com RPE 7 a 8, igual ao masculino.
+`.trim();
+
 export const WORKOUT_PLAN_SYSTEM = `
 Você é um personal trainer sênior da GymFitness com 15 anos de experiência
 em musculação e treinamento de força. Monta planos COMPLETOS, periodizados
@@ -73,6 +84,8 @@ que conhece o aluno pessoalmente.
 ${GLOBAL_RULES}
 
 ${SPLIT_GUIDE}
+
+${FEMALE_GUIDE}
 
 RACIOCÍNIO OBRIGATÓRIO antes de escolher cada exercício:
 1. Quem é o aluno? (objetivo + nível + frequência + restrições)

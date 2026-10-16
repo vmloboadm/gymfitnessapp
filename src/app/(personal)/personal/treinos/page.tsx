@@ -225,6 +225,11 @@ function PersonalTreinosContent() {
   const editId = params.get("edit") ?? "";
   const target = students.find((s) => s.id === targetId) ?? null;
 
+  // Troca de aluno: volta para a escolha inicial (IA / manual / copiar).
+  useEffect(() => {
+    setEntry(null);
+  }, [targetId]);
+
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -458,6 +463,10 @@ function PersonalTreinosContent() {
   // ===== Trocar exercício por outro da biblioteca (na revisão) =====
   const [swapTarget, setSwapTarget] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [swapQuery, setSwapQuery] = useState("");
+  // Entrada guiada (passo 1): com IA, manual ou copiar plano de outro aluno
+  const [entry, setEntry] = useState<"choose" | "ia" | "manual" | "copy" | null>(null);
+  const [copyQuery, setCopyQuery] = useState("");
+  const [copySaving, setCopySaving] = useState(false);
   // Picker de MÚLTIPLA escolha por categoria (modo esqueleto guiado)
   const [pickSheet, setPickSheet] = useState<{ dayIdx: number } | null>(null);
   const [pickSel, setPickSel] = useState<Set<string>>(new Set());
@@ -472,7 +481,6 @@ function PersonalTreinosContent() {
   const [repeatSelected, setRepeatSelected] = useState<Set<string>>(new Set());
   const [repeatQuery, setRepeatQuery] = useState("");
   const [repeatSaving, setRepeatSaving] = useState(false);
-  const [manualPick, setManualPick] = useState(false);
 
   const swapList = useMemo(() => {
     const q = normBusca(swapQuery);
@@ -776,7 +784,7 @@ function PersonalTreinosContent() {
       cardio: "",
     });
     setActiveDay(0);
-    setManualPick(false);
+    setEntry(null);
     setUsedFallback(false);
     toast.success("Monte os dias abaixo", {
       description: "Toque em Adicionar em cada dia e busque na biblioteca.",
@@ -823,10 +831,35 @@ function PersonalTreinosContent() {
       cardio: /emagrec|condic/i.test(objetivoLabel) ? "Cardio 2-3x na semana" : "",
     });
     setActiveDay(0);
+    setEntry(null);
     setUsedFallback(false);
     toast.success("Estrutura pronta", {
       description: "Toque em “Escolher exercícios” em cada dia e marque os que quiser.",
     });
+  };
+
+  // Copiar um plano já pronto da academia para o aluno atual (1 toque).
+  const copyPlanToTarget = async (programId: string, planName: string, fromStudent: string) => {
+    if (!target || !profile || copySaving) return;
+    setCopySaving(true);
+    try {
+      const res = await assignExistingPlan({
+        gymId: profile.gym_id,
+        programId,
+        targets: [{ id: target.id, name: target.name }],
+      });
+      if (res.ok === 0) throw new Error("Não deu copiar o plano.");
+      toast.success("Plano copiado!", {
+        description: `“${planName}” (de ${fromStudent}) foi para ${target.name.split(" ")[0]}.`,
+      });
+      setEntry(null);
+      refresh();
+      router.replace("/personal/treinos");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não deu copiar agora. Tente de novo.");
+    } finally {
+      setCopySaving(false);
+    }
   };
 
   const openPick = (dayIdx: number) => {
@@ -935,6 +968,7 @@ function PersonalTreinosContent() {
     setPrompt("");
     setNotes("");
     setAdjustSwId(null);
+    setEntry(null);
     refresh();
     router.replace("/personal/treinos");
   };
@@ -1038,59 +1072,166 @@ function PersonalTreinosContent() {
               </button>
             </div>
           ) : null}
-          {/* 1 toque: respostas já vieram da ficha, gera direto sem clicar nas perguntas */}
-          {guidedReady && !plan && !loading ? (
-            <button
-              type="button"
-              onClick={run}
-              disabled={!libReady}
-              className="tactile mb-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 text-[13.5px] font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-50"
-            >
-              <Send className="h-4 w-4" />
-              {!libReady ? "Carregando biblioteca..." : "Gerar treino com dados da ficha"}
-            </button>
-          ) : null}
-          {guidedReady && !plan && !loading ? (
-            <p className="mb-3 text-center text-[10.5px] text-muted-foreground">
-              {ansNivel} · {objetivoLabel} · {focoLabel} · {split}, ou ajuste nas perguntas abaixo
-            </p>
-          ) : null}
-          {guidedReady && !plan && !loading ? (
-            <button
-              type="button"
-              onClick={startSkeletonPlan}
-              disabled={!libReady}
-              className="tactile mb-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-brand/40 bg-brand/[0.06] py-3 text-[12.5px] font-black text-brand disabled:opacity-50"
-            >
-              <ListChecks className="h-4 w-4" />
-              Montar estrutura e escolher exercícios
-            </button>
-          ) : null}
-          {!plan && !loading ? (
-            <div className="mb-3">
-              <button
-                type="button"
-                onClick={() => setManualPick((v) => !v)}
-                aria-expanded={manualPick}
-                className="tactile w-full rounded-xl border border-white/[0.08] bg-white/[0.03] py-2.5 text-[12px] font-bold text-muted-foreground transition-colors hover:text-brand"
-              >
-                Montar manualmente (sem IA)
-              </button>
-              {manualPick ? (
-                <div className="mt-2 grid grid-cols-5 gap-1.5" role="group" aria-label="Divisão do plano manual">
-                  {SPLIT_OPTS.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => startManualPlan(s.id)}
-                      className="tactile rounded-xl border border-brand/40 bg-brand/10 py-2.5 text-[12px] font-black text-brand"
-                    >
-                      {s.label}
-                    </button>
-                  ))}
+          {/* Passo 1 (guiado): por onde começar. Cada botão abre UMA etapa. */}
+          {!plan && !loading && !adjustSwId ? (
+            <>
+              {entry === null ? (
+                <div className="mb-3 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setEntry("ia")}
+                    className="tactile flex w-full items-center gap-3 rounded-2xl bg-brand p-3.5 text-left text-brand-foreground shadow-lg shadow-brand/25"
+                  >
+                    <Sparkles className="h-5 w-5 shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-black">Montar treino com IA</span>
+                      <span className="block text-[10.5px] opacity-90">a IA monta o plano completo a partir da ficha</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntry("manual")}
+                    className="tactile flex w-full items-center gap-3 rounded-2xl border border-brand/40 bg-brand/[0.06] p-3.5 text-left text-brand"
+                  >
+                    <ListChecks className="h-5 w-5 shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-black">Montar manualmente</span>
+                      <span className="block text-[10.5px] opacity-80">você escolhe a divisão e marca os exercícios por categoria</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntry("copy")}
+                    className="tactile flex w-full items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3.5 text-left text-foreground"
+                  >
+                    <History className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-black">Usar treino de outro aluno</span>
+                      <span className="block text-[10.5px] text-muted-foreground">copia um plano já pronto da academia</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEntry(null)}
+                  className="tactile mb-2 text-[11px] font-bold text-muted-foreground hover:text-brand"
+                >
+                  ← Trocar opção
+                </button>
+              )}
+
+              {/* MODO IA */}
+              {entry === "ia" && guidedReady ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={run}
+                    disabled={!libReady}
+                    className="tactile mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 text-[13.5px] font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-50"
+                  >
+                    <Send className="h-4 w-4" />
+                    {!libReady ? "Carregando biblioteca..." : "Gerar treino com dados da ficha"}
+                  </button>
+                  <p className="mb-3 text-center text-[10.5px] text-muted-foreground">
+                    {ansNivel} · {objetivoLabel} · {focoLabel} · {split}, ou ajuste nas perguntas abaixo
+                  </p>
+                </>
+              ) : null}
+
+              {/* MODO MANUAL: divisão + estrutura sugerida (esqueleto) ou dias vazios */}
+              {entry === "manual" ? (
+                <div className="mb-3 space-y-2">
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Escolha a divisão</p>
+                  <div className="grid grid-cols-5 gap-1.5" role="group" aria-label="Divisão do plano">
+                    {SPLIT_OPTS.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setAnsSplit(s.id)}
+                        aria-pressed={split === s.id}
+                        className={cn(
+                          "tactile rounded-xl border py-2.5 text-[12px] font-black",
+                          split === s.id ? "border-brand bg-brand text-brand-foreground" : "border-white/[0.08] bg-white/[0.03] text-muted-foreground"
+                        )}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[9.5px] leading-snug text-muted-foreground">
+                    Rotação {split.split("").join(" · ")}: o aluno faz na ordem, em qualquer dia.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={startSkeletonPlan}
+                    disabled={!libReady}
+                    className="tactile flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 text-[13px] font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-50"
+                  >
+                    <ListChecks className="h-4 w-4" />
+                    Criar estrutura e escolher exercícios
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startManualPlan(split)}
+                    disabled={!libReady}
+                    className="tactile w-full rounded-xl border border-white/[0.08] bg-white/[0.03] py-2.5 text-[11.5px] font-bold text-muted-foreground transition-colors hover:text-brand"
+                  >
+                    Começar do zero (dias vazios)
+                  </button>
                 </div>
               ) : null}
-            </div>
+
+              {/* MODO COPIAR: plano já pronto de outro aluno */}
+              {entry === "copy" ? (
+                <div className="mb-3 space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={copyQuery}
+                      onChange={(e) => setCopyQuery(e.target.value)}
+                      placeholder="Buscar plano ou aluno..."
+                      aria-label="Buscar plano para copiar"
+                      className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                    />
+                  </div>
+                  <ul className="max-h-[40vh] space-y-1.5 overflow-y-auto">
+                    {assigned
+                      .filter((a) => a.programId)
+                      .filter((a) => !copyQuery.trim() || normBusca(a.name + " " + a.studentName).includes(normBusca(copyQuery)))
+                      .map((a) => (
+                        <li key={a.id}>
+                          <button
+                            type="button"
+                            onClick={() => copyPlanToTarget(a.programId, a.name, a.studentName)}
+                            disabled={copySaving}
+                            className="tactile flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-left transition-colors hover:border-brand/30 disabled:opacity-50"
+                          >
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
+                              <History className="h-3.5 w-3.5 text-brand" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[12.5px] font-bold text-foreground">{a.name}</span>
+                              <span className="block text-[10px] text-muted-foreground">
+                                de {a.studentName} · {a.days}d · {a.exercises} ex
+                              </span>
+                            </span>
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          </button>
+                        </li>
+                      ))}
+                    {assigned.filter((a) => a.programId).length === 0 ? (
+                      <li className="rounded-2xl border border-dashed border-white/[0.1] p-4 text-center text-[12px] text-muted-foreground">
+                        Nenhum plano na academia ainda. Monte um com IA ou manualmente.
+                      </li>
+                    ) : null}
+                  </ul>
+                </div>
+              ) : null}
+            </>
           ) : null}
           {!plan && !loading ? (
             <div className="mb-3">
@@ -1123,6 +1264,9 @@ function PersonalTreinosContent() {
             </div>
           ) : null}
 
+          {/* Perguntas guiadas (só no modo IA ou ajuste) */}
+          {entry === "ia" || adjustSwId ? (
+            <>
           {/* Pergunta 1: nível */}
           <div className="mb-2.5 max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground">
             Qual o nível de {target.name.split(" ")[0]} hoje?
@@ -1439,6 +1583,8 @@ function PersonalTreinosContent() {
               {loading ? `Gerando... ${genElapsed}s` : !libReady ? "Carregando biblioteca..." : adjustSwId ? "Gerar ajuste (v2)" : "Gerar plano completo"}
             </Button>
           </div>
+            </>
+          ) : null}
         </section>
 
         {/* Estado de geração */}

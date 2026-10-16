@@ -369,6 +369,11 @@ function scoreExercise(
   if (focus.includes("Tríceps") && /tr[íi]ceps|franc[êe]s|mergulho|paralelas/.test(text)) s += 3;
   if (focus.includes("Abdômen / Core") && /abd|prancha|abdominal|eleva[çc][ãa]o de pernas|bicicleta no solo|russian twist|crunch/.test(text)) s += 3;
   if (focus.includes("Posterior") && /stiff|femoral|mesa|posterior/.test(text)) s += 4;
+  // Perfil feminino: glúteos e pernas ganham peso, com glúteo à frente.
+  if (_student?.sex === "F") {
+    if (/gl[úu]teo|quadril|p[ée]lvica|abdutor|abdu[cç]|hip thrust|coice|glute bridge|sum[ôo]|b[úu]lgaro|kickback/.test(text)) s += 3;
+    if (/agach|leg press|extensora|flexora|stiff|afundo|passada|panturrilha|posterior|femoral/.test(text)) s += 2;
+  }
   if (COMPOUND_RE.test(text) && focus.length > 1) s += 1;
 
   // restrições
@@ -417,7 +422,8 @@ function buildDay(
   const scored = pool
     .map((e) => ({ e, s: scoreExercise(e, focus, restrictions, bias, student) }))
     .filter((x) => x.s > 0)
-    .sort((a, b) => b.s - a.s);
+    // desempate determinístico por dia: dias do mesmo tipo (A/C) variam
+    .sort((a, b) => b.s - a.s || (((hashCode(a.e.name) + seed) % 97) - ((hashCode(b.e.name) + seed) % 97)));
 
   // jitter determinístico por dia: entre exercícios com o mesmo score,
   // o desempate varia de dia para dia (variedade controlada no split)
@@ -495,7 +501,6 @@ export function generatePlanOffline(
     ...(options?.daysMeta?.restricoes ?? []),
     ...intent.restrictions,
   ].filter((r) => r && r !== "Nenhuma");
-  void focoMeta;
 
   // Usa exercícios reais do banco se disponíveis, senão fallback pro demoLib
   const pool: LibEntry[] = options?.dbExercises?.length
@@ -513,12 +518,14 @@ export function generatePlanOffline(
     : ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].slice(0, numDays);
 
   // Quando o assistente guia (diasMeta), o foco é distribuído no split; senão
-  // deriva do prompt (mas nunca trata lesão como foco).
+  // deriva do prompt (mas nunca trata lesão como foco). Prioriza o foco
+  // ESTRUTURADO do assistente, que é mais confiável que o texto do prompt.
+  const focoWords = focoMeta.length ? focoMeta : intent.focus;
   const flags = {
-    lowerFocus: intent.focus.some((f) => ["Inferiores", "Posterior", "Glúteo"].includes(f)),
-    gluteFocus: intent.focus.includes("Glúteo"),
-    upperFocus: intent.focus.some((f) => ["Peito", "Costas", "Ombro"].includes(f)),
-    armsFocus: intent.focus.includes("Braço"),
+    lowerFocus: focoWords.some((f) => ["Inferiores", "Posterior", "Glúteo", "Pernas"].includes(f)),
+    gluteFocus: focoWords.some((f) => f === "Glúteo"),
+    upperFocus: focoWords.some((f) => ["Peito", "Costas", "Ombro", "Superiores"].includes(f)),
+    armsFocus: focoWords.some((f) => f === "Braço" || f === "Bíceps" || f === "Tríceps"),
   };
 
   const archetypes = splitArchetypes(numDays, nivel, flags);

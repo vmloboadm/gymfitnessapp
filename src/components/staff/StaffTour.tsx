@@ -64,7 +64,7 @@ function markDone() {
  * ?tour=1 ou evento window "gf:staff-tour".
  */
 export function StaffTour() {
-  const { profile, loading } = useAuth();
+  const { profile } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [idx, setIdx] = useState(0);
@@ -73,17 +73,9 @@ export function StaffTour() {
   const isStaff = role === "trainer" || role === "manager" || role === "admin";
   const isManager = role === "manager" || role === "admin";
 
-  // Abre sozinho uma vez para staff autenticado que nunca completou.
-  useEffect(() => {
-    if (loading || !isStaff || open) return;
-    let done = false;
-    try {
-      done = localStorage.getItem(TOUR_KEY) === "done";
-    } catch {}
-    if (done) return;
-    const t = setTimeout(() => setOpen(true), 600);
-    return () => clearTimeout(t);
-  }, [loading, isStaff, open]);
+  // NÃO abre sozinho: o staff já conhece o app e o tour incomodava no login.
+  // Reabertura manual via ?tour=1 ou evento window "gf:staff-tour" (Perfil).
+
 
   // Reabertura manual: ?tour=1 (limpa o param) ou evento gf:staff-tour.
   useEffect(() => {
