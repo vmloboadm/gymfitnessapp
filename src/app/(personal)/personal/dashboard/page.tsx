@@ -185,11 +185,11 @@ export default function PersonalDashboardPage() {
 
   const stats = useMemo(() => {
     return {
-      activeStudents: students.filter((s) => s.lastTrainingDaysAgo <= 2).length,
+      activeStudents: students.filter((s) => s.lastTrainingDaysAgo != null && s.lastTrainingDaysAgo <= 2).length,
       totalStudents: students.length,
       prescribedToday: prescribedTodayCount,
       prescribedYesterday: prescribedYesterdayCount,
-      missesWeek: students.filter((s) => s.lastTrainingDaysAgo >= 3).length,
+      missesWeek: students.filter((s) => s.lastTrainingDaysAgo != null && s.lastTrainingDaysAgo >= 3).length,
     };
   }, [students, prescribedTodayCount, prescribedYesterdayCount]);
 
@@ -209,9 +209,9 @@ export default function PersonalDashboardPage() {
         pendingApprovals: approvalsPending,
         worstStudent:
           students
-            .filter((s) => s.lastTrainingDaysAgo >= 3)
-            .sort((a, b) => b.lastTrainingDaysAgo - a.lastTrainingDaysAgo)[0]?.name ?? null,
-        worstDays: Math.max(0, ...students.map((s) => s.lastTrainingDaysAgo)),
+            .filter((s) => (s.lastTrainingDaysAgo ?? -1) >= 3)
+            .sort((a, b) => (b.lastTrainingDaysAgo ?? -1) - (a.lastTrainingDaysAgo ?? -1))[0]?.name ?? null,
+        worstDays: Math.max(0, ...students.map((s) => s.lastTrainingDaysAgo ?? 0)),
         topStudent: students.find((s) => s.lastTrainingDaysAgo === 0)?.name ?? null,
       }),
     [stats, approvalsPending, students, tick]
@@ -520,7 +520,13 @@ export default function PersonalDashboardPage() {
                   <span
                     className={cn(
                       "absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#0B1220]",
-                      s.lastTrainingDaysAgo === 0 ? "bg-[#4ADE80]" : s.lastTrainingDaysAgo <= 2 ? "bg-[#FFC24D]" : "bg-[#F87171]"
+                      s.lastTrainingDaysAgo === 0
+                        ? "bg-[#4ADE80]"
+                        : s.lastTrainingDaysAgo != null && s.lastTrainingDaysAgo <= 2
+                          ? "bg-[#FFC24D]"
+                          : s.lastTrainingDaysAgo != null
+                            ? "bg-[#F87171]"
+                            : "bg-white/25"
                     )}
                     aria-hidden
                   />
@@ -529,7 +535,7 @@ export default function PersonalDashboardPage() {
                   {s.name.split(" ")[0]}
                 </p>
                 <p className="truncate text-[9px] text-muted-foreground">
-                  {s.lastTrainingDaysAgo === 0 ? "check-in feito" : `${s.freq}x semana`}
+                  {s.lastTrainingDaysAgo == null ? "sem registro" : s.lastTrainingDaysAgo === 0 ? "check-in feito" : `${s.freq}x semana`}
                 </p>
               </button>
             ))}
@@ -540,8 +546,8 @@ export default function PersonalDashboardPage() {
       {/* Alunos para reengajar (parados há 3+ dias), WhatsApp em 1 toque */}
       {(() => {
         const parados = students
-          .filter((s) => s.approved_at && s.lastTrainingDaysAgo >= 3)
-          .sort((a, b) => b.lastTrainingDaysAgo - a.lastTrainingDaysAgo)
+          .filter((s) => s.approved_at && (s.lastTrainingDaysAgo ?? -1) >= 3)
+          .sort((a, b) => (b.lastTrainingDaysAgo ?? -1) - (a.lastTrainingDaysAgo ?? -1))
           .slice(0, 5);
         if (parados.length === 0) return null;
         return (
@@ -652,9 +658,10 @@ const rowItem: Variants = {
 
 /** Mini-gráfico de barras: check-ins + treinos concluídos por dia (últimos 7 dias). */
 function WeeklyChart({ days, students }: { days: { label: string; count: number; isToday: boolean }[]; students: PersonalStudent[] }) {
-  const data = useMemo(() => {
-    if (days.length === 7 && days.some((d) => d.count > 0)) return days;
-    // fallback (primeiro load sem dado): estimativa pelo padrão de atividade
+  const { data, estimated } = useMemo(() => {
+    // Dado real carregado (mesmo zerado): mostra a verdade, sem estimativa.
+    if (days.length === 7) return { data: days, estimated: false };
+    // Primeiro load sem dado: estimativa temporária pelo padrão de atividade.
     const result: { label: string; count: number; isToday: boolean }[] = [];
     const today = new Date();
     for (let i = 6; i >= 0; i--) {
@@ -670,8 +677,9 @@ function WeeklyChart({ days, students }: { days: { label: string; count: number;
       }).length;
       result.push({ label: dayNames[d.getDay()], count: activeOnDay, isToday });
     }
-    return result;
+    return { data: result, estimated: true };
   }, [days, students]);
+  const total = data.reduce((a, d) => a + d.count, 0);
 
   const maxCount = Math.max(1, ...data.map((d) => d.count));
 
@@ -711,6 +719,11 @@ function WeeklyChart({ days, students }: { days: { label: string; count: number;
           </div>
         ))}
       </div>
+      {!estimated && total === 0 ? (
+        <p className="mt-2 text-center text-[10px] text-muted-foreground">
+          Sem movimento registrado ainda. Check-ins e treinos concluídos aparecem aqui.
+        </p>
+      ) : null}
     </div>
   );
 }

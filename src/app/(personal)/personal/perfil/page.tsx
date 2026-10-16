@@ -271,7 +271,7 @@ export default function PersonalPerfilPage() {
 
   const monthKey = new Date().getMonth();
   const monthWorkouts = assigned.filter((w) => new Date(w.created_at).getMonth() === monthKey).length;
-  const activeCount = students.filter((s) => s.lastTrainingDaysAgo <= 2).length;
+  const activeCount = students.filter((s) => s.lastTrainingDaysAgo != null && s.lastTrainingDaysAgo <= 2).length;
   const retention = Math.round((activeCount / students.length) * 100);
   const avgStreak =
     Math.round(

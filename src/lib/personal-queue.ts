@@ -70,7 +70,9 @@ export function computeQueue(
       continue;
     }
 
-    if (st.lastTrainingDaysAgo >= 3) {
+    // Sem histórico real não é "sumido": quem está começando aparece
+    // em "aguardando treino" ou no plano novo de hoje.
+    if (st.lastTrainingDaysAgo != null && st.lastTrainingDaysAgo >= 3) {
       if (assignedTodayStudentIds.has(st.id)) {
         items.push({
           id: `queue-new-${st.id}`,

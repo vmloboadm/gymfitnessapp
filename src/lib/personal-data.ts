@@ -31,8 +31,8 @@ export type PersonalStudent = {
   phone: string | null;
   /** Consentimento LGPD para contato via WhatsApp (onboarding) */
   whatsapp_consent: boolean;
-  /** Dias desde o último treino (0 = treinou hoje) */
-  lastTrainingDaysAgo: number;
+  /** Dias desde o último treino (0 = treinou hoje). Null = sem registro ainda. */
+  lastTrainingDaysAgo: number | null;
   streak: number;
   activeWorkout: string | null;
   /** Último exercício registrado pelo aluno (para dar contexto na lista) */
@@ -110,8 +110,8 @@ export function computeRadar(
       });
       continue;
     }
-    // VERMELHO: sumido
-    if (st.lastTrainingDaysAgo >= 3) {
+    // VERMELHO: sumido (só com histórico real; sem registro não é "sumido")
+    if (st.lastTrainingDaysAgo != null && st.lastTrainingDaysAgo >= 3) {
       alerts.push({
         id: `radar-red-${st.id}`,
         severity: "red",
@@ -181,6 +181,7 @@ export function demoPersonalStudents(): PersonalStudent[] {
 
 export function studentStatus(s: PersonalStudent): { label: string; tone: "green" | "red" | "amber" } {
   if (s.approved_at && !s.activeWorkout) return { label: "Aguardando treino", tone: "amber" };
+  if (s.lastTrainingDaysAgo == null) return { label: "Começando agora", tone: "amber" };
   if (s.lastTrainingDaysAgo === 0) return { label: "Treinou hoje", tone: "green" };
   if (s.lastTrainingDaysAgo <= 2) return { label: `Ativo, ${s.lastTrainingDaysAgo}d sem treinar`, tone: "amber" };
   return { label: `Inativo, ${s.lastTrainingDaysAgo} dias`, tone: "red" };

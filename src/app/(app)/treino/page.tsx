@@ -779,10 +779,10 @@ export default function TreinoHomePage() {
         <PendingApprovalBanner />
         <div className="space-y-6 p-4">
           <EmptyState
-            title={profile?.approved_at ? "Sem treino prescrito para hoje" : "Aguardando aprovação do personal"}
+            title={profile?.approved_at ? "Aguardando seu treino" : "Aguardando aprovação do personal"}
             description={
               profile?.approved_at
-                ? "Quando seu personal atribuir um programa, ele aparece aqui, e os planos disponíveis já dão um gostinho do que vem por aí."
+                ? "Seu personal está montando seu treino. Enquanto isso, faça seu check-in, suba no ranking e teste um treino livre abaixo."
                 : "Seu cadastro está com o personal. Assim que ele aprovar e montar seu treino, ele aparece aqui."
             }
             icon={Dumbbell}

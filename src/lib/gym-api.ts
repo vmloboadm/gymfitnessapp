@@ -82,7 +82,7 @@ async function fetchRealStudents(gymId: string): Promise<PersonalStudent[]> {
       avatar: p.avatar_url ?? null,
       phone: p.phone,
       whatsapp_consent: p.whatsapp_consent ?? true,
-      lastTrainingDaysAgo: last ? daysAgo(last) : 30,
+      lastTrainingDaysAgo: last ? daysAgo(last) : null,
       streak,
       activeWorkout: active ? progNames.get(active.program_id) ?? null : null,
       lastWorkout: null,

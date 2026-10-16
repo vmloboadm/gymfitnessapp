@@ -380,9 +380,11 @@ export function StudentSheet({
                   Última vez
                 </p>
                 <p className="mt-1 text-[13px] font-bold text-foreground">
-                  {student.lastTrainingDaysAgo === 0
-                    ? "Hoje"
-                    : `${student.lastTrainingDaysAgo}d atrás`}
+                  {student.lastTrainingDaysAgo == null
+                    ? "Sem registro"
+                    : student.lastTrainingDaysAgo === 0
+                      ? "Hoje"
+                      : `${student.lastTrainingDaysAgo}d atrás`}
                 </p>
               </div>
               <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3">

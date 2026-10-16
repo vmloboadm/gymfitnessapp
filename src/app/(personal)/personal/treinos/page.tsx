@@ -1058,7 +1058,7 @@ function PersonalTreinosContent() {
             <span className="flex items-center gap-1 font-bold text-[#FF9A5C]">
               <Flame className="h-3 w-3" aria-hidden /> {target.streak}d sequência
             </span>
-            <span>último treino há {target.lastTrainingDaysAgo}d</span>
+            <span>{target.lastTrainingDaysAgo == null ? "sem treino registrado" : `último treino há ${target.lastTrainingDaysAgo}d`}</span>
             {target.lastRpe != null ? <span>último RPE {target.lastRpe}</span> : null}
             <span>meta {target.freq ?? splitLen}x/sem</span>
           </div>

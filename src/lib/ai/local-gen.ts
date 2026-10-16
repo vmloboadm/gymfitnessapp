@@ -723,7 +723,7 @@ export function briefingOffline(input: {
 export function insightOffline(input: {
   name: string;
   streak: number;
-  lastTrainingDaysAgo: number;
+  lastTrainingDaysAgo: number | null;
   lastRpe?: number;
   weights: number[];
   activeWorkout?: string | null;
@@ -731,6 +731,9 @@ export function insightOffline(input: {
   const w = input.weights;
   const delta = w.length >= 2 ? Math.round((w[w.length - 1] - w[0]) * 10) / 10 : 0;
   const first = input.name.split(" ")[0];
+  if (input.lastTrainingDaysAgo == null) {
+    return `${first} está começando agora e ainda não tem treino registrado. Monte o plano, acompanhe a primeira semana e cobre o check-in.`;
+  }
   if (input.lastTrainingDaysAgo >= 3) {
     return `${first} está há ${input.lastTrainingDaysAgo} dias sem treinar e o risco de evasão é alto. Dispare um WhatsApp hoje com um chamado leve pra volta, sem cobrar pesado.`;
   }
