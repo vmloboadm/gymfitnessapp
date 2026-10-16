@@ -3,6 +3,7 @@
 import { Crown, Medal, Trophy, Users, Flame, TrendingUp, ChevronRight, Gem, Award } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { toast } from "sonner";
 import { m } from "framer-motion";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -65,6 +66,27 @@ export default function RankingPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const demo = isDemoMode();
   const [period, setPeriod] = useState<PeriodId>("week");
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviting, setInviting] = useState<string | null>(null);
+
+  const inviteTogether = async (id: string, name?: string) => {
+    if (demo || inviting) return;
+    setInviting(id);
+    try {
+      const { data: res, error } = await supabaseBrowser().rpc("invite_train_together", { p_invitee: id });
+      if (error) throw new Error(error.message);
+      const ok = (res as { ok?: boolean } | null)?.ok;
+      if (!ok) throw new Error("Não deu para convidar");
+      toast.success(`Convite enviado${name ? ` para ${displayName(name)}` : ""}!`, {
+        description: "Você e a pessoa ganharam 30 pontos.",
+      });
+      setInviteOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não deu para convidar agora");
+    } finally {
+      setInviting(null);
+    }
+  };
 
   const { data, loading, error, refetch } = useAsyncQuery<{
     rows: RankRow[];
@@ -393,6 +415,55 @@ export default function RankingPage() {
                 );
               })}
             </div>
+          </div>
+        ) : null}
+
+        {/* Treinar junto: convite entre alunos (+30 para os dois) */}
+        {!loading && !error && data && data.rows.length > 1 ? (
+          <div className="gf-rise rounded-[20px] border border-brand/25 bg-brand/[0.05] p-4" style={{ animationDelay: "140ms" }}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-[12.5px] font-black text-foreground">
+                  <Users className="h-4 w-4 text-brand" /> Treinar junto
+                </p>
+                <p className="mt-0.5 text-[10.5px] text-muted-foreground">
+                  Chame alguém para treinar hoje: vocês dois ganham 30 pontos.
+                </p>
+              </div>
+              <button
+                onClick={() => setInviteOpen((v) => !v)}
+                className="tactile shrink-0 rounded-xl bg-brand px-3 py-2 text-[11.5px] font-black text-brand-foreground"
+              >
+                {inviteOpen ? "Fechar" : "Convidar"}
+              </button>
+            </div>
+            {inviteOpen ? (
+              <ul className="mt-3 space-y-1.5">
+                {data.rows
+                  .filter((r) => r.student_id !== (user?.id ?? ME))
+                  .slice(0, 20)
+                  .map((r) => (
+                    <li key={r.student_id} className="flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={r.student?.avatar_url ?? undefined} alt={r.student?.name ?? "Atleta"} />
+                        <AvatarFallback className="bg-secondary text-[10px] text-secondary-foreground">
+                          {(r.student?.name?.[0] ?? "?").toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-foreground">
+                        {displayName(r.student?.name)}
+                      </span>
+                      <button
+                        onClick={() => inviteTogether(r.student_id, r.student?.name)}
+                        disabled={inviting === r.student_id}
+                        className="tactile shrink-0 rounded-lg bg-brand/15 px-2.5 py-1.5 text-[10.5px] font-bold text-brand disabled:opacity-50"
+                      >
+                        {inviting === r.student_id ? "..." : "Convidar"}
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            ) : null}
           </div>
         ) : null}
 

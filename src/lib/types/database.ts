@@ -167,6 +167,10 @@ export interface Database {
         Args: { p_other_id: string };
         Returns: string;
       };
+      invite_train_together: {
+        Args: { p_invitee: string };
+        Returns: Record<string, unknown>;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

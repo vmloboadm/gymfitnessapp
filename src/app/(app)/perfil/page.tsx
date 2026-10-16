@@ -144,7 +144,16 @@ export default function PerfilPage() {
                   <Badge variant="success">Ativo</Badge>
                   {displayObjetivo ? <Badge variant="outline">{displayObjetivo === "hipertrofia" ? "Hipertrofia" : displayObjetivo === "emagrecimento" ? "Emagrecimento" : displayObjetivo === "condicionamento" ? "Condicionamento" : "Saúde"}</Badge> : null}
                 </div>
-                {displayBio ? <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-slate-300">{displayBio}</p> : null}
+                {displayBio ? (
+                  <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-slate-300">{displayBio}</p>
+                ) : (
+                  <button
+                    onClick={() => router.push("/configuracoes")}
+                    className="mt-2 inline-flex items-center gap-1 rounded-full border border-brand/40 bg-brand/10 px-2.5 py-1 text-[10.5px] font-bold text-brand"
+                  >
+                    Adicione uma bio para se apresentar
+                  </button>
+                )}
               </div>
             </div>
 

@@ -49,9 +49,10 @@ export default function PersonalPerfilPage() {
   const [students, setStudents] = useState<PersonalStudent[]>([]);
   const [tab, setTab] = useState<TabId>("alunos");
   const [demoAvatar, setDemoAvatar] = useState<string | null>(null);
-  const [bio, setBio] = useState(
-    "C Parish treinando há 8 anos. Especialista em hipertrofia e recomposição corporal. Acredito em execução limpa antes de carga."
-  );
+  const [bio, setBio] = useState("");
+  useEffect(() => {
+    if (profile?.bio) setBio((prev) => prev || profile.bio!);
+  }, [profile?.bio]);
   const [editingBio, setEditingBio] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
@@ -341,9 +342,14 @@ export default function PersonalPerfilPage() {
                 className="flex-1 resize-none rounded-xl border border-white/[0.08] bg-white/[0.05] p-2.5 text-[12px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
               />
               <button
-                onClick={() => {
+                onClick={async () => {
                   setEditingBio(false);
-                  toast.success("Bio atualizada");
+                  try {
+                    await supabaseBrowser().rpc("update_profile_own", { p_bio: bio.trim() || null });
+                    toast.success("Bio atualizada");
+                  } catch {
+                    toast.error("Não deu para salvar a bio agora");
+                  }
                 }}
                 aria-label="Salvar bio"
                 className="tactile flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-xl bg-brand text-brand-foreground transition-transform active:scale-[0.96]"
@@ -353,7 +359,13 @@ export default function PersonalPerfilPage() {
             </div>
           ) : (
             <div className="group relative">
-              <p className="pr-8 text-[12.5px] leading-snug text-muted-foreground">{bio}</p>
+              {bio ? (
+                <p className="pr-8 text-[12.5px] leading-snug text-muted-foreground">{bio}</p>
+              ) : (
+                <p className="pr-8 text-[12.5px] leading-snug text-muted-foreground">
+                  Sem bio ainda. Escreva algo curto para os alunos te conhecerem.
+                </p>
+              )}
               <button
                 onClick={() => setEditingBio(true)}
                 aria-label="Editar bio"

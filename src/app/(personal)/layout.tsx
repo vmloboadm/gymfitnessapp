@@ -14,14 +14,16 @@ import {
   ClipboardList,
   Inbox,
   UserRound,
+  Trophy,
 } from "lucide-react";
 
-/** Nav do personal: 5 itens fixos, Aprovações com badge de pendentes. */
+/** Nav do personal: itens fixos, Aprovações com badge de pendentes. */
 const TRAINER_NAV = [
   { href: "/personal/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/personal/alunos", label: "Alunos", icon: Users },
   { href: "/personal/treinos", label: "Treinos", icon: ClipboardList },
   { href: "/personal/aprovacoes", label: "Aprovações", icon: Inbox, badge: true },
+  { href: "/personal/ranking", label: "Ranking", icon: Trophy },
   { href: "/personal/perfil", label: "Perfil", icon: UserRound },
 ] as const;
 
@@ -31,6 +33,7 @@ const MANAGER_NAV = [
   { href: "/personal/alunos", label: "Alunos", icon: Users },
   { href: "/personal/treinos", label: "Treinos", icon: ClipboardList },
   { href: "/personal/aprovacoes", label: "Aprovações", icon: Inbox, badge: true },
+  { href: "/personal/ranking", label: "Ranking", icon: Trophy },
   { href: "/personal/perfil", label: "Perfil", icon: UserRound },
 ] as const;
 
