@@ -18,6 +18,7 @@ import { formatNumber, formatDate, displayName } from "~/lib/utils/format";
 import { LEAGUES, leagueFor } from "~/lib/utils/leagues";
 import { cn } from "~/lib/utils";
 import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
+import { HIDDEN_FROM_RANKING } from "~/lib/gym-api";
 import { recentAchievements } from "~/lib/achievements";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import type { Leaderboard, Profiles } from "~/lib/types/models";
@@ -130,7 +131,7 @@ export default function RankingPage() {
       const rpcRes = await supabase.rpc("gym_roster", { p_gym_id: profile.gym_id });
       if (rpcRes.error) return { data: null, error: rpcRes.error };
       const mates = ((rpcRes.data ?? []) as Array<Profiles & { role?: string }>).filter(
-        (m) => (m.role ?? "student") === "student"
+        (m) => (m.role ?? "student") === "student" && !HIDDEN_FROM_RANKING.includes(m.id)
       );
       // linhas do período (90 dias agrega sob demanda, resto lê o placar)
       type Board = { student_id: string; points: number; sessions: number; streak?: number | null };
@@ -205,7 +206,9 @@ export default function RankingPage() {
       let cardioTop: Array<{ student_id: string; minutes: number }> = [];
       const cq = await supabase.rpc("cardio_weekly", { p_gym_id: profile.gym_id });
       if (!cq.error && Array.isArray(cq.data)) {
-        cardioTop = ((cq.data ?? []) as Array<{ student_id: string; minutes: number }>).slice(0, 3);
+        cardioTop = ((cq.data ?? []) as Array<{ student_id: string; minutes: number }>)
+          .filter((c) => !HIDDEN_FROM_RANKING.includes(c.student_id))
+          .slice(0, 3);
       }
       return {
         data: { rows, mine, streakById, cardioTop },

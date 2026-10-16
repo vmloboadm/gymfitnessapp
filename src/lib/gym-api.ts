@@ -629,6 +629,14 @@ export type RankRow = {
   streakZeroed: boolean;
 };
 
+/**
+ * Perfis ocultos do ranking (não aparecem na lista, mas os pontos seguem
+ * somando). Uso: criador/testes intensivos. Remova o id para voltar a exibir.
+ */
+export const HIDDEN_FROM_RANKING: string[] = [
+  "25543c88-032b-4198-bd10-9e8d5d23885c", // Vinícius Lobo (criador)
+];
+
 export async function getRankingRows(gymId: string, students: PersonalStudent[]): Promise<RankRow[]> {
   if (isDemoMode()) {
     const ranks = (demoFallback("leaderboard") as Array<{ student_id: string; points: number }>) ?? [];
@@ -655,7 +663,9 @@ export async function getRankingRows(gymId: string, students: PersonalStudent[])
 
   const lbRows = (lb ?? []) as unknown as Array<{ student_id: string; points: number }>;
   const lbMap = new Map<string, number>(lbRows.map((r) => [r.student_id, r.points]));
-  const rows: RankRow[] = students.map((s) => {
+  const rows: RankRow[] = students
+    .filter((s) => !HIDDEN_FROM_RANKING.includes(s.id))
+    .map((s) => {
     const adjRows = (adj ?? []) as unknown as Array<{ student_id: string; kind: string; points: number; reason: string | null; created_at: string }>;
   const mine = adjRows.filter((a) => a.student_id === s.id);
     return {
