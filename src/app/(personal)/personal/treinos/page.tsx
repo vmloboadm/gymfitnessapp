@@ -1229,6 +1229,17 @@ function PersonalTreinosContent() {
                                 de {a.studentName} · {a.days}d · {a.exercises} ex
                               </span>
                             </span>
+                            {(() => {
+                              const src = students.find((s) => s.id === a.studentId);
+                              return (
+                                <Avatar className="h-8 w-8 shrink-0 border border-white/[0.08]">
+                                  <AvatarImage src={src?.avatar ?? undefined} alt="" />
+                                  <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-[10px] font-black text-brand-foreground">
+                                    {((src?.name ?? a.studentName)[0] ?? "?").toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                              );
+                            })()}
                             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                           </button>
                         </li>
