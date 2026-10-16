@@ -99,6 +99,9 @@ export default function PersonalDashboardPage() {
   const [prescribedTodayCount, setPrescribedTodayCount] = useState(0);
   const [prescribedYesterdayCount, setPrescribedYesterdayCount] = useState(0);
   const [approvalsPending, setApprovalsPending] = useState(0);
+  const [todayCheckins, setTodayCheckins] = useState(0);
+  const [todayWorkouts, setTodayWorkouts] = useState(0);
+  const [weeklyReal, setWeeklyReal] = useState<{ label: string; count: number; isToday: boolean }[]>([]);
   const [sheetStudent, setSheetStudent] = useState<PersonalStudent | null>(null);
   const [queueOpen, setQueueOpen] = useState(false);
   const [tick, setTick] = useState(0);
@@ -132,13 +135,16 @@ export default function PersonalDashboardPage() {
         const sb = supabaseBrowser();
         const today = new Date().toISOString().slice(0, 10);
         const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
         const threeHoursAgo = new Date(Date.now() - 3 * 3600000).toISOString();
-        const [ck, eq, sw, swY, req] = await Promise.all([
+        const [ck, eq, sw, swY, req, ckWeek, logsWeek] = await Promise.all([
           sb.from("checkins").select("student_id").eq("gym_id", gymId).gte("checked_at", `${today}T00:00:00`).limit(200),
           sb.from("equipment_sessions").select("student_id").eq("gym_id", gymId).eq("status", "active").gte("started_at", threeHoursAgo).limit(200),
           sb.from("student_workouts").select("student_id, assigned_at").eq("gym_id", gymId).gte("assigned_at", `${today}T00:00:00`).limit(200),
           sb.from("student_workouts").select("student_id").eq("gym_id", gymId).gte("assigned_at", `${yesterday}T00:00:00`).lt("assigned_at", `${today}T00:00:00`).limit(200),
           getRequests(gymId).catch(() => []),
+          sb.from("checkins").select("checked_at").eq("gym_id", gymId).gte("checked_at", `${weekAgo}T00:00:00`).limit(2000),
+          sb.from("workout_logs").select("date").eq("gym_id", gymId).gte("date", weekAgo).limit(2000),
         ]);
         if (!alive) return;
         const present = new Set<string>();
@@ -150,6 +156,28 @@ export default function PersonalDashboardPage() {
         setPrescribedTodayCount(swRows.length);
         setPrescribedYesterdayCount(((swY.data ?? []) as Array<{ student_id: string }>).length);
         setApprovalsPending(req.filter((r) => r.status === "pendente").length);
+        setTodayCheckins(present.size);
+
+        // Atividade REAL por dia (check-ins + treinos concluídos), últimos 7 dias
+        const byDay = new Map<string, number>();
+        for (const r of ((ckWeek.data ?? []) as Array<{ checked_at: string }>)) {
+          const k = r.checked_at.slice(0, 10);
+          byDay.set(k, (byDay.get(k) ?? 0) + 1);
+        }
+        for (const r of ((logsWeek.data ?? []) as Array<{ date: string }>)) {
+          const k = r.date.slice(0, 10);
+          byDay.set(k, (byDay.get(k) ?? 0) + 1);
+        }
+        setTodayWorkouts(((logsWeek.data ?? []) as Array<{ date: string }>).filter((r) => r.date.slice(0, 10) === today).length);
+        const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+        const week: { label: string; count: number; isToday: boolean }[] = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const k = d.toISOString().slice(0, 10);
+          week.push({ label: dayNames[d.getDay()], count: byDay.get(k) ?? 0, isToday: i === 0 });
+        }
+        setWeeklyReal(week);
       } catch { /* mantém zeros */ }
     })();
     return () => { alive = false; };
@@ -275,6 +303,31 @@ export default function PersonalDashboardPage() {
           ) : null}
         </div>
       </m.header>
+
+      {/* Números de HOJE (dado real, ao vivo) */}
+      <m.div variants={item} initial="hidden" animate="show" className="grid grid-cols-3 gap-2">
+        <div className="gf-card gf-glass !rounded-2xl !p-3 text-center">
+          <CalendarCheck className="mx-auto h-4 w-4 text-[#4ADE80]" />
+          <p className="mt-1 font-display text-xl font-black leading-none text-foreground">
+            <CountUp value={todayCheckins} />
+          </p>
+          <p className="mt-1 text-[9px] font-semibold text-muted-foreground">check-ins hoje</p>
+        </div>
+        <div className="gf-card gf-glass !rounded-2xl !p-3 text-center">
+          <Dumbbell className="mx-auto h-4 w-4 text-brand" />
+          <p className="mt-1 font-display text-xl font-black leading-none text-foreground">
+            <CountUp value={todayWorkouts} />
+          </p>
+          <p className="mt-1 text-[9px] font-semibold text-muted-foreground">treinos concluídos</p>
+        </div>
+        <Link href="/personal/alunos" className="gf-card gf-glass !rounded-2xl !p-3 text-center transition-transform active:scale-[0.97]">
+          <UserCheck className="mx-auto h-4 w-4 text-[#FFC24D]" />
+          <p className="mt-1 font-display text-xl font-black leading-none text-foreground">
+            <CountUp value={approvalsPending} />
+          </p>
+          <p className="mt-1 text-[9px] font-semibold text-muted-foreground">p/ aprovar</p>
+        </Link>
+      </m.div>
 
       {/* Lembretes: alunos aguardando aprovação + matrícula Gymfitness vencendo */}
       {(() => {
@@ -438,9 +491,9 @@ export default function PersonalDashboardPage() {
         <LivePulse online={online} />
       </m.div>
 
-      {/* Gráfico de frequência semanal */}
+      {/* Gráfico de movimento semanal (dado real) */}
       <m.section variants={item} initial="hidden" animate="show">
-        <WeeklyChart students={students} />
+        <WeeklyChart days={weeklyReal} students={students} />
       </m.section>
 
       {/* Agenda de hoje */}
@@ -484,6 +537,58 @@ export default function PersonalDashboardPage() {
         </m.section>
       ) : null}
 
+      {/* Alunos para reengajar (parados há 3+ dias), WhatsApp em 1 toque */}
+      {(() => {
+        const parados = students
+          .filter((s) => s.approved_at && s.lastTrainingDaysAgo >= 3)
+          .sort((a, b) => b.lastTrainingDaysAgo - a.lastTrainingDaysAgo)
+          .slice(0, 5);
+        if (parados.length === 0) return null;
+        return (
+          <m.section variants={item} initial="hidden" animate="show" aria-labelledby="reengage-title">
+            <h2 id="reengage-title" className="mb-2 flex items-center gap-2 text-sm font-bold text-foreground">
+              <UserRoundX className="h-4 w-4 text-[#F87171]" />
+              Reengajar
+              <span className="ml-auto text-[10px] font-medium text-muted-foreground">
+                {parados.length} parado{parados.length === 1 ? "" : "s"}
+              </span>
+            </h2>
+            <div className="space-y-2">
+              {parados.map((s) => (
+                <div key={s.id} className="gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-3">
+                  <button
+                    onClick={() => setSheetStudent(s)}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  >
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src={s.avatar ?? undefined} alt={s.name} />
+                      <AvatarFallback className="bg-secondary text-[10px] text-secondary-foreground">
+                        {(s.name[0] ?? "?").toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-bold text-foreground">{s.name.split(" ")[0]}</span>
+                      <span className="block text-[10px] text-[#F87171]">há {s.lastTrainingDaysAgo} dias sem treinar</span>
+                    </span>
+                  </button>
+                  {s.phone ? (
+                    <a
+                      href={waHref(s.phone, `Oi ${s.name.split(" ")[0]}! Sentindo sua falta na academia. Bora voltar aos treinos?`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Chamar ${s.name.split(" ")[0]} no WhatsApp`}
+                      className="tactile flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#4ADE80]/30 bg-[#4ADE80]/10 text-[#4ADE80]"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </a>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </m.section>
+        );
+      })()}
+
       {/* Ações rápidas */}
       <m.section variants={item} initial="hidden" animate="show" aria-labelledby="quick-title">
         <h2 id="quick-title" className="mb-2 text-sm font-bold text-foreground">Ferramentas</h2>
@@ -514,7 +619,7 @@ export default function PersonalDashboardPage() {
           <Link href="/personal/exercicios" className="gf-card gf-glass !rounded-2xl !p-3 text-center transition-transform active:scale-[0.96]">
             <Dumbbell className="mx-auto h-4.5 w-4.5 text-[#4ADE80]" />
             <p className="mt-1.5 text-[10px] font-bold text-foreground">Exercícios</p>
-            <p className="text-[8.5px] text-muted-foreground">289 na base</p>
+            <p className="text-[8.5px] text-muted-foreground">ver biblioteca</p>
           </Link>
         </div>
       </m.section>
@@ -545,9 +650,11 @@ const rowItem: Variants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] } },
 };
 
-/** Mini-gráfico de barras: check-ins por dia da semana (últimos 7 dias) */
-function WeeklyChart({ students }: { students: PersonalStudent[] }) {
-  const days = useMemo(() => {
+/** Mini-gráfico de barras: check-ins + treinos concluídos por dia (últimos 7 dias). */
+function WeeklyChart({ days, students }: { days: { label: string; count: number; isToday: boolean }[]; students: PersonalStudent[] }) {
+  const data = useMemo(() => {
+    if (days.length === 7 && days.some((d) => d.count > 0)) return days;
+    // fallback (primeiro load sem dado): estimativa pelo padrão de atividade
     const result: { label: string; count: number; isToday: boolean }[] = [];
     const today = new Date();
     for (let i = 6; i >= 0; i--) {
@@ -555,7 +662,6 @@ function WeeklyChart({ students }: { students: PersonalStudent[] }) {
       d.setDate(d.getDate() - i);
       const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
       const isToday = i === 0;
-      // Simula check-ins baseado no padrão de atividade dos alunos
       const activeOnDay = students.filter((s) => {
         const dow = d.getDay();
         if (s.freq >= 5) return dow >= 1 && dow <= 5;
@@ -565,19 +671,19 @@ function WeeklyChart({ students }: { students: PersonalStudent[] }) {
       result.push({ label: dayNames[d.getDay()], count: activeOnDay, isToday });
     }
     return result;
-  }, [students]);
+  }, [days, students]);
 
-  const maxCount = Math.max(1, ...days.map((d) => d.count));
+  const maxCount = Math.max(1, ...data.map((d) => d.count));
 
   return (
     <div className="gf-card gf-glass relative overflow-hidden !rounded-2xl !p-3">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand via-[#FFC24D] to-brand/20" aria-hidden />
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[11px] font-bold text-foreground">Frequência da semana</p>
-        <p className="text-[9px] text-muted-foreground">check-ins/dia</p>
+        <p className="text-[11px] font-bold text-foreground">Movimento da semana</p>
+        <p className="text-[9px] text-muted-foreground">check-ins + treinos/dia</p>
       </div>
       <div className="flex items-end gap-1.5" style={{ height: 64 }}>
-        {days.map((d, i) => (
+        {data.map((d, i) => (
           <div key={i} className="flex flex-1 flex-col items-center gap-1">
             <span className={cn("text-[8px] font-bold", d.isToday ? "text-brand" : "text-muted-foreground")}>{d.count}</span>
             <div className="w-full overflow-hidden rounded-t-md" style={{ height: 44 }}>
