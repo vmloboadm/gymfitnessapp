@@ -10,7 +10,7 @@ import { ExerciseVideoModal } from "~/components/common/ExerciseVideoModal";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
 import { assetPath } from "~/lib/asset-path";
-import { readSessionProgress, saveSessionProgress, clearSessionProgress } from "~/lib/workout-session";
+import { readSessionProgress, saveSessionProgress } from "~/lib/workout-session";
 import { ImageLightbox } from "~/components/common/ImageLightbox";
 
 export type WExercise = {
@@ -28,7 +28,7 @@ export type WExercise = {
   videoUrlFemale?: string | null;
 };
 
-type SetRecord = { reps: string; done: boolean };
+type SetRecord = { reps: string; weight: string; done: boolean };
 type ExerciseProgress = { sets: SetRecord[] };
 
 function fmt(seconds: number): string {
@@ -51,7 +51,7 @@ export default function WorkoutInProgress({
   onProgressChange,
 }: {
   exercises: WExercise[];
-  onFinish: (completedIds: string[]) => void;
+  onFinish: (completedIds: string[], progress: Record<string, ExerciseProgress>) => void;
   onMinimize?: () => void;
   onProgressChange?: (completedIds: string[]) => void;
 }) {
@@ -60,9 +60,14 @@ export default function WorkoutInProgress({
   const [detailEx, setDetailEx] = useState<ExerciseDetail | null>(null);
   const [videoEx, setVideoEx] = useState<{ name: string; poster?: string | null; url: string } | null>(null);
   const [showFinish, setShowFinish] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [restLeft, setRestLeft] = useState<number | null>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const restInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restIdxRef = useRef(-1);
+  // snapshot ao vivo do progresso p/ o handler de finalizar (sem stale closure)
+  const progressRef = useRef<Record<string, ExerciseProgress>>({});
+  progressRef.current = progress;
 
   // imersão: topo da página + esconde BottomNav global
   useEffect(() => {
@@ -82,24 +87,47 @@ export default function WorkoutInProgress({
       // retoma exatamente de onde parou (aluno circulou pelo app)
       setProgress(saved.progress as Record<string, ExerciseProgress>);
       setCurrentIdx(Math.min(saved.currentIdx, exercises.length - 1));
+      // retoma o descanso que estava rodando quando saiu da tela
+      if (saved.restIdx === currentIdx && typeof saved.restEndsAt === "number") {
+        const left = Math.ceil((saved.restEndsAt - Date.now()) / 1000);
+        if (left > 0 && left <= 600) {
+          restIdxRef.current = currentIdx;
+          startRest(left);
+        }
+      }
       return;
     }
     setProgress(() => {
       const next: Record<string, ExerciseProgress> = {};
       for (const ex of exercises) {
         next[ex.id] = {
-          sets: Array.from({ length: ex.sets }, () => ({ reps: String(ex.reps), done: false })),
+          sets: Array.from({ length: ex.sets }, () => ({ reps: String(ex.reps), weight: "", done: false })),
         };
       }
       return next;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exercises]);
 
-  // persiste a cada mudança · navegar pelo app não perde séries
+  // persiste a cada mudança · navegar pelo app não perde séries.
+  // Debounce do texto (reps/peso): salvar a cada tecla engasga o teclado.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!exercises.length || !Object.keys(progress).length) return;
-    saveSessionProgress({ exercises, progress, currentIdx });
-  }, [exercises, progress, currentIdx]);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveSessionProgress({
+        exercises,
+        progress,
+        currentIdx,
+        restIdx: restIdxRef.current,
+        restEndsAt: restLeft !== null ? Date.now() + restLeft * 1000 : null,
+      });
+    }, 250);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [exercises, progress, currentIdx, restLeft]);
 
   // reporta ids concluídos para cima (barra "Finalizar Treino" usa o ref)
   const completedIds = useMemo(
@@ -118,6 +146,7 @@ export default function WorkoutInProgress({
       setRestLeft((v) => {
         if (v === null || v <= 1) {
           if (restInterval.current) clearInterval(restInterval.current);
+          restIdxRef.current = -1;
           return null;
         }
         return v - 1;
@@ -137,6 +166,12 @@ export default function WorkoutInProgress({
   const nextEx = exercises[currentIdx + 1];
   const isLast = currentIdx === exercises.length - 1;
 
+  const cancelRest = useCallback(() => {
+    if (restInterval.current) clearInterval(restInterval.current);
+    restIdxRef.current = -1;
+    setRestLeft(null);
+  }, []);
+
   const toggleSet = (idx: number) => {
     if (!current) return;
     const willBeDone = !currentProgress?.sets[idx]?.done;
@@ -147,7 +182,13 @@ export default function WorkoutInProgress({
       const sets = p.sets.map((s, i) => (i === idx ? { ...s, done: !s.done } : s));
       return { ...prev, [current.id]: { sets } };
     });
-    if (willBeDone) startRest(current.rest);
+    if (willBeDone) {
+      restIdxRef.current = currentIdx;
+      startRest(current.rest);
+    } else {
+      // desmarcou por engano: para o descanso que não faz mais sentido
+      cancelRest();
+    }
   };
 
   const setReps = (idx: number, reps: string) => {
@@ -160,16 +201,31 @@ export default function WorkoutInProgress({
     });
   };
 
-  const markAll = () => {
+  const setWeight = (idx: number, weight: string) => {
     if (!current) return;
-    navigator.vibrate?.(25);
     setProgress((prev) => {
       const p = prev[current.id];
       if (!p) return prev;
-      const allDone = p.sets.every((s) => s.done);
+      const sets = p.sets.map((s, i) => (i === idx ? { ...s, weight } : s));
+      return { ...prev, [current.id]: { sets } };
+    });
+  };
+
+  const markAll = () => {
+    if (!current) return;
+    navigator.vibrate?.(25);
+    const allDone = currentProgress?.sets.every((s) => s.done) ?? false;
+    setProgress((prev) => {
+      const p = prev[current.id];
+      if (!p) return prev;
       return { ...prev, [current.id]: { sets: p.sets.map((s) => ({ ...s, done: !allDone })) } };
     });
-    if (!currentAllDone) startRest(current.rest);
+    if (!allDone) {
+      restIdxRef.current = currentIdx;
+      startRest(current.rest);
+    } else {
+      cancelRest();
+    }
   };
 
   const goNext = () => {
@@ -200,10 +256,13 @@ export default function WorkoutInProgress({
   };
 
   const handleFinish = () => {
+    if (finishing) return;
+    setFinishing(true);
     navigator.vibrate?.([50, 30, 50]);
     if (restInterval.current) clearInterval(restInterval.current);
-    clearSessionProgress();
-    onFinish(completedIds);
+    // NÃO limpa o progresso aqui: o conclude() da página lê este snapshot
+    // (reps/peso reais) e só então limpa. Limpar antes matava o fallback.
+    onFinish(completedIds, progressRef.current);
   };
 
   const photo = current?.thumbUrl ?? current?.imageUrl ?? null;
@@ -212,7 +271,7 @@ export default function WorkoutInProgress({
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-background p-6 text-center">
         <p className="text-sm font-bold text-foreground">Nenhum exercício nesta sessão</p>
-        <button onClick={() => onFinish([])} className="rounded-xl border border-border px-6 py-3 text-sm font-bold">
+        <button onClick={() => onFinish([], {})} className="rounded-xl border border-border px-6 py-3 text-sm font-bold">
           Voltar
         </button>
       </div>
@@ -276,11 +335,8 @@ export default function WorkoutInProgress({
               <span className="text-sm font-black tabular-nums text-brand">{fmt(restLeft)}</span>
               <span className="text-[11px] font-semibold text-muted-foreground">descanso</span>
               <button
-                onClick={() => {
-                  if (restInterval.current) clearInterval(restInterval.current);
-                  setRestLeft(null);
-                }}
-                className="ml-2 rounded-full border border-border px-2.5 py-0.5 text-[10px] font-bold text-muted-foreground"
+                onClick={cancelRest}
+                className="gf-touch ml-2 rounded-full border border-border px-3 py-1 text-[11px] font-bold text-muted-foreground"
               >
                 Pular
               </button>
@@ -367,7 +423,7 @@ export default function WorkoutInProgress({
                     aria-pressed={s.done}
                     aria-label={`Série ${i + 1}: toque para ${s.done ? "desmarcar" : "marcar como feita"}`}
                     className={cn(
-                      "flex h-16 cursor-pointer select-none items-center gap-3.5 rounded-2xl border px-4 transition-all active:scale-[0.99]",
+                      "flex min-h-[76px] cursor-pointer select-none items-center gap-2.5 rounded-2xl border px-3 transition-all active:scale-[0.99]",
                       s.done ? "border-success/45 bg-success/[0.09]" : "border-border bg-card/40"
                     )}
                   >
@@ -380,22 +436,38 @@ export default function WorkoutInProgress({
                       {s.done ? <Check className="h-5 w-5 stroke-[3]" /> : i + 1}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className={cn("block text-[15px] font-black", s.done ? "text-success" : "text-foreground")}>
+                      <span className={cn("block text-[14px] font-black", s.done ? "text-success" : "text-foreground")}>
                         Série {i + 1}
                       </span>
-                      <span className="block text-[11px] font-semibold text-muted-foreground">
-                        {s.done ? "Feita! Descansa e parte pra próxima" : `${current.reps} repetições`}
+                      <span className="block text-[10px] font-semibold text-muted-foreground">
+                        {s.done ? "Feita! Descansa" : `${current.reps} reps · descanso ${current.rest}s`}
                       </span>
                     </span>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      value={s.reps}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => setReps(i, e.target.value)}
-                      aria-label={`Reps da série ${i + 1}`}
-                      className="h-11 w-14 shrink-0 rounded-xl border border-border bg-background text-center text-lg font-black tabular-nums text-foreground outline-none focus:border-brand"
-                    />
+                    <label className="flex shrink-0 flex-col items-center gap-0.5">
+                      <span className="text-[8px] font-black uppercase tracking-wide text-muted-foreground">reps</span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={s.reps}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setReps(i, e.target.value)}
+                        aria-label={`Reps da série ${i + 1}`}
+                        className="h-9 w-12 rounded-lg border border-border bg-background text-center text-base font-black tabular-nums text-foreground outline-none focus:border-brand"
+                      />
+                    </label>
+                    <label className="flex shrink-0 flex-col items-center gap-0.5">
+                      <span className="text-[8px] font-black uppercase tracking-wide text-muted-foreground">kg</span>
+                      <input
+                        type="tel"
+                        inputMode="decimal"
+                        value={s.weight}
+                        placeholder="—"
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setWeight(i, e.target.value)}
+                        aria-label={`Carga em kg da série ${i + 1}`}
+                        className="h-9 w-14 rounded-lg border border-border bg-background text-center text-base font-black tabular-nums text-foreground outline-none focus:border-brand placeholder:text-muted-foreground/40"
+                      />
+                    </label>
                   </div>
                 ))}
               </div>
@@ -482,8 +554,12 @@ export default function WorkoutInProgress({
                 <button onClick={() => setShowFinish(false)} className="rounded-xl border border-border py-3 text-sm font-bold text-foreground">
                   Continuar
                 </button>
-                <button onClick={handleFinish} className="rounded-xl bg-success py-3 text-sm font-black text-black shadow-lg shadow-success/25">
-                  Finalizar
+                <button
+                  onClick={handleFinish}
+                  disabled={finishing}
+                  className="rounded-xl bg-success py-3 text-sm font-black text-black shadow-lg shadow-success/25 disabled:opacity-60"
+                >
+                  {finishing ? "Salvando…" : "Finalizar"}
                 </button>
               </div>
             </m.div>

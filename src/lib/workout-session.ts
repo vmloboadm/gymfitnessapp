@@ -141,8 +141,12 @@ const KEY_PROGRESS = "gymfit_session_progress_v1";
 
 export type SavedExerciseProgress = {
   exercises: unknown[];
-  progress: Record<string, { sets: Array<{ reps: string; done: boolean }> }>;
+  progress: Record<string, { sets: Array<{ reps: string; weight?: string; done: boolean }> }>;
   currentIdx: number;
+  /** em qual exercício o descanso parou (-1 = sem descanso) */
+  restIdx?: number;
+  /** timestamp (ms) de quando o descanso termina; permite retomar o contador */
+  restEndsAt?: number | null;
   savedAt: number;
 };
 

@@ -55,7 +55,7 @@ import { libraryMatch } from "~/lib/demo-data";
 import { toast } from "sonner";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
-import { useWorkoutSession, elapsedSeconds, readSessionProgress, clearSessionProgress, startWorkoutSession as startLocalDaySession, isDayUnlocked, markDayUnlocked, TRAINING_GATE_OPEN } from "~/lib/workout-session";
+import { useWorkoutSession, elapsedSeconds, readSessionProgress, clearSessionProgress, isDayUnlocked, markDayUnlocked, TRAINING_GATE_OPEN } from "~/lib/workout-session";
 import { checkDayPassword } from "~/lib/day-pass";
 import { SessionClock } from "~/components/common/SessionClock";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
@@ -266,7 +266,14 @@ export default function TreinoHomePage() {
     { enabled: !authLoading && !!user }
   );
 
-  useStudentWorkoutsRealtime(profile?.gym_id, refetch);
+  // Realtime: só refaz a query fora da sessão ativa. Enquanto o aluno está
+  // treinando, um evento de OUTRO aluno não pode recarregar e desmontar a tela.
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  useStudentWorkoutsRealtime(profile?.gym_id, () => {
+    if (phaseRef.current === "active") return;
+    void refetch();
+  });
 
   const router = useRouter();
   const { session: daySession, start: startDaySession, end: endDaySession } = useWorkoutSession();
@@ -342,7 +349,17 @@ export default function TreinoHomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, daySession]);
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  // dia LOCAL (UTC quebrava treino após 21h: caía no dia seguinte)
+  const todayKey = (() => {
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  })();
+  const dayOf = (iso: string) => {
+    const d = new Date(iso);
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
   // MESMA FONTE da home, nunca diverge
   const tw = useMemo(() => (demo ? getTodayWorkout() : resolveFromLogs(data?.logs ?? [])), [demo, data?.logs]);
   function resolveFromLogs(logs: NonNullable<TreinoData["logs"]>) {
@@ -355,7 +372,19 @@ export default function TreinoHomePage() {
     }
     return { focusLabel: String(f.label), resume: !!f.resume, bodyCat: String(f.bodyCat), label: `Treino do dia · ${String(f.label)}`, lastTrained };
   }
-  const todayLogs = useMemo(() => (data?.logs ?? []).filter((l) => l.date.slice(0, 10) === todayKey).length, [data, todayKey]);
+  // "Concluído hoje" só conta os exercícios DO PLANO DE HOJE (os details),
+  // não logs de qualquer exercício: fazer o slot A não podia travar o B.
+  const detailsIds = useMemo(
+    () => new Set(((data?.details ?? []) as Array<{ exercise_id?: string | null }>).map((d) => d.exercise_id).filter(Boolean)),
+    [data?.details]
+  );
+  const todayLogs = useMemo(
+    () =>
+      (data?.logs ?? []).filter(
+        (l) => dayOf(l.date).slice(0, 10) === todayKey && (detailsIds.size === 0 || detailsIds.has((l as { exercise_id?: string }).exercise_id))
+      ).length,
+    [data, todayKey, detailsIds]
+  );
   const totalToday = data?.details.length ?? 0;
   const finishedToday = totalToday > 0 && todayLogs >= totalToday;
 
@@ -389,10 +418,32 @@ export default function TreinoHomePage() {
     return fuzzy?.exercise_id ?? null;
   };
 
-  const conclude = async (completedIds?: string[]) => {
+  // trava anti duplo-toque: finalizar duas vezes gerava log duplicado
+  const concludingRef = useRef(false);
+
+  /** Data/hora LOCAL (não UTC): treino das 22h não pode virar "amanhã". */
+  const localISO = () => {
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  };
+
+  const conclude = async (
+    completedIds?: string[],
+    progressMap?: Record<string, { sets?: Array<{ reps?: string; weight?: string; done?: boolean }> }>
+  ) => {
+    if (concludingRef.current) return;
+    concludingRef.current = true;
     setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
-    // ids: parâmetro → ref ao vivo → progresso persistido (fallback triplo:
-    // garante logs mesmo se o chamador passou lista vazia)
+    const parseReps = (r: string): number => {
+      const m = String(r ?? "").match(/\d+/);
+      return m ? Math.min(999, parseInt(m[0], 10)) : 0;
+    };
+    const parseWeight = (w?: string): number | null => {
+      const m = String(w ?? "").match(/\d+(?:[.,]\d+)?/);
+      return m ? Math.round(parseFloat(m[0].replace(",", ".")) * 10) / 10 : null;
+    };
+    // ids: parâmetro → ref ao vivo → progresso persistido (fallback triplo)
     let ids = completedIds?.length ? completedIds : [...completedRef.current];
     if (ids.length === 0) {
       try {
@@ -403,7 +454,17 @@ export default function TreinoHomePage() {
           .map(([k]) => k);
       } catch { /* sem fallback */ }
     }
-    setConcludedCount(ids.length);
+    // progresso real digitado pelo aluno (reps/peso por série)
+    const progMap: Record<string, { sets?: Array<{ reps?: string; weight?: string; done?: boolean }> }> =
+      progressMap ?? {};
+    // registra TODO exercício com pelo menos 1 série feita (não só 100% completo:
+    // fazer 2 de 3 séries e finalizar É treino, e antes virava "registrado" sem log)
+    const loggedIds = ids.length
+      ? ids
+      : Object.entries(progMap)
+          .filter(([, v]) => (v.sets ?? []).some((s) => s?.done))
+          .map(([k]) => k);
+    setConcludedCount(loggedIds.length || ids.length);
     endDaySession();
     clearSessionProgress();
     try {
@@ -413,7 +474,6 @@ export default function TreinoHomePage() {
       const active = await getActiveWorkoutSession(user.id).catch(() => null);
       setFinishedSessionId(active?.id ?? null);
       void completeWorkoutSession(user.id);
-      // feedback do treino que acabou de terminar (abre na hora, não só no próximo acesso)
       try {
         const last = await getLastSessionNeedingFeedback(user.id).catch(() => null);
         if (last) {
@@ -422,88 +482,86 @@ export default function TreinoHomePage() {
         }
       } catch { /* feedback é bônus */ }
     }
-    if (ids.length) {
-      setDoneIds((prev) => new Set([...prev, ...ids]));
-      // produção: grava workout_logs reais dos exercícios concluídos.
-      // Resolve exercise_id na hora (mapa do plano OU busca por nome),
-      // então o dashboard/progresso SEMPRE atualizam ao finalizar.
+    let inserted = 0;
+    if (loggedIds.length) {
+      setDoneIds((prev) => new Set([...prev, ...loggedIds]));
+      // produção: grava workout_logs reais das séries que o aluno FEZ,
+      // com as reps e a carga que ele DIGITOU (não as do plano).
       if (!demo && user && profile) {
-        void (async () => {
-          try {
-            const supabase = supabaseBrowser();
-            const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
-            const parseReps = (r: string): number => {
-              const m = String(r).match(/\d+/);
-              return m ? Math.min(999, parseInt(m[0], 10)) : 0;
-            };
-            const sessList = session ?? [];
-            const missing = ids.filter(
-              (id) => !(planExerciseMap && planExerciseMap[id]?.exerciseId)
-            );
-            // 1) tenta os details do plano ativo (fonte mais confiável)
-            const detailIds: Record<string, string> = {};
-            const stillMissing = missing.filter((id) => {
-              const s = sessList.find((x) => x.id === id);
-              const resolved = s ? detailsExerciseId(s.name) : null;
-              if (resolved) {
-                detailIds[id] = resolved;
-                return false;
-              }
-              return true;
-            });
-            const nameToId: Record<string, string> = {};
-            if (stillMissing.length > 0) {
-              const names = stillMissing.map((id) => sessList.find((s) => s.id === id)?.name).filter(Boolean) as string[];
-              if (names.length > 0) {
-                const orFilter = names.map((n) => `name.ilike.%${n.replace(/[%_,]/g, "").slice(0, 24)}%`).join(",");
-                const { data: found } = await supabase
-                  .from("exercises")
-                  .select("id, name")
-                  .or(orFilter)
-                  .limit(names.length * 3);
-                for (const f of (found ?? []) as Array<{ id: string; name: string }>) {
-                  if (!nameToId[norm(f.name)]) nameToId[norm(f.name)] = f.id;
-                }
+        try {
+          const supabase = supabaseBrowser();
+          const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
+          const sessList = session ?? [];
+          const missing = loggedIds.filter(
+            (id) => !(planExerciseMap && planExerciseMap[id]?.exerciseId)
+          );
+          // 1) tenta os details do plano ativo (fonte mais confiável)
+          const detailIds: Record<string, string> = {};
+          const stillMissing = missing.filter((id) => {
+            const s = sessList.find((x) => x.id === id);
+            const resolved = s ? detailsExerciseId(s.name) : null;
+            if (resolved) {
+              detailIds[id] = resolved;
+              return false;
+            }
+            return true;
+          });
+          const nameToId: Record<string, string> = {};
+          if (stillMissing.length > 0) {
+            const names = stillMissing.map((id) => sessList.find((s) => s.id === id)?.name).filter(Boolean) as string[];
+            if (names.length > 0) {
+              const orFilter = names.map((n) => `name.ilike.%${n.replace(/[%_,]/g, "").slice(0, 24)}%`).join(",");
+              const { data: found } = await supabase
+                .from("exercises")
+                .select("id, name")
+                .or(orFilter)
+                .limit(names.length * 3);
+              for (const f of (found ?? []) as Array<{ id: string; name: string }>) {
+                if (!nameToId[norm(f.name)]) nameToId[norm(f.name)] = f.id;
               }
             }
-            const findId = (name: string): string | null => {
-              const n = norm(name);
-              const words = n.split(" ").filter(Boolean);
-              for (const [k, v] of Object.entries(nameToId)) {
-                if (k.includes(n) || n.includes(k)) return v;
-              }
-              for (const [k, v] of Object.entries(nameToId)) {
-                if (words.slice(0, 2).every((w) => k.includes(w))) return v;
-              }
-              return null;
-            };
-              const rows = ids.flatMap((id) => {
-                const m = planExerciseMap?.[id];
-                const s = sessList.find((x) => x.id === id);
-                const exerciseId = m?.exerciseId ?? detailIds[id] ?? (s ? findId(s.name) : null);
-                if (!exerciseId) return [];
-                return [{
-                  gym_id: profile.gym_id,
-                  student_id: user.id,
-                  workout_id: m?.workoutId || null,
-                  exercise_id: exerciseId,
-                date: new Date().toISOString(),
-                reps: m?.reps ? parseReps(m.reps) : parseReps(s?.reps ?? "0"),
-                rpe: m?.rpe ?? null,
-              }];
-            });
-            if (rows.length === 0) {
-              // nunca mais em silêncio: se concluiu mas nada resolveu, avisa
-              toast.error("Treino não entrou no histórico", {
-                description: "Concluiu mas não consegui identificar os exercícios. Avise seu personal.",
-              });
+          }
+          const findId = (name: string): string | null => {
+            const n = norm(name);
+            const words = n.split(" ").filter(Boolean);
+            for (const [k, v] of Object.entries(nameToId)) {
+              if (k.includes(n) || n.includes(k)) return v;
             }
-            if (rows.length > 0) {
-              const { error: logErr } = await supabase.from("workout_logs").insert(rows as never);
-              if (logErr) {
-                toast.error("Falha ao registrar treino", { description: "Tente novamente." });
-              } else if (activeSlot && planActive[0]?.id) {
-                // check do slot na rotação (sem zerar: histórico contínuo)
+            for (const [k, v] of Object.entries(nameToId)) {
+              if (words.slice(0, 2).every((w) => k.includes(w))) return v;
+            }
+            return null;
+          };
+          const rows = loggedIds.flatMap((id) => {
+            const m = planExerciseMap?.[id];
+            const s = sessList.find((x) => x.id === id);
+            const exerciseId = m?.exerciseId ?? detailIds[id] ?? (s ? findId(s.name) : null);
+            if (!exerciseId) return [];
+            // reps/carga REAIS: última série feita desse exercício
+            const doneSets = (progMap[id]?.sets ?? []).filter((x) => x?.done);
+            const lastSet = doneSets[doneSets.length - 1];
+            const realReps = lastSet?.reps != null && String(lastSet.reps).trim() !== ""
+              ? parseReps(String(lastSet.reps))
+              : m?.reps
+                ? parseReps(m.reps)
+                : parseReps(s?.reps ?? "0");
+            const realWeight = lastSet?.weight != null ? parseWeight(String(lastSet.weight)) : null;
+            return [{
+              gym_id: profile.gym_id,
+              student_id: user.id,
+              workout_id: m?.workoutId || null,
+              exercise_id: exerciseId,
+              date: localISO(),
+              reps: realReps,
+              weight_kg: realWeight,
+              rpe: m?.rpe ?? null,
+            }];
+          });
+          if (rows.length > 0) {
+            const { error: logErr } = await supabase.from("workout_logs").insert(rows as never);
+            if (!logErr) {
+              inserted = rows.length;
+              if (activeSlot && planActive[0]?.id) {
                 await supabase.from("slot_checks").insert({
                   gym_id: profile.gym_id,
                   student_id: user.id,
@@ -512,15 +570,27 @@ export default function TreinoHomePage() {
                 } as never).then(() => {});
               }
             }
-          } catch {
-            /* treino segue mesmo se o log falhar */
           }
-        })();
+        } catch {
+          /* segue mesmo se o log falhar; o toast abaixo avisa */
+        }
       }
     }
     navigator.vibrate?.([60, 40, 90]);
     setPhase("done");
-    toast.success("Treino registrado!");
+    // toast HONESTO: só diz "registrado" se realmente entrou no histórico
+    if (demo || !user) {
+      toast.success("Treino registrado!");
+    } else if (inserted > 0) {
+      toast.success(`Treino registrado! ${inserted} exercício${inserted === 1 ? "" : "s"} no histórico.`);
+    } else if (loggedIds.length > 0) {
+      toast.error("Treino finalizado, mas não entrou no histórico", {
+        description: "Sem conexão ou falha no servidor. Avisamos seu personal.",
+      });
+    } else {
+      toast("Sessão finalizada", { description: "Nenhuma série marcada como feita." });
+    }
+    concludingRef.current = false;
   };
 
   // Volta ao treino em andamento (mesma sessão, progresso restaurado pela
@@ -571,14 +641,11 @@ export default function TreinoHomePage() {
     else await startPlanSession(pending.dayIdx, { force: true });
   };
 
-  // Finaliza de qualquer lugar (barra fixa, nudge dos 45min)
+  // Finaliza de qualquer lugar (barra fixa, nudge dos 45min). O conclude()
+  // cuida do toast, da fase "done" e da trava anti duplo-toque.
   const finishNow = () => {
     navigator.vibrate?.([60, 40, 60]);
-    setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
     void conclude([...completedRef.current]);
-    endDaySession();
-    toast.success("Sessão finalizada. Registre como foi!");
-    setPhase("done");
   };
 
   // Nudge aos 45min de sessão: pergunta se está tudo bem e oferece finalizar
@@ -588,10 +655,12 @@ export default function TreinoHomePage() {
     const fireNudge = () => {
       if (nudgedRef.current) return;
       nudgedRef.current = true;
+      // NÃO finaliza com 1 toque: um tap acidental no toast fechava o treino
+      // inteiro no meio do descanso. Só leva de volta pra tela de treino.
       toast("45 min de treino. Tudo bem por aí?", {
-        description: "Se terminou, finalize e conte como foi.",
-        duration: 15000,
-        action: { label: "Finalizar treino", onClick: () => finishNow() },
+        description: "Se terminou, volte ao treino e finalize com calma.",
+        duration: 12000,
+        action: { label: "Ver treino", onClick: () => router.push("/treino") },
       });
     };
     const wait = 45 * 60000 - (Date.now() - daySession.startedAt);
@@ -650,7 +719,10 @@ export default function TreinoHomePage() {
     };
   }) as typeof DEFAULT_DEMO_EX);
 
-  if (loading) {
+  // SKELETON só no primeiro load. Um refetch em segundo plano (realtime de
+  // outro aluno) NUNCA pode derrubar o WorkoutInProgress: matava o descanso,
+  // puxava o scroll pro topo e fechava o teclado no meio da série.
+  if (loading && !data) {
     return (
       <>
         <TopBar title="Hoje" subtitle={cap(weekdayName())} />
@@ -766,7 +838,33 @@ export default function TreinoHomePage() {
           exit={{ opacity: 0, scale: 0.98 }}
           transition={{ duration: 0.18 }}
         >
-          <WorkoutInProgress exercises={activeExercises} onFinish={(ids) => { conclude(ids); setPlanTodayActive(false); }} onProgressChange={(ids) => { completedRef.current = ids; }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
+          <WorkoutInProgress exercises={activeExercises} onFinish={(ids, prog) => { void conclude(ids, prog); setPlanTodayActive(false); }} onProgressChange={(ids) => { completedRef.current = ids; }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
+        </m.div>
+      </AnimatePresence>
+    );
+  }
+
+  // Tela de encerramento, pós-treino. ANTES do "sem treino": quem fez um
+  // treino livre/provisório (sem student_workouts) também merece o resumo.
+  if (phase === "done") {
+    return (
+      <AnimatePresence mode="wait">
+        <m.div
+          key="treino-done"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.22 }}
+        >
+          <WorkoutSummary
+            seconds={summarySeconds ?? 0}
+            done={concludedCount ?? Math.min(todayLogs, totalToday)}
+            total={totalToday || Math.max(concludedCount ?? 0, 1)}
+            sessionId={finishedSessionId}
+            onDone={() => {
+              router.replace("/");
+            }}
+          />
         </m.div>
       </AnimatePresence>
     );
@@ -791,31 +889,6 @@ export default function TreinoHomePage() {
         </div>
         <AiCoach />
       </>
-    );
-  }
-
-  // Tela de encerramento, pós-treino
-  if (phase === "done") {
-    return (
-      <AnimatePresence mode="wait">
-        <m.div
-          key="treino-done"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.22 }}
-        >
-          <WorkoutSummary
-            seconds={summarySeconds ?? 0}
-            done={concludedCount ?? Math.min(todayLogs, totalToday)}
-            total={totalToday || 1}
-            sessionId={finishedSessionId}
-            onDone={() => {
-              router.replace("/");
-            }}
-          />
-        </m.div>
-      </AnimatePresence>
     );
   }
 
@@ -1603,7 +1676,9 @@ function UnlockSheet({ gymId, onClose, onUnlocked }: {
   const confirm = () => {
     if (!gymId) return;
     if (checkDayPassword(gymId, code)) {
-      startLocalDaySession();
+      // só destrava o dia; o relógio da sessão só liga quando o treino
+      // de fato começar (startPlanSession/startTemplateSession)
+      markDayUnlocked("senha");
       navigator.vibrate?.(60);
       onUnlocked();
     } else {

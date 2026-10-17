@@ -57,6 +57,9 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 5,
   themeColor: "#070B14",
+  // teclado Android redimensiona o conteúdo: sem isso o botão "Próximo" e o
+  // campo de reps da última série ficam atrás do teclado
+  interactiveWidgetResizesVisualViewport: true,
 };
 
 export default function RootLayout({
