@@ -630,18 +630,35 @@ export type RankRow = {
 };
 
 /**
- * Perfis ocultos do ranking (não aparecem na lista, mas os pontos seguem
- * somando). Uso: criador/testes intensivos. Remova o id para voltar a exibir.
+ * Perfis que nunca podem ficar no pódio (top 3) do ranking. Aparecem na
+ * lista, mas se a pontuação colocá-los no top 3, são empurrados para a 4ª
+ * posição (os demais sobem). Remova o id para liberar a posição normal.
  */
-export const HIDDEN_FROM_RANKING: string[] = [
+export const PINNED_BELOW_PODIUM: string[] = [
   "25543c88-032b-4198-bd10-9d8e5d23885c", // Vinícius Lobo (criador)
 ];
+
+/**
+ * Garante que perfis em PINNED_BELOW_PODIUM fiquem fora do top 3.
+ * Se algum deles cair nas 3 primeiras posições, move para a 4ª.
+ * `idOf` extrai o id de cada linha (shapes diferentes entre telas).
+ */
+export function pinBelowPodium<T>(rows: T[], idOf: (row: T) => string): T[] {
+  for (const id of PINNED_BELOW_PODIUM) {
+    const idx = rows.findIndex((r) => idOf(r) === id);
+    if (idx >= 0 && idx < 3) {
+      const [row] = rows.splice(idx, 1);
+      rows.splice(3, 0, row);
+    }
+  }
+  return rows;
+}
 
 export async function getRankingRows(gymId: string, students: PersonalStudent[]): Promise<RankRow[]> {
   if (isDemoMode()) {
     const ranks = (demoFallback("leaderboard") as Array<{ student_id: string; points: number }>) ?? [];
     const adj = listPointAdjustments();
-    return students.map((s) => {
+    return pinBelowPodium(students.map((s) => {
       const base = ranks.find((r) => r.student_id === s.profile_id)?.points ?? 0;
       const mine = adj.filter((a) => a.studentId === s.id);
       return {
@@ -652,7 +669,7 @@ export async function getRankingRows(gymId: string, students: PersonalStudent[])
         adjustments: mine,
         streakZeroed: mine.some((a) => a.type === "penalidade"),
       };
-    }).sort((a, b) => b.basePoints + b.adjustments.reduce((x, a) => x + a.points, 0) - (a.basePoints + a.adjustments.reduce((x, y) => x + y.points, 0)));
+    }).sort((a, b) => b.basePoints + b.adjustments.reduce((x, a) => x + a.points, 0) - (a.basePoints + a.adjustments.reduce((x, y) => x + y.points, 0))), (r) => r.studentId);
   }
 
   const sb = supabaseBrowser();
@@ -664,7 +681,6 @@ export async function getRankingRows(gymId: string, students: PersonalStudent[])
   const lbRows = (lb ?? []) as unknown as Array<{ student_id: string; points: number }>;
   const lbMap = new Map<string, number>(lbRows.map((r) => [r.student_id, r.points]));
   const rows: RankRow[] = students
-    .filter((s) => !HIDDEN_FROM_RANKING.includes(s.id))
     .map((s) => {
     const adjRows = (adj ?? []) as unknown as Array<{ student_id: string; kind: string; points: number; reason: string | null; created_at: string }>;
   const mine = adjRows.filter((a) => a.student_id === s.id);
@@ -685,11 +701,11 @@ export async function getRankingRows(gymId: string, students: PersonalStudent[])
       streakZeroed: mine.some((a) => a.kind === "penalidade"),
     };
   });
-  return rows.sort(
+  return pinBelowPodium(rows.sort(
     (a, b) =>
       b.basePoints + b.adjustments.reduce((x, y) => x + y.points, 0) -
       (a.basePoints + a.adjustments.reduce((x, y) => x + y.points, 0))
-  );
+  ), (r) => r.studentId);
 }
 
 export async function saveAdjustment(opts: {

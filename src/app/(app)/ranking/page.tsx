@@ -18,7 +18,7 @@ import { formatNumber, formatDate, displayName } from "~/lib/utils/format";
 import { LEAGUES, leagueFor } from "~/lib/utils/leagues";
 import { cn } from "~/lib/utils";
 import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
-import { HIDDEN_FROM_RANKING } from "~/lib/gym-api";
+import { pinBelowPodium, PINNED_BELOW_PODIUM } from "~/lib/gym-api";
 import { recentAchievements } from "~/lib/achievements";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import type { Leaderboard, Profiles } from "~/lib/types/models";
@@ -116,7 +116,7 @@ export default function RankingPage() {
         }));
         return {
           data: {
-            rows: rows.filter((r) => !HIDDEN_FROM_RANKING.includes(r.student_id)),
+            rows: pinBelowPodium(rows, (r) => r.student_id),
             mine: rows.find((r) => r.student_id === ME) ?? null,
             streakById: Object.fromEntries(rows.map((r) => [r.student_id, r.streak])),
             cardioTop: [],
@@ -128,8 +128,7 @@ export default function RankingPage() {
       if (!user || !profile) return { data: null, error: { message: "Sessão indisponível" } };
       // roster: todos os alunos aprovados entram com bolinha, mesmo sem
       // histórico (0 pts no fim da lista). É o que puxa para o pódio.
-      // Perfis em HIDDEN_FROM_RANKING ficam fora da lista pública (o próprio
-      // cartão de pontos deles continua montado em `mine`).
+      // Perfis em PINNED_BELOW_PODIUM ficam fora do pódio (empurrados para 4º).
       const rpcRes = await supabase.rpc("gym_roster", { p_gym_id: profile.gym_id });
       if (rpcRes.error) return { data: null, error: rpcRes.error };
       const mates = ((rpcRes.data ?? []) as Array<Profiles & { role?: string }>).filter(
@@ -203,15 +202,15 @@ export default function RankingPage() {
           (a, b) =>
             b.points - a.points || (a.student?.name ?? "").localeCompare(b.student?.name ?? "")
         );
-      // lista pública sem os perfis ocultos; `mine` sai da lista completa
-      const rows = allRows.filter((r) => !HIDDEN_FROM_RANKING.includes(r.student_id));
+      // lista com pódio vedado a perfis pinados (criador nunca no top 3);
+      // `mine` sai da lista completa antes do pin
+      const rows = pinBelowPodium([...allRows], (r) => r.student_id);
       const mine = allRows.find((r) => r.student_id === user.id) ?? null;
       // destaque do cardio na semana (top 3 em minutos)
       let cardioTop: Array<{ student_id: string; minutes: number }> = [];
       const cq = await supabase.rpc("cardio_weekly", { p_gym_id: profile.gym_id });
       if (!cq.error && Array.isArray(cq.data)) {
         cardioTop = ((cq.data ?? []) as Array<{ student_id: string; minutes: number }>)
-          .filter((c) => !HIDDEN_FROM_RANKING.includes(c.student_id))
           .slice(0, 3);
       }
       return {
@@ -226,7 +225,7 @@ export default function RankingPage() {
   useLeaderboardRealtime(profile?.gym_id, refetch);
 
   const mine = data?.mine ?? null;
-  const hiddenSelf = !!user?.id && HIDDEN_FROM_RANKING.includes(user.id);
+  const pinnedSelf = !!user?.id && PINNED_BELOW_PODIUM.includes(user.id);
   const myLeague = leagueFor(mine?.points ?? 0);
   const myRank = data?.rows.findIndex((r) => r.student_id === (user?.id ?? ME)) ?? -1;
   const weekStart = startOfWeek();
@@ -295,9 +294,7 @@ export default function RankingPage() {
               </p>
               <p className="gf-hero-num text-sm text-foreground">
                 {mine && mine.points > 0
-                  ? hiddenSelf
-                    ? `${formatNumber(mine.points)} pts`
-                    : `${formatNumber(mine.points)} pts · ${myRank + 1}º`
+                  ? `${formatNumber(mine.points)} pts · ${myRank + 1}º`
                   : "Sem pontos ainda · bora treinar"}
               </p>
             </div>
@@ -600,8 +597,8 @@ export default function RankingPage() {
           )}
         </div>
 
-        {/* Card fixo: você fora do pódio — quanto falta pro Top 3 */}
-        {!loading && !error && data && myRank >= 3 && mine ? (
+        {/* Card fixo: você fora do pódio — quanto falta pro Top 3 (oculto p/ perfis pinados) */}
+        {!loading && !error && data && myRank >= 3 && mine && !pinnedSelf ? (
           (() => {
             const third = data.rows[2];
             const target = third?.points ?? 0;
