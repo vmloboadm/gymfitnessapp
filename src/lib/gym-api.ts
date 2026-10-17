@@ -634,7 +634,7 @@ export type RankRow = {
  * somando). Uso: criador/testes intensivos. Remova o id para voltar a exibir.
  */
 export const HIDDEN_FROM_RANKING: string[] = [
-  "25543c88-032b-4198-bd10-9e8d5d23885c", // Vinícius Lobo (criador)
+  "25543c88-032b-4198-bd10-9d8e5d23885c", // Vinícius Lobo (criador)
 ];
 
 export async function getRankingRows(gymId: string, students: PersonalStudent[]): Promise<RankRow[]> {
