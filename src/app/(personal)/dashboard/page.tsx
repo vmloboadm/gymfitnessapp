@@ -14,6 +14,7 @@ import {
   BarChart3,
   ShieldCheck,
   Trophy,
+  AlertTriangle,
   Newspaper,
   Library,
   Wallet,
@@ -459,8 +460,8 @@ export default function DashboardPage() {
                     <p className="flex items-center gap-1.5 truncate text-[13px] font-bold text-foreground">
                       {p.name}
                       {p.workoutSince ? (
-                        <span className="shrink-0 rounded-md bg-brand/15 px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wide text-brand">
-                          🏋 em treino
+                        <span className="flex shrink-0 items-center gap-1 rounded-md bg-brand/15 px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wide text-brand">
+                          <Dumbbell className="h-2.5 w-2.5" /> em treino
                         </span>
                       ) : null}
                     </p>
@@ -565,15 +566,15 @@ export default function DashboardPage() {
                     <p className="truncate text-[13px] font-bold text-foreground">{s.student?.name ?? "Aluno"}</p>
                     <p className="truncate text-[10.5px] text-muted-foreground">{s.equipment?.name ?? "Aparelho"}</p>
                   </div>
-                  <p className={`shrink-0 text-[10.5px] font-bold ${over2h ? "text-destructive" : "text-brand"}`}>
-                    {over2h ? "⚠ " : ""}{elapsed(s.started_at)}
+                  <p className={`flex shrink-0 items-center gap-1 text-[10.5px] font-bold ${over2h ? "text-destructive" : "text-brand"}`}>
+                    {over2h ? <AlertTriangle className="h-3 w-3" /> : null}{elapsed(s.started_at)}
                   </p>
                 </div>
               );
             })}
             {data.sessions.some((s) => (Date.now() - new Date(s.started_at).getTime()) / 60000 >= 120) ? (
-              <p className="px-1 text-[10px] font-semibold text-destructive">
-                ⚠ Sessão aberta há mais de 2h, verificar ocorrência
+              <p className="flex items-center gap-1 px-1 text-[10px] font-semibold text-destructive">
+                <AlertTriangle className="h-3 w-3 shrink-0" /> Sessão aberta há mais de 2h, verificar ocorrência
               </p>
             ) : null}
           </div>

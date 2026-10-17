@@ -18,6 +18,8 @@ interface HeroWorkoutProps {
   notice?: string;
   /** Destino do toque (padrão: treino de hoje). */
   href?: string;
+  /** Quando ainda não há plano: substitui o bloco de números por um recado honesto. */
+  emptyHint?: string;
 }
 
 /** Hero do treino de hoje, imagem de fundo + overlay de leitura forte + CTA glow.
@@ -32,6 +34,7 @@ export function HeroWorkout({
   ready,
   notice,
   href,
+  emptyHint,
 }: HeroWorkoutProps) {
   return (
     <m.div variants={item} whileTap={{ scale: 0.985 }}>
@@ -78,25 +81,29 @@ export function HeroWorkout({
             </p>
           ) : null}
 
-          <div className="mt-7 flex items-end justify-between">
-            <div>
-              <p className="pm-num text-[64px] leading-none text-white">{exerciseCount}</p>
-              <p className="mt-2 text-[12px] font-medium text-[#9AA5B8]">exercícios hoje</p>
-            </div>
-            <div className="flex gap-8 text-right">
+          {emptyHint ? (
+            <p className="mt-6 max-w-[26ch] text-[13px] leading-snug text-[#C9D2E3]">{emptyHint}</p>
+          ) : (
+            <div className="mt-7 flex items-end justify-between">
               <div>
-                <p className="flex items-center justify-end gap-1.5">
-                  <Clock className="h-4 w-4 text-[#9AA5B8]" />
-                  <span className="pm-num text-[26px] text-[#E6EAF3]">{estMin}</span>
-                </p>
-                <p className="mt-1 text-[12px] font-medium text-[#9AA5B8]">minutos</p>
+                <p className="pm-num text-[64px] leading-none text-white">{exerciseCount}</p>
+                <p className="mt-2 text-[12px] font-medium text-[#9AA5B8]">exercícios hoje</p>
               </div>
-              <div>
-                <p className="pm-num text-[26px] text-[#E6EAF3]">{sessionsWeek}</p>
-                <p className="mt-1 text-[12px] font-medium text-[#9AA5B8]">na semana</p>
+              <div className="flex gap-8 text-right">
+                <div>
+                  <p className="flex items-center justify-end gap-1.5">
+                    <Clock className="h-4 w-4 text-[#9AA5B8]" />
+                    <span className="pm-num text-[26px] text-[#E6EAF3]">{estMin}</span>
+                  </p>
+                  <p className="mt-1 text-[12px] font-medium text-[#9AA5B8]">minutos</p>
+                </div>
+                <div>
+                  <p className="pm-num text-[26px] text-[#E6EAF3]">{sessionsWeek}</p>
+                  <p className="mt-1 text-[12px] font-medium text-[#9AA5B8]">na semana</p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <m.span
             className="mt-7 relative flex items-center justify-center gap-3 overflow-hidden rounded-[18px] bg-gradient-to-r from-[#FF8A3C] to-[#E85D0E] py-4 shadow-[0_22px_54px_-16px_rgba(244,113,30,0.85)]"

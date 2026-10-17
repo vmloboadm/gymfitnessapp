@@ -740,7 +740,12 @@ export default function HomePage() {
                     : "Treino de hoje"
             }
             notice={fatigueNotice ?? undefined}
-            ready
+            emptyHint={
+              heroPlan
+                ? undefined
+                : "Seu personal ainda não montou seu treino. Enquanto isso, dê uma olhada nos treinos livres e faça seu check-in."
+            }
+            ready={!!heroPlan}
           />
         </m.div>
 

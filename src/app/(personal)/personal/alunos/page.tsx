@@ -9,6 +9,7 @@ import {
   Sparkles,
   CalendarClock,
   Dumbbell,
+  Flame,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -278,7 +279,7 @@ export default function PersonalAlunosPage() {
                 </div>
                 {s.streak > 0 ? (
                   <span className="flex shrink-0 items-center gap-1 rounded-full border border-[#FFC24D]/25 bg-[#FFC24D]/10 px-2 py-1 text-[10px] font-bold text-[#FFC24D]">
-                    🔥 {s.streak} {s.streak === 1 ? "dia" : "dias"}
+                    <Flame className="h-3 w-3" /> {s.streak} {s.streak === 1 ? "dia" : "dias"}
                   </span>
                 ) : vencBadge(s) ? (
                   vencBadge(s)

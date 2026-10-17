@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, Lightbulb } from "lucide-react";
 
 export type ExerciseCardData = {
   id: string;
@@ -33,8 +33,9 @@ export function ExerciseCard({ exercise }: { exercise: ExerciseCardData }) {
         <p className="truncate text-[13px] font-semibold text-foreground">{exercise.name}</p>
         <p className="text-[10px] capitalize text-muted-foreground">{muscles}</p>
         {firstTip ? (
-          <p className="mt-0.5 line-clamp-1 text-[10px] italic text-muted-foreground/80">
-            💡 {firstTip}
+          <p className="mt-0.5 flex items-start gap-1 line-clamp-1 text-[10px] italic text-muted-foreground/80">
+            <Lightbulb className="mt-px h-3 w-3 shrink-0" />
+            {firstTip}
           </p>
         ) : null}
       </div>

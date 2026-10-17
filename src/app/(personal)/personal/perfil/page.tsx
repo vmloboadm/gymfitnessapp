@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { getGymStudents } from "~/lib/gym-api";
 import { m } from "framer-motion";
-import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2, LogOut, Shield, Settings, Crown, Sparkles, MapPin } from "lucide-react";
+import { Pencil, Check, Users, BarChart3, TrendingUp, ClipboardList, UserRound, Camera, KeyRound, Loader2, LogOut, Shield, Settings, Crown, Sparkles, MapPin, ChevronRight } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { toast } from "sonner";
@@ -632,16 +633,14 @@ export default function PersonalPerfilPage() {
           </div>
 
           {[
-            { label: "Gerenciar personais", icon: Users, desc: "Adicionar, remover ou alterar permissões" },
-            { label: "Planos e preços", icon: ClipboardList, desc: "Configurar planos de matrícula" },
-            { label: "Horário de funcionamento", icon: Settings, desc: "Definir horários da academia" },
-            { label: "Notificações", icon: Shield, desc: "Gerenciar alertas e comunicados" },
+            { label: "Gerenciar personais", icon: Users, desc: "Adicionar, remover ou alterar permissões", href: "/personais" },
+            { label: "Matrículas e planos", icon: ClipboardList, desc: "Assinaturas, planos e vencimentos", href: "/matriculas" },
           ].map((item, i) => {
             const Icon = item.icon;
             return (
-              <button
+              <Link
                 key={i}
-                onClick={() => toast.info("Funcionalidade em breve!")}
+                href={item.href}
                 className="tactile flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.06]"
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/20 bg-brand/10">
@@ -651,7 +650,8 @@ export default function PersonalPerfilPage() {
                   <p className="text-[12px] font-bold text-foreground">{item.label}</p>
                   <p className="truncate text-[10px] text-muted-foreground">{item.desc}</p>
                 </div>
-              </button>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </Link>
             );
           })}
         </div>

@@ -147,7 +147,7 @@ export default function MirrorPage() {
 
         <p className="flex items-start gap-1.5 rounded-2xl border border-brand/25 bg-brand/[0.07] p-3 text-[11px] leading-relaxed text-foreground">
           <Camera className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
-          Poste sua foto marcando a GymFitness e apareça na TV do salão! 📺
+          Poste sua foto marcando a GymFitness e apareça na TV do salão!
         </p>
       </div>
     </>
