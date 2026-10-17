@@ -109,7 +109,7 @@ export default function RankingPage() {
         }
         const rows: RankRow[] = ranks.map((r) => ({
           student_id: r.student_id,
-          points: r.points,
+          points: PINNED_BELOW_PODIUM.includes(r.student_id) ? 0 : r.points,
           sessions: r.sessions,
           streak: r.streak ?? 0,
           student: profiles.find((p) => p.id === r.student_id) ?? (r.student_id === ME ? { id: ME, name: "Atleta Demo" } as any : null),
@@ -190,9 +190,11 @@ export default function RankingPage() {
       const allRows: RankRow[] = mates
         .map((m) => {
           const b = byId.get(m.id);
+          // criador aparece sem pontos (exibição zerada; real fica no banco)
+          const pinned = PINNED_BELOW_PODIUM.includes(m.id);
           return {
             student_id: m.id,
-            points: b?.points ?? 0,
+            points: pinned ? 0 : (b?.points ?? 0),
             sessions: b?.sessions ?? 0,
             streak: streakById[m.id] ?? b?.streak ?? 0,
             student: m as Profiles,
@@ -202,8 +204,8 @@ export default function RankingPage() {
           (a, b) =>
             b.points - a.points || (a.student?.name ?? "").localeCompare(b.student?.name ?? "")
         );
-      // lista com pódio vedado a perfis pinados (criador nunca no top 3);
-      // `mine` sai da lista completa antes do pin
+      // rede de segurança: se o pino cair no top 3 (empate de 0 pts em
+      // ordem alfabética), empurra pra 4º. `mine` sai da lista completa.
       const rows = pinBelowPodium([...allRows], (r) => r.student_id);
       const mine = allRows.find((r) => r.student_id === user.id) ?? null;
       // destaque do cardio na semana (top 3 em minutos)

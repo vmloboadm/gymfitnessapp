@@ -630,9 +630,10 @@ export type RankRow = {
 };
 
 /**
- * Perfis que nunca podem ficar no pódio (top 3) do ranking. Aparecem na
- * lista, mas se a pontuação colocá-los no top 3, são empurrados para a 4ª
- * posição (os demais sobem). Remova o id para liberar a posição normal.
+ * Perfis que nunca podem ficar no pódio (top 3) e aparecem com a pontuação
+ * exibida zerada. Os pontos reais continuam no banco; só a exibição é
+ * zerada, pra não criar ranking falso enquanto o criador testa o app.
+ * Remova o id para liberar a posição e os pontos normais.
  */
 export const PINNED_BELOW_PODIUM: string[] = [
   "25543c88-032b-4198-bd10-9d8e5d23885c", // Vinícius Lobo (criador)
@@ -642,6 +643,7 @@ export const PINNED_BELOW_PODIUM: string[] = [
  * Garante que perfis em PINNED_BELOW_PODIUM fiquem fora do top 3.
  * Se algum deles cair nas 3 primeiras posições, move para a 4ª.
  * `idOf` extrai o id de cada linha (shapes diferentes entre telas).
+ * Use depois de zerar os pontos e ordenar.
  */
 export function pinBelowPodium<T>(rows: T[], idOf: (row: T) => string): T[] {
   for (const id of PINNED_BELOW_PODIUM) {
@@ -658,7 +660,7 @@ export async function getRankingRows(gymId: string, students: PersonalStudent[])
   if (isDemoMode()) {
     const ranks = (demoFallback("leaderboard") as Array<{ student_id: string; points: number }>) ?? [];
     const adj = listPointAdjustments();
-    return pinBelowPodium(students.map((s) => {
+    return students.map((s) => {
       const base = ranks.find((r) => r.student_id === s.profile_id)?.points ?? 0;
       const mine = adj.filter((a) => a.studentId === s.id);
       return {
@@ -669,7 +671,7 @@ export async function getRankingRows(gymId: string, students: PersonalStudent[])
         adjustments: mine,
         streakZeroed: mine.some((a) => a.type === "penalidade"),
       };
-    }).sort((a, b) => b.basePoints + b.adjustments.reduce((x, a) => x + a.points, 0) - (a.basePoints + a.adjustments.reduce((x, y) => x + y.points, 0))), (r) => r.studentId);
+    }).sort((a, b) => b.basePoints + b.adjustments.reduce((x, a) => x + a.points, 0) - (a.basePoints + a.adjustments.reduce((x, y) => x + y.points, 0)));
   }
 
   const sb = supabaseBrowser();
@@ -701,11 +703,11 @@ export async function getRankingRows(gymId: string, students: PersonalStudent[])
       streakZeroed: mine.some((a) => a.kind === "penalidade"),
     };
   });
-  return pinBelowPodium(rows.sort(
+  return rows.sort(
     (a, b) =>
       b.basePoints + b.adjustments.reduce((x, y) => x + y.points, 0) -
       (a.basePoints + a.adjustments.reduce((x, y) => x + y.points, 0))
-  ), (r) => r.studentId);
+  );
 }
 
 export async function saveAdjustment(opts: {
