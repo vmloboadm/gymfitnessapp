@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Settings, LogOut, CalendarClock, ChevronRight, Scale, ListMusic, FileText, BadgePercent, MessageCircle } from "lucide-react";
+  Settings, LogOut, CalendarClock, ChevronRight, Scale, FileText, BadgePercent, MessageCircle } from "lucide-react";
 import { gymSupportLink } from "~/lib/whatsapp";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -266,11 +266,6 @@ export default function PerfilPage() {
           <Link href="/configuracoes" className="tactile flex w-full items-center gap-3 border-b border-border bg-card/40 px-4 py-3.5 transition-colors hover:bg-card/70">
             <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">Configurações</span>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </Link>
-          <Link href="/playlist" className="tactile flex w-full items-center gap-3 border-b border-border bg-card/40 px-4 py-3.5 transition-colors hover:bg-card/70">
-            <ListMusic className="h-4 w-4 shrink-0 text-[#1DB954]" />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">Playlist da academia</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           </Link>
           <Link href="/premium" className="tactile flex w-full items-center gap-3 border-b border-border bg-card/40 px-4 py-3.5 transition-colors hover:bg-card/70">

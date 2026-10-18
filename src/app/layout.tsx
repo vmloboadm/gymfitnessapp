@@ -30,6 +30,17 @@ export const metadata: Metadata = {
   title: "GymFitness",
   description: "App de academia com check-in NFC e métrica real",
   manifest: "/app/manifest.json",
+  icons: {
+    apple: "/app/icons/icon-180x180.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "GymFitness",
+    statusBarStyle: "black-translucent",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
   openGraph: {
     title: "GymFitness",
     description: "Treine. Evolua. Apareça. Check-in, treinos do personal e ranking da academia.",

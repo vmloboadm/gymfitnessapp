@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { cn } from "~/lib/utils";
 import { formatRelative, displayName } from "~/lib/utils/format";
 import { toast } from "sonner";
+import { enqueueOffline, isNetworkError, isOffline } from "~/lib/offline-queue";
 import { isDemoMode, demoFeedData, demoFallback } from "~/lib/demo-bridge";
 import {
   type FeedCommentLocal,
@@ -67,6 +68,8 @@ export default function FeedPage() {
   const [demoLikes, setDemoLikes] = useState<Record<string, boolean>>({});
   const [demoComments, setDemoComments] = useState<Record<string, CommentRow[]>>({});
   const [demoPosts, setDemoPosts] = useState<PostRow[]>([]);
+  // curtidas/comentários enfileirados offline (pendentes até o sync esvaziar)
+  const [pendingLikes, setPendingLikes] = useState<Record<string, boolean>>({});
   const demo = isDemoMode();
 
   // guardas anti duplo clique + expansão de comentários + paginação simples
@@ -273,10 +276,33 @@ export default function FeedPage() {
       return;
     }
     if (!user || !profile) return;
+    const saveLikeOffline = () => {
+      const ok = enqueueOffline("feed_likes", {
+        gym_id: profile.gym_id,
+        post_id: post.id,
+        user_id: user.id,
+        reaction: kind,
+      });
+      if (ok) {
+        setPendingLikes((prev) => ({ ...prev, [post.id]: true }));
+        toast("Curtida guardada", { description: "Sincroniza quando a conexão voltar." });
+      } else {
+        toast.error("Não foi possível guardar no aparelho. Tente de novo.");
+      }
+    };
+    if (isOffline()) {
+      if (post.myReaction === kind) {
+        toast.error("Sem internet para tirar a reação agora. Tente quando a conexão voltar.");
+        return;
+      }
+      saveLikeOffline();
+      return;
+    }
     setReactingIds((prev) => new Set(prev).add(post.id));
     const supabase = supabaseBrowser();
+    const removing = post.myReaction === kind;
     try {
-      if (post.myReaction === kind) {
+      if (removing) {
         const { error } = await supabase.from("feed_likes").delete().eq("post_id", post.id).eq("user_id", user.id);
         if (error) throw error;
       } else {
@@ -287,8 +313,13 @@ export default function FeedPage() {
         if (error) throw error;
       }
       refetch();
-    } catch {
-      toast.error("Não foi possível reagir agora. Tente de novo.");
+    } catch (err) {
+      // rede caiu no meio: só a criação da reação cabe na fila (sem delete)
+      if (!removing && isNetworkError(err)) {
+        saveLikeOffline();
+      } else {
+        toast.error("Não foi possível reagir agora. Tente de novo.");
+      }
     } finally {
       setReactingIds((prev) => {
         const next = new Set(prev);
@@ -323,11 +354,45 @@ export default function FeedPage() {
         return;
       }
       if (!user || !profile) return;
+      const text = commentDraft.trim();
+      const pendingRow = (): CommentRow => ({
+        id: `local-${Date.now()}`,
+        gym_id: profile.gym_id,
+        post_id: postId,
+        user_id: user.id,
+        body: text,
+        created_at: new Date().toISOString(),
+        user: { id: user.id, name: profile.name ?? "Você", role: (profile.role ?? "student") as Profiles["role"] } as Profiles,
+      });
+      const saveCommentOffline = () => {
+        const ok = enqueueOffline("feed_comments", {
+          gym_id: profile.gym_id,
+          post_id: postId,
+          user_id: user.id,
+          body: text,
+        });
+        if (ok) {
+          setDemoComments((prev) => ({ ...prev, [postId]: [...(prev[postId] ?? []), pendingRow()] }));
+          setCommentDraft("");
+          setCommentingId(null);
+          toast("Comentário guardado", { description: "Sincroniza quando a conexão voltar." });
+        } else {
+          toast.error("Não foi possível guardar o comentário. Tente de novo.");
+        }
+      };
+      if (isOffline()) {
+        saveCommentOffline();
+        return;
+      }
       const { error } = await supabaseBrowser()
         .from("feed_comments")
-        .insert({ gym_id: profile.gym_id, post_id: postId, user_id: user.id, body: commentDraft.trim() } as never);
+        .insert({ gym_id: profile.gym_id, post_id: postId, user_id: user.id, body: text } as never);
       if (error) {
-        toast.error("Falha ao comentar", { description: error.message });
+        if (isNetworkError(error)) {
+          saveCommentOffline();
+        } else {
+          toast.error("Falha ao comentar", { description: error.message });
+        }
         return;
       }
       setCommentDraft("");
@@ -418,8 +483,12 @@ export default function FeedPage() {
         ) : (
           <div className="space-y-3">
             {sorted.map((post, i) => {
-              const liked = post.likedByMe || !!demoLikes[post.id];
-              const comments = [...post.comments, ...(demoComments[post.id] ?? [])];
+              const liked = post.likedByMe || !!demoLikes[post.id] || !!pendingLikes[post.id];
+              // comentários locais já sincronizados somem do merge (sem duplicar)
+              const localComments = (demoComments[post.id] ?? []).filter(
+                (lc) => !post.comments.some((c) => c.user_id === lc.user_id && c.body === lc.body)
+              );
+              const comments = [...post.comments, ...localComments];
               return (
                 <div
                   key={post.id}

@@ -31,18 +31,34 @@ export function useOfflineQueue() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setQueue(JSON.parse(raw) as QueueAction[]);
-    } catch {
-      /* noop */
-    }
+    const read = () => {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        setQueue(raw ? (JSON.parse(raw) as QueueAction[]) : []);
+      } catch {
+        setQueue([]);
+      }
+    };
+    read();
+    // enqueue dispara o evento; o flush do listener só mexe no storage, então
+    // o intervalo curto cobre a fila esvaziar sem recarregar a página
+    window.addEventListener("gf_offline_queue", read);
+    window.addEventListener("storage", read);
+    window.addEventListener("focus", read);
+    const interval = setInterval(read, 15000);
+    return () => {
+      window.removeEventListener("gf_offline_queue", read);
+      window.removeEventListener("storage", read);
+      window.removeEventListener("focus", read);
+      clearInterval(interval);
+    };
   }, []);
 
   const persist = useCallback((next: QueueAction[]) => {
     setQueue(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      window.dispatchEvent(new Event("gf_offline_queue"));
     } catch {
       /* storage cheia */
     }

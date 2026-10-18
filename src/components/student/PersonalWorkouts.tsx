@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { TRAINER_WORKOUTS_EVENT, type AssignedWorkout } from "~/lib/trainer-store";
 import { useAuth } from "~/hooks/useAuth";
 import { fetchMyAssignedPlans, submitRequest } from "~/lib/gym-api";
+import { enqueuePremiumRequest, isNetworkError, isOffline } from "~/lib/offline-queue";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { cn } from "~/lib/utils";
@@ -209,18 +210,42 @@ function AdjustRequestCard({ workoutName, studentId, plan }: { workoutName: stri
   ] as const;
 
   const request = async (label: string, detail: string, reqType: "carga" | "ajuste" = "carga") => {
+    const message = `Ajuste de treino em "${workoutName}": o aluno informa que ${detail}.`;
+    const saveOffline = () => {
+      const ok = enqueuePremiumRequest({
+        gymId: profile?.gym_id ?? "",
+        userId: uid,
+        type: reqType,
+        message,
+      });
+      if (ok) {
+        setSent(label);
+        setOpen(false);
+        toast("Pedido guardado", { description: "Envia quando a internet voltar." });
+      } else {
+        toast.error("Não foi possível guardar o pedido. Tente de novo.");
+      }
+    };
+    if (isOffline()) {
+      saveOffline();
+      return;
+    }
     try {
       await submitRequest({
         gymId: profile?.gym_id ?? "",
         userId: uid,
         userName: profile?.name ?? "Aluno",
         type: reqType,
-        message: `Ajuste de treino em "${workoutName}": o aluno informa que ${detail}.`,
+        message,
       });
       setSent(label);
       setOpen(false);
       toast.success(reqType === "ajuste" ? "Pedido de troca enviado ao seu Personal" : "Ajuste enviado ao seu Personal");
-    } catch {
+    } catch (err) {
+      if (isNetworkError(err)) {
+        saveOffline();
+        return;
+      }
       toast.error("Não foi possível enviar o pedido. Tente de novo.");
     }
   };
@@ -334,20 +359,47 @@ function SwapRequestButton({
 
   const send = async (newName: string) => {
     if (!oldName) return;
+    const sentLabel = `Trocar ${oldName.split(" ").slice(0, 2).join(" ")}`;
+    const message = `Trocar "${oldName}" por "${newName}" no treino "${workoutName}".`;
+    const finish = () => {
+      setStep("closed");
+      setOldName(null);
+      setQuery("");
+      onSent(sentLabel);
+    };
+    const saveOffline = () => {
+      const ok = enqueuePremiumRequest({
+        gymId: profile?.gym_id ?? "",
+        userId: uid,
+        type: "ajuste",
+        message,
+      });
+      if (ok) {
+        finish();
+        toast("Pedido guardado", { description: "Envia quando a internet voltar." });
+      } else {
+        toast.error("Não foi possível guardar o pedido. Tente de novo.");
+      }
+    };
+    if (isOffline()) {
+      saveOffline();
+      return;
+    }
     try {
       await submitRequest({
         gymId: profile?.gym_id ?? "",
         userId: uid,
         userName: profile?.name ?? "Aluno",
         type: "ajuste",
-        message: `Trocar "${oldName}" por "${newName}" no treino "${workoutName}".`,
+        message,
       });
-      setStep("closed");
-      setOldName(null);
-      setQuery("");
-      onSent(`Trocar ${oldName.split(" ").slice(0, 2).join(" ")}`);
+      finish();
       toast.success("Pedido de troca enviado ao seu Personal");
-    } catch {
+    } catch (err) {
+      if (isNetworkError(err)) {
+        saveOffline();
+        return;
+      }
       toast.error("Não foi possível enviar o pedido. Tente de novo.");
     }
   };

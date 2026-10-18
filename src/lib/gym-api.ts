@@ -339,6 +339,14 @@ export async function assignExistingPlan(opts: {
   return { ok, failed };
 }
 
+/**
+ * Lista paginada: é o próprio array (compatível com quem espera `T[]`) com o
+ * total real de registros do filtro, sem precisar de segunda chamada.
+ */
+export type Paged<T> = T[] & { total: number };
+
+export type PageOpts = { offset?: number; limit?: number };
+
 export type GymAssignedPlan = {
   id: string;
   studentId: string;
@@ -353,9 +361,9 @@ export type GymAssignedPlan = {
 };
 
 /** Planos atribuídos do gym (visão do personal): produção lê o banco. */
-export async function fetchGymAssignedPlans(gymId: string): Promise<GymAssignedPlan[]> {
+export async function fetchGymAssignedPlans(gymId: string, opts?: PageOpts): Promise<Paged<GymAssignedPlan>> {
   if (isDemoMode()) {
-    return listAssignedWorkouts().map((w) => ({
+    const rows = listAssignedWorkouts().map((w) => ({
       id: w.id,
       studentId: w.studentId,
       studentName: w.studentName,
@@ -367,22 +375,35 @@ export async function fetchGymAssignedPlans(gymId: string): Promise<GymAssignedP
       days: w.plan?.dias.length ?? 1,
       exercises: w.exercises.length,
     }));
+    return Object.assign(rows, { total: rows.length });
   }
+  const limit = opts?.limit ?? 40;
+  const offset = opts?.offset ?? 0;
   const sb = supabaseBrowser();
-  const { data, error } = await sb
-    .from("student_workouts")
-    .select(`
-      id, student_id, status, assigned_at,
-      workout_programs ( id, name, objective,
-        workout_days ( id, workout_exercises ( id ) )
-      ),
-      profiles ( name )
-    `)
-    .eq("gym_id", gymId)
-    .eq("status", "active")
-    .order("assigned_at", { ascending: false })
-    .limit(40);
-  if (error) throw new Error(error.message);
+  const [pageRes, countRes] = await Promise.all([
+    sb
+      .from("student_workouts")
+      .select(`
+        id, student_id, status, assigned_at,
+        workout_programs ( id, name, objective,
+          workout_days ( id, workout_exercises ( id ) )
+        ),
+        profiles ( name )
+      `)
+      .eq("gym_id", gymId)
+      .eq("status", "active")
+      .order("assigned_at", { ascending: false })
+      .range(offset, offset + limit - 1),
+    // Contagem em query separada: o select embute to-many (dias/exercícios),
+    // então o count no mesmo request poderia vir inflado pelo join.
+    sb
+      .from("student_workouts")
+      .select("id", { count: "exact", head: true })
+      .eq("gym_id", gymId)
+      .eq("status", "active"),
+  ]);
+  if (pageRes.error) throw new Error(pageRes.error.message);
+  if (countRes.error) throw new Error(countRes.error.message);
   type Row = {
     id: string;
     student_id: string;
@@ -398,7 +419,7 @@ export async function fetchGymAssignedPlans(gymId: string): Promise<GymAssignedP
   };
   const profName = (p: Row["profiles"]): string =>
     Array.isArray(p) ? p[0]?.name ?? "Aluno" : p?.name ?? "Aluno";
-  return ((data ?? []) as unknown as Row[])
+  const rows = ((pageRes.data ?? []) as unknown as Row[])
     .filter((r) => !!r.workout_programs)
     .map((r) => ({
       id: r.id,
@@ -412,6 +433,7 @@ export async function fetchGymAssignedPlans(gymId: string): Promise<GymAssignedP
       days: r.workout_programs!.workout_days.length,
       exercises: r.workout_programs!.workout_days.reduce((n, d) => n + d.workout_exercises.length, 0),
     }));
+  return Object.assign(rows, { total: countRes.count ?? offset + rows.length });
 }
 
 /** Planos do aluno logado (aba Treino): demo → local; produção → banco. */
@@ -534,15 +556,22 @@ type ReqRow = {
   profiles: { name: string } | null;
 };
 
-export async function getRequests(gymId: string): Promise<ApprovalRequest[]> {
-  if (isDemoMode()) return listApprovals();
+export async function getRequests(gymId: string, opts?: PageOpts): Promise<Paged<ApprovalRequest>> {
+  if (isDemoMode()) {
+    const rows = listApprovals();
+    return Object.assign([...rows], { total: rows.length });
+  }
+  const limit = opts?.limit ?? 30;
+  const offset = opts?.offset ?? 0;
   const sb = supabaseBrowser();
-  const { data } = await sb
+  // count: "exact" no mesmo request devolve o total do filtro, ignorando o range.
+  const { data, count, error } = await sb
     .from("premium_requests")
-    .select("id, student_id, request_type, details, status, created_at, profiles(name)")
+    .select("id, student_id, request_type, details, status, created_at, profiles(name)", { count: "exact" })
     .eq("gym_id", gymId)
     .order("created_at", { ascending: false })
-    .limit(30);
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as unknown as ReqRow[];
   const tagOf = (details: string | null): ApprovalRequest["type"] => {
@@ -552,16 +581,19 @@ export async function getRequests(gymId: string): Promise<ApprovalRequest[]> {
     if (d.startsWith("[carga]")) return "carga";
     return "premium";
   };
-  return rows.map((r) => ({
-    id: r.id,
-    studentId: r.student_id,
-    studentName: r.profiles?.name ?? "Aluno",
-    type: tagOf(r.details),
-    message: (r.details ?? "").replace(/^\[(carga|premium|relatorio|ajuste)\]\s*/, ""),
-    status: r.status === "aprovado" || r.status === "approved" ? ("aprovado" as const) : r.status === "recusado" || r.status === "rejected" ? ("recusado" as const) : ("pendente" as const),
-    created_at: r.created_at,
-    resolved_at: null,
-  }));
+  return Object.assign(
+    rows.map((r) => ({
+      id: r.id,
+      studentId: r.student_id,
+      studentName: r.profiles?.name ?? "Aluno",
+      type: tagOf(r.details),
+      message: (r.details ?? "").replace(/^\[(carga|premium|relatorio|ajuste)\]\s*/, ""),
+      status: r.status === "aprovado" || r.status === "approved" ? ("aprovado" as const) : r.status === "recusado" || r.status === "rejected" ? ("recusado" as const) : ("pendente" as const),
+      created_at: r.created_at,
+      resolved_at: null,
+    })),
+    { total: count ?? offset + rows.length }
+  );
 }
 
 export async function submitRequest(opts: {

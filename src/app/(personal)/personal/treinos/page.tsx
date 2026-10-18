@@ -285,6 +285,8 @@ function PersonalTreinosContent() {
   const [notes, setNotes] = useState("");
   const [daysSelected, setDaysSelected] = useState<Set<string>>(new Set());
   const [assigned, setAssigned] = useState<GymAssignedPlan[]>([]);
+  const [assignedTotal, setAssignedTotal] = useState(0);
+  const [assignedLoadingMore, setAssignedLoadingMore] = useState(false);
   const [adjustSwId, setAdjustSwId] = useState<string | null>(null);
   // trava dos botões que disparam escrita no banco (nada de duplo toque)
   const [approving, setApproving] = useState(false);
@@ -386,7 +388,7 @@ function PersonalTreinosContent() {
 
   const refresh = () => {
     if (!gymId) {
-      setAssigned(listAssignedWorkouts().map((w) => ({
+      const rows = listAssignedWorkouts().map((w) => ({
         id: w.id,
         studentId: w.studentId,
         studentName: w.studentName,
@@ -397,12 +399,37 @@ function PersonalTreinosContent() {
         assigned_at: w.created_at,
         days: w.plan?.dias.length ?? 1,
         exercises: w.exercises.length,
-      })));
+      }));
+      setAssigned(rows);
+      setAssignedTotal(rows.length);
       return;
     }
-    fetchGymAssignedPlans(gymId).then(setAssigned).catch(() => setAssigned([]));
+    fetchGymAssignedPlans(gymId)
+      .then((rows) => {
+        setAssigned(rows);
+        setAssignedTotal(rows.total);
+      })
+      .catch(() => {
+        setAssigned([]);
+        setAssignedTotal(0);
+      });
   };
   useEffect(refresh, [gymId]);
+
+  const loadMorePlans = () => {
+    if (!gymId || assignedLoadingMore) return;
+    setAssignedLoadingMore(true);
+    fetchGymAssignedPlans(gymId, { offset: assigned.length, limit: 40 })
+      .then((rows) => {
+        setAssigned((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          return [...prev, ...rows.filter((r) => !seen.has(r.id))];
+        });
+        setAssignedTotal(rows.total);
+      })
+      .catch(() => toast.error("Não deu carregar mais planos agora."))
+      .finally(() => setAssignedLoadingMore(false));
+  };
   useEffect(() => {
     if (!gymId) return;
     getGymStudents(gymId).then(setStudents).catch(() => setStudents([]));
@@ -2563,7 +2590,9 @@ function PersonalTreinosContent() {
       <header>
         <h1 className="text-lg font-bold text-foreground">Montar Treino Automático</h1>
         <p className="text-[11px] text-muted-foreground">
-          {assigned.length} plano{assigned.length === 1 ? "" : "s"} atribuído{assigned.length === 1 ? "" : "s"}
+          {assignedTotal > assigned.length
+            ? `${assigned.length} de ${assignedTotal} planos atribuídos`
+            : `${assigned.length} plano${assigned.length === 1 ? "" : "s"} atribuído${assigned.length === 1 ? "" : "s"}`}
         </p>
       </header>
 
@@ -2725,6 +2754,16 @@ function PersonalTreinosContent() {
                 </button>
               </div>
             ))}
+            {assignedTotal > assigned.length ? (
+              <button
+                type="button"
+                onClick={loadMorePlans}
+                disabled={assignedLoadingMore}
+                className="tactile h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.05] text-[12px] font-bold text-foreground transition-colors hover:text-brand disabled:opacity-50"
+              >
+                {assignedLoadingMore ? "Carregando..." : `Carregar mais (restam ${assignedTotal - assigned.length})`}
+              </button>
+            ) : null}
           </div>
         </section>
       ) : null}

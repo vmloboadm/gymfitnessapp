@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { m, type Variants } from "framer-motion";
 import { Inbox, Crown, Dumbbell, Check, X, Inbox as InboxIcon, FileText, ArrowLeftRight } from "lucide-react";
@@ -13,9 +13,11 @@ import {
   TRAINER_APPROVALS_EVENT,
   type ApprovalRequest,
 } from "~/lib/trainer-store";
-import { decideRequest, getRequests, getGymStudents } from "~/lib/gym-api";
+import { decideRequest, getRequests, getGymStudents, countPendingRequests } from "~/lib/gym-api";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { cn } from "~/lib/utils";
+
+const PAGE_SIZE = 30;
 
 const row: Variants = {
   hidden: { opacity: 0, y: 18 },
@@ -62,10 +64,23 @@ export default function PersonalAprovacoesPage() {
   const { profile, user } = useAuth();
   const [students, setStudents] = useState<PersonalStudent[]>([]);
   const [items, setItems] = useState<ApprovalRequest[]>([]);
+  const [total, setTotal] = useState(0);
+  const [pendingTotal, setPendingTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [decidingId, setDecidingId] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [tick, setTick] = useState(0);
+  // Páginas já pedidas: refetch periódico mantém o que o gestor expandiu.
+  const pagesRef = useRef(1);
+
+  const loadQueue = async (gymId: string) => {
+    const [rows, pend] = await Promise.all([
+      getRequests(gymId, { offset: 0, limit: PAGE_SIZE * pagesRef.current }),
+      countPendingRequests(gymId),
+    ]);
+    return { rows, pend };
+  };
 
   // Alunos reais p/ resolver avatares dos pedidos
   useEffect(() => {
@@ -84,15 +99,20 @@ export default function PersonalAprovacoesPage() {
       setLoading(true);
       setLoadError(null);
       try {
-        // Sonda direta: getRequests engole erro interno, então testamos a
-        // conexão com a tabela antes de confiar que [] é fila vazia.
+        // Sonda direta: confirma a conexão com a tabela antes de tratar
+        // retorno vazio como fila vazia de verdade.
         const probe = await supabaseBrowser()
           .from("premium_requests")
           .select("id", { count: "exact", head: true })
           .eq("gym_id", profile.gym_id);
         if (probe.error) throw new Error(probe.error.message);
-        const rows = await getRequests(profile.gym_id);
-        if (alive) { setItems(rows); setLoading(false); }
+        const { rows, pend } = await loadQueue(profile.gym_id);
+        if (alive) {
+          setItems(rows);
+          setTotal(rows.total);
+          setPendingTotal(pend);
+          setLoading(false);
+        }
       } catch {
         if (alive) {
           setLoadError("Não foi possível carregar as aprovações. Verifique a conexão.");
@@ -120,12 +140,38 @@ export default function PersonalAprovacoesPage() {
   const pending = items.filter((a) => a.status === "pendente");
   const resolved = items.filter((a) => a.status !== "pendente");
 
+  const loadMore = async () => {
+    if (loadingMore || !profile?.gym_id) return;
+    setLoadingMore(true);
+    try {
+      const rows = await getRequests(profile.gym_id, {
+        offset: PAGE_SIZE * pagesRef.current,
+        limit: PAGE_SIZE,
+      });
+      setItems((prev) => {
+        const seen = new Set(prev.map((a) => a.id));
+        return [...prev, ...rows.filter((a) => !seen.has(a.id))];
+      });
+      setTotal(rows.total);
+      pagesRef.current += 1;
+    } catch {
+      toast.error("Não deu carregar mais solicitações agora.");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const decide = async (id: string, status: "aprovado" | "recusado") => {
     if (decidingId) return;
     setDecidingId(id);
     try {
       await decideRequest(id, status, user?.id ?? "");
-      if (profile?.gym_id) setItems(await getRequests(profile.gym_id));
+      if (profile?.gym_id) {
+        const { rows, pend } = await loadQueue(profile.gym_id);
+        setItems(rows);
+        setTotal(rows.total);
+        setPendingTotal(pend);
+      }
       toast.success(
         status === "aprovado" ? "Solicitação aprovada" : "Solicitação recusada",
         { description: "O aluno vê a resposta na área dele." }
@@ -148,14 +194,16 @@ export default function PersonalAprovacoesPage() {
         <h1 className="flex items-center gap-2 text-lg font-bold text-foreground">
           <Inbox className="h-5 w-5 text-brand" />
           Aprovações
-          {pending.length > 0 ? (
+          {pendingTotal > 0 ? (
             <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-black text-brand-foreground">
-              {pending.length}
+              {pendingTotal}
             </span>
           ) : null}
         </h1>
         <p className="text-[11px] text-muted-foreground">
           Requisições dos alunos que dependem do seu ok
+          {total > items.length ? ` · ${items.length} de ${total} listadas` : ""}
+          {pendingTotal > pending.length ? ` · ${pending.length} de ${pendingTotal} pendentes` : ""}
         </p>
       </header>
 
@@ -252,7 +300,7 @@ export default function PersonalAprovacoesPage() {
             Histórico
           </h2>
           <ul className="divide-y divide-white/[0.05] rounded-2xl border border-white/[0.06] bg-white/[0.02]">
-            {resolved.slice(0, 8).map((a) => (
+            {resolved.slice(0, items.length > PAGE_SIZE ? resolved.length : 8).map((a) => (
               <li key={a.id} className="flex items-center gap-3 px-3.5 py-2.5">
                 <span
                   className={cn(
@@ -277,6 +325,17 @@ export default function PersonalAprovacoesPage() {
             ))}
           </ul>
         </section>
+      ) : null}
+
+      {!loading && !loadError && total > items.length ? (
+        <button
+          type="button"
+          onClick={loadMore}
+          disabled={loadingMore}
+          className="tactile h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.05] text-[12px] font-bold text-foreground transition-colors hover:text-brand disabled:opacity-50"
+        >
+          {loadingMore ? "Carregando..." : `Carregar mais (restam ${total - items.length})`}
+        </button>
       ) : null}
     </div>
   );

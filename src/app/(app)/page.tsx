@@ -17,6 +17,7 @@ import { supabaseBrowser } from "~/lib/supabase/client";
 import { fetchMyAssignedPlans } from "~/lib/gym-api";
 import { SkeletonList } from "~/components/common/AsyncStates";
 import { toast } from "sonner";
+import { enqueuePremiumRequest, isNetworkError, isOffline } from "~/lib/offline-queue";
 import { cn } from "~/lib/utils";
 import { calcStreak, weekdayName, startOfWeek } from "~/lib/utils/calculations";
 import { cap } from "~/lib/utils/format";
@@ -1034,24 +1035,43 @@ function PremiumRequestCard({
       </div>
     );
   }
+  const send = async () => {
+    const message = "Quero desbloquear o Plano Premium com acompanhamento do Personal.";
+    const saveOffline = () => {
+      const ok = enqueuePremiumRequest({ gymId, userId, type: "premium", message });
+      if (ok) {
+        setSent(true);
+        toast("Pedido guardado", { description: "Envia quando a internet voltar." });
+      } else {
+        toast.error("Não foi possível guardar o pedido no aparelho. Tente de novo.");
+      }
+    };
+    if (isOffline()) {
+      saveOffline();
+      return;
+    }
+    try {
+      const { submitRequest } = await import("~/lib/gym-api");
+      await submitRequest({
+        gymId,
+        userId,
+        userName: userName ?? "Você",
+        type: "premium",
+        message,
+      });
+      setSent(true);
+      toast.success("Pedido enviado ao seu Personal");
+    } catch (err) {
+      if (isNetworkError(err)) {
+        saveOffline();
+        return;
+      }
+      toast.error("Falha ao enviar pedido", { description: "Tente novamente." });
+    }
+  };
   return (
     <button
-      onClick={async () => {
-        try {
-          const { submitRequest } = await import("~/lib/gym-api");
-          await submitRequest({
-            gymId,
-            userId,
-            userName: userName ?? "Você",
-            type: "premium",
-            message: "Quero desbloquear o Plano Premium com acompanhamento do Personal.",
-          });
-          setSent(true);
-          toast.success("Pedido enviado ao seu Personal");
-        } catch {
-          toast.error("Falha ao enviar pedido", { description: "Tente novamente." });
-        }
-      }}
+      onClick={() => { void send(); }}
       className="w-[72%] shrink-0 snap-start rounded-[18px] border border-[#FFC24D]/35 bg-gradient-to-br from-[#FFC24D]/15 via-card to-card p-4 text-left transition-transform active:scale-[0.98]"
     >
       <p className="text-[10px] font-bold uppercase tracking-widest text-[#FFC24D]">Plano Premium</p>

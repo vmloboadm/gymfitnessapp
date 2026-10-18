@@ -53,6 +53,7 @@ import { assetPath } from "~/lib/asset-path";
 import { findInDatabase } from "~/lib/exercises-database";
 import { libraryMatch } from "~/lib/demo-data";
 import { toast } from "sonner";
+import { enqueueOffline, isOffline, isNetworkError } from "~/lib/offline-queue";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
 import { useWorkoutSession, elapsedSeconds, readSessionProgress, clearSessionProgress, isDayUnlocked, markDayUnlocked, TRAINING_GATE_OPEN } from "~/lib/workout-session";
@@ -483,13 +484,17 @@ export default function TreinoHomePage() {
       } catch { /* feedback é bônus */ }
     }
     let inserted = 0;
+    let queuedOffline = 0;
+    let queuedTotal = 0;
     if (loggedIds.length) {
       setDoneIds((prev) => new Set([...prev, ...loggedIds]));
       // produção: grava workout_logs reais das séries que o aluno FEZ,
       // com as reps e a carga que ele DIGITOU (não as do plano).
       if (!demo && user && profile) {
+        let logRows: Array<Record<string, unknown>> = [];
         try {
           const supabase = supabaseBrowser();
+          const offline = isOffline();
           const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
           const sessList = session ?? [];
           const missing = loggedIds.filter(
@@ -507,7 +512,7 @@ export default function TreinoHomePage() {
             return true;
           });
           const nameToId: Record<string, string> = {};
-          if (stillMissing.length > 0) {
+          if (stillMissing.length > 0 && !offline) {
             const names = stillMissing.map((id) => sessList.find((s) => s.id === id)?.name).filter(Boolean) as string[];
             if (names.length > 0) {
               const orFilter = names.map((n) => `name.ilike.%${n.replace(/[%_,]/g, "").slice(0, 24)}%`).join(",");
@@ -557,22 +562,36 @@ export default function TreinoHomePage() {
               rpe: m?.rpe ?? null,
             }];
           });
+          logRows = rows;
           if (rows.length > 0) {
-            const { error: logErr } = await supabase.from("workout_logs").insert(rows as never);
-            if (!logErr) {
-              inserted = rows.length;
-              if (activeSlot && planActive[0]?.id) {
-                await supabase.from("slot_checks").insert({
-                  gym_id: profile.gym_id,
-                  student_id: user.id,
-                  program_id: planActive[0].id,
-                  slot: activeSlot,
-                } as never).then(() => {});
+            if (offline) {
+              // sem sinal: nada de tentar rede, guarda tudo no aparelho
+              queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
+              queuedTotal = logRows.length;
+            } else {
+              const { error: logErr } = await supabase.from("workout_logs").insert(rows as never);
+              if (!logErr) {
+                inserted = rows.length;
+                if (activeSlot && planActive[0]?.id) {
+                  await supabase.from("slot_checks").insert({
+                    gym_id: profile.gym_id,
+                    student_id: user.id,
+                    program_id: planActive[0].id,
+                    slot: activeSlot,
+                  } as never).then(() => {});
+                }
+              } else if (isNetworkError(logErr)) {
+                queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
+                queuedTotal = logRows.length;
               }
             }
           }
-        } catch {
-          /* segue mesmo se o log falhar; o toast abaixo avisa */
+        } catch (err) {
+          // caiu no meio (rede): o que já estava montado vira fila offline
+          if (logRows.length > 0 && (isOffline() || isNetworkError(err))) {
+            queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
+            queuedTotal = logRows.length;
+          }
         }
       }
     }
@@ -583,6 +602,16 @@ export default function TreinoHomePage() {
       toast.success("Treino registrado!");
     } else if (inserted > 0) {
       toast.success(`Treino registrado! ${inserted} exercício${inserted === 1 ? "" : "s"} no histórico.`);
+    } else if (queuedOffline > 0) {
+      if (queuedTotal > queuedOffline) {
+        toast.error("Sem internet e o aparelho guardou só parte do treino", {
+          description: "O que foi salvo sincroniza quando a conexão voltar.",
+        });
+      } else {
+        toast("Sem internet: treino guardado no aparelho", {
+          description: "Sincroniza quando a conexão voltar.",
+        });
+      }
     } else if (loggedIds.length > 0) {
       toast.error("Treino finalizado, mas não entrou no histórico", {
         description: "Sem conexão ou falha no servidor. Avisamos seu personal.",

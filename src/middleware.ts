@@ -31,7 +31,6 @@ const STUDENT_PATHS = [
   "/ranking",
   "/squads",
   "/conquistas",
-  "/playlist",
   "/premium",
   "/perfil",
   "/notificacoes",

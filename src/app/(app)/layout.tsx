@@ -37,7 +37,12 @@ export default function AppLayout({
       {!isOnline ? (
         <div className="sticky top-[56px] z-30 flex items-center justify-center gap-2 bg-warning py-1.5 text-[11px] font-bold text-black">
           <CloudOff className="h-3.5 w-3.5" />
-          Sem internet{pendingCount > 0 ? ` · ${pendingCount} ação(ões) sincroniza(m) quando voltar` : " · dados salvos no aparelho"}
+          Sem internet{pendingCount > 0 ? ` · ${pendingCount} aguardando sincronização` : ""}
+        </div>
+      ) : pendingCount > 0 ? (
+        <div className="sticky top-[56px] z-30 flex items-center justify-center gap-2 border-b border-border bg-card/85 py-1.5 text-[11px] font-semibold text-muted-foreground backdrop-blur">
+          <CloudOff className="h-3.5 w-3.5" />
+          {pendingCount} {pendingCount === 1 ? "ação" : "ações"} aguardando sincronização
         </div>
       ) : null}
       <PhotoGate>
