@@ -14,12 +14,9 @@ import {
   type ApprovalRequest,
 } from "~/lib/trainer-store";
 import { decideRequest, getRequests, getGymStudents } from "~/lib/gym-api";
+import { supabaseBrowser } from "~/lib/supabase/client";
 import { cn } from "~/lib/utils";
 
-const container: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.07, delayChildren: 0.04 } },
-};
 const row: Variants = {
   hidden: { opacity: 0, y: 18 },
   show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] } },
@@ -27,6 +24,28 @@ const row: Variants = {
 
 const fmt = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+/** Iniciais de duas letras + cor estável derivada do id (sem fabricar avatar). */
+const AVATAR_TONES = [
+  "bg-[#FFC24D]/20 text-[#FFC24D]",
+  "bg-[#4ADE80]/20 text-[#4ADE80]",
+  "bg-sky-400/20 text-sky-400",
+  "bg-[#F87171]/20 text-[#F87171]",
+  "bg-brand/20 text-brand",
+] as const;
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function toneFor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return AVATAR_TONES[h % AVATAR_TONES.length];
+}
 
 const TYPE_META: Record<ApprovalRequest["type"], { label: string; short: string; icon: typeof Crown; cls: string }> = {
   premium: { label: "Desbloqueio de Plano Premium", short: "Premium", icon: Crown, cls: "text-[#FFC24D]" },
@@ -43,6 +62,10 @@ export default function PersonalAprovacoesPage() {
   const { profile, user } = useAuth();
   const [students, setStudents] = useState<PersonalStudent[]>([]);
   const [items, setItems] = useState<ApprovalRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   // Alunos reais p/ resolver avatares dos pedidos
   useEffect(() => {
@@ -57,10 +80,26 @@ export default function PersonalAprovacoesPage() {
   useEffect(() => {
     if (!profile?.gym_id) return;
     let alive = true;
-    const hydrate = () =>
-      getRequests(profile.gym_id)
-        .then((rows) => { if (alive) setItems(rows); })
-        .catch(() => {});
+    const hydrate = async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        // Sonda direta: getRequests engole erro interno, então testamos a
+        // conexão com a tabela antes de confiar que [] é fila vazia.
+        const probe = await supabaseBrowser()
+          .from("premium_requests")
+          .select("id", { count: "exact", head: true })
+          .eq("gym_id", profile.gym_id);
+        if (probe.error) throw new Error(probe.error.message);
+        const rows = await getRequests(profile.gym_id);
+        if (alive) { setItems(rows); setLoading(false); }
+      } catch {
+        if (alive) {
+          setLoadError("Não foi possível carregar as aprovações. Verifique a conexão.");
+          setLoading(false);
+        }
+      }
+    };
     hydrate();
     window.addEventListener(TRAINER_APPROVALS_EVENT, hydrate);
     window.addEventListener("storage", hydrate);
@@ -71,34 +110,32 @@ export default function PersonalAprovacoesPage() {
       window.removeEventListener("storage", hydrate);
       clearInterval(t);
     };
-  }, [profile?.gym_id]);
+  }, [profile?.gym_id, tick]);
 
   // Realtime: refetch when student submits or trainer decides
-  usePremiumRequestsRealtime(profile?.gym_id, () => {
-    if (!profile?.gym_id) return;
-    getRequests(profile.gym_id).then(setItems).catch(() => {});
-  });
+  usePremiumRequestsRealtime(profile?.gym_id, () => setTick((t) => t + 1));
 
-  useMedicalClearancesRealtime(profile?.gym_id, () => {
-    if (!profile?.gym_id) return;
-    getRequests(profile.gym_id).then(setItems).catch(() => {});
-  });
+  useMedicalClearancesRealtime(profile?.gym_id, () => setTick((t) => t + 1));
 
   const pending = items.filter((a) => a.status === "pendente");
-  const _isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
   const resolved = items.filter((a) => a.status !== "pendente");
 
   const decide = async (id: string, status: "aprovado" | "recusado") => {
+    if (decidingId) return;
+    setDecidingId(id);
     try {
       await decideRequest(id, status, user?.id ?? "");
-      if (!profile?.gym_id) return;
-      setItems(await getRequests(profile.gym_id));
+      if (profile?.gym_id) setItems(await getRequests(profile.gym_id));
       toast.success(
         status === "aprovado" ? "Solicitação aprovada" : "Solicitação recusada",
         { description: "O aluno vê a resposta na área dele." }
       );
-    } catch {
-      toast.error("Não deu registrar a decisão. Tente de novo.");
+    } catch (e) {
+      toast.error("Não deu registrar a decisão. Tente de novo.", {
+        description: String(e instanceof Error ? e.message : e).slice(0, 80),
+      });
+    } finally {
+      setDecidingId(null);
     }
   };
 
@@ -123,7 +160,24 @@ export default function PersonalAprovacoesPage() {
       </header>
 
       {/* pendentes */}
-      {pending.length === 0 ? (
+      {loading ? (
+        <div className="space-y-2.5">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-28 animate-pulse rounded-2xl bg-white/[0.04]" />
+          ))}
+        </div>
+      ) : loadError ? (
+        <div className="rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.06] p-6 text-center">
+          <p className="text-[13px] font-bold text-foreground">Não foi possível carregar as aprovações</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">{loadError}</p>
+          <button
+            onClick={() => setTick((t) => t + 1)}
+            className="tactile mt-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-2 text-[12px] font-bold text-foreground transition-colors hover:text-brand"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      ) : pending.length === 0 ? (
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-8 text-center">
           <InboxIcon className="mx-auto mb-2 h-7 w-7 text-muted-foreground" />
           <p className="text-sm font-semibold text-foreground">Caixa vazia</p>
@@ -132,14 +186,19 @@ export default function PersonalAprovacoesPage() {
           </p>
         </div>
       ) : (
-        <m.div variants={container} initial="hidden" animate="show" className="space-y-2.5">
+        <m.div
+          variants={{ hidden: {}, show: { transition: { staggerChildren: Math.min(0.07, 0.4 / Math.max(1, pending.length)), delayChildren: 0.04 } } }}
+          initial="hidden"
+          animate="show"
+          className="space-y-2.5"
+        >
           {pending.map((a) => (
             <m.article key={a.id} variants={row} className="gf-card gf-glass !p-4">
               <div className="flex items-start gap-3">
                 <Avatar className="h-10 w-10 border border-white/[0.08]">
                   <AvatarImage src={avatarFor(a) ?? undefined} alt="" />
-                  <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-[11px] font-black text-brand-foreground">
-                    {a.studentName[0]}
+                  <AvatarFallback className={cn("text-[11px] font-black", toneFor(a.studentId || a.studentName))}>
+                    {initialsOf(a.studentName)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
@@ -168,15 +227,17 @@ export default function PersonalAprovacoesPage() {
                 ) : null}
                 <button
                   onClick={() => decide(a.id, "aprovado")}
-                  className="tactile flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#4ADE80]/15 text-[12px] font-bold text-[#4ADE80] ring-1 ring-[#4ADE80]/30 transition-transform active:scale-[0.97]"
+                  disabled={decidingId !== null}
+                  className="tactile flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#4ADE80]/15 text-[12px] font-bold text-[#4ADE80] ring-1 ring-[#4ADE80]/30 transition-transform active:scale-[0.97] disabled:opacity-50"
                 >
-                  <Check className="h-4 w-4" /> Aprovar
+                  <Check className="h-4 w-4" /> {decidingId === a.id ? "Salvando..." : "Aprovar"}
                 </button>
                 <button
                   onClick={() => decide(a.id, "recusado")}
-                  className="tactile flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#F87171]/15 text-[12px] font-bold text-[#F87171] ring-1 ring-[#F87171]/30 transition-transform active:scale-[0.97]"
+                  disabled={decidingId !== null}
+                  className="tactile flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#F87171]/15 text-[12px] font-bold text-[#F87171] ring-1 ring-[#F87171]/30 transition-transform active:scale-[0.97] disabled:opacity-50"
                 >
-                  <X className="h-4 w-4" /> Recusar
+                  <X className="h-4 w-4" /> {decidingId === a.id ? "Salvando..." : "Recusar"}
                 </button>
               </div>
             </m.article>

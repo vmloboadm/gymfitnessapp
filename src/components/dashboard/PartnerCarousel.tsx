@@ -8,6 +8,10 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { isDemoMode, demoPatrocinadores, codeResgate, type Patrocinador } from "~/lib/demo-bridge";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { useAuth } from "~/hooks/useAuth";
+
+/** Parceiro com código de resgate real cadastrado (coluna resgate). */
+type Partner = Patrocinador & { code?: string };
 
 /** Monograma premium, primeira letra em display pesado sobre a cor da marca.
     Quando o parceiro cadastra a logo (upload), ela substitui o monograma. */
@@ -51,34 +55,42 @@ function PartnerMark({ p, size = 44 }: { p: Patrocinador; size?: number }) {
 /** Carrossel universal de parceiros, snap central sedoso, autoplay lento, peek do próximo card.
     Sem corte abrupto na borda: o contéudo do card nunca é cortado feio. */
 export default function PartnerCarousel() {
+  const { profile } = useAuth();
+  const gymId = profile?.gym_id ?? null;
   // produção: patrocinadores reais do gym (tabela partners)
-  const [partners, setPartners] = useState<Patrocinador[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
   useEffect(() => {
     if (isDemoMode()) {
       setPartners(demoPatrocinadores());
       return;
     }
+    if (!gymId) {
+      setPartners([]);
+      return;
+    }
     const sb = supabaseBrowser();
     sb.from("partners")
       .select("id, name, image_url, link, resgate")
-      .eq("gym_id", "00000000-0000-0000-0000-000000000001")
+      .eq("gym_id", gymId)
       .eq("active", true)
       .then(({ data }) => {
         const rows = (data ?? []) as Array<{ id: string; name: string; image_url: string | null; link: string | null; resgate: string | null }>;
         setPartners(
-          rows.map((p) => ({
-            id: p.id,
-            name: p.name,
-            msg: "",
-            discount: 0,
-            url: p.link ?? "",
-            brand: "#1B3A66",
-            logo: p.image_url ?? "",
-            code: p.resgate ?? "",
-          })) as unknown as Patrocinador[]
+          rows
+            .filter((p) => p.name?.trim() && (p.link || p.resgate))
+            .map((p) => ({
+              id: p.id,
+              name: p.name,
+              msg: "",
+              discount: 0,
+              url: p.link ?? "",
+              brand: "#1B3A66",
+              logo: p.image_url ?? "",
+              code: p.resgate ?? "",
+            }))
         );
       });
-  }, []);
+  }, [gymId]);
   const [emblaRef] = useEmblaCarousel(
     {
       loop: partners.length > 1,
@@ -97,10 +109,14 @@ export default function PartnerCarousel() {
 
   if (partners.length === 0) return null;
 
-  const rescue = (p: Patrocinador) => {
-    const code = codeResgate(p.id);
-    window.open(p.url, "_blank", "noopener,noreferrer");
-    toast.success(`Cupom gerado: ${code}`, { description: `Mostre o código no ${p.name} e garanta seu desconto.` });
+  const rescue = (p: Partner) => {
+    if (p.url) window.open(p.url, "_blank", "noopener,noreferrer");
+    const code = p.code ?? (isDemoMode() ? codeResgate(p.id) : "");
+    if (code) {
+      toast.success(`Código de resgate: ${code}`, {
+        description: `Copie o código e apresente no ${p.name} para aproveitar a oferta.`,
+      });
+    }
   };
 
   return (
@@ -142,14 +158,18 @@ export default function PartnerCarousel() {
                   </div>
                 </div>
 
-                <p className="mt-3 line-clamp-2 text-[12px] leading-snug text-[#BFC7D8]">{p.msg}</p>
+                {p.msg ? (
+                  <p className="mt-3 line-clamp-2 text-[12px] leading-snug text-[#BFC7D8]">{p.msg}</p>
+                ) : (
+                  <div className="mt-3" />
+                )}
 
                 <div className="mt-auto pt-3">
                   <button
                     onClick={() => rescue(p)}
                     className="tactile gf-touch flex w-full items-center justify-center gap-1.5 rounded-[12px] border border-white/12 bg-white/[0.03] py-2.5 text-[12px] font-bold text-[#FFB073] transition-colors hover:bg-white/[0.07]"
                   >
-                    Resgatar {p.discount}% Off
+                    {p.discount > 0 ? `Resgatar ${p.discount}% Off` : "Resgatar"}
                     <ExternalLink className="h-3.5 w-3.5" />
                   </button>
                 </div>

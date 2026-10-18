@@ -25,10 +25,6 @@ import { curatedSearch } from "~/lib/exercises-database";
 import { readLibraryEdits, saveLibraryEdit } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
 
-const container: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.04, delayChildren: 0.03 } },
-};
 const row: Variants = {
   hidden: { opacity: 0, y: 14 },
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.2, 0.8, 0.2, 1] } },
@@ -163,6 +159,13 @@ export default function PersonalExerciciosPage() {
   };
 
   const deleteGymExercise = async (id: string, name: string) => {
+    if (
+      !window.confirm(
+        `Apagar "${name}" da biblioteca da academia? Ele some do picker e da IA. Exercícios em uso em um treino ativo não podem ser apagados.`
+      )
+    ) {
+      return;
+    }
     try {
       const { error } = await supabaseBrowser().from("exercises").delete().eq("id", id);
       if (error) throw error;
@@ -401,7 +404,12 @@ export default function PersonalExerciciosPage() {
           </p>
         </div>
       ) : (
-        <m.ul variants={container} initial="hidden" animate="show" className="space-y-2">
+        <m.ul
+          variants={{ hidden: {}, show: { transition: { staggerChildren: Math.min(0.04, 0.4 / Math.max(1, filtered.length)), delayChildren: 0.03 } } }}
+          initial="hidden"
+          animate="show"
+          className="space-y-2"
+        >
           {filtered.map((e) => (
             <m.li key={e.id} variants={row}>
               <div

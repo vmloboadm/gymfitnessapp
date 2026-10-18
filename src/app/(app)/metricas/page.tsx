@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
-import { useMemo } from "react";
 import {
   Camera,
   CheckCircle2, Scale, Ruler, Percent, Activity, TrendingDown, TrendingUp } from "lucide-react";
@@ -136,18 +135,14 @@ export default function MetricasPage() {
   const [salvandoMedida, setSalvandoMedida] = useState(false);
   const fileVisorRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setSupMetrics(listMetrics());
-  }, []);
-
   const comprimir = async (file: File): Promise<Blob> => {
     const bitmap = await createImageBitmap(file);
     const canvas = document.createElement("canvas");
     const scale = Math.min(1, 360 / Math.max(bitmap.width, bitmap.height));
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
     canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("falha"))), "image/webp", 0.72));
+    return new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("falha ao comprimir"))), "image/webp", 0.72));
   };
 
   const salvarMedida = async () => {
@@ -156,31 +151,56 @@ export default function MetricasPage() {
       toast.error("Informe um peso válido (25–350 kg)");
       return;
     }
-    if (!fotoVisor) {
-      toast.error("Anexe a foto do visor da balança", { description: "É a comprovação que valida a medida pro ranking." });
+    const gordura = Number(gorduraInput.replace(",", ".")) || null;
+    if (!demo && (!user || !profile?.gym_id)) {
+      toast.error("Sessão indisponível. Entre de novo para registrar a medida.");
       return;
     }
     setSalvandoMedida(true);
     try {
-      let photoUrl: string | null = null;
-      const blob = await comprimir(fotoVisor);
-      const SUP = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-      const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-      const path = `visor-${Date.now()}.webp`;
-      const up = await fetch(`${SUP}/storage/v1/object/avatars/${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "image/webp", apikey: KEY, Authorization: `Bearer ${KEY}` },
-        body: blob,
-      });
-      if (up.ok) photoUrl = `${SUP}/storage/v1/object/public/avatars/${path}`;
-      addMetric({ peso_kg: peso, gordura_pct: Number(gorduraInput.replace(",", ".")) || null, photo_url: photoUrl, fonte: "foto-visor" });
-      setSupMetrics(listMetrics());
+      if (demo) {
+        addMetric({ peso_kg: peso, gordura_pct: gordura, photo_url: null, fonte: "foto-visor" });
+        setSupMetrics(listMetrics());
+      } else {
+        const { error } = await supabaseBrowser().from("body_metrics").insert({
+          gym_id: profile!.gym_id,
+          student_id: user!.id,
+          weight_kg: peso,
+          body_fat_pct: gordura,
+          source: "manual",
+        } as never);
+        if (error) throw new Error(error.message);
+      }
+
+      // Foto do visor é opcional: se o envio falhar (bucket/RLS), a medida
+      // já está salva e o aviso diz que a comprovação não foi anexada.
+      let fotoEnviada = false;
+      if (fotoVisor) {
+        try {
+          const blob = await comprimir(fotoVisor);
+          const path = `${user!.id}/visor-${Date.now()}.webp`;
+          const { error: upErr } = await supabaseBrowser()
+            .storage.from("avatars")
+            .upload(path, blob, { contentType: "image/webp" });
+          fotoEnviada = !upErr;
+        } catch {
+          fotoEnviada = false;
+        }
+      }
+
       setPesoInput("");
       setGorduraInput("");
       setFotoVisor(null);
-      toast.success("Medida registrada como pendente", { description: "O personal vai validar · comprovada, ela conta pro ranking." });
+      if (!demo) refetch();
+      toast.success(demo ? "Medida registrada (pendente de validação)" : "Medida registrada no seu histórico", {
+        description: fotoEnviada
+          ? "Foto do visor anexada. Seu personal acompanha pela aba de métricas."
+          : fotoVisor
+            ? "A medida foi salva, mas a foto do visor não pôde ser enviada. Seu personal valida sem a comprovação anexada."
+            : "Visível no seu histórico de métricas e para o seu personal.",
+      });
     } catch (e) {
-      toast.error("Falha ao salvar a medida", { description: String(e).slice(0, 80) });
+      toast.error("Não foi possível salvar a medida", { description: String(e instanceof Error ? e.message : e).slice(0, 100) });
     } finally {
       setSalvandoMedida(false);
     }
@@ -250,10 +270,10 @@ if (loading) {
         {/* Registro supervisionado de peso */}
         <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "120ms" }}>
           <p className="gf-section flex items-center gap-1.5">
-            <Scale className="h-3.5 w-3.5 text-brand" /> Nova medida supervisionada
+            <Scale className="h-3.5 w-3.5 text-brand" /> Nova medida
           </p>
           <p className="gf-card-text mb-3">
-            Peso entra no ranking só quando <span className="font-bold text-foreground">comprovada</span>: anexe a foto do visor e o personal valida.
+            Registre o peso pesado na balança. A medida entra no seu histórico e fica visível para o seu personal acompanhar.
           </p>
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
@@ -295,17 +315,17 @@ if (loading) {
             className="gf-touch mt-2 flex w-full items-center gap-2 rounded-xl border border-dashed border-border bg-card/30 px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground"
           >
             <Camera className="h-4 w-4 shrink-0" />
-            {fotoVisor ? <span className="truncate text-foreground">{fotoVisor.name} ✓</span> : "Anexar foto do visor da balança"}
+            {fotoVisor ? <span className="truncate text-foreground">{fotoVisor.name} ✓</span> : "Foto do visor da balança (opcional)"}
           </button>
           <button
             onClick={salvarMedida}
             disabled={salvandoMedida}
             className="gf-touch mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-60"
           >
-            {salvandoMedida ? "Enviando…" : "Registrar medida (pendente de validação)"}
+            {salvandoMedida ? "Salvando..." : "Registrar medida"}
           </button>
 
-          {supMetrics.length > 0 ? (
+          {demo && supMetrics.length > 0 ? (
             <div className="mt-3 space-y-1.5">
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Minhas medições</p>
               {supMetrics.slice(0, 5).map((m) => (

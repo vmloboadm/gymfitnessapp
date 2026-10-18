@@ -6,29 +6,53 @@ import { useRealtime } from "~/hooks/useRealtime";
 
 /**
  * "X pessoas treinando agora".
- * Baseline = query inicial; depois mantido "vivo" via Realtime
- * (contagem de equipment_sessions ativas por gym).
- * Só conta sessões iniciadas há menos de 3h: sessão travada (app fechado
- * sem finalizar) não infla o número.
+ * Conta pessoas distintas: sessões de equipamento ativas + check-ins de
+ * entrada recentes (mesmo aluno em os dois conta uma vez).
+ * Depois mantido "vivo" via Realtime das duas tabelas.
+ * Só conta atividade das últimas 3h: registro travado não infla o número.
  */
 export function useOnlineCount(gymId?: string) {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const since = () => new Date(Date.now() - 3 * 3600000).toISOString();
 
+  const recount = (gym: string) =>
+    Promise.all([
+      supabaseBrowser()
+        .from("equipment_sessions")
+        .select("student_id")
+        .eq("gym_id", gym)
+        .eq("status", "active")
+        .gte("started_at", since())
+        .limit(200),
+      supabaseBrowser()
+        .from("checkins")
+        .select("student_id")
+        .eq("gym_id", gym)
+        .eq("type", "entrada")
+        .gte("checked_at", since())
+        .limit(200),
+    ]).then(([sessRes, ciRes]) => {
+      const ids = new Set<string>();
+      for (const r of (sessRes.data ?? []) as Array<{ student_id: string }>) ids.add(r.student_id);
+      for (const r of (ciRes.data ?? []) as Array<{ student_id: string }>) ids.add(r.student_id);
+      return ids.size;
+    });
+
   useEffect(() => {
     if (!gymId) return;
     let cancelled = false;
 
-    supabaseBrowser()
-      .from("equipment_sessions")
-      .select("id", { count: "exact", head: true })
-      .eq("gym_id", gymId)
-      .eq("status", "active")
-      .gte("started_at", since())
-      .then(({ count: c }) => {
+    recount(gymId)
+      .then((c) => {
         if (!cancelled) {
-          setCount(c ?? 0);
+          setCount(c);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCount(0);
           setLoading(false);
         }
       });
@@ -36,21 +60,24 @@ export function useOnlineCount(gymId?: string) {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gymId]);
 
-  // Realtime: recalcula no insert/delete de sessão
+  // Realtime: recalcula no insert/delete de sessão ou check-in
   useRealtime(
-    `online-${gymId}`,
+    `online-sess-${gymId}`,
     { table: "equipment_sessions", gymId },
     () => {
       if (!gymId) return;
-      supabaseBrowser()
-        .from("equipment_sessions")
-        .select("id", { count: "exact", head: true })
-        .eq("gym_id", gymId)
-        .eq("status", "active")
-        .gte("started_at", since())
-        .then(({ count: c }) => setCount(c ?? 0));
+      recount(gymId).then(setCount).catch(() => {});
+    }
+  );
+  useRealtime(
+    `online-ci-${gymId}`,
+    { table: "checkins", gymId },
+    () => {
+      if (!gymId) return;
+      recount(gymId).then(setCount).catch(() => {});
     }
   );
 

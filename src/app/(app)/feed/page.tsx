@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Plus, ThumbsUp, Flame, Hand, MessageSquare, Send, GraduationCap, Pin } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, ThumbsUp, Flame, Hand, MessageSquare, Send, GraduationCap, Pin, ChevronDown } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { useFeedRealtime } from "~/hooks/useRealtimeSubscriptions";
@@ -69,6 +69,13 @@ export default function FeedPage() {
   const [demoPosts, setDemoPosts] = useState<PostRow[]>([]);
   const demo = isDemoMode();
 
+  // guardas anti duplo clique + expansão de comentários + paginação simples
+  const [reactingIds, setReactingIds] = useState<Set<string>>(new Set());
+  const [sendingComment, setSendingComment] = useState(false);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [loadingMore, setLoadingMore] = useState(false);
+  const postsLimitRef = useRef(30);
+
   useEffect(() => {
     if (!demo) return;
     const hydrate = () => {
@@ -118,7 +125,7 @@ export default function FeedPage() {
         .select("*")
         .eq("gym_id", profile.gym_id)
         .order("created_at", { ascending: false })
-        .limit(30);
+        .limit(postsLimitRef.current);
       if (postsRes.error) return { data: null, error: postsRes.error };
 
       const posts = (postsRes.data ?? []) as FeedPosts[];
@@ -258,6 +265,7 @@ export default function FeedPage() {
 
   /** Reações (curtir, fogo, palmas): toca de novo para tirar, troca atualiza. */
   const react = async (post: PostRow, kind: string) => {
+    if (reactingIds.has(post.id)) return;
     navigator.vibrate?.(20);
     if (demo) {
       feedLocalToggleLike(post.id);
@@ -265,6 +273,7 @@ export default function FeedPage() {
       return;
     }
     if (!user || !profile) return;
+    setReactingIds((prev) => new Set(prev).add(post.id));
     const supabase = supabaseBrowser();
     try {
       if (post.myReaction === kind) {
@@ -279,43 +288,73 @@ export default function FeedPage() {
       }
       refetch();
     } catch {
-      toast.error("Não deu reagir agora. Tente de novo.");
+      toast.error("Não foi possível reagir agora. Tente de novo.");
+    } finally {
+      setReactingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(post.id);
+        return next;
+      });
     }
   };
 
   const toggleLike = async (post: PostRow) => react(post, "like");
 
   const addComment = async (postId: string) => {
-    if (!commentDraft.trim()) return;
-    if (demo) {
-      const c: CommentRow = {
-        id: `lc-${Date.now()}`,
-        gym_id: "1",
-        post_id: postId,
-        user_id: user?.id ?? ME_DEMO,
-        body: commentDraft.trim(),
-        created_at: new Date().toISOString(),
-        user: { id: user?.id ?? ME_DEMO, name: profile?.name ?? "Você", role: (profile?.role ?? "student") as Profiles["role"] } as Profiles,
-      };
-      feedLocalAddComment(postId, c as FeedCommentLocal);
-      setDemoComments((prev) => ({ ...prev, [postId]: [...(prev[postId] ?? []), c] }));
+    if (!commentDraft.trim() || sendingComment) return;
+    setSendingComment(true);
+    try {
+      if (demo) {
+        const c: CommentRow = {
+          id: `lc-${Date.now()}`,
+          gym_id: "1",
+          post_id: postId,
+          user_id: user?.id ?? ME_DEMO,
+          body: commentDraft.trim(),
+          created_at: new Date().toISOString(),
+          user: { id: user?.id ?? ME_DEMO, name: profile?.name ?? "Você", role: (profile?.role ?? "student") as Profiles["role"] } as Profiles,
+        };
+        feedLocalAddComment(postId, c as FeedCommentLocal);
+        setDemoComments((prev) => ({ ...prev, [postId]: [...(prev[postId] ?? []), c] }));
+        setCommentDraft("");
+        setCommentingId(null);
+        navigator.vibrate?.(25);
+        toast.success("Comentário publicado");
+        return;
+      }
+      if (!user || !profile) return;
+      const { error } = await supabaseBrowser()
+        .from("feed_comments")
+        .insert({ gym_id: profile.gym_id, post_id: postId, user_id: user.id, body: commentDraft.trim() } as never);
+      if (error) {
+        toast.error("Falha ao comentar", { description: error.message });
+        return;
+      }
       setCommentDraft("");
       setCommentingId(null);
-      navigator.vibrate?.(25);
-      toast.success("Comentário publicado");
-      return;
+      refetch();
+    } finally {
+      setSendingComment(false);
     }
-    if (!user || !profile) return;
-    const { error } = await supabaseBrowser()
-      .from("feed_comments")
-      .insert({ gym_id: profile.gym_id, post_id: postId, user_id: user.id, body: commentDraft.trim() } as never);
-    if (error) {
-      toast.error("Falha ao comentar", { description: error.message });
-      return;
+  };
+
+  const toggleCommentsExpanded = (postId: string) => {
+    setExpandedComments((prev) => {
+      const next = new Set(prev);
+      if (next.has(postId)) next.delete(postId);
+      else next.add(postId);
+      return next;
+    });
+  };
+
+  const loadMore = async () => {
+    postsLimitRef.current += 30;
+    setLoadingMore(true);
+    try {
+      await refetch();
+    } finally {
+      setLoadingMore(false);
     }
-    setCommentDraft("");
-    setCommentingId(null);
-    refetch();
   };
 
   return (
@@ -421,20 +460,32 @@ export default function FeedPage() {
 
                   <p className="mt-3 text-sm leading-relaxed text-foreground">{post.body}</p>
 
+                  {post.media_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={post.media_url}
+                      alt=""
+                      loading="lazy"
+                      className="mt-3 max-h-80 w-full rounded-xl border border-border/60 object-cover"
+                    />
+                  ) : null}
+
                   <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-3">
                     {REACTIONS.map(({ id, label, Icon }) => {
                       const active = (post.myReaction ?? (liked ? "like" : null)) === id;
                       const count = post.reactions[id] ?? 0;
+                      const busy = reactingIds.has(post.id);
                       return (
                         <button
                           key={id}
                           type="button"
                           onClick={() => react(post, id)}
+                          disabled={busy}
                           aria-pressed={active}
                           aria-label={`${label} (${count})`}
                           title={label}
                           className={cn(
-                            "tactile flex min-h-[36px] items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] font-bold transition-all active:scale-125",
+                            "tactile flex min-h-[36px] items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] font-bold transition-all active:scale-125 disabled:opacity-50",
                             active
                               ? "border-brand/60 bg-brand/15 text-brand"
                               : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
@@ -459,7 +510,7 @@ export default function FeedPage() {
 
                   {comments.length > 0 ? (
                     <div className="mt-3 space-y-2">
-                      {comments.slice(-3).map((c) => (
+                      {(expandedComments.has(post.id) ? comments : comments.slice(-3)).map((c) => (
                         <div key={c.id} className="flex items-start gap-2 rounded-xl bg-card/40 px-3 py-2">
                           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-bold text-secondary-foreground">
                             {(c.user?.name?.[0] ?? "?").toUpperCase()}
@@ -473,6 +524,19 @@ export default function FeedPage() {
                           </div>
                         </div>
                       ))}
+                      {comments.length > 3 ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleCommentsExpanded(post.id)}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-brand"
+                        >
+                          {expandedComments.has(post.id) ? (
+                            <>Mostrar menos <ChevronDown className="h-3 w-3 rotate-180" /></>
+                          ) : (
+                            <>Ver todos os comentários ({comments.length}) <ChevronDown className="h-3 w-3" /></>
+                          )}
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
 
@@ -486,7 +550,7 @@ export default function FeedPage() {
                         rows={1}
                         className="min-h-[36px] resize-none text-sm"
                       />
-                      <Button size="sm" onClick={() => addComment(post.id)} disabled={!commentDraft.trim()}>
+                      <Button size="sm" onClick={() => addComment(post.id)} disabled={!commentDraft.trim() || sendingComment}>
                         Enviar
                       </Button>
                     </div>
@@ -496,6 +560,19 @@ export default function FeedPage() {
             })}
           </div>
         )}
+
+        {!loading && !error && (data?.length ?? 0) >= postsLimitRef.current ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={loadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Carregando..." : "Carregar mais publicações"}
+          </Button>
+        ) : null}
       </div>
     </>
   );

@@ -265,57 +265,38 @@ function LogHistorySheet({ machine, isCardio, gymId, userId, userName, onClose, 
         meta,
       } as never);
       if (error) throw new Error(error.message);
-      // Ponte para o histórico: cardio soma minutos; musculação conta o dia
-      // treinado (streak, meta, ranking) via primeiro exercício do aparelho.
-      try {
-        if (isCardio) {
-          const n = machine.name.toLowerCase();
-          const modality = n.includes("esteira")
-            ? "esteira"
-            : n.includes("bike") || n.includes("spinning")
-              ? "bike"
-              : n.includes("nata") || n.includes("piscina")
-                ? "natacao"
-                : n.includes("corri")
-                  ? "corrida"
-                  : "outros";
-          await sb.from("cardio_logs").insert({
-            gym_id: gymId,
-            student_id: userId,
-            modality,
-            minutes: mins,
-            intensity: null,
-          } as never);
-        } else {
-          const { data: linked } = await sb
-            .from("exercises")
-            .select("id")
-            .eq("equipment_id", machine.id)
-            .limit(1)
-            .maybeSingle();
-          const exerciseId = (linked as { id?: string } | null)?.id ?? null;
-          if (exerciseId) {
-            const kg = Number(String(load).replace(",", "."));
-            await sb.from("workout_logs").insert({
-              gym_id: gymId,
-              student_id: userId,
-              workout_id: null,
-              exercise_id: exerciseId,
-              date: now.toISOString(),
-              weight_kg: kg > 0 ? kg : 0,
-              reps: 0,
-              rpe: null,
-            } as never);
-          }
-        }
-      } catch {
-        /* equipamento já salvo; o histórico extra é bônus */
+      // Ponte para o histórico: cardio entra em cardio_logs (com checagem de
+      // erro). Musculação não insere workout_logs sem série real (reps/carga).
+      let cardioFalhou = false;
+      if (isCardio) {
+        const n = machine.name.toLowerCase();
+        const modality = n.includes("esteira")
+          ? "esteira"
+          : n.includes("bike") || n.includes("spinning")
+            ? "bike"
+            : n.includes("nata") || n.includes("piscina")
+              ? "natacao"
+              : n.includes("corri")
+                ? "corrida"
+                : "outros";
+        const { error: cardioErr } = await sb.from("cardio_logs").insert({
+          gym_id: gymId,
+          student_id: userId,
+          modality,
+          minutes: mins,
+          intensity: null,
+        } as never);
+        cardioFalhou = !!cardioErr;
       }
-      toast.success("Histórico salvo!", { description: `${machine.name} · ${mins} min · valeu no seu dia` });
+      toast.success("Histórico salvo!", {
+        description: cardioFalhou
+          ? `${machine.name} · ${mins} min · o registro de cardio não contabilizou, tente de novo.`
+          : `${machine.name} · ${mins} min · valeu no seu dia`,
+      });
       navigator.vibrate?.([40, 30, 60]);
       onSaved();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não deu salvar. Tente novamente.");
+      toast.error(e instanceof Error ? e.message : "Não foi possível salvar. Tente novamente.");
     } finally {
       setSaving(false);
     }

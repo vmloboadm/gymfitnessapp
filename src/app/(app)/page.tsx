@@ -47,7 +47,6 @@ import {
   nextWorkoutFromLogs,
 } from "~/components/dashboard/mocks";
 import type { WorkoutLogs, Leaderboard } from "~/lib/types/models";
-import { BUILD_LABEL } from "~/lib/build";
 import { getProfileEdits } from "~/lib/profile-store";
 
 const META_SEMANAL_PADRAO = 3; // fallback quando o aluno ainda não definiu os dias
@@ -233,7 +232,6 @@ export default function HomePage() {
 
   const { data, loading: dataLoading, refetch: refetchLogs } = useAsyncQuery<{
     logs: WorkoutLogs[];
-    detailCount: number;
     points: number;
     rank: number;
   }>(
@@ -245,7 +243,6 @@ export default function HomePage() {
         return {
           data: {
             logs: t.logs as WorkoutLogs[],
-            detailCount: t.details.length,
             points: meIdx >= 0 ? ranks[meIdx].points : 1980,
             rank: meIdx >= 0 ? meIdx + 1 : 1,
           },
@@ -264,12 +261,12 @@ export default function HomePage() {
       const pts = (rRes.data as { points?: number } | null)?.points ?? 0;
       const rows = (lRes.data ?? []) as WorkoutLogs[];
       return {
-        data: { logs: rows, detailCount: 0, points: pts, rank: 0 },
+        data: { logs: rows, points: pts, rank: 0 },
         error: null,
       };
     },
     [user?.id, profile?.id, demo],
-    { enabled: !loading && !!user }
+    { enabled: !loading && !!user, silentRefetch: true }
   );
 
   // Realtime: refetch workout_logs when any student in the gym logs a workout
@@ -348,7 +345,8 @@ export default function HomePage() {
       if (error) return { data: null, error };
       return { data: (data as { phrase: string | null } | null) ?? { phrase: null }, error: null };
     },
-    [profile?.gym_id, demo]
+    [profile?.gym_id, demo],
+    { silentRefetch: true }
   );
   useGymMotivationRealtime(profile?.gym_id, refetchMotivation);
   const motivationPhrase = motivation?.phrase?.trim() || "bora somar com a galera!";
@@ -437,7 +435,6 @@ export default function HomePage() {
   const myRank = data?.rank ?? 0;
 
   const streakCount = useCountUp(streak);
-  const exCount = useCountUp(data?.detailCount ?? 0);
   const rankCount = useCountUp(myRank);
 
   // Treino de hoje = próximo da SEQUÊNCIA da ficha (não decide por fadiga).
@@ -726,7 +723,7 @@ export default function HomePage() {
           <HeroWorkout
             image={heroPlan?.image ?? FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
             title={heroPlan ? `Treino ${heroPlan.slot} · ${heroPlan.foco}` : todayLabel}
-            exerciseCount={heroPlan?.count ?? exCount}
+            exerciseCount={heroPlan?.count ?? 0}
             estMin={45}
             sessionsWeek={sessionsWeek}
             href={isCheckedInToday ? "/treino?resume=1" : undefined}
@@ -741,11 +738,11 @@ export default function HomePage() {
             }
             notice={fatigueNotice ?? undefined}
             emptyHint={
-              heroPlan
+              heroPlan && heroPlan.count > 0
                 ? undefined
                 : "Seu personal ainda não montou seu treino. Enquanto isso, dê uma olhada nos treinos livres e faça seu check-in."
             }
-            ready={!!heroPlan}
+            ready={!!heroPlan && heroPlan.count > 0}
           />
         </m.div>
 
@@ -978,18 +975,20 @@ export default function HomePage() {
                 <p className="mt-2 text-[11px] font-semibold text-brand">Ver personais →</p>
               </Link>
             </m.div>
-            <PremiumRequestCard />
+            <PremiumRequestCard
+              gymId={profile?.gym_id ?? null}
+              userId={user?.id ?? null}
+              userName={profile?.name ?? null}
+            />
           </div>
         </m.section>
 
 
-        {/* Marcador de build, confirma visualmente que o app está atualizado */}
-        <p className="text-center text-[10px] text-[#4A5568]">{BUILD_LABEL}</p>
           </>
         ) : null}
       </m.div>
 
-      {/* Voltar ao topo (nav:back-to-top) */}
+      {/* Voltar ao topo (nav:back-to-top), acima do FAB do assistente */}
       <AnimatePresence>
         {showTopBtn ? (
           <m.button
@@ -1002,7 +1001,7 @@ export default function HomePage() {
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
             aria-label="Voltar ao topo"
-            className="fixed bottom-24 right-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-brand/40 bg-[#0B1A33]/90 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur"
+            className="fixed bottom-[152px] right-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-brand/40 bg-[#0B1A33]/90 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur"
           >
             <ChevronDown className="h-5 w-5 rotate-180 text-brand" />
           </m.button>
@@ -1014,8 +1013,17 @@ export default function HomePage() {
 }
 
 /** Pedido de desbloqueio Premium: cai na caixa de aprovações do personal. */
-function PremiumRequestCard() {
+function PremiumRequestCard({
+  gymId,
+  userId,
+  userName,
+}: {
+  gymId: string | null;
+  userId: string | null;
+  userName: string | null;
+}) {
   const [sent, setSent] = useState(false);
+  if (!gymId || !userId) return null;
   if (sent) {
     return (
       <div className="w-[72%] shrink-0 snap-start rounded-[18px] border border-white/[0.06] bg-card/60 p-4">
@@ -1031,13 +1039,10 @@ function PremiumRequestCard() {
       onClick={async () => {
         try {
           const { submitRequest } = await import("~/lib/gym-api");
-          const { supabaseBrowser } = await import("~/lib/supabase/client");
-          const { data: sess } = await supabaseBrowser().auth.getSession();
-          const uid = sess.session?.user?.id ?? "student-self";
           await submitRequest({
-            gymId: "00000000-0000-0000-0000-000000000001",
-            userId: uid,
-            userName: "Você",
+            gymId,
+            userId,
+            userName: userName ?? "Você",
             type: "premium",
             message: "Quero desbloquear o Plano Premium com acompanhamento do Personal.",
           });

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
-import { TrendingUp, CalendarClock, Flame, CalendarDays, Target, Timer, NotebookPen, FileText, Clock3 } from "lucide-react";
+import { TrendingUp, CalendarClock, Flame, CalendarDays, Target, Dumbbell, NotebookPen, FileText, Clock3 } from "lucide-react";
 const ProgressoCharts = dynamic(() => import("~/components/charts/ProgressoCharts"), {
   ssr: false,
   loading: () => (
@@ -27,7 +27,6 @@ import { Badge } from "~/components/ui/badge";
 import { calcStreak, totalVolume } from "~/lib/utils/calculations";
 import { formatDate } from "~/lib/utils/format";
 import { buildFrequencySeries } from "~/lib/academia";
-import { cn } from "~/lib/utils";
 import { isDemoMode, demoProgressoData, demoMetricsData } from "~/lib/demo-bridge";
 import type { WorkoutLogs } from "~/lib/types/models";
 import { toast } from "sonner";
@@ -50,7 +49,6 @@ const FEELING_LABEL: Record<string, string> = {
 export default function ProgressoPage() {
   const { user, profile } = useAuth();
   const demo = isDemoMode();
-  const [loadProgram, setLoadProgram] = useState(false);
 
   const { data, loading, error, refetch } = useAsyncQuery<{
     logs: WorkoutLogs[];
@@ -58,11 +56,12 @@ export default function ProgressoPage() {
     checkins: Array<{ checked_at: string }>;
     sessions: StudentSession[];
     lastReportAt: string | null;
+    metrics: Array<{ recorded_at: string; weight_kg?: number | null; body_fat_pct?: number | null }>;
   }>(
     async () => {
       if (demo) {
         const d = demoProgressoData() as any;
-        return { data: d, error: null };
+        return { data: { ...d, metrics: [] }, error: null };
       }
 
       const supabase = supabaseBrowser();
@@ -70,8 +69,10 @@ export default function ProgressoPage() {
 
       const today = new Date();
       const since = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 13).toISOString().slice(0, 10);
+      // check-ins desde o início do mês anterior: sustenta constância e comparativo mensal
+      const checkinsSince = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().slice(0, 10);
 
-      const [last14Res, prev14Res, checkinsRes] = await Promise.all([
+      const [last14Res, prev14Res, checkinsRes, metricsRes] = await Promise.all([
         supabase
           .from("workout_logs")
           .select("date, weight_kg, reps")
@@ -86,11 +87,18 @@ export default function ProgressoPage() {
           .from("checkins")
           .select("checked_at")
           .eq("student_id", user.id)
-          .gte("checked_at", since),
+          .gte("checked_at", checkinsSince),
+        supabase
+          .from("body_metrics")
+          .select("recorded_at, weight_kg, body_fat_pct")
+          .eq("student_id", user.id)
+          .order("recorded_at", { ascending: false })
+          .limit(12),
       ]);
       if (last14Res.error) return { data: null, error: last14Res.error };
       if (prev14Res.error) return { data: null, error: prev14Res.error };
       if (checkinsRes.error) return { data: null, error: checkinsRes.error };
+      if (metricsRes.error) return { data: null, error: metricsRes.error };
 
       const [sessions, lastReportAt] = await Promise.all([
         getRecentSessions(user.id, 10),
@@ -104,6 +112,11 @@ export default function ProgressoPage() {
           checkins: checkinsRes.data ?? [],
           sessions,
           lastReportAt,
+          metrics: (metricsRes.data ?? []) as Array<{
+            recorded_at: string;
+            weight_kg?: number | null;
+            body_fat_pct?: number | null;
+          }>,
         },
         error: null,
       };
@@ -156,12 +169,14 @@ export default function ProgressoPage() {
     }));
   }, [freq]);
 
-  // Métricas passivas, calculadas dos dados existentes, sem esforço do aluno.
+  // Métricas reais, direto dos check-ins e logs do aluno.
   const freqMonthly = useMemo(() => {
     const monthStart = new Date().toISOString().slice(0, 7);
-    return new Set((data?.checkins ?? []).map((c) => c.checked_at.slice(0, 7)).filter((m) => m === monthStart)).size
-      ? new Set((data?.checkins ?? []).filter((c) => c.checked_at.startsWith(monthStart)).map((c) => c.checked_at.slice(0, 10))).size
-      : Math.max(8, Math.round((data?.checkins?.length ?? 0) / 2));
+    return new Set(
+      (data?.checkins ?? [])
+        .filter((c) => c.checked_at.startsWith(monthStart))
+        .map((c) => c.checked_at.slice(0, 10))
+    ).size;
   }, [data?.checkins]);
   const freqDays = useMemo(
     () =>
@@ -172,20 +187,19 @@ export default function ProgressoPage() {
       ).size,
     [data?.checkins]
   );
-  const timeInMonth = useMemo(() => {
-    const mins = Math.round(sessionsThisWeek * 55);
-    const h = Math.floor(mins / 60);
-    return h > 0 ? `${h}h${mins % 60 ? `${mins % 60}m` : ""}` : `${mins}m`;
-  }, [sessionsThisWeek]);
 
-  // Comparativo de constância (mês atual vs mês anterior)
+  // Comparativo de constância (mês atual vs mês anterior, dias com check-in)
   const constancyDelta = useMemo(() => {
     const now = new Date();
     const curM = now.toISOString().slice(0, 7);
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevM = prev.toISOString().slice(0, 7);
-    const days = (data?.checkins ?? []).filter((c) => c.checked_at.startsWith(curM)).length;
-    const prevDays = (data?.checkins ?? []).filter((c) => c.checked_at.startsWith(prevM)).length;
+    const days = new Set(
+      (data?.checkins ?? []).filter((c) => c.checked_at.startsWith(curM)).map((c) => c.checked_at.slice(0, 10))
+    ).size;
+    const prevDays = new Set(
+      (data?.checkins ?? []).filter((c) => c.checked_at.startsWith(prevM)).map((c) => c.checked_at.slice(0, 10))
+    ).size;
     return prevDays > 0 && days > 0 ? Math.round(((days - prevDays) / prevDays) * 100) : null;
   }, [data?.checkins]);
   const prevMonthLabel = useMemo(() => {
@@ -194,14 +208,15 @@ export default function ProgressoPage() {
     return prev.toLocaleDateString("pt-BR", { month: "short" });
   }, []);
 
-  // Evolução corporal (peso/bioimpedância), serviço pago (plano Pro)
+  // Evolução corporal (peso/bioimpedância): série real quando há medições,
+  // senão o card vira o pitch do plano Pro.
   const evolution = useMemo(() => {
-    if (!demo) return null;
-    const m = (demoMetricsData().metrics ?? []) as Array<{
+    const m = (demo ? (demoMetricsData().metrics ?? []) : (data?.metrics ?? [])) as Array<{
       recorded_at: string;
-      weight_kg?: number;
-      body_fat_pct?: number;
+      weight_kg?: number | null;
+      body_fat_pct?: number | null;
     }>;
+    if (m.length < 2) return null;
     return [...m]
       .sort((a, b) => (a.recorded_at < b.recorded_at ? -1 : 1))
       .map((x) => ({
@@ -209,7 +224,7 @@ export default function ProgressoPage() {
         peso: x.weight_kg ?? 0,
         bf: x.body_fat_pct ?? 0,
       }));
-  }, [demo]);
+  }, [demo, data?.metrics]);
 
   if (loading) {
     return (
@@ -244,10 +259,10 @@ export default function ProgressoPage() {
         <div className="gf-rise grid grid-cols-2 gap-3">
           <StatCard
             label="Constância do mês"
-            value={`${freqMonthly} treinos`}
+            value={`${freqMonthly} ${freqMonthly === 1 ? "presença" : "presenças"}`}
             delta={constancyDelta}
             icon={CalendarClock}
-            context={`vs mês passado · ${prevMonthLabel}`}
+            context={`dias com check-in · vs ${prevMonthLabel}`}
           />
           <StatCard
             label="Sequência"
@@ -257,14 +272,14 @@ export default function ProgressoPage() {
           />
         </div>
 
-        {/* Métricas passivas, sem esforço de registro */}
+        {/* Métricas reais, sem esforço de registro */}
         <div className="gf-rise grid grid-cols-3 gap-2" style={{ animationDelay: "60ms" }}>
-          <PassiveMetric label="Frequência/mês" value={`${freqMonthly}`} icon={CalendarDays} />
-          <PassiveMetric label="Dias ativos semana" value={`${freqDays}`} icon={Target} />
-          <PassiveMetric label="Tempo no mês" value={timeInMonth} icon={Timer} />
+          <PassiveMetric label="Check-ins semana" value={`${freqDays}`} icon={CalendarDays} />
+          <PassiveMetric label="Treinos semana" value={`${sessionsThisWeek}`} icon={Target} />
+          <PassiveMetric label="Volume semana" value={`${Math.round(weekVolume)} kg`} icon={Dumbbell} />
         </div>
 
-        {weekVolume === 0 && streak === 0 ? (
+        {allLogDates.length === 0 && (data?.checkins?.length ?? 0) === 0 ? (
           <EmptyState
             title="Sem dados de treino"
             description="Seus logs de carga e check-ins aparecem aqui após o primeiro treino."
@@ -282,18 +297,18 @@ export default function ProgressoPage() {
           </>
         )}
 
-        <p className="text-xs text-muted-foreground">{sessionsThisWeek} {sessionsThisWeek === 1 ? "sessão" : "sessões"} na semana</p>
-
-        {/* Evolução corporal (peso/bioimpedância), plano Pro */}
+        {/* Evolução corporal (peso/bioimpedância) */}
         <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "240ms" }}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <p className="gf-section">Evolução corporal</p>
               <p className="mt-0.5 text-[12px] text-muted-foreground">Peso · gordura corporal · massa muscular</p>
             </div>
-            <Badge variant="outline" className="shrink-0 gap-1.5 !border-brand/40 !px-2.5 !py-1 !text-[10px] !text-brand">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand animate-pulse" /> Pro
-            </Badge>
+            {!evolution ? (
+              <Badge variant="outline" className="shrink-0 gap-1.5 !border-brand/40 !px-2.5 !py-1 !text-[10px] !text-brand">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand animate-pulse" /> Pro
+              </Badge>
+            ) : null}
           </div>
 
           {evolution && evolution.length >= 2 ? (
@@ -302,7 +317,7 @@ export default function ProgressoPage() {
                 <PesoLineChartD data={evolution} left={-14} />
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">
-                Última bioimpedância: {evolution[evolution.length - 1]?.peso} kg · BF {evolution[evolution.length - 1]?.bf}%, acompanhamento do plano Pro.
+                Última medição: {evolution[evolution.length - 1]?.peso} kg · BF {evolution[evolution.length - 1]?.bf}%. Compare a tendência das semanas.
               </p>
             </>
           ) : (
@@ -317,43 +332,6 @@ export default function ProgressoPage() {
 
         {/* Fotos de evolução (antes/depois) */}
         <ProgressPhotos />
-
-        {/* Programa de evolução de carga, opt-in, fora do topo */}
-        <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "300ms" }}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 space-y-1">
-              <p className="gf-section">Programa de evolução de carga</p>
-              <p className="text-[13px] font-semibold text-foreground">
-                {loadProgram ? "Ativo, registro rápido pré-preenchido" : "Acompanhe o aumento de carga nos exercícios"}
-              </p>
-              <p className="gf-card-text">
-                Quando ativo, todo registro de série usa o valor anterior como base, só ajuste toque a toque, sem digitar do zero.
-              </p>
-            </div>
-            <button
-              role="switch"
-              aria-checked={loadProgram}
-              aria-label="Ativar programa de evolução de carga"
-              onClick={() => setLoadProgram((v) => !v)}
-              className={cn(
-                "gf-touch relative h-8 w-14 shrink-0 rounded-full border transition-colors",
-                loadProgram ? "border-brand bg-brand" : "border-border bg-card"
-              )}
-            >
-              <span
-                className={cn(
-                  "absolute top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-white shadow transition-all",
-                  loadProgram ? "left-[calc(100%-1.75rem)]" : "left-1"
-                )}
-              />
-            </button>
-          </div>
-          {loadProgram ? (
-            <p className="mt-3 rounded-lg bg-brand-soft/40 px-3 py-2 text-[11px] font-medium text-brand">
-              Registro ativado. Use o stepper +/− no registro de séries para subir a carga com segurança.
-            </p>
-          ) : null}
-        </div>
 
         {/* Diário de treinos: sessões com feedback */}
         <SessionDiary sessions={data?.sessions ?? []} />

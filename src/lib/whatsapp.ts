@@ -68,9 +68,9 @@ export function buildPlanWhatsMessage(opts: {
   const first = opts.studentName.split(" ")[0];
   const totalEx = opts.plan.dias.reduce((a, d) => a + d.exercicios.length, 0);
   const lines: string[] = [
-    `Oi ${first}! Seu treino novo ja esta disponivel no app.`,
+    `Oi ${first}! Seu treino novo já está disponível no app.`,
     "",
-    `${opts.plan.nome} · ${opts.plan.dias.length} ${opts.plan.dias.length === 1 ? "dia" : "dias"} · ${totalEx} exercicios`,
+    `${opts.plan.nome} · ${opts.plan.dias.length} ${opts.plan.dias.length === 1 ? "dia" : "dias"} · ${totalEx} exercícios`,
   ];
   for (const d of opts.plan.dias) {
     lines.push("");
@@ -78,7 +78,7 @@ export function buildPlanWhatsMessage(opts: {
     d.exercicios.forEach((e, i) => lines.push(`${i + 1}. ${e.exercicio} · ${e.series}x${e.reps}`));
   }
   lines.push("");
-  lines.push("Abra o app, faca o check-in na academia e bora treinar. Qualquer duvida me chama!");
+  lines.push("Abra o app, faça o check-in na academia e bora treinar. Qualquer dúvida me chama!");
   return lines.join("\n");
 }
 
@@ -89,17 +89,17 @@ export function buildQuickMessage(kind: string, studentName: string): string {
     case "sumido":
       return `Oi ${first}! Sentindo sua falta por aqui. Bora retomar os treinos essa semana? Te espero!`;
     case "vencido":
-      return `Oi ${first}! Sua matricula esta vencendo. Quer renovar para nao perder o ritmo dos treinos?`;
+      return `Oi ${first}! Sua matrícula está vencendo. Quer renovar para não perder o ritmo dos treinos?`;
     case "cobrar":
-      return `Oi ${first}! Ja fez o treino de hoje? Registra no app que eu vejo seu progresso. Bora!`;
+      return `Oi ${first}! Já fez o treino de hoje? Registra no app que eu vejo seu progresso. Bora!`;
     case "parabens":
-      return `Parabens, ${first}! Vi sua constancia no app, seu esforco esta aparecendo. Continue assim!`;
+      return `Parabéns, ${first}! Vi sua constância no app, seu esforço está aparecendo. Continue assim!`;
     case "incentivo":
-      return `Bora, ${first}! Cada treino conta. Hoje e um otimo dia para evoluir mais um pouco.`;
+      return `Bora, ${first}! Cada treino conta. Hoje é um ótimo dia para evoluir mais um pouco.`;
     case "avaliacao":
-      return `Oi ${first}! Vamos marcar sua avaliacao fisica e atualizar seus treinos? Me diz o melhor horario.`;
+      return `Oi ${first}! Vamos marcar sua avaliação física e atualizar seus treinos? Me diz o melhor horário.`;
     case "aniversario":
-      return `Feliz aniversario, ${first}! Que seja um ano de muita saude e treinos. Comemore com a gente!`;
+      return `Feliz aniversário, ${first}! Que seja um ano de muita saúde e treinos. Comemore com a gente!`;
     default:
       return `Oi ${first}! Tudo bem? Vamos falar sobre seus treinos?`;
   }

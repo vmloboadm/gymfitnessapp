@@ -62,7 +62,8 @@ export default function CheckinPage() {
       if (error) return { data: [], error: null };
       return { data: (data ?? []) as Array<{ date: string }>, error: null };
     },
-    [user?.id, demo, daySession?.startedAt]
+    [user?.id, demo, daySession?.startedAt],
+    { silentRefetch: true }
   );
   const sessionMetrics = useMemo(() => {
     const logs = demo ? (getTodayWorkout().logs as Array<{ date: string }>) : (weekLogs ?? []);
@@ -111,7 +112,8 @@ export default function CheckinPage() {
         error: null,
       };
     },
-    [user?.id, profile?.id, demo]
+    [user?.id, profile?.id, demo],
+    { silentRefetch: true }
   );
 
   // Sincroniza sessão ativa vinda do banco
@@ -180,21 +182,48 @@ export default function CheckinPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.equipment, user?.id, profile?.gym_id]);
 
-  // Auto-close após 5 min inativo
-  const closeSession = useCallback(async (confirm = false) => {
+  // Sessão parada além do tempo: nada de popup nativo no meio do treino.
+  // O banner não bloqueante na UI dá as opções; toque na página já reconta o tempo.
+  const [sessionIdle, setSessionIdle] = useState(false);
+  const [idleSince, setIdleSince] = useState<number | null>(null);
+  const [idleNow, setIdleNow] = useState(() => Date.now());
+  const idleArmedRef = useRef(false);
+  useEffect(() => {
+    if (!sessionIdle) return;
+    const t = setInterval(() => setIdleNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, [sessionIdle]);
+
+  const clearIdleState = useCallback(() => {
+    idleArmedRef.current = false;
+    setSessionIdle(false);
+    setIdleSince(null);
+  }, []);
+
+  const openWorkoutLog = useCallback(async () => {
     if (!session) return;
-    if (confirm) {
-      const ok = window.confirm("Deseja finalizar a sessão e registrar o treino?");
-      if (!ok) return;
-    }
     setShowWorkoutModal(true);
   }, [session]);
 
   const { remainingLabel, resetTimer } = useSessionTimeout(
     session?.id ?? null,
-    () => closeSession(true),
+    () => {
+      if (idleArmedRef.current) return;
+      idleArmedRef.current = true;
+      setIdleSince(Date.now());
+      setIdleNow(Date.now());
+      setSessionIdle(true);
+    },
     5 * 60 * 1000
   );
+
+  const continueSession = () => {
+    clearIdleState();
+    resetTimer();
+    toast.success("Sessão retomada. Bora!");
+  };
+
+  const idleMin = idleSince ? Math.max(1, Math.round((idleNow - idleSince) / 60000)) : 1;
 
   const startSession = async (equipmentId: string, variationId?: string) => {
     if (demo) {
@@ -213,6 +242,7 @@ export default function CheckinPage() {
       };
       setSession(fakeSession);
       toast.success(`Treino liberado em ${eq?.name ?? "aparelho"}`);
+      clearIdleState();
       resetTimer();
       return;
     }
@@ -247,6 +277,7 @@ export default function CheckinPage() {
     }
     setSession(inserted as EquipmentSessions);
     toast.success("Aparelho seu por agora. Bora!");
+    clearIdleState();
     resetTimer();
     refetch();
   };
@@ -256,6 +287,7 @@ export default function CheckinPage() {
     if (demo) {
       setSession(null);
       setShowWorkoutModal(false);
+      clearIdleState();
       toast.success("Sessão finalizada");
       return;
     }
@@ -270,6 +302,7 @@ export default function CheckinPage() {
       return;
     }
     setSession(null);
+    clearIdleState();
     toast.success("Equipamento liberado");
     refetch();
   };
@@ -638,7 +671,7 @@ endWorkoutSession();
                 fechamento em {remainingLabel || "5:00"}
               </div>
             </div>
-            <Button size="sm" onClick={() => closeSession(true)}>
+            <Button size="sm" onClick={openWorkoutLog}>
               <X className="mr-1 h-3.5 w-3.5" />
               Finalizar
             </Button>
@@ -650,6 +683,21 @@ endWorkoutSession();
             <ScanLine className="h-4 w-4" />
             Escanear outro equipamento (encerra esta sessão)
           </button>
+        </div>
+      )}
+
+      {/* Sessão parada: escolha do aluno, sem interromper o treino com pop-up */}
+      {session && sessionIdle && (
+        <div className="mx-4 flex flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3">
+          <p className="min-w-0 flex-1 text-xs font-semibold text-warning">
+            Sessão parada há {idleMin} min. O que você prefere?
+          </p>
+          <Button size="sm" onClick={continueSession}>
+            Continuar sessão
+          </Button>
+          <Button size="sm" variant="outline" onClick={openWorkoutLog}>
+            Encerrar
+          </Button>
         </div>
       )}
 

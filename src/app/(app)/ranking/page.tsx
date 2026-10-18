@@ -2,7 +2,7 @@
 
 import { Crown, Medal, Trophy, Users, Flame, TrendingUp, ChevronRight, Gem, Award } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { m } from "framer-motion";
 import { useAuth } from "~/hooks/useAuth";
@@ -19,7 +19,7 @@ import { LEAGUES, leagueFor } from "~/lib/utils/leagues";
 import { cn } from "~/lib/utils";
 import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
 import { pinBelowPodium, PINNED_BELOW_PODIUM } from "~/lib/gym-api";
-import { recentAchievements } from "~/lib/achievements";
+import { loadEarnedAchievements, type StudentAchievement } from "~/lib/achievements";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import type { Leaderboard, Profiles } from "~/lib/types/models";
 
@@ -54,6 +54,13 @@ const PERIODS = [
   { id: "all", label: "Geral" },
 ] as const;
 type PeriodId = (typeof PERIODS)[number]["id"];
+
+const PODIUM_TITLE: Record<PeriodId, string> = {
+  week: "Pódio da semana",
+  month: "Pódio do mês",
+  quarter: "Pódio dos últimos 90 dias",
+  all: "Pódio geral",
+};
 
 type RankRow = {
   student_id: string;
@@ -226,6 +233,26 @@ export default function RankingPage() {
 
   useLeaderboardRealtime(profile?.gym_id, refetch);
 
+  // Conquistas reais do aluno (derivadas do banco, sem dados fabricados)
+  const [earnedAch, setEarnedAch] = useState<StudentAchievement[]>([]);
+  useEffect(() => {
+    if (demo || !user?.id) {
+      setEarnedAch([]);
+      return;
+    }
+    let alive = true;
+    loadEarnedAchievements(user.id)
+      .then((list) => {
+        if (alive) setEarnedAch(list.filter((a) => a.earned_at).slice(0, 3));
+      })
+      .catch(() => {
+        if (alive) setEarnedAch([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [user?.id, demo]);
+
   const mine = data?.mine ?? null;
   const pinnedSelf = !!user?.id && PINNED_BELOW_PODIUM.includes(user.id);
   const myLeague = leagueFor(mine?.points ?? 0);
@@ -317,18 +344,35 @@ export default function RankingPage() {
               )}
             </div>
           </div>
-          {/* progresso até próxima liga */}
+          {/* progresso até próxima liga (thresholds reais de LEAGUES) */}
           <div className="relative mt-4">
-            <div className="h-2 overflow-hidden rounded-full bg-card/60">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-brand to-warning"
-                style={{ width: `${Math.min(100, ((mine?.points ?? 0) % 800) / 8)}%` }}
-              />
-            </div>
-            <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground">
-              <span>{leagueFor((mine?.points ?? 0) - 800).label}</span>
-              <span className="font-semibold text-brand">subir com +{800 - ((mine?.points ?? 0) % 800)} pts</span>
-            </div>
+            {(() => {
+              const pts = mine?.points ?? 0;
+              const idx = LEAGUES.findIndex((l) => l.id === myLeague.id);
+              const next = idx >= 0 && idx < LEAGUES.length - 1 ? LEAGUES[idx + 1] : null;
+              const span = next ? next.min - myLeague.min : 1;
+              const pct = next ? Math.max(0, Math.min(100, ((pts - myLeague.min) / span) * 100)) : 100;
+              return (
+                <>
+                  <div className="h-2 overflow-hidden rounded-full bg-card/60">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-brand to-warning"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground">
+                    <span>{myLeague.label}</span>
+                    {next ? (
+                      <span className="font-semibold text-brand">
+                        {formatNumber(Math.max(0, next.min - pts))} pts pra {next.label}
+                      </span>
+                    ) : (
+                      <span className="font-semibold text-brand">liga máxima</span>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
 
@@ -362,7 +406,7 @@ export default function RankingPage() {
         {/* Pódio, top 3 da semana em destaque — 1º central, mais alto */}
         {!loading && !error && data && data.rows.length >= 3 ? (
           <div className="gf-rise rounded-[20px] border border-border bg-card/40 p-4" style={{ animationDelay: "120ms" }}>
-            <p className="gf-section mb-3">Pódio da semana</p>
+            <p className="gf-section mb-3">{PODIUM_TITLE[period]}</p>
             <div className="grid grid-cols-3 items-end gap-2">
               {[1, 0, 2].map((pos) => {
                 const row = data.rows[pos];
@@ -518,26 +562,36 @@ export default function RankingPage() {
               Ver todas <ChevronRight className="h-3 w-3" />
             </Link>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {recentAchievements(3).map((a) => (
-              <div key={a.id} className="flex flex-col items-center gap-1 rounded-xl border border-brand/30 bg-brand-soft/25 px-2 py-3 text-center">
-                <FitnessIcon glyph={fitnessForName(a.name)} size={20} />
-                <span className="text-[9px] leading-tight text-muted-foreground">{a.name}</span>
+          {earnedAch.length > 0 ? (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                {earnedAch.map((a) => (
+                  <div key={a.id} className="flex flex-col items-center gap-1 rounded-xl border border-brand/30 bg-brand-soft/25 px-2 py-3 text-center">
+                    <FitnessIcon glyph={fitnessForName(a.name)} size={20} />
+                    <span className="text-[9px] leading-tight text-muted-foreground">{a.name}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <p className="mt-2 text-[10px] text-muted-foreground">Últimas conquistas · lista completa no seu Perfil</p>
+              <p className="mt-2 text-[10px] text-muted-foreground">Últimas conquistas · lista completa no seu Perfil</p>
+            </>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              Nenhuma conquista ainda. Treine e ganhe check-ins para conquistar as primeiras.
+            </p>
+          )}
         </div>
 
         {/* Ranking numérico — continuação direta do pódio (4º em diante) */}
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h3 className="flex items-center gap-1.5 text-sm font-bold text-foreground">
-              <Trophy className="h-4 w-4 text-brand" /> Ranking da semana
+              <Trophy className="h-4 w-4 text-brand" /> Ranking {periodLabel.toLowerCase()}
             </h3>
-            <Badge variant="outline" className="text-[10px]">
-              reset {formatDate(weekStart.toISOString())}
-            </Badge>
+            {period === "week" ? (
+              <Badge variant="outline" className="text-[10px]">
+                reset {formatDate(weekStart.toISOString())}
+              </Badge>
+            ) : null}
           </div>
           <p className="mb-2 text-[10px] text-muted-foreground">
             4º lugar em diante · todo mundo aparece, mesmo zerado
@@ -642,7 +696,7 @@ export default function RankingPage() {
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-brand-soft">
                 <Flame className="h-3.5 w-3.5 text-brand" />
               </span>
-              <span>Carga movida conta pontos. Suba de liga acumulando entre 800 e 2.600+ pontos.</span>
+              <span>Carga movida conta pontos. Suba de liga em 800, 1.600, 2.600 e 4.000 pontos.</span>
             </div>
             <div className="flex items-start gap-2">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-brand-soft">

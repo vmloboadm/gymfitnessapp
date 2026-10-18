@@ -21,6 +21,7 @@ import {
   Activity,
   Waves,
   ArrowLeft,
+  ZoomIn,
 } from "lucide-react";
 import * as Accordion from "@radix-ui/react-accordion";
 import { useAuth } from "~/hooks/useAuth";
@@ -434,7 +435,7 @@ function InfoSheet({ ex, onClose }: { ex: DemoExercise; onClose: () => void }) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={assetPath(ex.imageUrl ?? "")} alt={`Execução de ${ex.name}`} loading="lazy" decoding="async" className="h-full w-full object-contain" />
-            <span className="absolute bottom-2 right-2 rounded-full bg-black/50 px-2 py-0.5 text-[9px] font-bold text-white">ampliar 🔍</span>
+            <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[9px] font-bold text-white"><ZoomIn className="h-3 w-3" /> ampliar</span>
           </button>
         ) : null}
 
@@ -457,7 +458,7 @@ function InfoSheet({ ex, onClose }: { ex: DemoExercise; onClose: () => void }) {
             onClick={onClose}
             className="gf-touch mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-bold text-brand-foreground shadow-lg shadow-brand/25"
           >
-            <ScanLine className="h-4 w-4" /> Escanear & iniciar neste aparelho
+            <ScanLine className="h-4 w-4" /> Escanear e iniciar neste aparelho
           </Link>
         ) : (
           <Link

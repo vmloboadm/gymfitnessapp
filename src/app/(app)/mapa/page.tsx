@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { MapPin } from "lucide-react";
+import { MapPin, Map as MapIcon } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
-import { SkeletonList } from "~/components/common/AsyncStates";
+import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { cn } from "~/lib/utils";
 
 type MapEq = {
@@ -32,51 +32,68 @@ export default function MapaPage() {
   const { profile } = useAuth();
   const [eqs, setEqs] = useState<MapEq[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("todas");
+
+  const load = useCallback(async (gymId: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const sb = supabaseBrowser();
+      const { data, error: err } = await sb
+        .from("equipment")
+        .select("id, name, category, status, map_position")
+        .eq("gym_id", gymId)
+        .order("name");
+      if (err) throw new Error(err.message);
+      setEqs(((data ?? []) as MapEq[]).filter((e) => e.map_position));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível carregar o mapa.");
+      setEqs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!profile?.gym_id) return;
-    let alive = true;
-    (async () => {
-      try {
-        const sb = supabaseBrowser();
-        const { data } = await sb
-          .from("equipment")
-          .select("id, name, category, status, map_position")
-          .eq("gym_id", profile.gym_id)
-          .order("name");
-        if (alive) setEqs(((data ?? []) as MapEq[]).filter((e) => e.map_position));
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, [profile?.gym_id]);
+    load(profile.gym_id).catch(() => {});
+  }, [profile?.gym_id, load]);
 
   const cats = ["todas", ...Array.from(new Set(eqs.map((e) => e.category)))];
   const shown = filter === "todas" ? eqs : eqs.filter((e) => e.category === filter);
 
   return (
     <>
-      <TopBar title="Mapa do salão" subtitle={`${shown.length} aparelhos`} />
+      <TopBar title="Mapa do salão" subtitle={loading ? "Carregando..." : `${shown.length} aparelhos`} />
       <div className="mx-auto max-w-md space-y-3 p-4 pb-10">
-        <div className="flex flex-wrap gap-1.5">
-          {cats.map((c) => (
-            <button
-              key={c}
-              onClick={() => setFilter(c)}
-              className={cn(
-                "tactile rounded-full px-2.5 py-1 text-[10px] font-black uppercase",
-                filter === c ? "bg-brand text-brand-foreground" : "bg-white/[0.06] text-muted-foreground"
-              )}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
+        {!loading && !error && eqs.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {cats.map((c) => (
+              <button
+                key={c}
+                onClick={() => setFilter(c)}
+                className={cn(
+                  "tactile rounded-full px-2.5 py-1 text-[10px] font-black uppercase",
+                  filter === c ? "bg-brand text-brand-foreground" : "bg-white/[0.06] text-muted-foreground"
+                )}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {loading ? (
           <SkeletonList rows={2} />
+        ) : error ? (
+          <ErrorState message={error} onRetry={() => profile?.gym_id && load(profile.gym_id)} />
+        ) : eqs.length === 0 ? (
+          <EmptyState
+            title="Mapa não configurado para esta academia"
+            description="Ainda não há equipamentos posicionados na planta do salão. Pergunte na recepção ou consulte a lista de equipamentos."
+            icon={MapIcon}
+          />
         ) : (
           <div className="relative overflow-hidden rounded-3xl border border-white/[0.06] bg-white/[0.02]">
             {/* planta: entrada em cima, fundo embaixo */}
@@ -94,12 +111,16 @@ export default function MapaPage() {
                   href={`/maquina/${e.id}`}
                   aria-label={e.name}
                   title={e.name}
-                  className={cn(
-                    "absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-black/40 transition-transform active:scale-150",
-                    STATUS_COLOR[e.status] ?? "bg-white/30"
-                  )}
+                  className="flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center transition-transform active:scale-110"
                   style={{ left: `${e.map_position!.x}%`, top: `${e.map_position!.y}%` }}
-                />
+                >
+                  <span
+                    className={cn(
+                      "h-3 w-3 rounded-full ring-2 ring-black/40",
+                      STATUS_COLOR[e.status] ?? "bg-white/30"
+                    )}
+                  />
+                </Link>
               ))}
             </div>
             <div className="flex items-center justify-center gap-3 border-t border-white/[0.06] py-2 text-[9px] font-bold text-muted-foreground">
@@ -110,10 +131,12 @@ export default function MapaPage() {
           </div>
         )}
 
-        <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
-          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
-          Toque num ponto pra ver os exercícios do aparelho.
-        </p>
+        {eqs.length > 0 ? (
+          <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
+            Toque num ponto pra ver os exercícios do aparelho.
+          </p>
+        ) : null}
       </div>
     </>
   );

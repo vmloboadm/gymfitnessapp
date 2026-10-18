@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldAlert, Flag, Check, Trash2 } from "lucide-react";
+import { ShieldAlert, Trash2 } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -13,6 +13,13 @@ import { toast } from "sonner";
 import type { FeedPosts, Profiles } from "~/lib/types/models";
 
 type PostRow = FeedPosts & { author: Profiles | null; likes: number; comments: number };
+
+const TYPE_LABEL: Record<string, string> = {
+  geral: "Geral",
+  conquista: "Conquista",
+  comunicado: "Comunicado",
+  desafio: "Desafio",
+};
 
 /**
  * Moderação do feed (gestor): visualiza posts recentes, pode remover.
@@ -42,22 +49,27 @@ export default function ModerationPage() {
         if (!aRes.error) authors = (aRes.data ?? []) as Profiles[];
       }
 
+      // Contagens POR POST (group by post_id), não o total da lista
       const postIds = posts.map((p) => p.id);
-      let likesCount = 0;
-      let commentsCount = 0;
+      const likesByPost = new Map<string, number>();
+      const commentsByPost = new Map<string, number>();
       if (postIds.length) {
-        const lRes = await supabase.from("feed_likes").select("id").in("post_id", postIds);
-        const cRes = await supabase.from("feed_comments").select("id").in("post_id", postIds);
-        likesCount = lRes.data?.length ?? 0;
-        commentsCount = cRes.data?.length ?? 0;
+        const lRes = await supabase.from("feed_likes").select("post_id").in("post_id", postIds);
+        const cRes = await supabase.from("feed_comments").select("post_id").in("post_id", postIds);
+        for (const r of (lRes.data ?? []) as Array<{ post_id: string }>) {
+          likesByPost.set(r.post_id, (likesByPost.get(r.post_id) ?? 0) + 1);
+        }
+        for (const r of (cRes.data ?? []) as Array<{ post_id: string }>) {
+          commentsByPost.set(r.post_id, (commentsByPost.get(r.post_id) ?? 0) + 1);
+        }
       }
 
       return {
         data: posts.map((p) => ({
           ...p,
           author: authors.find((a) => a.id === p.author_id) ?? null,
-          likes: likesCount,
-          comments: commentsCount,
+          likes: likesByPost.get(p.id) ?? 0,
+          comments: commentsByPost.get(p.id) ?? 0,
         })),
         error: null,
       };
@@ -66,6 +78,7 @@ export default function ModerationPage() {
   );
 
   const remove = async (postId: string) => {
+    if (!window.confirm("Remover esta publicação do feed? Essa ação não pode ser desfeita.")) return;
     const { error } = await supabaseBrowser().from("feed_posts").delete().eq("id", postId);
     if (error) {
       toast.error("Falha ao remover", { description: error.message });
@@ -111,27 +124,17 @@ export default function ModerationPage() {
                       <span className="ml-1.5 text-[10px] uppercase text-muted-foreground">{p.author?.role}</span>
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      {p.type} · {formatRelative(p.created_at)} · {p.likes} curtidas · {p.comments} comentários
+                      {TYPE_LABEL[p.type] ?? "Geral"} · {formatRelative(p.created_at)} · {p.likes} curtidas · {p.comments} comentários
                     </p>
                   </div>
                   <Badge variant={p.is_pinned ? "default" : "outline"}>{p.is_pinned ? "Fixado" : "Normal"}</Badge>
                 </div>
                 <p className="mt-2 text-sm leading-relaxed text-foreground">{p.body}</p>
-                <div className="mt-3 flex items-center gap-2 border-t border-border/60 pt-3">
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <Flag className="h-3 w-3" />
-                    Conteúdo avaliado
-                  </span>
-                  <div className="ml-auto flex gap-2">
-                    <Button variant="outline" size="sm" className="text-xs" onClick={() => { toast.success("Publicação aprovada"); refetch(); }}>
-                      <Check className="mr-1 h-3.5 w-3.5" />
-                      Aprovar
-                    </Button>
-                    <Button variant="outline" size="sm" className="text-xs text-destructive" onClick={() => remove(p.id)}>
-                      <Trash2 className="mr-1 h-3.5 w-3.5" />
-                      Remover
-                    </Button>
-                  </div>
+                <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+                  <Button variant="outline" size="sm" className="text-xs text-destructive" onClick={() => remove(p.id)}>
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    Remover
+                  </Button>
                 </div>
               </div>
             ))}

@@ -43,10 +43,6 @@ import {
 } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
 
-const _container: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
-};
 const item: Variants = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.2, 0.8, 0.2, 1] } },
@@ -67,18 +63,9 @@ const TONE = {
   },
 } as const;
 
-const WEEKDAY_PATTERN: Record<number, number[]> = {
-  1: [1, 3, 5],
-  2: [2, 4, 6],
-  3: [1, 3, 5],
-  4: [2, 4, 6],
-  5: [1, 3, 5],
-  6: [2, 4, 6],
-  0: [0],
-};
-
-function waHref(phone: string, text: string) {
-  const normalized = normalizeBRPhone(phone) ?? phone.replace(/\D/g, "");
+function waHref(phone: string, text: string): string | null {
+  const normalized = normalizeBRPhone(phone);
+  if (!normalized) return null;
   return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
 }
 
@@ -105,6 +92,9 @@ export default function PersonalDashboardPage() {
   const [sheetStudent, setSheetStudent] = useState<PersonalStudent | null>(null);
   const [queueOpen, setQueueOpen] = useState(false);
   const [tick, setTick] = useState(0);
+  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [studentsError, setStudentsError] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   // reage a TODAS as ações do personal (atribuir treino, aprovar, penalizar)
   useEffect(() => {
@@ -123,8 +113,31 @@ export default function PersonalDashboardPage() {
 
   useEffect(() => {
     if (!gymId) return;
-    getGymStudents(gymId).then(setStudents).catch(() => setStudents([]));
-  }, [gymId, tick]);
+    let alive = true;
+    (async () => {
+      setStudentsLoading(true);
+      setStudentsError(false);
+      try {
+        // Sonda direta: getGymStudents engole erro interno e devolve [],
+        // então testamos a conexão com a tabela antes de confiar na lista.
+        const probe = await supabaseBrowser()
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("gym_id", gymId)
+          .eq("role", "student");
+        if (!alive) return;
+        if (probe.error) throw new Error(probe.error.message);
+        const rows = await getGymStudents(gymId);
+        if (!alive) return;
+        setStudents(rows);
+      } catch {
+        if (alive) { setStudents([]); setStudentsError(true); }
+      } finally {
+        if (alive) setStudentsLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [gymId, tick, reloadToken]);
 
   // Dados reais do dia: presença + prescrições + aprovações
   useEffect(() => {
@@ -185,7 +198,7 @@ export default function PersonalDashboardPage() {
 
   const stats = useMemo(() => {
     return {
-      activeStudents: students.filter((s) => s.lastTrainingDaysAgo != null && s.lastTrainingDaysAgo <= 2).length,
+      activeStudents: students.filter((s) => s.lastTrainingDaysAgo === 0).length,
       totalStudents: students.length,
       prescribedToday: prescribedTodayCount,
       prescribedYesterday: prescribedYesterdayCount,
@@ -217,14 +230,10 @@ export default function PersonalDashboardPage() {
     [stats, approvalsPending, students, tick]
   );
 
-  // Agenda de hoje: quem tem treino pautado no dia da semana
+  // Quem já apareceu hoje (check-ins + sessões de equipamento reais), sem sorteio
   const agenda = useMemo(() => {
-    const dow = new Date().getDay();
-    return students.filter((s) => {
-      if (s.freq >= 5) return dow >= 1 && dow <= 5;
-      return (WEEKDAY_PATTERN[dow] ?? []).includes((s.id.charCodeAt(3) + dow) % 6 || 1);
-    }).slice(0, 4);
-  }, [students, tick]);
+    return students.filter((s) => onlineIds.has(s.id)).slice(0, 8);
+  }, [students, onlineIds]);
 
   const openStudent = (studentId: string) => {
     const s = students.find((x) => x.id === studentId);
@@ -365,7 +374,7 @@ export default function PersonalDashboardPage() {
       })()}
 
       {/* Skeleton do primeiro load (imita o layout real) */}
-      {students.length === 0 ? (
+      {studentsLoading ? (
         <div className="space-y-3" aria-hidden>
           {[0, 1].map((i) => (
             <div key={i} className="h-[104px] animate-pulse rounded-[20px] bg-white/[0.04]" />
@@ -375,6 +384,27 @@ export default function PersonalDashboardPage() {
               <div key={i} className="h-[92px] animate-pulse rounded-2xl bg-white/[0.04]" />
             ))}
           </div>
+        </div>
+      ) : studentsError ? (
+        <div className="rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.06] p-6 text-center">
+          <p className="text-[13px] font-bold text-foreground">Não foi possível carregar os alunos</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Falha de conexão com o servidor. Tente novamente.
+          </p>
+          <button
+            onClick={() => setReloadToken((t) => t + 1)}
+            className="tactile mt-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-2 text-[12px] font-bold text-foreground transition-colors hover:text-brand"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      ) : students.length === 0 ? (
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 text-center">
+          <Users className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+          <p className="text-[13px] font-bold text-foreground">Nenhum aluno na academia ainda</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Quando os alunos se cadastrarem, eles aparecem aqui.
+          </p>
         </div>
       ) : null}
 
@@ -390,7 +420,19 @@ export default function PersonalDashboardPage() {
           </p>
         </div>
 
-        {queue.length === 0 ? (
+        {studentsLoading ? (
+          <div className="space-y-2">
+            {[0, 1].map((i) => (
+              <div key={i} className="h-[52px] animate-pulse rounded-xl bg-white/[0.04]" />
+            ))}
+          </div>
+        ) : studentsError ? (
+          <div className="rounded-2xl border border-[#F87171]/25 bg-[#F87171]/[0.06] p-5 text-center">
+            <CircleAlert className="mx-auto mb-1.5 h-5 w-5 text-[#F87171]" />
+            <p className="text-[12px] font-bold text-foreground">Não foi possível carregar a fila</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">Falha de conexão. Use o botão acima para tentar de novo.</p>
+          </div>
+        ) : queue.length === 0 ? (
           <div className="rounded-2xl border border-[#4ADE80]/25 bg-[#4ADE80]/[0.06] p-5 text-center">
             <TrophyIcon className="mx-auto mb-1.5 h-5 w-5 text-[#4ADE80]" />
             <p className="text-[12px] font-bold text-foreground">Tudo em dia, turma resolvida</p>
@@ -412,12 +454,15 @@ export default function PersonalDashboardPage() {
         )}
 
         {/* resumo do dia no rodapé do card */}
-        <p className="mt-2.5 rounded-xl border border-white/[0.05] bg-white/[0.02] p-2.5 text-[10.5px] leading-snug text-muted-foreground">
-          {briefingLine}
-        </p>
+        {!studentsError && !studentsLoading ? (
+          <p className="mt-2.5 rounded-xl border border-white/[0.05] bg-white/[0.02] p-2.5 text-[10.5px] leading-snug text-muted-foreground">
+            {briefingLine}
+          </p>
+        ) : null}
       </m.section>
 
       {/* Métricas de gestão (count-up) */}
+      {!studentsError && !studentsLoading ? (
       <m.div variants={item} initial="hidden" animate="show" className="grid grid-cols-3 gap-2">
         <Link href="/personal/alunos" className="gf-card gf-glass relative overflow-hidden !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand to-brand/20" aria-hidden />
@@ -485,6 +530,7 @@ export default function PersonalDashboardPage() {
           )}
         </Link>
       </m.div>
+      ) : null}
 
       {/* Pulso da academia (mesmo componente do aluno) */}
       <m.div variants={item} initial="hidden" animate="show">
@@ -493,15 +539,15 @@ export default function PersonalDashboardPage() {
 
       {/* Gráfico de movimento semanal (dado real) */}
       <m.section variants={item} initial="hidden" animate="show">
-        <WeeklyChart days={weeklyReal} students={students} />
+        <WeeklyChart days={weeklyReal} />
       </m.section>
 
-      {/* Agenda de hoje */}
+      {/* Quem já passou por aqui hoje (check-ins reais) */}
       {agenda.length > 0 ? (
         <m.section variants={item} initial="hidden" animate="show" aria-labelledby="agenda-title">
           <h2 id="agenda-title" className="mb-2 flex items-center gap-2 text-sm font-bold text-foreground">
             <CalendarCheck className="h-4 w-4 text-brand" />
-            Agenda de hoje
+            Na academia hoje
           </h2>
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
             {agenda.map((s) => (
@@ -577,17 +623,35 @@ export default function PersonalDashboardPage() {
                       <span className="block text-[10px] text-[#F87171]">há {s.lastTrainingDaysAgo} dias sem treinar</span>
                     </span>
                   </button>
-                  {s.phone ? (
-                    <a
-                      href={waHref(s.phone, `Oi ${s.name.split(" ")[0]}! Sentindo sua falta na academia. Bora voltar aos treinos?`)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Chamar ${s.name.split(" ")[0]} no WhatsApp`}
-                      className="tactile flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#4ADE80]/30 bg-[#4ADE80]/10 text-[#4ADE80]"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                    </a>
-                  ) : null}
+                  {(() => {
+                    const href =
+                      s.whatsapp_consent && s.phone
+                        ? waHref(s.phone, `Oi ${s.name.split(" ")[0]}! Sentindo sua falta na academia. Bora voltar aos treinos?`)
+                        : null;
+                    return href ? (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Chamar ${s.name.split(" ")[0]} no WhatsApp`}
+                        className="tactile flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#4ADE80]/30 bg-[#4ADE80]/10 text-[#4ADE80]"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </a>
+                    ) : (
+                      <span
+                        aria-hidden
+                        title={
+                          !s.whatsapp_consent
+                            ? "Aluno não liberou contato no WhatsApp"
+                            : "Sem telefone válido cadastrado"
+                        }
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] text-muted-foreground opacity-50"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </span>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -657,30 +721,10 @@ const rowItem: Variants = {
 };
 
 /** Mini-gráfico de barras: check-ins + treinos concluídos por dia (últimos 7 dias). */
-function WeeklyChart({ days, students }: { days: { label: string; count: number; isToday: boolean }[]; students: PersonalStudent[] }) {
-  const { data, estimated } = useMemo(() => {
-    // Dado real carregado (mesmo zerado): mostra a verdade, sem estimativa.
-    if (days.length === 7) return { data: days, estimated: false };
-    // Primeiro load sem dado: estimativa temporária pelo padrão de atividade.
-    const result: { label: string; count: number; isToday: boolean }[] = [];
-    const today = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-      const isToday = i === 0;
-      const activeOnDay = students.filter((s) => {
-        const dow = d.getDay();
-        if (s.freq >= 5) return dow >= 1 && dow <= 5;
-        if (s.freq >= 3) return [1, 3, 5].includes(dow);
-        return dow === 1 || dow === 4;
-      }).length;
-      result.push({ label: dayNames[d.getDay()], count: activeOnDay, isToday });
-    }
-    return { data: result, estimated: true };
-  }, [days, students]);
+function WeeklyChart({ days }: { days: { label: string; count: number; isToday: boolean }[] }) {
+  const ready = days.length === 7;
+  const data = ready ? days : [];
   const total = data.reduce((a, d) => a + d.count, 0);
-
   const maxCount = Math.max(1, ...data.map((d) => d.count));
 
   return (
@@ -690,36 +734,47 @@ function WeeklyChart({ days, students }: { days: { label: string; count: number;
         <p className="text-[11px] font-bold text-foreground">Movimento da semana</p>
         <p className="text-[9px] text-muted-foreground">check-ins + treinos/dia</p>
       </div>
-      <div className="flex items-end gap-1.5" style={{ height: 64 }}>
-        {data.map((d, i) => (
-          <div key={i} className="flex flex-1 flex-col items-center gap-1">
-            <span className={cn("text-[8px] font-bold", d.isToday ? "text-brand" : "text-muted-foreground")}>{d.count}</span>
-            <div className="w-full overflow-hidden rounded-t-md" style={{ height: 44 }}>
-              <div
-                className={cn(
-                  "w-full rounded-t-md transition-all duration-500",
-                  d.isToday
-                    ? "bg-gradient-to-t from-brand-dark to-brand shadow-[0_0_12px_rgba(244,113,30,0.45)]"
-                    : "bg-white/10"
-                )}
-                style={{
-                  height: `${(d.count / maxCount) * 100}%`,
-                  minHeight: d.count > 0 ? 4 : 0,
-                }}
-              />
+      {!ready ? (
+        <div className="flex items-end gap-1.5" style={{ height: 64 }} aria-hidden>
+          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="flex flex-1 flex-col items-center gap-1">
+              <div className="w-full animate-pulse overflow-hidden rounded-t-md bg-white/[0.05]" style={{ height: 44 }} />
+              <span className="h-2 w-4 rounded bg-white/[0.05]" />
             </div>
-            <span
-              className={cn(
-                "text-[8px] font-bold",
-                d.isToday ? "text-brand" : "text-muted-foreground/60"
-              )}
-            >
-              {d.label}
-            </span>
-          </div>
-        ))}
-      </div>
-      {!estimated && total === 0 ? (
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-end gap-1.5" style={{ height: 64 }}>
+          {data.map((d, i) => (
+            <div key={i} className="flex flex-1 flex-col items-center gap-1">
+              <span className={cn("text-[8px] font-bold", d.isToday ? "text-brand" : "text-muted-foreground")}>{d.count}</span>
+              <div className="w-full overflow-hidden rounded-t-md" style={{ height: 44 }}>
+                <div
+                  className={cn(
+                    "w-full rounded-t-md transition-all duration-500",
+                    d.isToday
+                      ? "bg-gradient-to-t from-brand-dark to-brand shadow-[0_0_12px_rgba(244,113,30,0.45)]"
+                      : "bg-white/10"
+                  )}
+                  style={{
+                    height: `${(d.count / maxCount) * 100}%`,
+                    minHeight: d.count > 0 ? 4 : 0,
+                  }}
+                />
+              </div>
+              <span
+                className={cn(
+                  "text-[8px] font-bold",
+                  d.isToday ? "text-brand" : "text-muted-foreground/60"
+                )}
+              >
+                {d.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {ready && total === 0 ? (
         <p className="mt-2 text-center text-[10px] text-muted-foreground">
           Sem movimento registrado ainda. Check-ins e treinos concluídos aparecem aqui.
         </p>
@@ -769,15 +824,28 @@ function QueueRow({
 
       <div className="mt-2.5">
         {queueItem.action.kind === "whatsapp" ? (
-          <a
-            href={waHref(queueItem.action.phone, queueItem.action.text)}
-            target="_blank"
-            rel="noreferrer"
-            className="tactile inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#25D366]/15 px-3 text-[10.5px] font-bold text-[#4ADE80] ring-1 ring-[#25D366]/30 transition-transform active:scale-[0.96]"
-          >
-            <MessageCircle className="h-3 w-3" />
-            {queueItem.action.label}
-          </a>
+          (() => {
+            const href = waHref(queueItem.action.phone, queueItem.action.text);
+            return href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="tactile inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#25D366]/15 px-3 text-[10.5px] font-bold text-[#4ADE80] ring-1 ring-[#25D366]/30 transition-transform active:scale-[0.96]"
+              >
+                <MessageCircle className="h-3 w-3" />
+                {queueItem.action.label}
+              </a>
+            ) : (
+              <span
+                title="Sem telefone válido cadastrado"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/[0.05] px-3 text-[10.5px] font-bold text-muted-foreground ring-1 ring-white/[0.08] opacity-60"
+              >
+                <MessageCircle className="h-3 w-3" />
+                Sem telefone
+              </span>
+            );
+          })()
         ) : queueItem.action.kind === "link" ? (
           <Link
             href={queueItem.action.href}

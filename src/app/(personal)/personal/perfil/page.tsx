@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { useAuth } from "~/hooks/useAuth";
 import { studentStatus, type PersonalStudent } from "~/lib/personal-data";
-import { listAssignedWorkouts, streakOverride } from "~/lib/trainer-store";
+import { streakOverride } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
 import { hasRole } from "~/lib/utils/roles";
 import { ImageCropModal } from "~/components/common/ImageCropModal";
@@ -55,6 +55,7 @@ export default function PersonalPerfilPage() {
     if (profile?.bio) setBio((prev) => prev || profile.bio!);
   }, [profile?.bio]);
   const [editingBio, setEditingBio] = useState(false);
+  const [savingBio, setSavingBio] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
@@ -63,28 +64,37 @@ export default function PersonalPerfilPage() {
   const [pw2, setPw2] = useState("");
   const [savingPw, setSavingPw] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [assigned, setAssigned] = useState<Awaited<ReturnType<typeof listAssignedWorkouts>>>([]);
-
-  useEffect(() => {
-    setAssigned(listAssignedWorkouts());
-    const bump = () => setAssigned(listAssignedWorkouts());
-    window.addEventListener("gymfit-trainer-workouts", bump);
-    return () => window.removeEventListener("gymfit-trainer-workouts", bump);
-  }, []);
 
   // Alunos REAIS da academia (getGymStudents cobre demo internamente)
+  const [studentsError, setStudentsError] = useState(false);
+  const [studentsReload, setStudentsReload] = useState(0);
   useEffect(() => {
     if (!profile?.gym_id) return;
     let alive = true;
-    getGymStudents(profile.gym_id)
-      .then((rows) => { if (alive) setStudents(rows); })
-      .catch(() => {});
+    (async () => {
+      setStudentsError(false);
+      try {
+        // Sonda direta: getGymStudents engole erro interno e devolve [],
+        // então testamos a conexão antes de confiar na lista vazia.
+        const probe = await supabaseBrowser()
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("gym_id", profile.gym_id)
+          .eq("role", "student");
+        if (probe.error) throw new Error(probe.error.message);
+        const rows = await getGymStudents(profile.gym_id);
+        if (alive) setStudents(rows);
+      } catch {
+        if (alive) { setStudents([]); setStudentsError(true); }
+      }
+    })();
     return () => { alive = false; };
-  }, [profile?.gym_id]);
+  }, [profile?.gym_id, studentsReload]);
 
   // Equipe REAL: staff do gym + check-ins de hoje (sem mock)
   const [staff, setStaff] = useState<Array<{ id: string; name: string; role: string; avatar: string | null }>>([]);
   const [todayCount, setTodayCount] = useState<number | null>(null);
+  const [monthAssigned, setMonthAssigned] = useState<number | null>(null);
   const [week, setWeek] = useState<{
     trainings: number;
     trainingsToday: number;
@@ -109,7 +119,10 @@ export default function PersonalPerfilPage() {
           d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
           return d.toISOString().slice(0, 10);
         })();
-        const [stRes, ckRes, logsRes, cardioRes, swRes, profRes, lbRes] = await Promise.all([
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const [stRes, ckRes, logsRes, cardioRes, swRes, profRes, lbRes, maRes] = await Promise.all([
           sb.from("profiles").select("id, name, role, avatar_url").eq("gym_id", profile.gym_id).in("role", ["trainer", "manager", "admin"]).order("name"),
           sb.from("checkins").select("id").eq("gym_id", profile.gym_id).gte("checked_at", today),
           sb.from("workout_logs").select("student_id, date").eq("gym_id", profile.gym_id).gte("date", weekAgo).limit(2000),
@@ -117,8 +130,10 @@ export default function PersonalPerfilPage() {
           sb.from("student_workouts").select("student_id").eq("gym_id", profile.gym_id).eq("status", "active").limit(500),
           sb.from("profiles").select("id, approved_at, created_at").eq("gym_id", profile.gym_id).eq("role", "student"),
           sb.from("leaderboard").select("streak").eq("gym_id", profile.gym_id).eq("period", "week").eq("week_start", monday).eq("rank_type", "load").limit(100),
+          sb.from("student_workouts").select("id", { count: "exact", head: true }).eq("gym_id", profile.gym_id).gte("assigned_at", monthStart.toISOString()),
         ]);
         if (!alive) return;
+        setMonthAssigned(maRes.count ?? 0);
         setStaff(((stRes.data ?? []) as Array<{ id: string; name: string; role: string; avatar_url: string | null }>).map((s) => ({
           id: s.id, name: s.name, role: s.role, avatar: s.avatar_url,
         })));
@@ -270,14 +285,14 @@ export default function PersonalPerfilPage() {
     }
   };
 
-  const monthKey = new Date().getMonth();
-  const monthWorkouts = assigned.filter((w) => new Date(w.created_at).getMonth() === monthKey).length;
   const activeCount = students.filter((s) => s.lastTrainingDaysAgo != null && s.lastTrainingDaysAgo <= 2).length;
-  const retention = Math.round((activeCount / students.length) * 100);
+  const retention = students.length > 0 ? Math.round((activeCount / students.length) * 100) : null;
   const avgStreak =
-    Math.round(
-      students.reduce((acc, s) => acc + (streakOverride(s.id) ?? s.streak), 0) / students.length
-    ) || 0;
+    students.length > 0
+      ? Math.round(
+          students.reduce((acc, s) => acc + (streakOverride(s.id) ?? s.streak), 0) / students.length
+        ) || 0
+      : null;
 
   return (
     <div className="space-y-5">
@@ -319,11 +334,8 @@ export default function PersonalPerfilPage() {
                   <Crown className="h-3 w-3" /> Gestor & Personal Trainer
                 </span>
               ) : (
-                "Personal Trainer · CREF 000000 G/SP"
+                "Personal Trainer"
               )}
-            </p>
-            <p className="mt-0.5 inline-flex rounded-full bg-brand/15 px-2 py-0.5 text-[9.5px] font-bold text-brand">
-              Especialidade: Hipertrofia e Recomposição
             </p>
           </div>
         </div>
@@ -344,18 +356,26 @@ export default function PersonalPerfilPage() {
               />
               <button
                 onClick={async () => {
-                  setEditingBio(false);
+                  if (savingBio) return;
+                  setSavingBio(true);
                   try {
-                    await supabaseBrowser().rpc("update_profile_own", { p_bio: bio.trim() || null });
+                    const { error } = await supabaseBrowser().rpc("update_profile_own", { p_bio: bio.trim() || null });
+                    if (error) throw new Error(error.message);
+                    setEditingBio(false);
                     toast.success("Bio atualizada");
-                  } catch {
-                    toast.error("Não deu para salvar a bio agora");
+                  } catch (e) {
+                    toast.error("Não deu para salvar a bio agora", {
+                      description: String(e instanceof Error ? e.message : e).slice(0, 80),
+                    });
+                  } finally {
+                    setSavingBio(false);
                   }
                 }}
+                disabled={savingBio}
                 aria-label="Salvar bio"
-                className="tactile flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-xl bg-brand text-brand-foreground transition-transform active:scale-[0.96]"
+                className="tactile flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-xl bg-brand text-brand-foreground transition-transform active:scale-[0.96] disabled:opacity-60"
               >
-                <Check className="h-4 w-4" />
+                {savingBio ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               </button>
             </div>
           ) : (
@@ -391,6 +411,7 @@ export default function PersonalPerfilPage() {
       {/* Sair da conta */}
       <button
         onClick={async () => {
+          if (!window.confirm("Sair da conta? Dados salvos neste dispositivo (como treinos em rascunho) serão apagados.")) return;
           const { error } = await supabaseBrowser().auth.signOut();
           if (error) {
             toast.error("Não deu sair agora. Tente novamente.");
@@ -474,6 +495,22 @@ export default function PersonalPerfilPage() {
       </div>
 
       {tab === "alunos" ? (
+        studentsError ? (
+          <div className="rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.06] p-6 text-center">
+            <p className="text-[13px] font-bold text-foreground">Não foi possível carregar os alunos</p>
+            <button
+              onClick={() => setStudentsReload((t) => t + 1)}
+              className="tactile mt-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-2 text-[12px] font-bold text-foreground transition-colors hover:text-brand"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : students.length === 0 ? (
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 text-center">
+            <Users className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+            <p className="text-[13px] font-bold text-foreground">Nenhum aluno na academia ainda</p>
+          </div>
+        ) : (
         <div className="grid grid-cols-3 gap-2.5">
           {students.map((s) => {
             const st = studentStatus(s);
@@ -502,6 +539,7 @@ export default function PersonalPerfilPage() {
             );
           })}
         </div>
+        )
       ) : tab === "equipe" && hasRole(profile?.role, "manager") ? (
         /* aba Equipe (gestor) — staff real do gym + contagens reais */
         <div className="space-y-3">
@@ -662,26 +700,34 @@ export default function PersonalPerfilPage() {
               <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
                 <ClipboardList className="h-4 w-4 text-brand" />
               </span>
-              <p className="mt-2 font-display text-2xl font-black text-foreground">{monthWorkouts}</p>
+              <p className="mt-2 font-display text-2xl font-black text-foreground">
+                {monthAssigned === null ? "–" : monthAssigned}
+              </p>
               <p className="text-[10px] font-semibold text-muted-foreground">Treinos prescritos no mês</p>
             </div>
             <div className="gf-card gf-glass !rounded-2xl !p-4">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#4ADE80]/25 bg-[#4ADE80]/10">
                 <TrendingUp className="h-4 w-4 text-[#4ADE80]" />
               </span>
-              <p className="mt-2 font-display text-2xl font-black text-foreground">{retention}%</p>
+              <p className="mt-2 font-display text-2xl font-black text-foreground">
+                {retention === null ? "–" : `${retention}%`}
+              </p>
               <p className="text-[10px] font-semibold text-muted-foreground">
-                Taxa de retenção ({activeCount}/{students.length} ativos)
+                {retention === null
+                  ? studentsError
+                    ? "Taxa de retenção (sem dados)"
+                    : "Taxa de retenção (sem alunos)"
+                  : `Taxa de retenção (${activeCount}/${students.length} ativos)`}
               </p>
             </div>
           </div>
           <div className="gf-card gf-glass !rounded-2xl !p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Streak médio da turma</p>
-            <p className="mt-1 font-display text-xl font-black text-foreground">{avgStreak} dias</p>
+            <p className="mt-1 font-display text-xl font-black text-foreground">{avgStreak === null ? "–" : `${avgStreak} dias`}</p>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.06]">
               <m.div
                 initial={{ scaleX: 0 }}
-                animate={{ scaleX: Math.min(1, avgStreak / 10) }}
+                animate={{ scaleX: Math.min(1, (avgStreak ?? 0) / 10) }}
                 transition={{ duration: 0.9, ease: [0.2, 0.8, 0.2, 1] }}
                 className="h-full w-full origin-left rounded-full bg-gradient-to-r from-brand to-[#FF8A3C]"
               />

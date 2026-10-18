@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bell, CheckCheck, Inbox, Flame, Trophy, Award, Megaphone, Target } from "lucide-react";
+import Link from "next/link";
+import { Bell, CheckCheck, Inbox, Flame, Trophy, Award, Megaphone, Target, ChevronRight } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
 import { TopBar } from "~/components/layout/TopBar";
@@ -29,6 +30,27 @@ const KIND_ICON = {
   aviso: Megaphone,
   meta: Target,
 } as const;
+
+const KIND_LINK: Record<string, string> = {
+  streak: "/progresso",
+  desafio: "/ranking",
+  conquista: "/conquistas",
+  aviso: "/treino",
+  meta: "/progresso",
+};
+
+/** Deep link por conteúdo quando o registro não tem kind estruturado. */
+function linkFor(n: NotifItem): string {
+  if (n.kind && n.kind in KIND_LINK) return KIND_LINK[n.kind]!;
+  const t = `${n.title} ${n.body}`.toLowerCase();
+  if (t.includes("coment") || t.includes("curti") || t.includes("feed") || t.includes("publica")) return "/feed";
+  if (t.includes("conquista")) return "/conquistas";
+  if (t.includes("desafio") || t.includes("ranking") || t.includes("liga")) return "/ranking";
+  if (t.includes("treino") || t.includes("ajuste") || t.includes("carga") || t.includes("série") || t.includes("serie")) return "/treino";
+  if (t.includes("aprova") || t.includes("matr") || t.includes("plano") || t.includes("pagamento")) return "/";
+  if (t.includes("check") || t.includes("sequ") || t.includes("meta") || t.includes("const") || t.includes("frequ")) return "/progresso";
+  return "/";
+}
 
 const DEMO_NOTIFS: NotifItem[] = [
   {
@@ -102,14 +124,19 @@ export default function NotificacoesPage() {
   const loadError = demo ? null : hook.error;
   const unread = demo ? items.filter((n) => !(n.read_at || demoReads[n.id])).length : hook.unread;
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
     navigator.vibrate?.(30);
     if (demo) {
       setDemoReads(Object.fromEntries(DEMO_NOTIFS.map((n) => [n.id, true])));
       toast.success("Tudo marcado como lido");
       return;
     }
-    hook.markAllRead();
+    try {
+      await hook.markAllRead();
+      toast.success("Tudo marcado como lido");
+    } catch {
+      toast.error("Não foi possível marcar todas como lidas. Tente de novo.");
+    }
   };
 
   return (
@@ -139,10 +166,11 @@ export default function NotificacoesPage() {
               const isRead = !!n.read_at || !!demoReads[n.id];
               const KindIcon = n.kind && n.kind in KIND_ICON ? KIND_ICON[n.kind as keyof typeof KIND_ICON] : Bell;
               return (
-                <div
+                <Link
                   key={n.id}
+                  href={linkFor(n)}
                   className={cn(
-                    "gf-rise flex items-start gap-3 rounded-xl border bg-card/40 p-4",
+                    "gf-rise flex items-start gap-3 rounded-xl border bg-card/40 p-4 transition-colors hover:border-brand/40",
                     isRead ? "border-border" : "border-brand/40 bg-brand/5"
                   )}
                   style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}
@@ -163,7 +191,8 @@ export default function NotificacoesPage() {
                     <p className="text-xs leading-relaxed text-muted-foreground">{n.body}</p>
                     <p className="text-[11px] text-muted-foreground">{formatRelative(n.created_at)}</p>
                   </div>
-                </div>
+                  <ChevronRight className="mt-2 h-3.5 w-3.5 shrink-0 text-muted-foreground/50" aria-hidden />
+                </Link>
               );
             })}
           </div>

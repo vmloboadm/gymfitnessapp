@@ -16,14 +16,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { useAuth } from "~/hooks/useAuth";
 import { getGymStudents, getRankingRows, saveAdjustment } from "~/lib/gym-api";
+import { supabaseBrowser } from "~/lib/supabase/client";
 import type { PersonalStudent } from "~/lib/personal-data";
 import type { PointAdjustment } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
 
-const container: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
-};
 const row: Variants = {
   hidden: { opacity: 0, y: 18 },
   show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] } },
@@ -50,6 +47,8 @@ export default function PersonalRankingPage() {
   const [rows, setRows] = useState<RankRow[]>([]);
   const [menuFor, setMenuFor] = useState<RankRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [tick, setTick] = useState(0);
 
   const gymId = profile?.gym_id ?? "";
@@ -59,14 +58,23 @@ export default function PersonalRankingPage() {
     let alive = true;
     (async () => {
       try {
+        // Sonda direta: getGymStudents engole erro interno, então testamos a
+        // conexão antes de confiar que [] significa turma vazia.
+        const probe = await supabaseBrowser()
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("gym_id", gymId)
+          .eq("role", "student");
+        if (probe.error) throw new Error(probe.error.message);
         const st = await getGymStudents(gymId);
         if (!alive) return;
         setStudents(st);
         const r = await getRankingRows(gymId, st);
         if (!alive) return;
         setRows(r);
+        setLoadError(false);
       } catch {
-        if (alive) setRows([]);
+        if (alive) { setRows([]); setLoadError(true); }
       } finally {
         if (alive) setLoading(false);
       }
@@ -82,10 +90,19 @@ export default function PersonalRankingPage() {
   );
 
   const act = async (r: RankRow, action: "validacao" | "bonus" | "penalidade") => {
-    if (!profile || !user) return;
+    if (!profile || !user || busy) return;
     const student = students.find((s) => s.id === r.studentId);
     if (!student) return;
     const name = r.name.split(" ")[0];
+    if (
+      action === "penalidade" &&
+      !window.confirm(
+        `Zerar o streak de ${name}? Essa ação fica registrada no histórico de ajustes e não pode ser desfeita aqui.`
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
     try {
       if (action === "validacao") {
         await saveAdjustment({
@@ -122,6 +139,8 @@ export default function PersonalRankingPage() {
       setTick((t) => t + 1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao aplicar. Tente novamente.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -145,6 +164,17 @@ export default function PersonalRankingPage() {
             <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/[0.04]" />
           ))}
         </div>
+      ) : loadError ? (
+        <div className="rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.06] p-6 text-center">
+          <p className="text-[13px] font-bold text-foreground">Não foi possível carregar o ranking</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Falha de conexão com o servidor.</p>
+          <button
+            onClick={() => { setLoading(true); setTick((t) => t + 1); }}
+            className="tactile mt-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-2 text-[12px] font-bold text-foreground transition-colors hover:text-brand"
+          >
+            Tentar novamente
+          </button>
+        </div>
       ) : rows.length === 0 ? (
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-8 text-center">
           <Trophy className="mx-auto mb-2 h-7 w-7 text-muted-foreground" />
@@ -154,7 +184,12 @@ export default function PersonalRankingPage() {
           </p>
         </div>
       ) : (
-        <m.ul variants={container} initial="hidden" animate="show" className="space-y-2">
+        <m.ul
+          variants={{ hidden: {}, show: { transition: { staggerChildren: Math.min(0.06, 0.4 / Math.max(1, rows.length)), delayChildren: 0.04 } } }}
+          initial="hidden"
+          animate="show"
+          className="space-y-2"
+        >
           {rows.map((r, i) => {
             const final = r.basePoints + r.adjustments.reduce((x, a) => x + a.points, 0);
             const bonus = final - r.basePoints;
@@ -241,7 +276,8 @@ export default function PersonalRankingPage() {
             <div className="space-y-2">
               <button
                 onClick={() => act(menuFor, "validacao")}
-                className="tactile flex w-full items-center gap-3 rounded-2xl border border-[#4ADE80]/25 bg-[#4ADE80]/[0.08] p-3.5 text-left transition-transform active:scale-[0.98]"
+                disabled={busy}
+                className="tactile flex w-full items-center gap-3 rounded-2xl border border-[#4ADE80]/25 bg-[#4ADE80]/[0.08] p-3.5 text-left transition-transform active:scale-[0.98] disabled:opacity-50"
               >
                 <BadgeCheck className="h-5 w-5 text-[#4ADE80]" />
                 <span className="flex-1">
@@ -253,7 +289,8 @@ export default function PersonalRankingPage() {
               </button>
               <button
                 onClick={() => act(menuFor, "bonus")}
-                className="tactile flex w-full items-center gap-3 rounded-2xl border border-brand/25 bg-brand/[0.08] p-3.5 text-left transition-transform active:scale-[0.98]"
+                disabled={busy}
+                className="tactile flex w-full items-center gap-3 rounded-2xl border border-brand/25 bg-brand/[0.08] p-3.5 text-left transition-transform active:scale-[0.98] disabled:opacity-50"
               >
                 <Sparkles className="h-5 w-5 text-brand" />
                 <span className="flex-1">
@@ -265,7 +302,8 @@ export default function PersonalRankingPage() {
               </button>
               <button
                 onClick={() => act(menuFor, "penalidade")}
-                className="tactile flex w-full items-center gap-3 rounded-2xl border border-[#F87171]/25 bg-[#F87171]/[0.08] p-3.5 text-left transition-transform active:scale-[0.98]"
+                disabled={busy}
+                className="tactile flex w-full items-center gap-3 rounded-2xl border border-[#F87171]/25 bg-[#F87171]/[0.08] p-3.5 text-left transition-transform active:scale-[0.98] disabled:opacity-50"
               >
                 <Flame className="h-5 w-5 text-[#F87171]" />
                 <span className="flex-1">

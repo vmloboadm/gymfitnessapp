@@ -81,7 +81,7 @@ async function fetchRealStudents(gymId: string): Promise<PersonalStudent[]> {
       name: p.name,
       avatar: p.avatar_url ?? null,
       phone: p.phone,
-      whatsapp_consent: p.whatsapp_consent ?? true,
+      whatsapp_consent: p.whatsapp_consent ?? false,
       lastTrainingDaysAgo: last ? daysAgo(last) : null,
       streak,
       activeWorkout: active ? progNames.get(active.program_id) ?? null : null,
@@ -148,13 +148,43 @@ async function assignReal(
 
   const programId = (prog as { id: string }).id;
 
-  // resolve ids reais dos exercícios pelo nome (biblioteca global + do gym)
-  const { data: exRows } = await sb.from("exercises").select("id, name").or(`gym_id.is.null,gym_id.eq.${gymId}`);
-  const exList = (exRows ?? []) as Array<{ id: string; name: string }>;
-  const byName = new Map<string, string>(exList.map((e) => [e.name.toLowerCase(), e.id]));
-  // fallback: tabela pode estar vazia — usa um exercício existente como placeholder (nome real fica no notes)
-  const placeholder = exList[0]?.id ?? null;
+  const rollback = async (): Promise<boolean> => {
+    const daysRes = await sb.from("workout_days").delete().eq("program_id", programId);
+    const progRes = await sb.from("workout_programs").delete().eq("id", programId);
+    return !daysRes.error && !progRes.error;
+  };
+  const orphanNote = (base: string, ok: boolean): Error =>
+    new Error(ok ? base : `${base} (não foi possível desfazer o plano criado; pode ter ficado registro órfão)`);
 
+  // resolve ids reais dos exercícios pelo nome (biblioteca global + do gym)
+  const { data: exRows, error: exLibErr } = await sb.from("exercises").select("id, name").or(`gym_id.is.null,gym_id.eq.${gymId}`);
+  if (exLibErr) throw orphanNote("Falha ao carregar a biblioteca de exercícios: " + exLibErr.message, await rollback());
+  const exList = (exRows ?? []) as Array<{ id: string; name: string }>;
+  const normalize = (s: string): string =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  const normEntries = exList.map((e) => ({ norm: normalize(e.name), id: e.id }));
+  const byExact = new Map<string, string>();
+  for (const e of normEntries) if (!byExact.has(e.norm)) byExact.set(e.norm, e.id);
+  const resolveExerciseId = (original: string): string | null => {
+    const norm = normalize(original);
+    if (!norm) return null;
+    const exact = byExact.get(norm);
+    if (exact) return exact;
+    const prefixed = normEntries.filter((e) => e.norm.startsWith(norm + " ") || norm.startsWith(e.norm + " "));
+    if (prefixed.length === 1) return prefixed[0].id;
+    const firstWord = norm.split(" ")[0];
+    const byWord = normEntries.filter((e) => e.norm === firstWord || e.norm.startsWith(firstWord + " "));
+    if (byWord.length === 1) return byWord[0].id;
+    return null;
+  };
+
+  const dayFailures: string[] = [];
   for (let di = 0; di < plan.dias.length; di++) {
     const day = plan.dias[di];
     const { data: dayRow, error: dayErr } = await sb
@@ -162,24 +192,45 @@ async function assignReal(
       .insert(({ gym_id: gymId, program_id: programId, name: day.nome, day_order: di + 1 } as never))
       .select("id")
       .single();
-    if (dayErr || !dayRow) continue;
+    if (dayErr || !dayRow) {
+      dayFailures.push(dayErr ? `${day.nome}: ${dayErr.message}` : day.nome);
+      continue;
+    }
     const dayId = (dayRow as { id: string }).id;
 
-    const rows = day.exercicios.map((e, i) => ({
-      gym_id: gymId,
-      day_id: dayId,
-      exercise_id: byName.get(e.exercicio.toLowerCase()) ?? byName.get(e.exercicio.toLowerCase().split(" ")[0]) ?? placeholder,
-      sets: e.series,
-      reps: e.reps,
-      rest_seconds: parseInt(e.descanso) || 60,
-      rpe: e.rpe,
-      notes: `${e.exercicio}${e.dica ? `. ${e.dica}` : ""}`,
-      ord: i + 1,
-    }));
+    const rows: Array<Record<string, unknown>> = [];
+    let missing: string | null = null;
+    for (let i = 0; i < day.exercicios.length; i++) {
+      const e = day.exercicios[i];
+      const exerciseId = resolveExerciseId(e.exercicio);
+      if (!exerciseId) {
+        missing = e.exercicio;
+        break;
+      }
+      rows.push({
+        gym_id: gymId,
+        day_id: dayId,
+        exercise_id: exerciseId,
+        sets: e.series,
+        reps: e.reps,
+        rest_seconds: parseInt(e.descanso) || 60,
+        rpe: e.rpe,
+        notes: `${e.exercicio}${e.dica ? `. ${e.dica}` : ""}`,
+        ord: i + 1,
+      });
+    }
+    if (missing !== null) {
+      throw orphanNote(`Exercício não encontrado: "${missing}"`, await rollback());
+    }
     if (rows.length) {
       const { error: wexErr } = await sb.from("workout_exercises").insert(rows as never);
-      if (wexErr) throw new Error("exercicios do plano: " + wexErr.message);
+      if (wexErr) {
+        throw orphanNote(`Falha ao salvar os exercícios do dia "${day.nome}": ${wexErr.message}`, await rollback());
+      }
     }
+  }
+  if (dayFailures.length) {
+    throw orphanNote(`Falha ao criar dias do treino: ${dayFailures.join("; ")}`, await rollback());
   }
 
   const { data: swRow, error: swErr } = await sb.from("student_workouts").insert(({
@@ -188,13 +239,18 @@ async function assignReal(
     program_id: programId,
     status: "active",
   } as never)).select("id").single();
-  if (swErr || !swRow) throw new Error(swErr?.message ?? "falha ao atribuir");
+  if (swErr || !swRow) {
+    throw orphanNote(`Falha ao atribuir o plano ao aluno: ${swErr?.message ?? "sem registro"}`, await rollback());
+  }
   // um plano ativo por aluno: aposenta os anteriores (vira histórico)
-  await sb.from("student_workouts")
+  const { error: retireErr } = await sb.from("student_workouts")
     .update({ status: "completed", completed_at: new Date().toISOString() } as never)
     .eq("student_id", student.id)
     .eq("status", "active")
     .neq("id", (swRow as { id: string }).id);
+  if (retireErr) {
+    throw new Error(`Plano salvo, mas falhou ao aposentar os treinos ativos anteriores de ${student.name}: ${retireErr.message}`);
+  }
   return programId;
 }
 
@@ -229,10 +285,11 @@ export async function approvePlan(opts: {
 export async function completeStudentWorkout(workoutId: string): Promise<void> {
   if (isDemoMode()) return;
   const sb = supabaseBrowser();
-  await sb
+  const { error } = await sb
     .from("student_workouts")
     .update({ status: "completed", completed_at: new Date().toISOString() } as never)
     .eq("id", workoutId);
+  if (error) throw new Error(`Falha ao concluir o treino: ${error.message}`);
 }
 
 /**
@@ -257,6 +314,16 @@ export async function assignExistingPlan(opts: {
   const failed: string[] = [];
   let ok = 0;
   for (const t of opts.targets) {
+    const firstName = t.name.split(" ")[0];
+    // um plano ativo por aluno: aposenta os anteriores ANTES de inserir o novo
+    const { error: retireErr } = await sb.from("student_workouts")
+      .update({ status: "completed", completed_at: new Date().toISOString() } as never)
+      .eq("student_id", t.id)
+      .eq("status", "active");
+    if (retireErr) {
+      failed.push(firstName);
+      continue;
+    }
     const { data: swRow, error } = await sb.from("student_workouts").insert({
       gym_id: opts.gymId,
       student_id: t.id,
@@ -264,16 +331,10 @@ export async function assignExistingPlan(opts: {
       status: "active",
     } as never).select("id").single();
     if (error || !swRow) {
-      failed.push(t.name.split(" ")[0]);
+      failed.push(firstName);
       continue;
     }
     ok++;
-    // um plano ativo por aluno: aposenta os anteriores
-    await sb.from("student_workouts")
-      .update({ status: "completed", completed_at: new Date().toISOString() } as never)
-      .eq("student_id", t.id)
-      .eq("status", "active")
-      .neq("id", (swRow as { id: string }).id);
   }
   return { ok, failed };
 }
@@ -521,13 +582,14 @@ export async function submitRequest(opts: {
   }
   const sb = supabaseBrowser();
   const request_type = opts.type === "premium" || opts.type === "relatorio" ? "report" : "other";
-  await sb.from("premium_requests").insert({
+  const { error } = await sb.from("premium_requests").insert({
     gym_id: opts.gymId,
     student_id: opts.userId,
     request_type,
     details: `[${opts.type}] ${opts.message}`,
     status: "pending",
   } as never);
+  if (error) throw new Error(`Falha ao enviar a solicitação: ${error.message}`);
 }
 
 /** Contagem de aprovações pendentes do gym (produção lê o banco). */
@@ -550,10 +612,11 @@ export async function decideRequest(id: string, status: "aprovado" | "recusado",
     return;
   }
   const sb = supabaseBrowser();
-  await sb
+  const { error } = await sb
     .from("premium_requests")
     .update({ status: status === "aprovado" ? "approved" : "rejected", reviewed_at: new Date().toISOString(), reviewed_by: reviewerId })
     .eq("id", id);
+  if (error) throw new Error(`Falha ao registrar a decisão: ${error.message}`);
 }
 
 /* ------------------------------------------------------------------ */
@@ -597,7 +660,7 @@ export async function requestEvolutionReport(opts: {
       studentId: opts.userId,
       studentName: "Você",
       type: "premium",
-      message: "Relatório de evolução — últimos 15 dias",
+      message: "Relatório de evolução: últimos 15 dias",
     });
     return;
   }
@@ -610,7 +673,7 @@ export async function requestEvolutionReport(opts: {
     gym_id: opts.gymId,
     student_id: opts.userId,
     request_type: "report",
-    details: `${REPORT_TAG} Relatório de evolução detalhado — últimos 15 dias`,
+    details: `${REPORT_TAG} Relatório de evolução detalhado: últimos 15 dias`,
     status: "pending",
   } as never);
   if (error) throw new Error(error.message);
@@ -729,7 +792,7 @@ export async function saveAdjustment(opts: {
     return;
   }
   const sb = supabaseBrowser();
-  await sb.from("leaderboard_adjustments").insert({
+  const { error } = await sb.from("leaderboard_adjustments").insert({
     gym_id: opts.gymId,
     student_id: opts.student.id,
     kind: opts.type,
@@ -737,4 +800,5 @@ export async function saveAdjustment(opts: {
     reason: opts.reason,
     created_by: opts.userId,
   } as never);
+  if (error) throw new Error(`Falha ao registrar o ajuste de pontos: ${error.message}`);
 }

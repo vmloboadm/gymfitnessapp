@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { MessageCircle, ClipboardList, Flame, Dumbbell, Plus, Activity, Sparkles, Clock3, Feather, Link2 } from "lucide-react";
+import { MessageCircle, ClipboardList, Flame, Dumbbell, Plus, Activity, Sparkles, Clock3, Feather, Link2, AlertTriangle } from "lucide-react";
 import { insightOffline } from "~/lib/ai/local-gen";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
@@ -20,7 +20,9 @@ import {
   listWorkoutsForStudent,
   streakOverride,
   TRAINER_WORKOUTS_EVENT,
+  type AssignedWorkout,
 } from "~/lib/trainer-store";
+import { fetchMyAssignedPlans } from "~/lib/gym-api";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { useAuth } from "~/hooks/useAuth";
 import { waStudentLink, buildQuickMessage } from "~/lib/whatsapp";
@@ -125,7 +127,7 @@ export function StudentSheet({
   }, [student?.id]);
 
   // re-render quando um treino novo é atribuído
-  const [, setBump] = useState(0);
+  const [workoutsBump, setBump] = useState(0);
   useEffect(() => {
     const bump = () => setBump((b) => b + 1);
     window.addEventListener(TRAINER_WORKOUTS_EVENT, bump);
@@ -247,9 +249,76 @@ export function StudentSheet({
 
   const weights = demo ? (student ? mockWeightSeries(student) : []) : (realWeights ?? []);
   const history = demo ? (student ? mockWorkoutHistory(student) : []) : (realHistory ?? []);
-  const assigned = student ? listWorkoutsForStudent(student.id) : [];
   const effectiveStreak = student ? (streakOverride(student.id) ?? student.streak) : 0;
+
+  // Frequência real: dias com check-in nos últimos 30 dias (checkins).
+  const [freqDays30, setFreqDays30] = useState<number | null>(null);
+  useEffect(() => {
+    if (!student?.id) { setFreqDays30(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const since = new Date(Date.now() - 30 * 864e5).toISOString();
+        const { data, error } = await supabaseBrowser()
+          .from("checkins")
+          .select("checked_at")
+          .eq("student_id", student.id)
+          .gte("checked_at", since)
+          .limit(400);
+        if (cancelled) return;
+        if (error) { setFreqDays30(null); return; }
+        const days = new Set(((data ?? []) as Array<{ checked_at: string }>).map((r) => r.checked_at.slice(0, 10)));
+        setFreqDays30(days.size);
+      } catch {
+        if (!cancelled) setFreqDays30(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [student?.id]);
+
+  // Plano atribuído REAL do aluno: produção lê student_workouts; demo usa o store local.
+  const [assigned, setAssigned] = useState<AssignedWorkout[]>([]);
+  useEffect(() => {
+    if (!student?.id) { setAssigned([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        if (demo) {
+          if (!cancelled) setAssigned(listWorkoutsForStudent(student.id));
+          return;
+        }
+        if (!myProfile?.gym_id) { if (!cancelled) setAssigned([]); return; }
+        const rows = await fetchMyAssignedPlans(student.id, myProfile.gym_id);
+        if (!cancelled) setAssigned(rows);
+      } catch {
+        if (!cancelled) setAssigned([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [student?.id, demo, myProfile?.gym_id, workoutsBump]);
   const latestWorkoutId = assigned[0]?.id;
+
+  // Laudo médico real (medical_clearances): só alerta quando existe dado real.
+  const [clearance, setClearance] = useState<"none" | "pending" | "approved" | null>(null);
+  useEffect(() => {
+    if (!student?.id || !student.medical_risk) { setClearance(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabaseBrowser()
+          .from("medical_clearances")
+          .select("approved")
+          .eq("student_id", student.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!cancelled) setClearance(data ? ((data as { approved: boolean }).approved ? "approved" : "pending") : "none");
+      } catch {
+        if (!cancelled) setClearance(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [student?.id, student?.medical_risk]);
 
   // Fetch último feedback do aluno (workout_sessions.meta)
   const [lastFeedback, setLastFeedback] = useState<{ feeling: string | null; note: string | null; duration_min: number | null; date: string } | null>(null);
@@ -337,28 +406,38 @@ export function StudentSheet({
           </div>
 
           {/* Ações rápidas de WhatsApp (mensagens prontas, 1 toque) */}
-          {student.whatsapp_consent && student.phone ? (
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { k: "sumido", label: "Está sumido" },
-                { k: "cobrar", label: "Cobrar treino" },
-                { k: "parabens", label: "Parabéns" },
-                { k: "incentivo", label: "Incentivo" },
-                { k: "vencido", label: "Vencido" },
-                { k: "avaliacao", label: "Avaliação" },
-              ].map((a) => (
-                <a
-                  key={a.k}
-                  href={waStudentLink(student.phone, buildQuickMessage(a.k, student.name)) ?? "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="tactile inline-flex items-center gap-1 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-2.5 py-1.5 text-[10.5px] font-bold text-[#4ADE80]"
-                >
-                  <MessageCircle className="h-3 w-3" /> {a.label}
-                </a>
-              ))}
-            </div>
-          ) : null}
+          {student.whatsapp_consent && student.phone
+            ? (() => {
+                const actions = [
+                  { k: "sumido", label: "Está sumido" },
+                  { k: "cobrar", label: "Cobrar treino" },
+                  { k: "parabens", label: "Parabéns" },
+                  { k: "incentivo", label: "Incentivo" },
+                  { k: "vencido", label: "Vencido" },
+                  { k: "avaliacao", label: "Avaliação" },
+                ]
+                  .map((a) => ({
+                    ...a,
+                    href: waStudentLink(student.phone, buildQuickMessage(a.k, student.name)),
+                  }))
+                  .filter((a): a is typeof a & { href: string } => !!a.href);
+                return actions.length ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {actions.map((a) => (
+                      <a
+                        key={a.k}
+                        href={a.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="tactile inline-flex items-center gap-1 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-2.5 py-1.5 text-[10.5px] font-bold text-[#4ADE80]"
+                      >
+                        <MessageCircle className="h-3 w-3" /> {a.label}
+                      </a>
+                    ))}
+                  </div>
+                ) : null;
+              })()
+            : null}
 
           {/* conteúdo da aba */}
           {tab === "resumo" ? (
@@ -442,8 +521,18 @@ export function StudentSheet({
             <div className="space-y-2">
               {student.medical_risk ? (
                 <div className="rounded-xl border border-[#F87171]/40 bg-[#F87171]/10 p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#F87171]">⚠ Risco clínico ativo</p>
-                  <p className="mt-1 text-[11px] text-[#F87171]/80">Laudo médico pendente de aprovação pelo gestor.</p>
+                  <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#F87171]">
+                    <AlertTriangle className="h-3 w-3" /> Risco clínico ativo
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#F87171]/80">
+                    {clearance === "approved"
+                      ? "Laudo médico já aprovado pelo gestor."
+                      : clearance === "pending"
+                        ? "Laudo médico enviado, aguardando aprovação pelo gestor."
+                        : clearance === "none"
+                          ? "Risco informado no onboarding. Ainda sem laudo médico enviado."
+                          : "Risco informado no onboarding."}
+                  </p>
                 </div>
               ) : null}
               <InfoRow label="Objetivo" value={student.goal} />
@@ -473,7 +562,10 @@ export function StudentSheet({
                 </div>
               </div>
               <InfoRow label="Sexo" value={student.sex === "M" ? "Masculino" : student.sex === "F" ? "Feminino" : student.sex} />
-              <InfoRow label="Frequência" value={student.daily_intake ? `${student.daily_intake}× semana` : null} />
+              <InfoRow
+                label="Check-ins (30 dias)"
+                value={freqDays30 === null ? null : `${freqDays30} ${freqDays30 === 1 ? "dia" : "dias"}`}
+              />
               {student.available_days?.length ? (
                 <InfoRow label="Dias disponíveis" value={student.available_days.join(", ")} />
               ) : null}
@@ -575,7 +667,7 @@ export function StudentSheet({
                 ) : (
                   <p className="mt-2 flex items-center gap-2 text-[11.5px] text-muted-foreground">
                     <Activity className="h-4 w-4 opacity-60" />
-                    Nenhuma medição registrada ainda — peça para o aluno salvar o peso em Métricas.
+                    Nenhuma medição registrada ainda. Peça para o aluno salvar o peso em Métricas.
                   </p>
                 )}
               </div>
@@ -647,9 +739,16 @@ export function StudentSheet({
                   WhatsApp
                 </a>
               ) : (
-                <span className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-white/[0.04] text-[10px] font-medium text-muted-foreground ring-1 ring-white/[0.06]">
+                <span
+                  title={
+                    student.whatsapp_consent
+                      ? "Sem telefone válido cadastrado"
+                      : "Aluno ainda não liberou contato no WhatsApp"
+                  }
+                  className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-white/[0.04] text-[10px] font-medium text-muted-foreground ring-1 ring-white/[0.06]"
+                >
                   <MessageCircle className="h-4 w-4" />
-                  Sem ok
+                  {student.whatsapp_consent ? "Sem telefone" : "Sem ok"}
                 </span>
               );
             })()}

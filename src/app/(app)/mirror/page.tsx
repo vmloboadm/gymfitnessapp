@@ -88,7 +88,7 @@ export default function MirrorPage() {
       toast.success("Texto copiado! Cole no Instagram/WhatsApp.");
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      toast.error("Não deu copiar. Tente novamente.");
+      toast.error("Não foi possível copiar. Tente novamente.");
     }
   };
 

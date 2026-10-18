@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { m, type Variants } from "framer-motion";
 import {
   Search,
@@ -21,10 +21,6 @@ import { getGymStudents } from "~/lib/gym-api";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { cn } from "~/lib/utils";
 
-const container: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
-};
 const row: Variants = {
   hidden: { opacity: 0, y: 18 },
   show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] } },
@@ -45,14 +41,30 @@ export default function PersonalAlunosPage() {
   const router = useRouter();
   const [students, setStudents] = useState<PersonalStudent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
 
-  const loadStudents = useCallback(() => {
+  const loadStudents = useCallback(async () => {
     if (!profile?.gym_id) return;
-    getGymStudents(profile.gym_id)
-      .then(setStudents)
-      .catch(() => setStudents([]))
-      .finally(() => setLoading(false));
+    setLoading(true);
+    setLoadError(false);
+    try {
+      // Sonda direta: getGymStudents engole erro interno e devolve [],
+      // então testamos a conexão com a tabela antes de confiar na lista.
+      const probe = await supabaseBrowser()
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("gym_id", profile.gym_id)
+        .eq("role", "student");
+      if (probe.error) throw new Error(probe.error.message);
+      const rows = await getGymStudents(profile.gym_id);
+      setStudents(rows);
+      setLoading(false);
+    } catch {
+      setStudents([]);
+      setLoadError(true);
+      setLoading(false);
+    }
   }, [profile?.gym_id]);
 
   useEffect(() => {
@@ -80,6 +92,19 @@ export default function PersonalAlunosPage() {
   }, [profile?.gym_id, loadStudents]);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PersonalStudent | null>(null);
+
+  // Link "Abrir ficha do aluno" vindo de Aprovações: ?aluno=<id>
+  const openedFromLink = useRef(false);
+  useEffect(() => {
+    if (openedFromLink.current || students.length === 0) return;
+    const alunoParam = new URLSearchParams(window.location.search).get("aluno");
+    if (!alunoParam) { openedFromLink.current = true; return; }
+    const target = students.find((s) => s.id === alunoParam);
+    if (target) {
+      openedFromLink.current = true;
+      setSelected(target);
+    }
+  }, [students]);
 
   const pending = students.filter((s) => !s.approved_at);
   const approved = students.filter((s) => !!s.approved_at);
@@ -138,7 +163,7 @@ export default function PersonalAlunosPage() {
         <div>
           <h1 className="text-lg font-bold text-foreground">Alunos</h1>
           <p className="text-[11px] text-muted-foreground">
-            {approved.length} sob sua responsabilidade
+            {approved.length} aluno{approved.length === 1 ? "" : "s"} aprovado{approved.length === 1 ? "" : "s"} na academia
           </p>
         </div>
       </header>
@@ -240,15 +265,33 @@ export default function PersonalAlunosPage() {
         />
       </div>
 
-      {/* Lista com stagger */}
+      {/* Lista com stagger (limitado em listas grandes) */}
       {loading ? (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
             <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/[0.04]" />
           ))}
         </div>
+      ) : loadError ? (
+        <div className="rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.06] p-6 text-center">
+          <p className="text-[13px] font-bold text-foreground">Não foi possível carregar os alunos</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Falha de conexão com o servidor. Tente novamente.
+          </p>
+          <button
+            onClick={loadStudents}
+            className="tactile mt-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-2 text-[12px] font-bold text-foreground transition-colors hover:text-brand"
+          >
+            Tentar novamente
+          </button>
+        </div>
       ) : (
-      <m.ul variants={container} initial="hidden" animate="show" className="space-y-2">
+      <m.ul
+        variants={{ hidden: {}, show: { transition: { staggerChildren: Math.min(0.06, 0.4 / Math.max(1, filtered.length)), delayChildren: 0.04 } } }}
+        initial="hidden"
+        animate="show"
+        className="space-y-2"
+      >
         {filtered.map((s) => {
           const status = studentStatus(s);
           return (

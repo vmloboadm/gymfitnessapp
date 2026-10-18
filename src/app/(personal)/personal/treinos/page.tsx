@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -229,9 +229,50 @@ function PersonalTreinosContent() {
   const editId = params.get("edit") ?? "";
   const target = students.find((s) => s.id === targetId) ?? null;
 
-  // Troca de aluno: volta para a escolha inicial (IA / manual / copiar).
+  // Conta as gerações em andamento: se o aluno trocar no meio, a resposta
+  // antiga é descartada e nunca vira plano do aluno novo.
+  const genSeq = useRef(0);
+
+  // Troca de aluno: zera TUDO que pertence ao aluno/plano anterior (plano,
+  // prompt, observações, dias, modo ajuste e respostas do assistente) para
+  // não misturar fichas de um aluno com o treino de outro.
   useEffect(() => {
+    genSeq.current += 1;
     setEntry(null);
+    setPlan(null);
+    setActiveDay(0);
+    setExpandAll(false);
+    setPrompt("");
+    setNotes("");
+    setDaysSelected(new Set());
+    setAdjustSwId(null);
+    setSavedOk(false);
+    setApproving(false);
+    setLoading(false);
+    setUsedFallback(false);
+    setDiscardAsk(false);
+    setSwapTarget(null);
+    setSwapQuery("");
+    setPickSheet(null);
+    setPickSel(new Set());
+    setPickQuery("");
+    setPickCatOpen(null);
+    setCatOpen(null);
+    setCopyQuery("");
+    setCreatingEx(false);
+    setGenCreatingEx(false);
+    setRepeatSheet(null);
+    setRepeatSelected(new Set());
+    setRepeatQuery("");
+    setAnsNivel(null);
+    setAnsSexo(null);
+    setAnsObjetivo([]);
+    setObjetivoDone(false);
+    setAnsFoco([]);
+    setFocoDone(false);
+    setAnsSplit(null);
+    setAnsRestricoes([]);
+    setRestDone(false);
   }, [targetId]);
 
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -245,6 +286,11 @@ function PersonalTreinosContent() {
   const [daysSelected, setDaysSelected] = useState<Set<string>>(new Set());
   const [assigned, setAssigned] = useState<GymAssignedPlan[]>([]);
   const [adjustSwId, setAdjustSwId] = useState<string | null>(null);
+  // trava dos botões que disparam escrita no banco (nada de duplo toque)
+  const [approving, setApproving] = useState(false);
+  const [massSaving, setMassSaving] = useState(false);
+  // plano já salvo: libera o aviso no WhatsApp e troca o botão por "Concluir"
+  const [savedOk, setSavedOk] = useState(false);
   const [massTemplate, setMassTemplate] = useState<WorkoutTemplate | null>(null);
   const [massSelected, setMassSelected] = useState<Set<string>>(new Set());
 
@@ -271,18 +317,6 @@ function PersonalTreinosContent() {
     const t = setInterval(() => setGenElapsed(Math.floor((Date.now() - t0) / 1000)), 500);
     return () => clearInterval(t);
   }, [loading]);
-
-  // zera as respostas ao trocar de aluno
-  useEffect(() => {
-    setAnsNivel(null);
-    setAnsObjetivo([]);
-    setObjetivoDone(false);
-    setAnsFoco([]);
-    setFocoDone(false);
-    setAnsSplit(null);
-    setAnsRestricoes([]);
-    setRestDone(false);
-  }, [targetId]);
 
   // pré-preenche nível/objetivo do perfil do aluno
   useEffect(() => {
@@ -641,6 +675,8 @@ function PersonalTreinosContent() {
       : guidedRequest;
     setLoading(true);
     setUsedFallback(false);
+    setSavedOk(false);
+    const seq = genSeq.current;
     const daysArr = [...daysSelected];
     const daysMeta = {
       nivel: ansNivel,
@@ -666,10 +702,14 @@ function PersonalTreinosContent() {
       daysSelected: daysArr.length > 0 ? daysArr : target.available_days ?? undefined,
       daysMeta,
     });
+    // Timeout: a IA pode demorar, mas o stepper não pode girar para sempre.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 90_000);
     try {
       const res = await fetch(apiPath("/api/assistente"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ctrl.signal,
         body: JSON.stringify({
           message: buildWorkoutPrompt({
             studentName: target.name,
@@ -706,6 +746,8 @@ function PersonalTreinosContent() {
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; text?: string; error?: string; repaired?: boolean };
+      // aluno trocou no meio da geração: descarta a resposta antiga
+      if (seq !== genSeq.current) return;
       setLoading(false);
       if (data.ok && data.text) {
         let parsed = parsePlanFromLLM(data.text, fallback);
@@ -726,13 +768,21 @@ function PersonalTreinosContent() {
         setPlan(fallback);
       }
       setActiveDay(0);
-      setNotes("");
-    } catch {
+    } catch (e) {
+      if (seq !== genSeq.current) return;
       setLoading(false);
-      toast.error("O Assistente está offline no momento. Tente novamente.");
+      if (e instanceof Error && e.name === "AbortError") {
+        toast.error("A IA demorou mais que o esperado.", {
+          description: "Tente de novo, ou aproveite o plano que montei local.",
+        });
+      } else {
+        toast.error("O Assistente está offline no momento. Tente novamente.");
+      }
       setUsedFallback(true);
       setPlan(fallback);
       setActiveDay(0);
+    } finally {
+      clearTimeout(timer);
     }
   };
 
@@ -751,9 +801,10 @@ function PersonalTreinosContent() {
         targets,
       });
       if (res.failed.length > 0) {
-        toast.error(`Falha ao enviar para ${res.failed.join(", ")}`);
-      }
-      if (res.ok > 0) {
+        toast.error(res.ok > 0
+          ? `Enviado para ${res.ok} aluno${res.ok === 1 ? "" : "s"}, mas falhou em ${res.failed.join(", ")}.`
+          : `Falha ao enviar para ${res.failed.join(", ")}. Tente de novo.`);
+      } else if (res.ok > 0) {
         toast.success("Plano repetido!", {
           description: `"${repeatSheet.planName}" enviado para ${res.ok} aluno${res.ok === 1 ? "" : "s"}.`,
         });
@@ -914,6 +965,7 @@ function PersonalTreinosContent() {
 
   // ===== PASSO 5: aprovar e atribuir (ou salvar edição / ajuste v2) =====
   const approve = async () => {
+    if (approving) return;
     if (!plan || !target || !profile || !user) return;
     const emptyDays = plan.dias
       .map((d, i) => ({ d, i }))
@@ -928,22 +980,22 @@ function PersonalTreinosContent() {
     const flat = plan.dias.flatMap((d) =>
       d.exercicios.map((e) => ({ name: e.exercicio, sets: e.series, reps: e.reps, rest: e.descanso }))
     );
-    if (editId && editId.startsWith("aw-") && !adjustSwId) {
-      updateAssignedWorkout(editId, {
-        name: plan.nome,
-        notes: notes.trim() || null,
-        frequency: plan.frequencia,
-        level: plan.nivel,
-        exercises: flat,
-        plan,
-      });
-      toast.success("Plano atualizado com sucesso!", {
-        description: `${target.name} recebeu a nova versão com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
-      });
-    } else {
-      let newProgramId: string | null = null;
-      try {
-        newProgramId = await approvePlan({
+    setApproving(true);
+    try {
+      if (editId && editId.startsWith("aw-") && !adjustSwId) {
+        await updateAssignedWorkout(editId, {
+          name: plan.nome,
+          notes: notes.trim() || null,
+          frequency: plan.frequencia,
+          level: plan.nivel,
+          exercises: flat,
+          plan,
+        });
+        toast.success("Plano atualizado com sucesso!", {
+          description: `${target.name} recebeu a nova versão com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
+        });
+      } else {
+        const newProgramId = await approvePlan({
           gymId: profile.gym_id,
           trainerId: user.id,
           student: target,
@@ -955,67 +1007,101 @@ function PersonalTreinosContent() {
           },
           notes: notes.trim() || null,
         });
+        toast.success(adjustSwId ? "Plano ajustado com sucesso!" : editId ? "Plano atualizado com sucesso!" : "Plano enviado com sucesso!", {
+          description: `${target.name} recebeu "${plan.nome}" com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
+        });
+        if (newProgramId) {
+          setRepeatSheet({ programId: newProgramId, planName: plan.nome, excludeId: target.id });
+          setRepeatSelected(new Set());
+          setRepeatQuery("");
+        }
         // edição/ajuste em produção: conclui o plano anterior (vira histórico)
         const prevId = adjustSwId ?? (editId && !editId.startsWith("aw-") ? editId : null);
         if (prevId) {
-          await completeStudentWorkout(prevId).catch(() => {});
+          try {
+            await completeStudentWorkout(prevId);
+          } catch {
+            toast.error("O plano anterior não foi arquivado.", {
+              description: "O novo plano já está salvo. Confira a lista de Atribuídos.",
+            });
+          }
         }
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Não deu salvar o plano. Tente novamente.");
-        return;
       }
-      toast.success(adjustSwId ? "Plano ajustado com sucesso!" : editId ? "Plano atualizado com sucesso!" : "Plano enviado com sucesso!", {
-        description: `${target.name} recebeu "${plan.nome}" com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
-      });
-      if (newProgramId) {
-        setRepeatSheet({ programId: newProgramId, planName: plan.nome, excludeId: target.id });
-        setRepeatSelected(new Set());
-        setRepeatQuery("");
-      }
+      // salvo de verdade: entra no modo "já salvo" (WhatsApp só aqui em diante)
+      setSavedOk(true);
+      setEntry(null);
+      setAdjustSwId(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não deu salvar o plano. Tente novamente.");
+    } finally {
+      setApproving(false);
     }
+  };
+
+  // Depois de salvar: o personal avisa o aluno (se der) e só então volta.
+  const finishSave = () => {
     setPlan(null);
     setPrompt("");
     setNotes("");
     setAdjustSwId(null);
     setEntry(null);
+    setSavedOk(false);
     refresh();
     router.replace("/personal/treinos");
   };
 
   const applyMass = async () => {
+    if (massSaving) return;
     if (!massTemplate || massSelected.size === 0 || !profile || !user) return;
     const targets = [...massSelected]
       .map((sid) => students.find((s) => s.id === sid))
       .filter((s): s is PersonalStudent => !!s);
-    const results = await Promise.allSettled(
-      targets.map((student) =>
-        approvePlan({
-          gymId: profile.gym_id,
-          trainerId: user.id,
-          student,
-          plan: templateToPlan(massTemplate),
-          notes: null,
-        })
-      )
-    );
-    const okCount = results.filter((r) => r.status === "fulfilled").length;
-    const failNames = targets.filter((_, i) => results[i].status === "rejected").map((s) => s.name.split(" ")[0]);
-    if (failNames.length > 0) {
-      toast.error(`Falha ao enviar para ${failNames.join(", ")}`);
+    setMassSaving(true);
+    try {
+      const results = await Promise.allSettled(
+        targets.map((student) =>
+          approvePlan({
+            gymId: profile.gym_id,
+            trainerId: user.id,
+            student,
+            plan: templateToPlan(massTemplate),
+            notes: null,
+          })
+        )
+      );
+      const okCount = results.filter((r) => r.status === "fulfilled").length;
+      const failNames = targets.filter((_, i) => results[i].status === "rejected").map((s) => s.name.split(" ")[0]);
+      if (failNames.length > 0) {
+        toast.error(`Falha ao enviar para ${failNames.join(", ")}`);
+      }
+      if (okCount > 0) {
+        toast.success("Plano enviado com sucesso!", {
+          description: `Plano aplicado para ${okCount} aluno${okCount === 1 ? "" : "s"}.`,
+        });
+        setMassTemplate(null);
+        setMassSelected(new Set());
+        refresh();
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não deu aplicar agora. Tente de novo.");
+    } finally {
+      setMassSaving(false);
     }
-    if (okCount > 0) {
-      toast.success("Plano enviado com sucesso!", {
-        description: `Plano aplicado para ${okCount} aluno${okCount === 1 ? "" : "s"}.`,
-      });
-    }
-    setMassTemplate(null);
-    setMassSelected(new Set());
-    refresh();
   };
 
   // ===== MODO ATRIBUIÇÃO =====
   if (target) {
     const day = plan?.dias[Math.min(activeDay, (plan?.dias.length ?? 1) - 1)];
+    // Link do WhatsApp só com número válido; sem link, vira aviso (nunca "#" clicável)
+    const waHref =
+      plan && target.whatsapp_consent
+        ? waStudentLink(target.phone, buildPlanWhatsMessage({ studentName: target.name, plan }))
+        : null;
+    const waBlocked = !target.phone
+      ? "Aluno sem telefone cadastrado."
+      : !target.whatsapp_consent
+        ? "Aluno sem consentimento de WhatsApp. Combine na recepção."
+        : "Telefone do aluno não é um número válido de WhatsApp.";
     return (
       <div className="space-y-5">
         <TreinoGuide />
@@ -1703,6 +1789,36 @@ function PersonalTreinosContent() {
               className="gf-card gf-glass space-y-3 !p-4"
               aria-label="Plano de treino editável"
             >
+              {savedOk ? (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-[#4ADE80]/30 bg-[#4ADE80]/[0.08] p-3">
+                    <p className="flex items-center gap-2 text-[12.5px] font-black text-[#4ADE80]">
+                      <ClipboardCheck className="h-4 w-4" /> Plano salvo com sucesso
+                    </p>
+                    <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                      {target.name} recebeu “{plan.nome}” com {plan.dias.length} {plan.dias.length === 1 ? "dia" : "dias"} de treino.
+                    </p>
+                  </div>
+                  {waHref ? (
+                    <a
+                      href={waHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="tactile flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-[#25D366]/40 bg-[#25D366]/10 text-[12.5px] font-black text-[#4ADE80]"
+                    >
+                      <MessageCircle className="h-4 w-4" /> Avisar aluno no WhatsApp
+                    </a>
+                  ) : (
+                    <p className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-center text-[10.5px] text-muted-foreground">
+                      {waBlocked}
+                    </p>
+                  )}
+                  <Button onClick={finishSave} size="lg" className="h-12 w-full rounded-2xl text-[13px] font-bold">
+                    Concluir
+                  </Button>
+                </div>
+              ) : (
+                <>
               {discardAsk ? (
                 <div className="flex items-center gap-2 rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.07] p-3">
                   <p className="min-w-0 flex-1 text-[11.5px] font-semibold text-foreground">Descartar este treino e voltar?</p>
@@ -2134,27 +2250,21 @@ function PersonalTreinosContent() {
                 />
               </div>
 
-              {target.phone && target.whatsapp_consent ? (
-                <a
-                  href={waStudentLink(target.phone, buildPlanWhatsMessage({ studentName: target.name, plan })) ?? "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="tactile flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-[#25D366]/40 bg-[#25D366]/10 text-[12.5px] font-black text-[#4ADE80]"
-                >
-                  <MessageCircle className="h-4 w-4" /> Avisar aluno no WhatsApp
-                </a>
-              ) : (
-                <p className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-center text-[10.5px] text-muted-foreground">
-                  {target.phone
-                    ? "Aluno sem consentimento de WhatsApp. Combine na recepção."
-                    : "Aluno sem telefone cadastrado."}
-                </p>
-              )}
-
-              <Button onClick={approve} size="lg" className="h-12 w-full rounded-2xl text-[13px] font-bold">
-                <ClipboardCheck className="mr-2 h-4.5 w-4.5" />
-                {editId ? "Salvar Alterações" : "Aprovar e Atribuir"}
+              <Button
+                onClick={approve}
+                disabled={approving}
+                size="lg"
+                className="h-12 w-full rounded-2xl text-[13px] font-bold"
+              >
+                {approving ? (
+                  <Loader2 className="mr-2 h-4.5 w-4.5 animate-spin" />
+                ) : (
+                  <ClipboardCheck className="mr-2 h-4.5 w-4.5" />
+                )}
+                {approving ? "Atribuindo..." : editId ? "Salvar Alterações" : "Aprovar e Atribuir"}
               </Button>
+                </>
+              )}
             </motion.section>
           ) : null}
         </AnimatePresence>
@@ -2598,7 +2708,7 @@ function PersonalTreinosContent() {
                     setAssigned((prev) => prev.filter((a) => a.id !== w.id));
                     try {
                       if (w.id.startsWith("aw-")) {
-                        deleteAssignedWorkout(w.id);
+                        await deleteAssignedWorkout(w.id);
                       } else {
                         await completeStudentWorkout(w.id);
                       }
@@ -2677,7 +2787,7 @@ function PersonalTreinosContent() {
       </BottomSheet>
 
       {/* aplicar em massa */}
-      <BottomSheet open={!!massTemplate} onClose={() => setMassTemplate(null)}>
+      <BottomSheet open={!!massTemplate} onClose={() => { if (!massSaving) setMassTemplate(null); }}>
         {massTemplate ? (
           <div className="space-y-4">
             <div>
@@ -2736,10 +2846,17 @@ function PersonalTreinosContent() {
             <Button
               size="lg"
               className="h-12 w-full rounded-2xl text-[13px] font-bold"
-              disabled={massSelected.size === 0}
+              disabled={massSelected.size === 0 || massSaving}
               onClick={applyMass}
             >
-              Aplicar para {massSelected.size} {massSelected.size === 1 ? "aluno" : "alunos"}
+              {massSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Aplicando...
+                </>
+              ) : (
+                `Aplicar para ${massSelected.size} ${massSelected.size === 1 ? "aluno" : "alunos"}`
+              )}
             </Button>
           </div>
         ) : null}

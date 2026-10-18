@@ -1,93 +1,134 @@
 "use client";
 
 import { m } from "framer-motion";
-import { MessageCircle, Star } from "lucide-react";
+import Link from "next/link";
+import { MessageCircle, UserRoundCheck } from "lucide-react";
+import { useAuth } from "~/hooks/useAuth";
+import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { demoPersonais } from "~/lib/demo-bridge";
+import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
+import { demoPersonais, isDemoMode } from "~/lib/demo-bridge";
 
 /**
- * Personals da Casa, vitrine de monetização (piloto via WhatsApp).
- * Card vertical grande: foto, nome, especialidade, pitch e CTA laranja
- * que abre o WhatsApp com mensagem pré-preenchida.
+ * Personais da casa: lista real de trainers/managers do gym
+ * (list_my_gym_trainers) marcando o personal vinculado (student_trainers).
+ * Contato é pelo chat do app, sem telefone ou nota inventados.
  */
 
-const EXTRA = [
-  { specialty: "Consultoria em Hipertrofia", pitch: "Treino periodizado + ajuste de carga semanal por vídeo. Quem já subiu de nível não volta." },
-  { specialty: "Emagrecimento & Condicionamento", pitch: "Plano realista pra rotina corrida, com evolução visível mês a mês." },
-  { specialty: "Iniciantes & Adaptação", pitch: "Primeiros 90 dias sem lesão e sem medo de máquina. Acompanhamento de perto." },
-];
-
-const PHOTOS: (string | null)[] = [null, null, null];
+type Trainer = {
+  id: string;
+  name: string;
+  avatar_url: string | null;
+  role: string;
+  linked?: boolean;
+};
 
 export default function PersonaisMarketplacePage() {
-  const personais = demoPersonais();
+  const { user, profile } = useAuth();
+  const demo = isDemoMode();
+
+  const { data, loading, error, refetch } = useAsyncQuery<Trainer[]>(
+    async () => {
+      if (demo) {
+        const list = demoPersonais().map((p) => ({
+          id: p.id,
+          name: p.trainer.name,
+          avatar_url: null,
+          role: "trainer",
+          linked: false,
+        }));
+        return { data: list, error: null };
+      }
+      if (!user) return { data: null, error: { message: "Sessão indisponível" } };
+      const supabase = supabaseBrowser();
+
+      const [linkRes, rpc] = await Promise.all([
+        supabase.from("student_trainers").select("trainer_id").eq("student_id", user.id),
+        supabase.rpc("list_my_gym_trainers"),
+      ]);
+      if (linkRes.error) return { data: null, error: linkRes.error };
+      if (rpc.error) return { data: null, error: rpc.error };
+
+      const linkedIds = new Set(((linkRes.data ?? []) as Array<{ trainer_id: string }>).map((r) => r.trainer_id));
+      const trainers = ((rpc.data ?? []) as Array<{ id: string; name: string; avatar_url: string | null; role: string }>)
+        .map((t) => ({ ...t, linked: linkedIds.has(t.id) }))
+        .sort((a, b) => Number(b.linked) - Number(a.linked));
+      return { data: trainers, error: null };
+    },
+    [user?.id, profile?.gym_id, demo]
+  );
+
+  const personais = data ?? [];
 
   return (
     <>
-      <TopBar title="Personals da Casa" subtitle="Acompanhamento premium dentro do gym" />
+      <TopBar title="Personais da Casa" subtitle="Acompanhamento premium dentro do gym" />
       <div className="space-y-5 p-4">
         <m.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="rounded-[20px] border border-brand/35 bg-gradient-to-br from-brand/15 via-card to-card p-5">
           <p className="text-sm font-bold text-foreground">Resultado mais rápido com quem faz isso por ofício</p>
           <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-            Escolha um personal da casa, fale direto no WhatsApp e monte seu acompanhamento.
+            Conheça os personais da casa e fale direto pelo chat do app.
             Sem burocracia, sem mensalidade escondida.
           </p>
         </m.div>
 
-        {personais.map((p, i) => {
-          const extra = EXTRA[i % EXTRA.length];
-          const msg = encodeURIComponent(
-            `Olá ${p.trainer.name.split(" ")[0]}! Vi seu perfil no GymFitness e quero saber mais sobre: ${extra.specialty}.`
-          );
-          return (
+        {loading ? (
+          <SkeletonList rows={2} />
+        ) : error ? (
+          <ErrorState message={error} onRetry={refetch} />
+        ) : personais.length === 0 ? (
+          <EmptyState
+            title="Nenhum personal cadastrado ainda"
+            description="Quando a academia cadastrar os personais, eles aparecem aqui. Por enquanto, acompanhe seus treinos na aba Treino."
+            icon={UserRoundCheck}
+          />
+        ) : (
+          personais.map((p, i) => (
             <m.article
               key={p.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08 }}
+              transition={{ delay: Math.min(i * 0.08, 0.4) }}
               whileTap={{ scale: 0.985 }}
               className="overflow-hidden rounded-[20px] border border-border bg-card/50"
             >
               <div className="flex items-center gap-4 p-4">
                 <Avatar className="h-16 w-16 border-2 border-brand/40">
-                  <AvatarImage src={PHOTOS[i % PHOTOS.length] ?? undefined} alt={p.trainer.name} />
+                  {p.avatar_url ? <AvatarImage src={p.avatar_url} alt={p.name} /> : null}
                   <AvatarFallback className="bg-secondary text-lg font-bold text-secondary-foreground">
-                    {p.trainer.name[0]}
+                    {p.name?.[0] ?? "?"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-black text-foreground">{p.trainer.name}</p>
-                  <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-warning">
-                    <Star className="h-3 w-3 fill-current" /> 4.{8 + (i % 2)} · {18 - i * 3 > 0 ? 15 + i : 15} alunos ativos
+                  <p className="truncate text-base font-black text-foreground">{p.name}</p>
+                  <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                    {p.role === "trainer" ? "Personal" : p.role === "manager" ? "Gestão da academia" : "Equipe"}
                   </p>
-                  <p className="mt-1 text-[12px] font-semibold text-brand">{extra.specialty}</p>
+                  {p.linked ? (
+                    <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-brand">
+                      <UserRoundCheck className="h-3 w-3" /> Seu personal
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
-              <div className="px-4 pb-1">
-                <p className="text-[13px] leading-relaxed text-muted-foreground">{extra.pitch}</p>
-              </div>
-
               <div className="p-4 pt-3">
-                <m.a
-                  href={`https://wa.me/552299999000${i + 1}?text=${msg}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="gf-touch flex w-full items-center justify-center gap-2 rounded-xl bg-[#F4711E] py-3.5 text-sm font-black text-black shadow-[0_0_20px_rgba(244,113,30,0.4)]"
+                <Link
+                  href="/conversas"
+                  className="gf-touch flex w-full items-center justify-center gap-2 rounded-xl bg-[#F4711E] py-3.5 text-sm font-black text-black shadow-[0_0_20px_rgba(244,113,30,0.4)] transition-transform active:scale-[0.98]"
                 >
                   <MessageCircle className="h-4 w-4" />
-                  Quero Consultoria Premium
-                </m.a>
+                  Conversar no chat
+                </Link>
               </div>
             </m.article>
-          );
-        })}
+          ))
+        )}
 
         <p className="pb-2 text-center text-[11px] text-muted-foreground">
-          O contato é direto pelo WhatsApp do personal, sem intermediários.
+          O contato é direto pelo chat do app, sem intermediários.
         </p>
       </div>
     </>

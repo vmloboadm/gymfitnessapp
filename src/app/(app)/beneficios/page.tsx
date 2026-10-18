@@ -192,7 +192,7 @@ function ManagerSponsorForm({ gymId, open, onOpen, onClose, onSaved }: {
     } as never);
     setSaving(false);
     if (error) {
-      toast.error("Não deu salvar", { description: error.message });
+      toast.error("Não foi possível salvar", { description: error.message });
       return;
     }
     toast.success("Parceiro cadastrado!");

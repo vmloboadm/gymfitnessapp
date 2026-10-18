@@ -44,19 +44,25 @@ export function useSessionTimeout(
     }
 
     const tick = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev <= 1000) {
-          clearInterval(tick);
-          return 0;
-        }
-        return prev - 1000;
-      });
+      setRemaining((prev) => (prev <= 1000 ? 0 : prev - 1000));
     }, 1000);
 
     return () => {
       clearInterval(tick);
     };
   }, [activeSessionId, durationMs, armTimer, clearTimer]);
+
+  // Qualquer interação do usuário na página reconta o tempo da sessão
+  useEffect(() => {
+    if (!activeSessionId) return;
+    const onActivity = () => armTimer();
+    window.addEventListener("pointerdown", onActivity, { passive: true });
+    window.addEventListener("keydown", onActivity);
+    return () => {
+      window.removeEventListener("pointerdown", onActivity);
+      window.removeEventListener("keydown", onActivity);
+    };
+  }, [activeSessionId, armTimer]);
 
   // Cleanup ao desmontar
   useEffect(() => {

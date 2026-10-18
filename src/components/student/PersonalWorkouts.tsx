@@ -221,7 +221,7 @@ function AdjustRequestCard({ workoutName, studentId, plan }: { workoutName: stri
       setOpen(false);
       toast.success(reqType === "ajuste" ? "Pedido de troca enviado ao seu Personal" : "Ajuste enviado ao seu Personal");
     } catch {
-      toast.error("Não deu enviar agora. Tente de novo.");
+      toast.error("Não foi possível enviar o pedido. Tente de novo.");
     }
   };
 
@@ -348,7 +348,7 @@ function SwapRequestButton({
       onSent(`Trocar ${oldName.split(" ").slice(0, 2).join(" ")}`);
       toast.success("Pedido de troca enviado ao seu Personal");
     } catch {
-      toast.error("Não deu enviar agora. Tente de novo.");
+      toast.error("Não foi possível enviar o pedido. Tente de novo.");
     }
   };
 

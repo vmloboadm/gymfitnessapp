@@ -75,16 +75,18 @@ export function useNotifications(userId?: string) {
     };
   }, [userId]);
 
+  /** Marca tudo como lido. Lança em falha para a UI não prometer "tudo lido". */
   const markAllRead = async () => {
     if (!userId) return;
     const now = new Date().toISOString();
-    setItems((prev) => prev.map((n) => (n.read_at ? n : { ...n, read_at: now })));
-    setUnread(0);
-    await supabaseBrowser()
+    const { error } = await supabaseBrowser()
       .from("notifications")
       .update({ read_at: now })
       .eq("user_id", userId)
       .is("read_at", null);
+    if (error) throw new Error(error.message);
+    setItems((prev) => prev.map((n) => (n.read_at ? n : { ...n, read_at: now })));
+    setUnread(0);
   };
 
   const refetch = async () => {

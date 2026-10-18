@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Search } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -27,7 +27,7 @@ type Row = {
  */
 export function ChatList({ basePath, title }: { basePath: string; title: string }) {
   const { user, profile, loading: authLoading } = useAuth();
-  const [q] = useState("");
+  const [q, setQ] = useState("");
 
   const { data, loading, error, refetch } = useAsyncQuery<Row[]>(
     async () => {
@@ -49,66 +49,98 @@ export function ChatList({ basePath, title }: { basePath: string; title: string 
         avatar_url: string | null;
       }>;
 
-      const { data: messages } = await supabase
-        .from("direct_messages")
-        .select("conversation_id, sender_id, body, created_at, read_at")
-        .in(
-          "conversation_id",
-          list.map((c) => c.id)
-        )
-        .order("created_at", { ascending: false })
-        .limit(300);
-      const byConv = new Map<string, Array<{ sender_id: string; body: string; created_at: string; read_at: string | null }>>();
-      for (const m of (messages ?? []) as Array<{
-        conversation_id: string;
-        sender_id: string;
-        body: string;
-        created_at: string;
-        read_at: string | null;
-      }>) {
-        const arr = byConv.get(m.conversation_id) ?? [];
-        arr.push(m);
-        byConv.set(m.conversation_id, arr);
-      }
-
-      const rows: Row[] = list.map((c) => {
-        const otherId = c.student_id === user.id ? c.staff_id : c.student_id;
-        const other = roster.find((r) => r.id === otherId) ?? null;
-        const msgs = (byConv.get(c.id) ?? []).filter((m) =>
-          !q || m.body.toLowerCase().includes(q.toLowerCase())
-        );
-        return {
-          id: c.id,
-          student_id: c.student_id,
-          staff_id: c.staff_id,
-          updated_at: c.updated_at,
-          other,
-          preview: msgs[0]?.body ?? null,
-          unread: msgs.filter((m) => m.sender_id !== user.id && !m.read_at).length,
-        };
-      });
+      // Só a última mensagem (prévia) + contador de não lidas por conversa:
+      // evita puxar centenas de mensagens que a lista não exibe.
+      const rows: Row[] = await Promise.all(
+        list.map(async (c) => {
+          const otherId = c.student_id === user.id ? c.staff_id : c.student_id;
+          const other = roster.find((r) => r.id === otherId) ?? null;
+          const [lastRes, unreadRes] = await Promise.all([
+            supabase
+              .from("direct_messages")
+              .select("body, created_at")
+              .eq("conversation_id", c.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            supabase
+              .from("direct_messages")
+              .select("id", { count: "exact", head: true })
+              .eq("conversation_id", c.id)
+              .neq("sender_id", user.id)
+              .is("read_at", null),
+          ]);
+          return {
+            id: c.id,
+            student_id: c.student_id,
+            staff_id: c.staff_id,
+            updated_at: c.updated_at,
+            other,
+            preview: ((lastRes.data ?? null) as { body: string } | null)?.body ?? null,
+            unread: unreadRes.count ?? 0,
+          };
+        })
+      );
       return { data: rows, error: null };
     },
-    [user?.id, profile?.id, q],
+    [user?.id, profile?.gym_id],
     { enabled: !authLoading && !!user }
   );
 
+  const filtered = useMemo(() => {
+    const rows = data ?? [];
+    const term = q.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter(
+      (c) =>
+        (c.other?.name ?? "").toLowerCase().includes(term) ||
+        (c.preview ?? "").toLowerCase().includes(term)
+    );
+  }, [data, q]);
+
+  const isStudent = (profile?.role ?? "student") === "student";
+
   return (
     <>
-      <TopBar title={title} subtitle="Fale direto com seu personal" />
+      <TopBar title={title} subtitle={isStudent ? "Fale direto com seu personal" : "Fale direto com o aluno"} />
       <div className="mx-auto max-w-md space-y-2 p-4 pb-28">
+        {(data ?? []).length > 0 ? (
+          <div className="flex items-center gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar conversa..."
+              aria-label="Buscar conversa"
+              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+        ) : null}
+
         {loading ? (
           <SkeletonList rows={4} />
         ) : error ? (
           <ErrorState message={error} onRetry={refetch} />
-        ) : (data ?? []).length === 0 ? (
-          <EmptyState
-            title="Sem conversas ainda"
-            description="Abra a ficha do aluno (staff) ou aguarde o contato do seu personal."
-            icon={MessageCircle}
-          />
+        ) : filtered.length === 0 ? (
+          q.trim() ? (
+            <EmptyState
+              title="Nenhuma conversa encontrada"
+              description="Tente outro nome ou termo de busca."
+              icon={Search}
+            />
+          ) : (
+            <EmptyState
+              title="Sem conversas ainda"
+              description={
+                isStudent
+                  ? "Quando seu personal mandar uma mensagem por aqui, ela aparece nesta lista."
+                  : "Abra a ficha do aluno ou aguarde o contato do seu personal."
+              }
+              icon={MessageCircle}
+            />
+          )
         ) : (
-          (data ?? []).map((c) => (
+          filtered.map((c) => (
             <Link
               key={c.id}
               href={`${basePath}/${c.id}`}
