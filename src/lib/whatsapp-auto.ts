@@ -1,7 +1,7 @@
 /**
  * Adaptador server-only de envio automático de WhatsApp.
  * NUNCA importar de componente cliente: usa envs privadas e fetch de servidor.
- * Providers: none (padrão, skip), evolution (self-hosted) e meta (Cloud API).
+ * Providers: none (padrão, skip), waha (WAHA HTTP API), evolution (self-hosted) e meta (Cloud API).
  */
 
 import { logger } from "~/lib/logger";
@@ -74,6 +74,41 @@ export async function sendWhatsAppText(
     } catch (err) {
       logger.error("whatsapp.evolution_error", err);
       return { ok: false, error: "Falha ao enviar pelo Evolution." };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  if (provider === "waha") {
+    const apiUrl = process.env.WAHA_API_URL;
+    const apiKey = process.env.WAHA_API_KEY;
+    const session = process.env.WAHA_SESSION ?? "default";
+    if (!apiUrl || !apiKey) {
+      return {
+        ok: false,
+        error: "WAHA incompleto (WAHA_API_URL, WAHA_API_KEY).",
+      };
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    try {
+      const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/sendText`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": apiKey,
+        },
+        body: JSON.stringify({ session, chatId: `${phoneE164}@c.us`, text }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        logger.warn("whatsapp.waha_http", { status: res.status });
+        return { ok: false, error: `WAHA respondeu ${res.status}.` };
+      }
+      return { ok: true };
+    } catch (err) {
+      logger.error("whatsapp.waha_error", err);
+      return { ok: false, error: "Falha ao enviar pelo WAHA." };
     } finally {
       clearTimeout(timer);
     }
