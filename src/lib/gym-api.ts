@@ -28,8 +28,15 @@ import {
   type PointAdjustment,
 } from "~/lib/trainer-store";
 import type { WorkoutPlan } from "~/lib/ai/local-gen";
+import { notifyStaffPush } from "~/lib/push-client";
 
 export type GymUser = { id: string; gymId: string; name: string };
+
+const NEW_WORKOUT_PUSH = {
+  title: "Novo treino disponível",
+  body: "Seu personal publicou um treino para você. Abra o app para começar.",
+  url: "/app/treino",
+};
 
 /* ------------------------------------------------------------------ */
 /* Alunos da academia                                                  */
@@ -251,6 +258,7 @@ async function assignReal(
   if (retireErr) {
     throw new Error(`Plano salvo, mas falhou ao aposentar os treinos ativos anteriores de ${student.name}: ${retireErr.message}`);
   }
+  notifyStaffPush([student.id], NEW_WORKOUT_PUSH.title, NEW_WORKOUT_PUSH.body, NEW_WORKOUT_PUSH.url).catch(() => {});
   return programId;
 }
 
@@ -335,6 +343,7 @@ export async function assignExistingPlan(opts: {
       continue;
     }
     ok++;
+    notifyStaffPush([t.id], NEW_WORKOUT_PUSH.title, NEW_WORKOUT_PUSH.body, NEW_WORKOUT_PUSH.url).catch(() => {});
   }
   return { ok, failed };
 }

@@ -430,3 +430,13 @@ export type StudentTrainers = {
   trainer_id: string;
   assigned_at: string;
 };
+
+export type PushSubscriptions = {
+  id: string;
+  gym_id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  created_at: string;
+};

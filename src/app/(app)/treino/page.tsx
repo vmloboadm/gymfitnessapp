@@ -54,6 +54,7 @@ import { findInDatabase } from "~/lib/exercises-database";
 import { libraryMatch } from "~/lib/demo-data";
 import { toast } from "sonner";
 import { enqueueOffline, isOffline, isNetworkError } from "~/lib/offline-queue";
+import { apiPath } from "~/lib/api-path";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
 import { useWorkoutSession, elapsedSeconds, readSessionProgress, clearSessionProgress, isDayUnlocked, markDayUnlocked, TRAINING_GATE_OPEN } from "~/lib/workout-session";
@@ -580,6 +581,31 @@ export default function TreinoHomePage() {
                     slot: activeSlot,
                   } as never).then(() => {});
                 }
+                // avisa o personal (in-app + push + WhatsApp quando configurado)
+                const totalVolumeKg = rows.reduce((sum, r) => {
+                  const w = typeof r.weight_kg === "number" ? r.weight_kg : null;
+                  const reps = typeof r.reps === "number" ? r.reps : 0;
+                  return w && reps ? sum + w * reps : sum;
+                }, 0);
+                void supabase.auth
+                  .getSession()
+                  .then(({ data: sess }) => {
+                    const token = sess.session?.access_token;
+                    if (!token) return null;
+                    return fetch(apiPath("/api/notify/workout-done"), {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({
+                        workoutName: planActive[0]?.name ?? data?.program?.name ?? undefined,
+                        exerciseCount: inserted,
+                        ...(totalVolumeKg > 0 ? { totalVolumeKg } : {}),
+                      }),
+                    });
+                  })
+                  .catch(() => {});
               } else if (isNetworkError(logErr)) {
                 queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
                 queuedTotal = logRows.length;

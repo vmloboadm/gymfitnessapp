@@ -20,6 +20,7 @@ import type {
   Notifications,
   PremiumRequests,
   Profiles,
+  PushSubscriptions,
   SquadMembers,
   SquadMessages,
   Squads,
@@ -75,6 +76,7 @@ export interface Database {
       premium_requests: RowTables<PremiumRequests>;
       medical_clearances: RowTables<MedicalClearances>;
       student_trainers: RowTables<StudentTrainers>;
+      push_subscriptions: RowTables<PushSubscriptions>;
       page_views: RowTables<PageViews>;
     };
     Views: Record<string, never>;

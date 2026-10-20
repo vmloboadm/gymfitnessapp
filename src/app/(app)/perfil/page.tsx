@@ -6,10 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Settings, LogOut, CalendarClock, ChevronRight, Scale, FileText, BadgePercent, MessageCircle } from "lucide-react";
+  Settings, LogOut, CalendarClock, ChevronRight, Scale, FileText, BadgePercent, MessageCircle, Bell } from "lucide-react";
 import { gymSupportLink } from "~/lib/whatsapp";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { usePush } from "~/hooks/usePush";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -22,6 +23,7 @@ import type { StudentSubscriptions } from "~/lib/types/models";
 import { BUILD_LABEL } from "~/lib/build";
 import { DeleteAccount } from "~/components/account/DeleteAccount";
 import { getProfileEdits } from "~/lib/profile-store";
+import { toast } from "sonner";
 
 /**
  * Perfil DESTILADO: identidade, matrícula, peso, conquistas e ações.
@@ -36,6 +38,13 @@ export default function PerfilPage() {
   const { user, profile } = useAuth();
   const router = useRouter();
   const demo = isDemoMode();
+  const push = usePush();
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    setIsIOS(/iphone|ipad|ipod/i.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream);
+  }, []);
 
   const { data } = useAsyncQuery<{
     sub: StudentSubscriptions | null;
@@ -212,6 +221,66 @@ export default function PerfilPage() {
             </p>
           ) : null}
         </div>
+
+        {/* Notificações push */}
+        {!demo && push.supported ? (
+          <div className="gf-card gf-glass !py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 space-y-0.5">
+                <p className="gf-section flex items-center gap-1.5">
+                  <Bell className="h-3.5 w-3.5" /> Notificações
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Avisamos quando o personal publicar um treino novo para você.
+                </p>
+              </div>
+              {push.active ? (
+                <button
+                  type="button"
+                  disabled={push.enabling}
+                  onClick={() => {
+                    void push.disable().then(() => toast("Avisos desativados."));
+                  }}
+                  className="tactile shrink-0 rounded-full border border-border bg-card px-3.5 py-2 text-[11px] font-bold text-foreground"
+                >
+                  Desativar
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={push.enabling}
+                  onClick={() => {
+                    void (async () => {
+                      const ok = await push.enable();
+                      if (ok) {
+                        toast.success("Avisos ativados.");
+                      } else if (typeof Notification !== "undefined" && Notification.permission === "denied") {
+                        toast.error("Notificações bloqueadas", {
+                          description: "Libere nas configurações do navegador para ativar os avisos.",
+                        });
+                      } else {
+                        toast.error("Não foi possível ativar os avisos.");
+                      }
+                    })();
+                  }}
+                  className="tactile shrink-0 rounded-full bg-brand px-3.5 py-2 text-[11px] font-black text-brand-foreground"
+                >
+                  Ativar avisos
+                </button>
+              )}
+            </div>
+            {push.permission === "denied" ? (
+              <p className="mt-2 rounded-lg bg-muted/70 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+                Notificações bloqueadas. Libere o acesso nas configurações do navegador para ativar os avisos.
+              </p>
+            ) : null}
+            {isIOS ? (
+              <p className="mt-2 rounded-lg bg-muted/70 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+                No iPhone, use Compartilhar &gt; Adicionar à Tela de Início.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* Peso atual + evolução em um só bloco */}
         <div className="gf-card gf-glass !py-4">
