@@ -73,6 +73,7 @@ export function StudentSheet({
   // não alcançam este aluno. O botão abaixo resolve em 1 toque.
   const [linkedToMe, setLinkedToMe] = useState<boolean | null>(null);
   const [linking, setLinking] = useState(false);
+  const [renewing, setRenewing] = useState(false);
   useEffect(() => {
     if (!student?.id || !me?.id) {
       setLinkedToMe(null);
@@ -118,6 +119,31 @@ export function StudentSheet({
       });
     } finally {
       setLinking(false);
+    }
+  };
+
+  // Renova matrícula +1 mês via RPC (staff_renew_matricula). Sem isso o
+  // staff não tinha como editar vencimento: só o onboarding seta, e as
+  // RPCs staff_update_student/update_student_profile não tocam vencimento.
+  const renewMatricula = async () => {
+    if (!student || renewing) return;
+    setRenewing(true);
+    try {
+      const { data, error } = await supabaseBrowser().rpc("staff_renew_matricula", {
+        p_student_id: student.id,
+        p_months: 1,
+      });
+      if (error) throw new Error(error.message);
+      toast.success("Matrícula renovada", {
+        description: `Novo vencimento: ${new Date(String(data) + "T12:00:00").toLocaleDateString("pt-BR")}.`,
+      });
+      onClose();
+    } catch (e) {
+      toast.error("Não deu para renovar agora", {
+        description: String(e instanceof Error ? e.message : e).slice(0, 80),
+      });
+    } finally {
+      setRenewing(false);
     }
   };
 
@@ -486,6 +512,32 @@ export function StudentSheet({
                 ) : null}
               </div>
             </div>
+            {/* Matrícula (só Gymfitness tem vencimento editável no app) */}
+            {student.plan_type === "Gymfitness" && student.vencimento ? (
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">Matrícula</p>
+                  <p
+                    className={cn(
+                      "mt-0.5 text-[12.5px] font-bold",
+                      student.vencimento < new Date().toISOString().slice(0, 10)
+                        ? "text-[#F87171]"
+                        : "text-foreground"
+                    )}
+                  >
+                    Vencimento: {student.vencimento.split("-").reverse().join("/")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={renewMatricula}
+                  disabled={renewing}
+                  className="tactile shrink-0 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-[10.5px] font-black text-brand disabled:opacity-50"
+                >
+                  {renewing ? "Renovando..." : "Renovar +1 mês"}
+                </button>
+              </div>
+            ) : null}
             {/* Último feedback do aluno */}
             {lastFeedback ? (
               <div className="rounded-2xl border border-[#4ADE80]/20 bg-[#4ADE80]/[0.06] p-3">

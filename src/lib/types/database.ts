@@ -157,6 +157,10 @@ export interface Database {
         Args: { p_student_id: string; p_experience_level?: string | null; p_goal?: string | null; p_objetivo?: string | null; p_available_days?: string[] | null };
         Returns: void;
       };
+      staff_renew_matricula: {
+        Args: { p_student_id: string; p_months?: number };
+        Returns: string;
+      };
       ranking_90d: {
         Args: { p_gym_id: string };
         Returns: Array<{ student_id: string; sessions: number; load_kg: number; points: number }>;

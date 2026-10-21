@@ -698,9 +698,12 @@ export default function TreinoHomePage() {
 
   // Finaliza de qualquer lugar (barra fixa, nudge dos 45min). O conclude()
   // cuida do toast, da fase "done" e da trava anti duplo-toque.
+  // Passa o progresso salvo: sem ele, séries parciais (exercício não 100%)
+  // eram descartadas e o treino registrava vazio.
   const finishNow = () => {
     navigator.vibrate?.([60, 40, 60]);
-    void conclude([...completedRef.current]);
+    const saved = readSessionProgress()?.progress ?? {};
+    void conclude([...completedRef.current], saved);
   };
 
   // Nudge aos 45min de sessão: pergunta se está tudo bem e oferece finalizar

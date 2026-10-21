@@ -206,7 +206,7 @@ export default function HomePage() {
   }, []);
   // Check-in contextual: lido da MESMA fonte que a aba Check-in grava (localStorage por dia)
   // SESSÃO ÚNICA (gate por scan) — mesma fonte do Treino e Checkin
-  const { session, end: endSession } = useWorkoutSession();
+  const { session } = useWorkoutSession();
   const isCheckedInToday = !!session;
   const startedAt = session?.startedAt ?? null;
 
@@ -520,8 +520,11 @@ export default function HomePage() {
               <button
                 data-testid="finalizar-treino-home"
                 onClick={() => {
-                  endSession();
-                  toast.success("Treino finalizado. Descanse bem!");
+                  // NÃO finaliza aqui: este botão só limpava a sessão local com
+                  // toast de sucesso e nada era gravado no banco (o aluno via
+                  // "treino finalizado" mas workout_logs ficava vazio). Manda
+                  // pra tela de treino, que retoma e conclui de verdade.
+                  router.push("/treino?resume=1");
                 }}
                 className="gf-touch tactile shrink-0 rounded-full bg-success px-4 py-2 text-[12px] font-black text-black transition-transform active:scale-95"
               >
