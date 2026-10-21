@@ -29,7 +29,11 @@ function ensureVapidDetails(): boolean {
   }
 }
 
-export type DeliverResult = { sent: number };
+export type DeliverResult = {
+  sent: number;
+  /** diagnostico quando sent=0: qtd de assinaturas, vapid ok e ultimo erro */
+  diag?: { subs: number; vapid: boolean; lastError: string | null };
+};
 
 /**
  * Insere o histórico in-app e envia push para cada usuário.
@@ -51,6 +55,9 @@ export async function deliverNotification(
     privateKey: process.env.VAPID_PRIVATE_KEY ?? "",
   };
   let sent = 0;
+  let subsTotal = 0;
+  let lastError: string | null = null;
+  let vapidOk = false;
 
   for (const userId of opts.userIds) {
     await admin
@@ -69,12 +76,19 @@ export async function deliverNotification(
       .eq("user_id", userId);
 
     for (const sub of subs ?? []) {
-      if (!ensureVapidDetails()) continue;
+      subsTotal++;
+      vapidOk = ensureVapidDetails();
+      if (!vapidOk) {
+        lastError = lastError ?? "vapid indisponivel";
+        continue;
+      }
       try {
         await webpush.sendNotification(sub.endpoint, payload, { vapidDetails });
         sent++;
       } catch (err) {
         const status = (err as { statusCode?: number }).statusCode;
+        const msg = err instanceof Error ? err.message : String(err);
+        lastError = `status=${status} ${msg}`.slice(0, 240);
         if (status === 404 || status === 410) {
           await admin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
         }
@@ -83,5 +97,8 @@ export async function deliverNotification(
     }
   }
 
+  if (sent === 0) {
+    return { sent, diag: { subs: subsTotal, vapid: vapidOk, lastError } };
+  }
   return { sent };
 }

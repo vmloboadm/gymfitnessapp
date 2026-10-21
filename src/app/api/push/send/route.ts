@@ -73,12 +73,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, sent: 0 });
   }
 
-  const { sent } = await deliverNotification(admin, {
+  const { sent, diag } = await deliverNotification(admin, {
     gymId: caller.gym_id,
     userIds: sameGym,
     title,
     body: text,
     url,
   });
-  return NextResponse.json({ ok: true, sent });
+  return NextResponse.json({ ok: true, sent, ...(diag ? { diag } : {}) });
 }
