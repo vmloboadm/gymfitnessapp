@@ -83,7 +83,12 @@ export async function deliverNotification(
         continue;
       }
       try {
-        await webpush.sendNotification(sub.endpoint, payload, { vapidDetails });
+        // web-push 3.x exige objeto {endpoint, keys} (string pura lanca erro)
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload,
+          { vapidDetails }
+        );
         sent++;
       } catch (err) {
         const status = (err as { statusCode?: number }).statusCode;
