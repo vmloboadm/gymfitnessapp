@@ -873,7 +873,7 @@ function PersonalTreinosContent() {
     setEntry(null);
     setUsedFallback(false);
     toast.success("Monte os dias abaixo", {
-      description: "Toque em Adicionar em cada dia e busque na biblioteca.",
+      description: "Toque em Escolher exercícios por categoria e marque quantos quiser de uma vez.",
     });
   };
 
@@ -977,7 +977,12 @@ function PersonalTreinosContent() {
         rpe: rx.rpe,
         dica: "",
       }));
-    if (novos.length === 0) return;
+    if (novos.length === 0) {
+      toast.error("Não consegui adicionar os exercícios marcados", {
+        description: "Abra a escolha de novo e marque os que quiser.",
+      });
+      return;
+    }
     const di = pickSheet.dayIdx;
     setPlan({
       ...plan,
@@ -2130,6 +2135,17 @@ function PersonalTreinosContent() {
                     </div>
                   );
                 })() : null}
+
+                {/* plano manual/edição: o seletor em múltipla escolha vale pra todo modo */}
+                {plan.modo !== "esqueleto" ? (
+                  <button
+                    type="button"
+                    onClick={() => openPick(activeDay)}
+                    className="tactile mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-2.5 text-[12px] font-black text-brand-foreground"
+                  >
+                    <ListChecks className="h-3.5 w-3.5" /> Escolher exercícios por categoria
+                  </button>
+                ) : null}
 
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Use as setas para reordenar · troque ou edite direto no card
