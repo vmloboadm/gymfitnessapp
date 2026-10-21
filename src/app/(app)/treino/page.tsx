@@ -558,8 +558,12 @@ export default function TreinoHomePage() {
               workout_id: m?.workoutId || null,
               exercise_id: exerciseId,
               date: localISO(),
+              // workout_logs.weight_kg é NOT NULL: um null (aluno sem carga
+              // numa série) derrubava o INSERT do lote inteiro e NENHUM log
+              // entrava — era por isso que "registrava" mas o histórico ficava
+              // vazio. 0 = sem carga, mesmo valor do default da coluna.
+              weight_kg: realWeight ?? 0,
               reps: realReps,
-              weight_kg: realWeight,
               rpe: m?.rpe ?? null,
             }];
           });
