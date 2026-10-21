@@ -16,6 +16,7 @@ import {
   UserRound,
   Trophy,
   BarChart3,
+  Newspaper,
 } from "lucide-react";
 
 /** Nav do personal: itens fixos, Aprovações com badge de pendentes. */
@@ -23,6 +24,7 @@ const TRAINER_NAV = [
   { href: "/personal/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/personal/alunos", label: "Alunos", icon: Users },
   { href: "/personal/treinos", label: "Treinos", icon: ClipboardList },
+  { href: "/feed", label: "Feed", icon: Newspaper },
   { href: "/personal/aprovacoes", label: "Aprovações", icon: Inbox, badge: true },
   { href: "/personal/ranking", label: "Ranking", icon: Trophy },
   { href: "/personal/perfil", label: "Perfil", icon: UserRound },
@@ -33,6 +35,7 @@ const MANAGER_NAV = [
   { href: "/personal/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/personal/alunos", label: "Alunos", icon: Users },
   { href: "/personal/treinos", label: "Treinos", icon: ClipboardList },
+  { href: "/feed", label: "Feed", icon: Newspaper },
   { href: "/personal/aprovacoes", label: "Aprovações", icon: Inbox, badge: true },
   { href: "/personal/ranking", label: "Ranking", icon: Trophy },
   { href: "/dashboard", label: "Painel", icon: BarChart3 },
