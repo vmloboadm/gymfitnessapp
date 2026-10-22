@@ -211,6 +211,12 @@ export async function middleware(request: NextRequest) {
   // Sem login e em rota protegida → login com next param
   // (API responde 401 JSON em vez de redirect para página HTML)
   if (!user && !PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+    // Rotas /api/staff/* validam o JWT do Bearer dentro da própria rota
+    // (ações do staff). O cookie pode não vir em chamadas via fetch com
+    // Authorization, então liberamos apenas esse prefixo.
+    if (pathname.startsWith("/api/staff/") && (request.headers.get("authorization") ?? "").toLowerCase().startsWith("bearer ")) {
+      return response;
+    }
     if (pathname === "/") {
       // produção: visitante não vê a home do aluno — vai pro login
       return redirectTo(request, "/login");
