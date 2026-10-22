@@ -106,7 +106,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const tokenHash = (link as { hashed_token?: string }).hashed_token ?? "";
+  const tokenHash =
+    (link as { properties?: { hashed_token?: string }; hashed_token?: string }).properties?.hashed_token ??
+    (link as { hashed_token?: string }).hashed_token ??
+    "";
   if (!tokenHash) {
     return NextResponse.json({ ok: false, error: "Link sem token." }, { status: 500 });
   }
