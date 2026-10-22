@@ -470,6 +470,26 @@ export default function FeedPage() {
           </div>
         </div>
 
+        {/* MISSÕES DA SEMANA: deixa visível o que dá pontos (check-in +5, post +10, treino +15, treinar-juntos +30) */}
+        <div className="gf-card gf-glass !py-3.5">
+          <p className="gf-section mb-2 flex items-center gap-1.5">
+            <Flame className="h-3.5 w-3.5 text-warning" aria-hidden /> Missões da semana
+          </p>
+          <ul className="space-y-1.5">
+            {[
+              { label: "Fazer check-in na academia", pts: 5 },
+              { label: "Postar no feed", pts: 10 },
+              { label: "Concluir um treino", pts: 15 },
+              { label: "Convidar alguém pra treinar junto", pts: 30 },
+            ].map((m) => (
+              <li key={m.label} className="flex items-center justify-between gap-2 text-[12px]">
+                <span className="text-muted-foreground">{m.label}</span>
+                <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-black text-brand">+{m.pts}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {loading ? (
           <SkeletonList rows={4} />
         ) : error ? (

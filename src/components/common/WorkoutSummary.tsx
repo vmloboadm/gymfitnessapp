@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { m } from "framer-motion";
-import { Camera, CheckCircle2, Copy, MessageCircle, Timer, Dumbbell , Trophy} from "lucide-react";
+import { Camera, CheckCircle2, Copy, MessageCircle, Timer, Dumbbell, Trophy, Bell, BellRing } from "lucide-react";
+import { usePush } from "~/hooks/usePush";
 import { TopBar } from "~/components/layout/TopBar";
 import { formatMMSS } from "~/lib/workout-session";
 import { nextToUnlock, unlockAchievement, type StudentAchievement } from "~/lib/achievements";
@@ -69,6 +70,8 @@ export default function WorkoutSummary({
   const [rpe, setRpe] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const push = usePush();
+  const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
 
   useEffect(() => {
     if (achievement) {
@@ -228,6 +231,41 @@ export default function WorkoutSummary({
             ))}
           </div>
         </div>
+
+        {/* ATIVAR PUSH: só aparece se suportado e ainda não ativo */}
+        {push.supported && push.permission !== "granted" && !pushPromptDismissed ? (
+          <m.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="gf-card gf-glass flex items-center gap-3 !py-3.5"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand/15">
+              <Bell className="h-5 w-5 text-brand" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-foreground">Fique por dentro</p>
+              <p className="text-[11px] text-muted-foreground">Ative as notificações e não perde treino, ranking nem recado da academia.</p>
+            </div>
+            <div className="flex shrink-0 flex-col gap-1">
+              <button
+                onClick={async () => {
+                  const ok = await push.enable();
+                  if (ok) toast.success("Notificações ativadas!");
+                  else toast.error("Não ativou agora. Você pode ativar no seu perfil.");
+                }}
+                className="gf-touch rounded-lg bg-brand px-3 py-1.5 text-[11px] font-black text-brand-foreground"
+              >
+                Ativar
+              </button>
+              <button
+                onClick={() => setPushPromptDismissed(true)}
+                className="gf-touch text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+              >
+                Agora não
+              </button>
+            </div>
+          </m.div>
+        ) : null}
 
         {/* NOTA RÁPIDA com exemplos */}
         <div className="gf-card gf-glass !py-4">
