@@ -108,24 +108,15 @@ export function FinalStepForm({
     setSaving(true);
     try {
       if (withExtras && !isDemo) {
-        const hasSavedPhoto = !!profile.avatar_url;
-        // Foto de perfil é obrigatória: o personal precisa reconhecer o aluno pelo rosto.
-        if (!pendingBlob && !hasSavedPhoto) {
-          toast.error("A foto de perfil é obrigatória", {
-            description: "Escolha uma foto do seu rosto para concluir o cadastro.",
-          });
-          setSaving(false);
-          return;
-        }
+        // Foto: recomendada, NÃO obrigatória. Exigir a foto travava alunos no
+        // último passo do cadastro e escondia o treino deles.
         if (pendingBlob) {
           try {
             await uploadPhoto();
-          } catch (e) {
+          } catch {
             toast.error("Não consegui enviar a foto", {
-              description: String(e).slice(0, 80),
+              description: "O cadastro segue sem foto. Você pode adicionar depois no perfil.",
             });
-            setSaving(false);
-            return;
           }
         }
         if (chosen) {
@@ -276,7 +267,7 @@ export function FinalStepForm({
           Finalizar cadastro
         </Button>
         <p className="text-center text-[11px] leading-snug text-muted-foreground/70">
-          A foto é obrigatória — é assim que seu personal e a academia te reconhecem.
+          A foto ajuda seu personal a te reconhecer, mas não é obrigatória. Você pode adicionar depois no perfil.
         </p>
       </div>
 

@@ -737,7 +737,7 @@ export function StudentSheet({
               {assigned.length > 0 ? (
                 <div className="rounded-2xl border border-brand/30 bg-brand/[0.08] p-3">
                   <p className="text-[9.5px] font-bold uppercase tracking-wider text-brand">
-                    Do seu Personal
+                    Do seu Personal · plano ativo
                   </p>
                   <p className="mt-1 text-[13px] font-bold text-foreground">
                     {assigned[0].name} · {assigned[0].exercises.length} exercícios
@@ -745,6 +745,29 @@ export function StudentSheet({
                   <p className="text-[10px] text-muted-foreground">
                     {assigned[0].frequency} · enviado {fmtDate(assigned[0].created_at)}
                   </p>
+                  {assigned[0].plan?.dias?.length ? (
+                    <div className="mt-2 space-y-1">
+                      {assigned[0].plan.dias.map((d, i) => {
+                        const slot = (d as { slot?: string }).slot ?? "ABCDEF"[i] ?? String(i + 1);
+                        return (
+                          <div
+                            key={`${slot}-${i}`}
+                            className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-black/25 px-2 py-1.5"
+                          >
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand/20 font-display text-[10.5px] font-black text-brand">
+                              {slot}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-foreground">
+                              {d.nome}
+                            </span>
+                            <span className="shrink-0 text-[9.5px] font-semibold text-muted-foreground">
+                              {d.exercicios.length} {d.exercicios.length === 1 ? "exercício" : "exercícios"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {history.length > 0 ? (

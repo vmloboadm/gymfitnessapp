@@ -30,6 +30,7 @@ import {
   Dumbbell,
   ListChecks,
   MessageCircle,
+  Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
@@ -49,6 +50,7 @@ import {
   type DBEquipment,
 } from "~/lib/ai/local-gen";
 import { demoLib } from "~/lib/demo-bridge";
+import { tecnicaPosition } from "~/lib/workout-groups";
 import { buildSkeleton, defaultPrescription } from "~/lib/ai/skeleton";
 import {
   type PersonalStudent,
@@ -1940,25 +1942,42 @@ function PersonalTreinosContent() {
                 {plan.observacao_geral}
               </p>
 
-              {/* tabs de dias + expandir tudo */}
+              {/* tabs de dias + expandir tudo — quebra em linhas: nenhum dia fica escondido */}
               {plan.dias.length > 1 ? (
-                <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Dias do plano">
-                  {plan.dias.map((d, i) => (
-                    <button
-                      key={d.nome + i}
-                      role="tab"
-                      aria-selected={activeDay === i}
-                      onClick={() => setActiveDay(i)}
-                      className={cn(
-                        "shrink-0 rounded-full border px-3 py-2 text-[10.5px] font-bold transition-colors",
-                        activeDay === i
-                          ? "border-brand bg-brand text-brand-foreground"
-                          : "border-white/[0.06] bg-white/[0.03] text-muted-foreground"
-                      )}
-                    >
-                      {d.nome}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Dias do plano">
+                  {plan.dias.map((d, i) => {
+                    const slot = plan.dias[i]?.slot ?? "ABCDEF"[i] ?? String(i + 1);
+                    const nEx = d.exercicios.length;
+                    return (
+                      <button
+                        key={d.nome + i}
+                        role="tab"
+                        aria-selected={activeDay === i}
+                        onClick={() => setActiveDay(i)}
+                        className={cn(
+                          "flex min-w-[46%] flex-1 items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition-colors",
+                          activeDay === i
+                            ? "border-brand bg-brand/15 text-foreground"
+                            : "border-white/[0.06] bg-white/[0.03] text-muted-foreground"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg font-display text-[12px] font-black",
+                            activeDay === i ? "bg-brand text-brand-foreground" : "bg-white/[0.07] text-foreground/70"
+                          )}
+                        >
+                          {slot}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[10.5px] font-bold leading-tight">{d.nome}</span>
+                          <span className="block text-[9px] font-semibold opacity-70">
+                            {nEx} {nEx === 1 ? "exercício" : "exercícios"}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : null}
 
@@ -2160,11 +2179,29 @@ function PersonalTreinosContent() {
                 </p>
 
                 <div className="space-y-2">
-                  {day.exercicios.map((e, i) => (
+                  {day.exercicios.map((e, i) => {
+                    const pos = tecnicaPosition(day.exercicios, i);
+                    return (
                     <div
                       key={`${activeDay}-${e.exercicio}-${i}`}
-                      className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5"
+                      className={cn(
+                        "relative rounded-xl border p-2.5",
+                        pos.role
+                          ? "border-brand/45 bg-brand/[0.06]"
+                          : "border-white/[0.06] bg-white/[0.03]"
+                      )}
                     >
+                      {pos.role ? (
+                        <>
+                          <span className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-brand" aria-hidden />
+                          <p className="mb-1.5 flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-brand">
+                            <Link2 className="h-3 w-3" />
+                            {pos.role === "start"
+                              ? `${e.tecnica === "triset" ? "Tri-set" : "Bi-set"} · começa aqui`
+                              : "continuação · sem descanso"}
+                          </p>
+                        </>
+                      ) : null}
                       {/* linha 1: setas de ordem + nome inteiro, sem corte */}
                       <div className="flex items-start gap-1.5">
                         <div className="flex shrink-0 flex-col">
@@ -2276,7 +2313,8 @@ function PersonalTreinosContent() {
                         <p className="mt-1.5 break-words pl-6 text-[10px] leading-snug text-muted-foreground">{e.dica}</p>
                       ) : null}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <button

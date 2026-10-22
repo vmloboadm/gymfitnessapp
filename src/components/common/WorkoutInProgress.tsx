@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { m, AnimatePresence } from "framer-motion";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Info, PlayCircle, Timer, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Info, PlayCircle, Timer, X, Link2 } from "lucide-react";
 import { type ExerciseDetail } from "~/components/common/ExerciseInfoSheet";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
@@ -12,6 +12,7 @@ import { cn } from "~/lib/utils";
 import { assetPath } from "~/lib/asset-path";
 import { readSessionProgress, saveSessionProgress } from "~/lib/workout-session";
 import { ImageLightbox } from "~/components/common/ImageLightbox";
+import { groupByTecnica, tecnicaLabel } from "~/lib/workout-groups";
 
 export type WExercise = {
   id: string;
@@ -164,6 +165,17 @@ export default function WorkoutInProgress({
   const current = exercises[currentIdx];
   const currentProgress = current ? progress[current.id] : null;
   const currentAllDone = !!currentProgress?.sets.length && currentProgress.sets.every((s) => s.done);
+  // Bloco conjugado: agrupa igual ao editor (marcar 1 ou os 2 dá no mesmo)
+  const currentGroup = useMemo(
+    () => groupByTecnica(exercises).find((g) => g.items.some((x) => x.index === currentIdx)) ?? null,
+    [exercises, currentIdx]
+  );
+  const isGroupStart = !!currentGroup && currentGroup.items[0]?.index === currentIdx;
+  const upNext =
+    currentGroup && currentGroup.items.length > 1 && isGroupStart
+      ? currentGroup.items.slice(1).map((x) => x.item)
+      : [];
+  const groupLabel = currentGroup && currentGroup.items.length > 1 ? tecnicaLabel(currentGroup.tecnica) : null;
   const nextEx = exercises[currentIdx + 1];
   const isLast = currentIdx === exercises.length - 1;
 
@@ -376,16 +388,32 @@ export default function WorkoutInProgress({
                   <h1 className="text-xl font-black leading-tight text-foreground">{current.name}</h1>
                   <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] font-semibold text-muted-foreground">
                     {current.sets} séries × {current.reps} reps
-                    {current.tecnica && current.tecnica !== "normal" ? (
+                    {groupLabel ? (
                       <span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-brand">
-                        {current.tecnica === "biset"
-                          ? "Bi-set"
-                          : current.tecnica === "triset"
-                            ? "Tri-set"
-                            : "Drop-set"}
+                        {groupLabel}
                       </span>
                     ) : null}
                   </p>
+                  {upNext.length > 0 ? (
+                    <div className="mt-2 rounded-xl border border-brand/35 bg-brand/[0.08] px-2.5 py-2">
+                      <p className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-brand">
+                        <Link2 className="h-3 w-3" /> {groupLabel} · sem descanso
+                      </p>
+                      <p className="mt-0.5 text-[11px] font-semibold text-foreground">
+                        Em seguida: {upNext.map((e) => e.name).join(" → ")}
+                      </p>
+                    </div>
+                  ) : null}
+                  {groupLabel && !isGroupStart ? (
+                    <div className="mt-2 rounded-xl border border-brand/35 bg-brand/[0.08] px-2.5 py-2">
+                      <p className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-brand">
+                        <Link2 className="h-3 w-3" /> {groupLabel} · sem descanso
+                      </p>
+                      <p className="mt-0.5 text-[11px] font-semibold text-foreground">
+                        Conjugado com o exercício anterior. Descanso só ao fechar o bloco.
+                      </p>
+                    </div>
+                  ) : null}
                   <div className="mt-2 flex gap-2">
                     <button
                       onClick={() =>

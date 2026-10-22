@@ -17,6 +17,8 @@ import {
   ScanLine,
   ArrowUpRight,
   KeyRound,
+  ArrowDown,
+  Link2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
@@ -43,6 +45,7 @@ const BodyMap = dynamic(() => import("~/components/body-map"), { ssr: false });
 import { ImageLightbox } from "~/components/common/ImageLightbox";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
+import { groupByTecnica, tecnicaLabel, tecnicaHint, type PlanExercise } from "~/lib/workout-groups";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { ProvisionalTemplates } from "~/components/training/ProvisionalTemplates";
 import { CardioQuickAdd } from "~/components/training/CardioQuickAdd";
@@ -1323,21 +1326,60 @@ export default function TreinoHomePage() {
                         Aquecimento: {sugDay.aquecimento.join(" · ")}
                       </p>
                     ) : null}
-                    <ul className="divide-y divide-white/[0.05] rounded-xl border border-white/[0.06] bg-white/[0.02]">
-                      {sugDay.exercicios.map((e, i) => (
-                        <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-[12.5px] font-semibold text-foreground">
-                              {i + 1}. {e.exercicio}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground">RPE {e.rpe}{e.dica ? ` · ${e.dica}` : ""}</p>
+                    <div className="space-y-2">
+                      {groupByTecnica(sugDay.exercicios as PlanExercise[]).map((g, gi) => {
+                        const hint = tecnicaHint(g.tecnica);
+                        const grouped = g.items.length > 1;
+                        return (
+                          <div
+                            key={`g-${gi}`}
+                            className={
+                              grouped
+                                ? "relative overflow-hidden rounded-xl border border-brand/40 bg-brand/[0.06] pl-3"
+                                : "rounded-xl border border-white/[0.06] bg-white/[0.02]"
+                            }
+                          >
+                            {grouped ? (
+                              <>
+                                {/* colchete vertical: amarra os exercícios do bloco */}
+                                <span className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-brand" aria-hidden />
+                                <div className="flex items-center gap-1.5 px-3 pt-2 text-[9.5px] font-black uppercase tracking-wider text-brand">
+                                  <Link2 className="h-3 w-3" /> {tecnicaLabel(g.tecnica)} · {g.items.length} exercícios
+                                </div>
+                              </>
+                            ) : null}
+                            <ul className="divide-y divide-white/[0.05]">
+                              {g.items.map(({ item: e, index: i }, k) => (
+                                <li key={i}>
+                                  {k > 0 ? (
+                                    <div className="flex items-center gap-1.5 px-3 pt-1.5 text-[9.5px] font-bold uppercase tracking-wide text-brand/80">
+                                      <ArrowDown className="h-3 w-3" /> direto, sem descanso
+                                    </div>
+                                  ) : null}
+                                  <div className="flex items-center justify-between gap-3 px-3 py-2">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-[12.5px] font-semibold text-foreground">
+                                        {i + 1}. {e.exercicio}
+                                      </p>
+                                      <p className="text-[10px] text-muted-foreground">
+                                        RPE {e.rpe}
+                                        {!grouped && e.dica ? ` · ${e.dica}` : ""}
+                                      </p>
+                                    </div>
+                                    <p className="shrink-0 text-[11px] font-bold tabular-nums text-brand">
+                                      {e.series}x {e.reps} · {e.descanso}
+                                    </p>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                            {hint ? (
+                              <p className="px-3 pb-2 text-[10px] leading-snug text-brand/80">{hint}</p>
+                            ) : null}
                           </div>
-                          <p className="shrink-0 text-[11px] font-bold tabular-nums text-brand">
-                            {e.series}x {e.reps} · {e.descanso}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
+                        );
+                      })}
+                    </div>
                     {sugDay.finalizador ? (
                       <p className="rounded-xl border border-brand/20 bg-brand/[0.06] p-2.5 text-[10.5px] leading-snug text-brand">
                         Finalizador: {sugDay.finalizador}

@@ -241,8 +241,18 @@ export async function middleware(request: NextRequest) {
 
     // Aluno com onboarding incompleto → força onboarding (páginas; API passa
     // direto para que upload da foto e outras chamadas funcionem no cadastro)
+    // Aluno com onboarding incompleto → força onboarding, EXCETO se já tem
+    // treino ativo: a ficha é o que ele precisa ver, e travar no cadastro
+    // escondia o plano (alunos ficavam presos no último passo).
     if (p && p.role === "student" && !p.onboarding_completed && !isApiRoute && !pathname.startsWith("/onboarding")) {
-      return redirectTo(request, "/onboarding");
+      const { data: activePlan } = await supabase
+        .from("student_workouts")
+        .select("id")
+        .eq("student_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle();
+      if (!activePlan) return redirectTo(request, "/onboarding");
     }
 
     // Role check
