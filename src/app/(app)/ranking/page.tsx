@@ -270,11 +270,13 @@ export default function RankingPage() {
 
   // Lista do ranking: com busca varre a lista INTEIRA (inclusive pódio)
   // mantendo a posição real; sem busca, segue 4º em diante.
+  // A busca usa o NOME COMPLETO (displayName encurta pra "Nome S." e
+  // impediria achar alguém pelo sobrenome ou por um termo do meio).
   const q = query.trim().toLowerCase();
   const listRows = (data?.rows ?? [])
     .map((row, idx) => ({ row, pos: idx }))
     .filter(({ row, pos }) =>
-      q ? displayName(row.student?.name ?? "").toLowerCase().includes(q) : pos >= 3
+      q ? (row.student?.name ?? "").toLowerCase().includes(q) : pos >= 3
     );
 
   return (
