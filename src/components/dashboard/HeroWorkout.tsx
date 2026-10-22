@@ -72,8 +72,9 @@ export function HeroWorkout({
           sizes="(max-width: 640px) 100vw, 448px"
           className="object-cover object-center transition-transform duration-[1400ms] ease-out group-hover:scale-[1.06]"
         />
-        {/* overlay bottom-up (legibilidade total) */}
-        <span className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/20" aria-hidden />
+        {/* overlay bottom-up (legibilidade total) + véu superior pro título */}
+        <span className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/35" aria-hidden />
+        <span className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-black/45 to-transparent" aria-hidden />
         <span
           className="absolute inset-0 mix-blend-overlay"
           style={{ background: "linear-gradient(115deg, rgba(255,111,22,0.35) 0%, rgba(255,111,22,0) 50%)" }}

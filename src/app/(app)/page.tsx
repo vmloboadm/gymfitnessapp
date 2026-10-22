@@ -501,15 +501,16 @@ export default function HomePage() {
       <div className="relative mx-auto max-w-md pb-32 pt-8">
         {/* ORBS DE AMBIENTE: luz difusa atrás do cockpit/hero — dá profundidade premium sem poluir.
             z negativo: pai é relative sem z-index (não cria stacking context), então o orb
-            vai pra trás de todo o conteúdo, mas à frente do canvas escuro do body. */}
-        <div className="pointer-events-none absolute inset-x-0 -top-24 -z-10 h-[420px] overflow-hidden" aria-hidden>
+            vai pra trás de todo o conteúdo, mas à frente do canvas escuro do body.
+            Posição: atrás da saudação/anel (banner e check-in têm fundo opaco e cobririam). */}
+        <div className="pointer-events-none absolute inset-x-0 top-24 -z-10 h-[520px] overflow-hidden" aria-hidden>
           <div
-            className="absolute -left-16 top-0 h-64 w-64 rounded-full blur-[70px]"
-            style={{ background: "radial-gradient(circle, rgba(244,113,30,0.34), transparent 70%)", animation: "float-orb 9s ease-in-out infinite" }}
+            className="absolute -left-20 top-0 h-72 w-72 rounded-full blur-[64px]"
+            style={{ background: "radial-gradient(circle, rgba(244,113,30,0.5), transparent 70%)", animation: "float-orb 9s ease-in-out infinite" }}
           />
           <div
-            className="absolute -right-14 top-36 h-56 w-56 rounded-full blur-[70px]"
-            style={{ background: "radial-gradient(circle, rgba(56,120,255,0.20), transparent 70%)", animation: "float-orb 11s ease-in-out infinite reverse" }}
+            className="absolute -right-16 top-44 h-64 w-64 rounded-full blur-[64px]"
+            style={{ background: "radial-gradient(circle, rgba(56,120,255,0.3), transparent 70%)", animation: "float-orb 11s ease-in-out infinite reverse" }}
           />
         </div>
         <PendingApprovalBanner />
