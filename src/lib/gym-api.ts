@@ -12,6 +12,7 @@
 
 import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { normalizaTecnica } from "~/lib/workout-groups";
 import { demoPersonalStudents, type PersonalStudent } from "~/lib/personal-data";
 import {
   listAssignedWorkouts,
@@ -618,7 +619,7 @@ export async function fetchMyAssignedPlans(
       workout_programs (
         id, name, objective, ai_draft, created_at,
         workout_days ( id, name, day_order,
-          workout_exercises ( exercise_id, sets, reps, rest_seconds, rpe, notes, ord, exercises ( name ) )
+          workout_exercises ( exercise_id, sets, reps, rest_seconds, rpe, notes, technique, ord, exercises ( name ) )
         )
       )
     `)
@@ -638,7 +639,7 @@ export async function fetchMyAssignedPlans(
       workout_days: Array<{
         name: string;
         day_order: number;
-        workout_exercises: Array<{ sets: number; reps: string; rest_seconds: number; rpe: number | null; notes: string | null; ord: number; exercises?: { name: string } | null }>;
+        workout_exercises: Array<{ sets: number; reps: string; rest_seconds: number; rpe: number | null; notes: string | null; technique?: string | null; ord: number; exercises?: { name: string } | null }>;
       }>;
     };
   };
@@ -699,6 +700,7 @@ export async function fetchMyAssignedPlans(
                 descanso: `${e.rest_seconds}s`,
                 rpe: e.rpe ?? 7,
                 dica: e.notes?.split(".")[1]?.trim() ?? "",
+                tecnica: normalizaTecnica(e.technique),
               })),
             finalizador: "",
           })),
