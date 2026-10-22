@@ -466,6 +466,16 @@ export default function TreinoHomePage() {
       : Object.entries(progMap)
           .filter(([, v]) => (v.sets ?? []).some((s) => s?.done))
           .map(([k]) => k);
+    // snapshot das exercícios ANTES de limpar: no reload da página o state
+    // `session` volta null e sem a lista nenhum exercise_id resolve (o log
+    // ficava de "não entrou no histórico" mesmo com séries marcadas)
+    const savedExList = (() => {
+      try {
+        return (readSessionProgress()?.exercises ?? []) as Array<{ id?: string; name?: string }>;
+      } catch {
+        return [];
+      }
+    })();
     setConcludedCount(loggedIds.length || ids.length);
     endDaySession();
     clearSessionProgress();
@@ -497,7 +507,7 @@ export default function TreinoHomePage() {
           const supabase = supabaseBrowser();
           const offline = isOffline();
           const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
-          const sessList = session ?? [];
+          const sessList = (session ?? savedExList) as Array<{ id?: string; name: string; reps?: string }>;
           const missing = loggedIds.filter(
             (id) => !(planExerciseMap && planExerciseMap[id]?.exerciseId)
           );
