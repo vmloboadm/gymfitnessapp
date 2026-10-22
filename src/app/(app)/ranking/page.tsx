@@ -1,6 +1,6 @@
 "use client";
 
-import { Crown, Medal, Trophy, Users, Flame, TrendingUp, ChevronRight, Gem, Award } from "lucide-react";
+import { Crown, Medal, Trophy, Users, Flame, TrendingUp, ChevronRight, Gem, Award, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
 import { pinBelowPodium, PINNED_BELOW_PODIUM } from "~/lib/gym-api";
 import { loadEarnedAchievements, type StudentAchievement } from "~/lib/achievements";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
+import { CountUp } from "~/components/common/CountUp";
 import type { Leaderboard, Profiles } from "~/lib/types/models";
 
 // Ligas por faixa (gamificação estilo Duolingo)
@@ -76,6 +77,7 @@ export default function RankingPage() {
   const [period, setPeriod] = useState<PeriodId>("week");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const inviteTogether = async (id: string, name?: string) => {
     if (demo || inviting) return;
@@ -266,6 +268,15 @@ export default function RankingPage() {
   // minutos pra reset (só a semana zera na segunda)
   const resetMins = useResetCountdown(weekStart);
 
+  // Lista do ranking: com busca varre a lista INTEIRA (inclusive pódio)
+  // mantendo a posição real; sem busca, segue 4º em diante.
+  const q = query.trim().toLowerCase();
+  const listRows = (data?.rows ?? [])
+    .map((row, idx) => ({ row, pos: idx }))
+    .filter(({ row, pos }) =>
+      q ? displayName(row.student?.name ?? "").toLowerCase().includes(q) : pos >= 3
+    );
+
   return (
     <>
       <TopBar title="Comunidade" subtitle={`Ranking ${periodLabel.toLowerCase()} · ${players} atletas na disputa`} />
@@ -405,10 +416,19 @@ export default function RankingPage() {
 
         {/* Pódio, top 3 da semana em destaque — 1º central, mais alto */}
         {!loading && !error && data && data.rows.length >= 3 ? (
-          <div className="gf-rise rounded-[20px] border border-border bg-card/40 p-4" style={{ animationDelay: "120ms" }}>
+          <div className="gf-rise relative overflow-hidden rounded-[20px] border border-border bg-card/40 p-4" style={{ animationDelay: "120ms" }}>
+            {/* brilho varrendo o pódio (1x, discreto) */}
+            <span
+              className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg]"
+              style={{
+                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent)",
+                animation: "podium-sweep 2.6s ease-out 0.5s 1 both",
+              }}
+              aria-hidden
+            />
             <p className="gf-section mb-3">{PODIUM_TITLE[period]}</p>
             <div className="grid grid-cols-3 items-end gap-2">
-              {[1, 0, 2].map((pos) => {
+              {[1, 0, 2].map((pos, order) => {
                 const row = data.rows[pos];
                 if (!row) return null;
                 // altura por MÉRITO: 1º mais alto no centro
@@ -419,35 +439,52 @@ export default function RankingPage() {
                 const medalTone = pos === 0 ? "text-[#FBBF24]" : pos === 1 ? "text-[#E5E7EB]" : "text-[#D97706]";
                 const streak = data.streakById[row.student_id] ?? 0;
                 return (
-                  <Link
+                  <m.div
                     key={row.student_id}
-                    href={`/perfil/${row.student_id}`}
-                    className="group flex flex-col items-center gap-1.5"
-                    role="listitem"
-                    aria-label={`${pos + 1}º lugar: ${row.student?.name ?? "Aluno"}`}
+                    initial={{ opacity: 0, y: 26, scale: 0.92 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ delay: 0.18 + order * 0.12, type: "spring", stiffness: 170, damping: 16 }}
                   >
-                    <MedalIcon className={cn("h-5 w-5", medalTone)} aria-hidden />
-                    <Avatar
-                      className={cn(
-                        "ring-[3px] transition-transform group-hover:scale-105",
-                        avatarSize
-                      )}
-                      style={{ boxShadow: `0 0 22px ${medalColor}66` }}
+                    <Link
+                      href={`/perfil/${row.student_id}`}
+                      className="group flex flex-col items-center gap-1.5"
+                      role="listitem"
+                      aria-label={`${pos + 1}º lugar: ${row.student?.name ?? "Aluno"}`}
                     >
-                      <span
-                        className="absolute inset-0 rounded-full"
-                        style={{ boxShadow: `inset 0 0 0 3px ${medalColor}` }}
-                        aria-hidden
-                      />
-                      <AvatarImage src={row.student?.avatar_url ?? avatarFor(row.student_id) ?? undefined} alt={row.student?.name ?? "Atleta"} />
-                      <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
-                        {(row.student?.name?.[0] ?? "?").toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <p className="max-w-full truncate text-[11px] font-semibold text-foreground group-hover:text-brand">
-                      {displayName(row.student?.name)}
-                      {row.student_id === (user?.id ?? ME) ? " (você)" : ""}
-                    </p>
+                      <span className="relative">
+                        <MedalIcon className={cn("h-5 w-5", medalTone)} aria-hidden />
+                        {/* halo pulsando só do 1º lugar */}
+                        {pos === 0 ? (
+                          <m.span
+                            className="absolute -inset-2 -z-10 rounded-full"
+                            style={{ background: "radial-gradient(circle, rgba(251,191,36,0.5), transparent 70%)" }}
+                            animate={{ opacity: [0.4, 0.85, 0.4], scale: [0.9, 1.12, 0.9] }}
+                            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                            aria-hidden
+                          />
+                        ) : null}
+                      </span>
+                      <Avatar
+                        className={cn(
+                          "ring-[3px] transition-transform group-hover:scale-105",
+                          avatarSize
+                        )}
+                        style={{ boxShadow: `0 0 22px ${medalColor}66` }}
+                      >
+                        <span
+                          className="absolute inset-0 rounded-full"
+                          style={{ boxShadow: `inset 0 0 0 3px ${medalColor}` }}
+                          aria-hidden
+                        />
+                        <AvatarImage src={row.student?.avatar_url ?? avatarFor(row.student_id) ?? undefined} alt={row.student?.name ?? "Atleta"} />
+                        <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
+                          {(row.student?.name?.[0] ?? "?").toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <p className="max-w-full truncate text-[11px] font-semibold text-foreground group-hover:text-brand">
+                        {displayName(row.student?.name)}
+                        {row.student_id === (user?.id ?? ME) ? " (você)" : ""}
+                      </p>
                     {streak >= 2 ? (
                       <span className="flex items-center gap-0.5 text-[10px] font-semibold text-[#FF9A5C]/80" title={`${streak} dias seguidos`}>
                         <Flame className="h-3 w-3" aria-hidden /> {streak}
@@ -461,12 +498,13 @@ export default function RankingPage() {
                       )}
                       style={{ borderColor: `${medalColor}88`, boxShadow: `inset 0 12px 24px -12px ${medalColor}55` }}
                     >
-                      <span className="gf-hero-num text-base">{formatNumber(row.points)}</span>
+                      <span className="gf-hero-num text-base tabular-nums"><CountUp value={row.points} format={formatNumber} /></span>
                       <span className="pb-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
                         {row.sessions} {row.sessions === 1 ? "treino" : "treinos"}
                       </span>
                     </div>
-                  </Link>
+                    </Link>
+                  </m.div>
                 );
               })}
             </div>
@@ -597,6 +635,21 @@ export default function RankingPage() {
             4º lugar em diante · todo mundo aparece, mesmo zerado
           </p>
 
+          {/* Busca rápida: 56 atletas, achar alguém sem rolar a lista toda */}
+          {data && data.rows.length > 8 ? (
+            <div className="relative mb-3">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar atleta pelo nome…"
+                aria-label="Buscar atleta no ranking"
+                className="tactile w-full rounded-xl border border-white/[0.07] bg-white/[0.03] py-2.5 pl-9 pr-3 text-[12.5px] text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              />
+            </div>
+          ) : null}
+
           {loading ? (
             <SkeletonList rows={8} />
           ) : error ? (
@@ -609,7 +662,12 @@ export default function RankingPage() {
             />
           ) : (
             <div className="space-y-2 pb-4">
-              {data?.rows.slice(3).map((row, i) => {
+              {listRows.length === 0 ? (
+                <p className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 text-center text-[12px] text-muted-foreground">
+                  Ninguém encontrado com “{query.trim()}”.
+                </p>
+              ) : (
+                listRows.map(({ row, pos }, i) => {
                 const league = leagueFor(row.points);
                 const glyphC = LEAGUE_GLYPHS[league.id]?.color ?? "#B8C4D8";
                 const streak = data?.streakById[row.student_id] ?? 0;
@@ -624,7 +682,7 @@ export default function RankingPage() {
                     style={{ borderLeft: `3px solid ${glyphC}`, animationDelay: `${Math.min(i * 40, 320)}ms` }}
                   >
                     <div className="w-7 shrink-0 text-center">
-                      <span className="gf-hero-num text-sm font-bold text-muted-foreground">{i + 4}</span>
+                      <span className="gf-hero-num text-sm font-bold text-muted-foreground">{pos + 1}</span>
                     </div>
                     <Avatar className="h-9 w-9">
                       <AvatarImage src={row.student?.avatar_url ?? avatarFor(row.student_id) ?? undefined} alt={row.student?.name ?? "Atleta"} />
@@ -636,6 +694,7 @@ export default function RankingPage() {
                       {displayName(row.student?.name)}
                       {row.student_id === (user?.id ?? ME) ? <span className="ml-1 text-xs text-brand">(você)</span> : null}
                     </p>
+                    <LeagueGlyph id={league.id} className="shrink-0" size={14} />
                     {streak >= 2 ? (
                       <span className="flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-[#FF9A5C]/80" title={`${streak} dias seguidos`}>
                         <Flame className="h-3 w-3" aria-hidden /> {streak}
@@ -648,7 +707,8 @@ export default function RankingPage() {
                     <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" aria-hidden />
                   </Link>
                 );
-              })}
+                })
+              )}
             </div>
           )}
         </div>

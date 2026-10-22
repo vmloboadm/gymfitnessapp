@@ -31,8 +31,9 @@ function useCountUp(target: number, duration = 900) {
   return val;
 }
 
-/** Número com animação count-up (padrão premium da home do aluno). */
-export function CountUp({ value, className }: { value: number; className?: string }) {
+/** Número com animação count-up (padrão premium da home do aluno).
+    `format` opcional preserva separador de milhar (ex.: formatNumber). */
+export function CountUp({ value, className, format }: { value: number; className?: string; format?: (n: number) => string }) {
   const v = useCountUp(value);
-  return <span className={className}>{v}</span>;
+  return <span className={className}>{format ? format(v) : v}</span>;
 }

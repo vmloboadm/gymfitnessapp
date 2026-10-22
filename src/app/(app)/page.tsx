@@ -498,7 +498,20 @@ export default function HomePage() {
   }
 
   return (
-      <div className="mx-auto max-w-md pb-32 pt-8">
+      <div className="relative mx-auto max-w-md pb-32 pt-8">
+        {/* ORBS DE AMBIENTE: luz difusa atrás do cockpit/hero — dá profundidade premium sem poluir.
+            z negativo: pai é relative sem z-index (não cria stacking context), então o orb
+            vai pra trás de todo o conteúdo, mas à frente do canvas escuro do body. */}
+        <div className="pointer-events-none absolute inset-x-0 -top-24 -z-10 h-[420px] overflow-hidden" aria-hidden>
+          <div
+            className="absolute -left-16 top-0 h-64 w-64 rounded-full blur-[70px]"
+            style={{ background: "radial-gradient(circle, rgba(244,113,30,0.34), transparent 70%)", animation: "float-orb 9s ease-in-out infinite" }}
+          />
+          <div
+            className="absolute -right-14 top-36 h-56 w-56 rounded-full blur-[70px]"
+            style={{ background: "radial-gradient(circle, rgba(56,120,255,0.20), transparent 70%)", animation: "float-orb 11s ease-in-out infinite reverse" }}
+          />
+        </div>
         <PendingApprovalBanner />
         {/* CHECK-IN CONTEXTUAL: some após o check-in do dia; foco vai pro treino */}
         <m.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="px-4 pb-5">
@@ -728,7 +741,7 @@ export default function HomePage() {
             image={heroPlan?.image ?? FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
             title={heroPlan ? `Treino ${heroPlan.slot} · ${heroPlan.foco}` : todayLabel}
             exerciseCount={heroPlan?.count ?? 0}
-            estMin={45}
+            estMin={heroPlan && heroPlan.count > 0 ? Math.max(15, heroPlan.count * 4) : 45}
             sessionsWeek={sessionsWeek}
             href={isCheckedInToday ? "/treino?resume=1" : undefined}
             sessionLabel={

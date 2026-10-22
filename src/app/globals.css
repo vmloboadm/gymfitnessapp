@@ -353,6 +353,19 @@ button:disabled {
   animation: gf-rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+/* orbs de ambiente da home: flutuação lenta e discreta (só transform) */
+@keyframes float-orb {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }
+  50% { transform: translate3d(14px, -22px, 0) scale(1.08); opacity: 1; }
+}
+
+/* brilho varrendo o pódio do ranking (uma passagem, discreto) */
+@keyframes podium-sweep {
+  from { transform: translateX(0); opacity: 0; }
+  30% { opacity: 1; }
+  to { transform: translateX(560%); opacity: 0; }
+}
+
 /* progresso de faixa tocando (loop suave, só width) */
 @keyframes track-progress {
   from { width: 4%; }
