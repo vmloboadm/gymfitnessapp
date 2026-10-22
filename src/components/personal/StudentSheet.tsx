@@ -26,6 +26,7 @@ import { fetchMyAssignedPlans } from "~/lib/gym-api";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { useAuth } from "~/hooks/useAuth";
 import { waStudentLink, buildQuickMessage } from "~/lib/whatsapp";
+import { apiPath } from "~/lib/api-path";
 import { cn } from "~/lib/utils";
 
 const TONE = {
@@ -74,6 +75,10 @@ export function StudentSheet({
   const [linkedToMe, setLinkedToMe] = useState<boolean | null>(null);
   const [linking, setLinking] = useState(false);
   const [renewing, setRenewing] = useState(false);
+  // Link de redefinição de senha (o e-mail automático do Supabase aponta
+  // para localhost, então o staff gera e envia pelo WhatsApp).
+  const [resetLink, setResetLink] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
   useEffect(() => {
     if (!student?.id || !me?.id) {
       setLinkedToMe(null);
@@ -150,7 +155,45 @@ export function StudentSheet({
   // reseta pra aba Resumo a cada aluno aberto
   useEffect(() => {
     if (student) setTab("resumo");
+    setResetLink(null);
   }, [student?.id]);
+
+  // Gera link de redefinição de senha do aluno (staff do mesmo gym).
+  const gerarLinkSenha = async () => {
+    if (!student || resetting) return;
+    setResetting(true);
+    try {
+      const { data: sess } = await supabaseBrowser().auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) throw new Error("Sessão expirada. Entre de novo.");
+      const res = await fetch(apiPath("/api/staff/reset-link"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ studentId: student.id }),
+      });
+      const body = (await res.json().catch(() => null)) as
+        | { ok?: boolean; link?: string; error?: string }
+        | null;
+      if (!res.ok || !body?.ok || !body.link) {
+        throw new Error(body?.error ?? "Não deu para gerar o link.");
+      }
+      setResetLink(body.link);
+      try {
+        await navigator.clipboard.writeText(body.link);
+        toast.success("Link copiado", {
+          description: "Envie no WhatsApp do aluno. Ele define a nova senha.",
+        });
+      } catch {
+        toast.success("Link gerado", { description: "Toque em copiar e envie para o aluno." });
+      }
+    } catch (e) {
+      toast.error("Não deu para gerar o link", {
+        description: String(e instanceof Error ? e.message : e).slice(0, 90),
+      });
+    } finally {
+      setResetting(false);
+    }
+  };
 
   // re-render quando um treino novo é atribuído
   const [workoutsBump, setBump] = useState(0);
@@ -538,7 +581,54 @@ export function StudentSheet({
                 </button>
               </div>
             ) : null}
-            {/* Último feedback do aluno */}
+            {/* Acesso: gera link de senha (o e-mail automático aponta pra localhost) */}
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">Acesso</p>
+                  <p className="mt-0.5 text-[11.5px] text-muted-foreground">Aluno não consegue entrar?</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={gerarLinkSenha}
+                  disabled={resetting}
+                  className="tactile shrink-0 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[10.5px] font-black text-foreground disabled:opacity-50"
+                >
+                  {resetting ? "Gerando..." : "Link de senha"}
+                </button>
+              </div>
+              {resetLink ? (
+                <div className="mt-2 space-y-1.5">
+                  <p className="max-h-16 overflow-y-auto break-all rounded-lg bg-black/40 p-2 text-[9.5px] leading-snug text-muted-foreground">
+                    {resetLink}
+                  </p>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(resetLink);
+                          toast.success("Link copiado");
+                        } catch {
+                          toast.error("Não deu para copiar");
+                        }
+                      }}
+                      className="tactile flex-1 rounded-lg bg-brand/15 py-1.5 text-[10.5px] font-bold text-brand"
+                    >
+                      Copiar link
+                    </button>
+                    <a
+                      href={waStudentLink(student.phone ?? "", `Oi! Segue o link para você criar uma nova senha no app da academia: ${resetLink}`) ?? "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="tactile flex-1 rounded-lg bg-[#25D366]/15 py-1.5 text-center text-[10.5px] font-bold text-[#25D366]"
+                    >
+                      Enviar no WhatsApp
+                    </a>
+                  </div>
+                </div>
+              ) : null}
+            </div>
             {lastFeedback ? (
               <div className="rounded-2xl border border-[#4ADE80]/20 bg-[#4ADE80]/[0.06] p-3">
                 <p className="flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider text-[#4ADE80]">

@@ -781,6 +781,7 @@ export default function TreinoHomePage() {
       sets: d.sets,
       reps: String(d.reps),
       rest: d.rest_seconds ?? 60,
+      tecnica: (d.technique ?? "normal") as "normal" | "biset" | "triset" | "dropset",
       info: d.exercise?.tips?.[0] ?? null,
       tips: d.exercise?.tips ?? null,
       imageUrl: img,

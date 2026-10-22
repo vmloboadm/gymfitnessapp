@@ -28,7 +28,7 @@ export function ForgotPasswordForm() {
     e.preventDefault();
     setLoading(true);
     const supabase = supabaseBrowser();
-    const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/forgot-password`;
+    const redirectTo = `${(process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "")}/reset-password`;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo,
     });
@@ -51,6 +51,10 @@ export function ForgotPasswordForm() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <p className="text-[12px] text-muted-foreground">
+            Não recebeu em alguns minutos? Confira o spam ou peça para a academia gerar
+            um link de acesso pelo WhatsApp.
+          </p>
           <Button
             asChild
             variant="outline"

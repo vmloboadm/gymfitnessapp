@@ -19,6 +19,7 @@ export type WExercise = {
   sets: number;
   reps: string;
   rest: number;
+  tecnica?: "normal" | "biset" | "triset" | "dropset" | null;
   info?: string | null;
   tips?: string[] | null;
   imageUrl?: string | null;
@@ -373,8 +374,17 @@ export default function WorkoutInProgress({
                 )}
                 <div className="min-w-0 flex-1">
                   <h1 className="text-xl font-black leading-tight text-foreground">{current.name}</h1>
-                  <p className="mt-1 text-[13px] font-semibold text-muted-foreground">
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] font-semibold text-muted-foreground">
                     {current.sets} séries × {current.reps} reps
+                    {current.tecnica && current.tecnica !== "normal" ? (
+                      <span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-brand">
+                        {current.tecnica === "biset"
+                          ? "Bi-set"
+                          : current.tecnica === "triset"
+                            ? "Tri-set"
+                            : "Drop-set"}
+                      </span>
+                    ) : null}
                   </p>
                   <div className="mt-2 flex gap-2">
                     <button

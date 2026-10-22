@@ -222,6 +222,7 @@ async function assignReal(
         reps: e.reps,
         rest_seconds: parseInt(e.descanso) || 60,
         rpe: e.rpe,
+        technique: e.tecnica ?? "normal",
         notes: `${e.exercicio}${e.dica ? `. ${e.dica}` : ""}`,
         ord: i + 1,
       });
@@ -345,6 +346,164 @@ export async function assignExistingPlan(opts: {
     ok++;
     notifyStaffPush([t.id], NEW_WORKOUT_PUSH.title, NEW_WORKOUT_PUSH.body, NEW_WORKOUT_PUSH.url).catch(() => {});
   }
+  return { ok, failed };
+}
+
+/**
+ * Repete um plano criando uma CÓPIA independente por aluno, já com o nome
+ * escolhido pelo personal. Resolve o caso "ficha da Bruna chegando pra Thalia":
+ * o programa original não é renomeado nem compartilhado.
+ * O template aceita {aluno}, trocado pelo primeiro nome de cada aluno.
+ */
+export async function assignCopiedPlan(opts: {
+  gymId: string;
+  trainerId: string;
+  programId: string;
+  nameTemplate: string;
+  targets: Array<{ id: string; name: string }>;
+}): Promise<{ ok: number; failed: string[] }> {
+  if (isDemoMode()) {
+    const existing = listAssignedWorkouts().find((w) => w.studentId && w.plan);
+    if (!existing) throw new Error("Sem plano para repetir no modo demo.");
+    for (const t of opts.targets) {
+      const firstName = t.name.split(" ")[0];
+      saveAssignedWorkout({
+        ...existing,
+        studentId: t.id,
+        studentName: t.name,
+        name: opts.nameTemplate.replace(/\{aluno\}/gi, firstName).trim() || existing.name,
+      });
+    }
+    return { ok: opts.targets.length, failed: [] };
+  }
+
+  const sb = supabaseBrowser();
+  const { data: prog, error: pErr } = await sb
+    .from("workout_programs")
+    .select("id, objective, ai_draft")
+    .eq("id", opts.programId)
+    .single();
+  if (pErr || !prog) throw new Error("Plano original não encontrado.");
+
+  const { data: days } = await sb
+    .from("workout_days")
+    .select("id, name, day_order")
+    .eq("program_id", opts.programId)
+    .order("day_order", { ascending: true });
+  const srcDays = (days ?? []) as Array<{ id: string; name: string; day_order: number }>;
+  const dayIds = srcDays.map((d) => d.id);
+  const { data: exs } = dayIds.length
+    ? await sb
+        .from("workout_exercises")
+        .select("day_id, exercise_id, variation_id, sets, reps, rest_seconds, rpe, notes, technique, ord")
+        .in("day_id", dayIds)
+        .order("ord", { ascending: true })
+    : { data: [] as Array<Record<string, unknown>> };
+  const srcExs = (exs ?? []) as Array<Record<string, unknown>>;
+
+  const failed: string[] = [];
+  let ok = 0;
+
+  for (const t of opts.targets) {
+    const firstName = t.name.split(" ")[0];
+    const finalName =
+      opts.nameTemplate.replace(/\{aluno\}/gi, firstName).trim() || `Treino de ${firstName}`;
+
+    // 1) programa novo (cópia)
+    const { data: np, error: npErr } = await sb
+      .from("workout_programs")
+      .insert(({
+        gym_id: opts.gymId,
+        trainer_id: opts.trainerId,
+        name: finalName,
+        objective: (prog as { objective: string | null }).objective,
+        created_via: "manual",
+        ai_draft: (prog as { ai_draft: string | null }).ai_draft,
+        reviewed_by: opts.trainerId,
+      } as never))
+      .select("id")
+      .single();
+    if (npErr || !np) {
+      failed.push(firstName);
+      continue;
+    }
+    const newProgramId = (np as { id: string }).id;
+
+    // 2) dias + exercícios
+    const rollback = async () => {
+      await sb.from("workout_exercises").delete().in(
+        "day_id",
+        (await sb.from("workout_days").select("id").eq("program_id", newProgramId)).data?.map((d: { id: string }) => d.id) ?? []
+      );
+      await sb.from("workout_days").delete().eq("program_id", newProgramId);
+      await sb.from("workout_programs").delete().eq("id", newProgramId);
+    };
+
+    let copyOk = true;
+    for (const d of srcDays) {
+      const { data: nd, error: ndErr } = await sb
+        .from("workout_days")
+        .insert(({ gym_id: opts.gymId, program_id: newProgramId, name: d.name, day_order: d.day_order } as never))
+        .select("id")
+        .single();
+      if (ndErr || !nd) {
+        copyOk = false;
+        break;
+      }
+      const newDayId = (nd as { id: string }).id;
+      const rows = srcExs.filter((e) => e.day_id === d.id).map((e) => ({
+        gym_id: opts.gymId,
+        day_id: newDayId,
+        exercise_id: e.exercise_id,
+        variation_id: e.variation_id,
+        sets: e.sets,
+        reps: e.reps,
+        rest_seconds: e.rest_seconds,
+        rpe: e.rpe,
+        notes: e.notes,
+        technique: e.technique ?? "normal",
+        ord: e.ord,
+      }));
+      if (rows.length) {
+        const { error: exErr } = await sb.from("workout_exercises").insert(rows as never);
+        if (exErr) {
+          copyOk = false;
+          break;
+        }
+      }
+    }
+    if (!copyOk) {
+      await rollback();
+      failed.push(firstName);
+      continue;
+    }
+
+    // 3) aposenta o plano ativo anterior e ativa a cópia
+    const { error: retireErr } = await sb
+      .from("student_workouts")
+      .update({ status: "completed", completed_at: new Date().toISOString() } as never)
+      .eq("student_id", t.id)
+      .eq("status", "active");
+    if (retireErr) {
+      await rollback();
+      failed.push(firstName);
+      continue;
+    }
+    const { error: swErr } = await sb.from("student_workouts").insert(({
+      gym_id: opts.gymId,
+      student_id: t.id,
+      program_id: newProgramId,
+      status: "active",
+    } as never));
+    if (swErr) {
+      await rollback();
+      failed.push(firstName);
+      continue;
+    }
+    ok++;
+    notifyStaffPush([t.id], NEW_WORKOUT_PUSH.title, NEW_WORKOUT_PUSH.body, NEW_WORKOUT_PUSH.url).catch(() => {});
+  }
+
   return { ok, failed };
 }
 

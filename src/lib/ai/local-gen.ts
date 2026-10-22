@@ -18,6 +18,8 @@ export type PlanExercise = {
   descanso: string;
   rpe: number;
   dica: string;
+  /** Método de execução: normal, bi-set, tri-set ou drop-set (conjugados). */
+  tecnica?: "normal" | "biset" | "triset" | "dropset";
 };
 
 export type PlanTarget = { categoria: string; qtd: number };

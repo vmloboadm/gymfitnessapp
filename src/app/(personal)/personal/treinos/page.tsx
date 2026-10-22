@@ -58,7 +58,7 @@ import { supabaseBrowser } from "~/lib/supabase/client";
 import { useAuth } from "~/hooks/useAuth";
 import {
   approvePlan,
-  assignExistingPlan,
+  assignCopiedPlan,
   deleteAssignedWorkout,
   getGymStudents,
   listAssignedWorkouts,
@@ -546,6 +546,9 @@ function PersonalTreinosContent() {
   const [catOpen, setCatOpen] = useState<string | null>(null);
   // Repetir plano para outros alunos (mesmo programa, sem gerar de novo)
   const [repeatSheet, setRepeatSheet] = useState<{ programId: string; planName: string; excludeId?: string } | null>(null);
+  // Nome da cópia que cada aluno vai receber. Evita a ficha da Bruna chegar
+  // pra Thalia com o nome da Bruna: cada aluno ganha uma cópia renomeada.
+  const [repeatName, setRepeatName] = useState("");
   const [repeatSelected, setRepeatSelected] = useState<Set<string>>(new Set());
   const [repeatQuery, setRepeatQuery] = useState("");
   const [repeatSaving, setRepeatSaving] = useState(false);
@@ -822,9 +825,11 @@ function PersonalTreinosContent() {
         .map((sid) => students.find((s) => s.id === sid))
         .filter((s): s is PersonalStudent => !!s)
         .map((s) => ({ id: s.id, name: s.name }));
-      const res = await assignExistingPlan({
+      const res = await assignCopiedPlan({
         gymId: profile.gym_id,
+        trainerId: user?.id ?? profile.id,
         programId: repeatSheet.programId,
+        nameTemplate: repeatName,
         targets,
       });
       if (res.failed.length > 0) {
@@ -833,7 +838,7 @@ function PersonalTreinosContent() {
           : `Falha ao enviar para ${res.failed.join(", ")}. Tente de novo.`);
       } else if (res.ok > 0) {
         toast.success("Plano repetido!", {
-          description: `"${repeatSheet.planName}" enviado para ${res.ok} aluno${res.ok === 1 ? "" : "s"}.`,
+          description: `Cópia enviada para ${res.ok} aluno${res.ok === 1 ? "" : "s"} com o nome que você escolheu.`,
         });
       }
     } catch (e) {
@@ -930,9 +935,11 @@ function PersonalTreinosContent() {
     if (!target || !profile || copySaving) return;
     setCopySaving(true);
     try {
-      const res = await assignExistingPlan({
+      const res = await assignCopiedPlan({
         gymId: profile.gym_id,
+        trainerId: user?.id ?? profile.id,
         programId,
+        nameTemplate: `Treino de {aluno}`,
         targets: [{ id: target.id, name: target.name }],
       });
       if (res.ok === 0) throw new Error("Não deu copiar o plano.");
@@ -1044,6 +1051,7 @@ function PersonalTreinosContent() {
         });
         if (newProgramId) {
           setRepeatSheet({ programId: newProgramId, planName: plan.nome, excludeId: target.id });
+          setRepeatName(`Treino de {aluno}`);
           setRepeatSelected(new Set());
           setRepeatQuery("");
         }
@@ -2245,6 +2253,24 @@ function PersonalTreinosContent() {
                         <span className="shrink-0 rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-bold tabular-nums text-muted-foreground">
                           RPE {e.rpe}
                         </span>
+                        <select
+                          value={e.tecnica ?? "normal"}
+                          onChange={(ev) =>
+                            updateDay(activeDay, {
+                              exercicios: day.exercicios.map((x, xi) =>
+                                xi === i ? { ...x, tecnica: ev.target.value as typeof x.tecnica } : x
+                              ),
+                            })
+                          }
+                          aria-label={`Método de ${e.exercicio}`}
+                          title="Conjugado / bi-set / tri-set / drop-set"
+                          className="ml-auto h-9 shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.05] px-2 text-[10.5px] font-semibold text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
+                        >
+                          <option value="normal">Normal</option>
+                          <option value="biset">Bi-set</option>
+                          <option value="triset">Tri-set</option>
+                          <option value="dropset">Drop-set</option>
+                        </select>
                       </div>
                       {e.dica ? (
                         <p className="mt-1.5 break-words pl-6 text-[10px] leading-snug text-muted-foreground">{e.dica}</p>
@@ -2325,6 +2351,22 @@ function PersonalTreinosContent() {
               <p className="text-base font-bold text-foreground">Repetir plano</p>
               <p className="text-[11px] text-muted-foreground">
                 {repeatSheet ? `“${repeatSheet.planName}” vai igualzinho para quem você marcar. Cada um recebe o sino.` : ""}
+              </p>
+            </div>
+            <div>
+              <label htmlFor="repeat-name" className="mb-1 block text-[11px] font-bold text-muted-foreground">
+                Nome do treino para cada aluno
+              </label>
+              <input
+                id="repeat-name"
+                value={repeatName}
+                onChange={(e) => setRepeatName(e.target.value)}
+                placeholder="Treino de {aluno}"
+                className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Use <strong className="text-foreground">{"{aluno}"}</strong> para o primeiro nome. Ex.: “Ficha de {"{aluno}"}”.
+                Cada aluno recebe uma cópia própria, sem herdar o nome de outro.
               </p>
             </div>
             <div className="relative">
@@ -2736,6 +2778,7 @@ function PersonalTreinosContent() {
                   <button
                     onClick={() => {
                       setRepeatSheet({ programId: w.programId, planName: w.name, excludeId: w.studentId });
+                      setRepeatName(`Treino de {aluno}`);
                       setRepeatSelected(new Set());
                       setRepeatQuery("");
                     }}
