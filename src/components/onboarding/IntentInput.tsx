@@ -52,15 +52,11 @@ export function EnrollmentTypeForm({
     const errs: string[] = [];
 
     if (!planType) errs.push("Selecione o tipo de matrícula.");
-    if (planType === "Gymfitness" && !vencimento.trim()) errs.push("Informe a data de vencimento da matrícula.");
+    // Vencimento é autoinformado e não é dado oficial: opcional e pode ser
+    // qualquer data. Quem confirma a matrícula é a recepção.
     if (vencimento.trim()) {
       const parsed = new Date(`${vencimento}T12:00:00`);
       if (isNaN(parsed.getTime())) errs.push("Data de vencimento inválida.");
-      else {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (parsed < today) errs.push("A data de vencimento não pode ser no passado.");
-      }
     }
 
     if (errs.length) { setErrors(errs); return; }
@@ -110,7 +106,7 @@ export function EnrollmentTypeForm({
 
       {planType === "Gymfitness" && (
         <div className="space-y-3">
-          <Label htmlFor="vencimento">Data de vencimento da matrícula</Label>
+          <Label htmlFor="vencimento">Data de vencimento (se souber)</Label>
           <Input
             id="vencimento"
             type="date"
@@ -119,6 +115,9 @@ export function EnrollmentTypeForm({
             placeholder="AAAA-MM-DD"
             className="mt-1 block w-full rounded-lg border border-white/[0.06] bg-white/[0.05] p-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
           />
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Opcional. Quem confirma a matrícula é a recepção, pode deixar em branco se não souber.
+          </p>
         </div>
       )}
 
