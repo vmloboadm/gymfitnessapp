@@ -251,9 +251,13 @@ export async function loadAdminData(): Promise<AdminData> {
         ...logs.filter((l) => last7(l.date)).map((l) => l.student_id),
       ]).size,
       idleStudents: students.filter((s) => s.approved && !s.active7).length,
-      expiringSoon: students.filter(
-        (s) => s.vencimento && new Date(s.vencimento + "T12:00:00").getTime() <= soon
-      ).length,
+      // Vencimento é autoinformado pelo aluno: data no passado não conta como
+      // "vence em 7 dias" (evita alerta falso no painel do admin).
+      expiringSoon: students.filter((s) => {
+        if (!s.vencimento) return false;
+        const t = new Date(s.vencimento + "T12:00:00").getTime();
+        return t >= Date.now() && t <= soon;
+      }).length,
       withPhone: students.filter((s) => !!s.phone).length,
       avgWeight30: weights.length > 0 ? Math.round((weights.reduce((a, b) => a + b, 0) / weights.length) * 10) / 10 : null,
     },

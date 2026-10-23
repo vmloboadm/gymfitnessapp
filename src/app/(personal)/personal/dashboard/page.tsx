@@ -341,10 +341,12 @@ export default function PersonalDashboardPage() {
       {/* Lembretes: alunos aguardando aprovação + matrícula Gymfitness vencendo */}
       {(() => {
         const pend = students.filter((s) => !s.approved_at);
+        // Só lembrete de quem vence nos próximos 14 dias. Data no passado é
+        // autoinformada e não confiável, então não entra como pendência.
         const venc = students.filter((s) => {
           if (s.plan_type !== "Gymfitness" || !s.vencimento) return false;
           const days = Math.ceil((new Date(`${s.vencimento}T12:00:00`).getTime() - Date.now()) / 864e5);
-          return days <= 14;
+          return days >= 0 && days <= 14;
         });
         if (pend.length === 0 && venc.length === 0) return null;
         return (

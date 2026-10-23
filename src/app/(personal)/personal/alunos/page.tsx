@@ -142,17 +142,17 @@ export default function PersonalAlunosPage() {
     const days = Math.ceil(
       (new Date(`${s.vencimento}T12:00:00`).getTime() - Date.now()) / 864e5
     );
-    if (days > 14) return null;
+    // Data informada pelo aluno, não é oficial da academia. Vencida não vira
+    // alerta (a recepção confirma); só lembramos quando está perto de vencer.
+    if (days < 0 || days > 14) return null;
     const tone =
-      days < 0
-        ? "border-[#F87171]/30 bg-[#F87171]/10 text-[#F87171]"
-        : days <= 7
-          ? "border-[#FFC24D]/30 bg-[#FFC24D]/10 text-[#FFC24D]"
-          : "border-white/[0.1] bg-white/[0.05] text-muted-foreground";
+      days <= 7
+        ? "border-[#FFC24D]/30 bg-[#FFC24D]/10 text-[#FFC24D]"
+        : "border-white/[0.1] bg-white/[0.05] text-muted-foreground";
     return (
       <span className={cn("flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-bold", tone)}>
         <CalendarClock className="h-3 w-3" />
-        {days < 0 ? "Vencida" : days === 0 ? "Vence hoje" : `Vence em ${days}d`}
+        {days === 0 ? "Vence hoje" : `Vence em ${days}d`}
       </span>
     );
   };

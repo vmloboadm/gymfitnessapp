@@ -112,6 +112,12 @@ export default function PerfilPage() {
 
   const sub = data?.sub ?? null;
   const expiring = sub && sub.ends_at && new Date(sub.ends_at).getTime() - Date.now() < 14 * 86400000;
+  // Vencimento é informado pelo próprio aluno no cadastro, não é dado oficial
+  // da academia. Data no passado não significa mensalidade em aberto.
+  const vencDays =
+    profile?.vencimento
+      ? Math.ceil((new Date(`${profile.vencimento}T12:00:00`).getTime() - Date.now()) / 864e5)
+      : null;
   const achievements = useMemo(() => sortedAchievements(), []);
   const earned = achievements.filter((a) => a.earned_at);
   const latestWeight = weightSeries[weightSeries.length - 1]?.peso ?? null;
@@ -195,25 +201,22 @@ export default function PerfilPage() {
                 <Badge variant="success" className="gap-1"><CalendarClock className="h-3 w-3" /> até {formatDate(sub.ends_at!)}</Badge>
               )
             ) : profile?.plan_type === "Gymfitness" && profile.vencimento ? (
-              (() => {
-                const days = Math.ceil(
-                  (new Date(`${profile.vencimento}T12:00:00`).getTime() - Date.now()) / 864e5
-                );
-                return days < 0 ? (
-                  <Badge variant="danger" className="gap-1"><CalendarClock className="h-3 w-3" /> vencida {formatDate(profile.vencimento)}</Badge>
-                ) : days <= 14 ? (
-                  <Badge variant="warning" className="gap-1"><CalendarClock className="h-3 w-3" /> vence {formatDate(profile.vencimento)}</Badge>
-                ) : (
-                  <Badge variant="success" className="gap-1"><CalendarClock className="h-3 w-3" /> até {formatDate(profile.vencimento)}</Badge>
-                );
-              })()
+              vencDays !== null && vencDays < 0 ? (
+                <Badge variant="outline" className="gap-1"><CalendarClock className="h-3 w-3" /> a confirmar</Badge>
+              ) : vencDays !== null && vencDays <= 14 ? (
+                <Badge variant="warning" className="gap-1"><CalendarClock className="h-3 w-3" /> vence {formatDate(profile.vencimento)}</Badge>
+              ) : (
+                <Badge variant="success" className="gap-1"><CalendarClock className="h-3 w-3" /> até {formatDate(profile.vencimento)}</Badge>
+              )
             ) : (
-              <Badge variant="warning">Sem registro</Badge>
+              <Badge variant="outline">Sem registro</Badge>
             )}
           </div>
           {profile?.plan_type === "Gymfitness" && profile.vencimento ? (
             <p className="mt-2 rounded-lg bg-muted/70 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-              Renove na recepção antes de {formatDate(profile.vencimento)} para manter o acesso.
+              {vencDays !== null && vencDays < 0
+                ? "Data informada por você no cadastro. Se já pagou, está tudo certo: a recepção confirma."
+                : `Renove na recepção antes de ${formatDate(profile.vencimento)} para manter o acesso.`}
             </p>
           ) : sub && (sub.type === "gympass" || sub.type === "totalpass") ? (
             <p className="mt-2 rounded-lg bg-muted/70 px-2.5 py-1.5 text-[11px] text-muted-foreground">
