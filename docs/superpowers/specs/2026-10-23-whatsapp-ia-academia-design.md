@@ -116,10 +116,10 @@ Número (22) 99778-7186  ->  WAHA / Deskcomm  ->  Agente de IA + base
                                     |
                                     |  precisa de humano
                                     v
-                 aviso de caso no WhatsApp  ->  celular do Claudeir/Rebeca
+        aviso de caso no WhatsApp  ->  celular do Claudeir (apoio: Rebeca)
                                     |
                                     v
-                 Claudeir/Rebeca respondem pelo número oficial
+             Claudeir ou Rebeca respondem pelo celular da academia
 
 Aluno logado no app  ->  pedido de aula experimental  ->  staff confirma
 ```
@@ -156,15 +156,17 @@ na mesma instalação.
 |---|---|
 | Mensal | R$ 109,90 |
 | Família (2 ou mais parentes) | R$ 99,90 por pessoa |
-| 3x na semana ou embarcado | R$ 89,90 |
+| 3x na semana | R$ 89,90 |
+| Embarcado (15 dias) | R$ 89,90 |
 | Trimestral | R$ 89,90 por mês (R$ 269,00 os 3 meses) |
 | Diária | R$ 20,00 |
 | Personal + academia 3x na semana | R$ 399,00 por mês |
 | Personal + academia 5x na semana | R$ 499,00 por mês |
 
-Pendente: o que é o plano "embarcado" e quais formas de pagamento a academia
-aceita. Sem isso, a IA não deve citar o "embarcado" nem prometer forma de
-pagamento.
+Formas de pagamento: Pix, cartão e dinheiro.
+
+"Embarcado" é o plano de 15 dias. A IA pode citar assim, sem inventar
+benefício que não existe.
 
 ### 8.3 Modalidades
 
@@ -184,8 +186,12 @@ pagamento.
 
 ### 8.5 Endereço e contato
 
-Pendente: endereço completo, ponto de referência e formas de pagamento. A IA
-não deve improvisar.
+- Endereço: Rua Manoel Viana de Abreu, 144, esquina com Rua Enedina M. Rangel,
+  Bairro Novo Jockey.
+- Pagamento: Pix, cartão e dinheiro.
+
+A IA pode confirmar esses dados. Se perguntarem algo que não está na base,
+como estacionamento ou acessibilidade, ela não improvisa: transfere.
 
 ## 9. Comportamento do agente
 
@@ -230,24 +236,24 @@ Mecânica:
 2. O Deskcomm registra a passagem com motivo e resumo.
 3. O Deskcomm manda o aviso de caso por WhatsApp para o número configurado da
    equipe, com nome, motivo e última mensagem.
-4. A pessoa responde pelo número oficial, do celular da academia ou de um
-   WhatsApp Web vinculado ao mesmo número.
+4. A pessoa responde pelo número oficial, direto do celular da academia.
 5. O Deskcomm pausa a IA por 60 minutos naquela conversa, renovando a cada
    mensagem humana.
 6. Se ninguém responder, a IA volta depois do prazo, sem falar por cima.
 
-Ponto importante: a resposta precisa sair do número oficial. Se a pessoa
-responder do WhatsApp pessoal, a IA não pausa e o cliente passa a falar em
-outro número. Para atender de fora da academia, a saída é manter um WhatsApp
-Web vinculado ao número oficial num computador.
+Ponto importante: a resposta precisa sair do celular da academia, que é o
+número oficial. Não haverá WhatsApp Web. Se a pessoa responder do número
+pessoal, a IA não pausa e o cliente passa a falar em outro número.
+
+Destino do aviso: o Deskcomm manda para um número por organização. Escolhi o
+Claudeir como principal, porque é ele que fica com o celular na maior parte do
+tempo. Rebeca e Daiana entram como apoio: se o Claudeir não estiver na
+academia, a Rebeca verifica o celular. Numa fase seguinte, o app pode avisar as
+duas também.
 
 Fora do horário de funcionamento, a IA não promete resposta imediata: diz que
 a recepção confirma no próximo horário de atendimento. O aviso continua sendo
 enviado, mas a equipe responde quando abrir.
-
-O aviso de caso do Deskcomm tem um destino por organização. Precisamos escolher
-o número principal (Claudeir ou Rebeca). O outro pode ser avisado pelo app numa
-fase seguinte.
 
 ## 11. Integração com o app
 
@@ -299,7 +305,7 @@ fase seguinte.
 | Número bloqueado por spam | Fase 1 só responde quem chega; nada de lista fria |
 | IA inventar preço | Base versionada, teste com perguntas reais antes de publicar |
 | IA responder por cima do humano | Pausa automática do Deskcomm, validada em teste |
-| Pessoa responder do número pessoal | Regra de operação: responder só pelo número oficial; WhatsApp Web vinculado num computador |
+| Pessoa responder do número pessoal | Regra de operação: responder só pelo celular da academia |
 | Celular sem internet | WhatsApp vinculado segue funcionando por um período; checklist de reconexão |
 | Cliente sem resposta | Aviso de caso no WhatsApp com resumo e motivo |
 | Custo de IA | Monitorar volume e custo por conversa na fase 1 |
@@ -310,28 +316,26 @@ fase seguinte.
   50 conversas reais.
 - Zero resposta da IA depois de uma pessoa assumir.
 - Primeira resposta em menos de 10 segundos.
-- Toda transferência com notificação registrada no app.
+- Toda transferência com aviso de caso entregue no WhatsApp.
 - Nenhum preço ou horário errado em auditoria semanal da base.
 
-## 15. Decisões que dependem do Vini
+## 15. Decisões confirmadas
 
-1. O número oficial é `(22) 99778-7186`? Quem pode escanear o QR (Claudeir,
-   Rebeca ou os dois)?
-2. Endereço completo e formas de pagamento aceitas.
-3. O que é o plano "embarcado".
-4. Quem é o destino principal do aviso de transferência? O Deskcomm manda para
-   um número por organização.
-5. A atendente virtual tem nome próprio ou assina "atendimento GymFitness"?
-6. A IA pode negociar desconto? Proposta: não, transfere.
-7. A IA pode matricular ou só agendar experimental? Proposta: só agendar.
-8. Quem responde quando precisa de uma pessoa: só do celular da academia ou
-   também de um WhatsApp Web vinculado ao número oficial num computador?
-9. O número recebe conversa pessoal, de fornecedor ou grupo? A IA pode
-   responder todo mundo ou só contatos que não são da equipe?
-10. Quem opera o Deskcomm depois do go-live (reconectar o WhatsApp, atualizar
-    preço, acompanhar aviso que ninguém respondeu)?
-11. Para a fase 2: horários e capacidade de cada modalidade, e se o aluno pode
-    agendar para um filho ou só para ele.
+- Número oficial: `(22) 99778-7186`. Atendimento só pelo celular da academia,
+  sem WhatsApp Web.
+- Quem responde: Claudeir e Rebeca, quando dá. Daiana tem número pessoal
+  cadastrado e entra como apoio.
+- Aviso de transferência: Claudeir como destino principal. Rebeca e Daiana
+  como apoio.
+- Endereço: Rua Manoel Viana de Abreu, 144, esquina com Rua Enedina M. Rangel,
+  Bairro Novo Jockey.
+- Pagamento: Pix, cartão e dinheiro.
+- Embarcado: 15 dias, R$ 89,90.
+- Nome: Atendimento GymFitness.
+- Operação do Deskcomm: Vinicius.
+- A IA não negocia desconto e não matricula. Agenda experimental e transfere o
+  resto.
+- A IA responde conversas diretas. Grupos ficam de fora.
 
 ### 15.1 Decisões que eu tomei (confira)
 
@@ -345,6 +349,13 @@ fase seguinte.
   confirma quando abrir.
 - **Go-live controlado**: o canal sobe com o gate da IA em allowlist, testa com
   os números da equipe e só depois abre para o público.
+- **Aviso principal no Claudeir**, com Rebeca e Daiana de apoio. Numa fase
+  seguinte, o app pode avisar as três.
+
+### 15.2 Pendências da fase 2
+
+- Horários e capacidade de cada modalidade.
+- Se o aluno pode agendar para um filho. Proposta: não, recepção.
 
 ## 16. Em aberto para quem for construir
 
