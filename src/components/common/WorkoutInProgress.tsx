@@ -87,13 +87,16 @@ export default function WorkoutInProgress({
     const currentIds = exercises.map((e) => e.id).join("|");
     if (saved && savedIds && savedIds === currentIds) {
       // retoma exatamente de onde parou (aluno circulou pelo app)
+      const resumeIdx = Math.min(saved.currentIdx, exercises.length - 1);
       setProgress(saved.progress as Record<string, ExerciseProgress>);
-      setCurrentIdx(Math.min(saved.currentIdx, exercises.length - 1));
-      // retoma o descanso que estava rodando quando saiu da tela
-      if (saved.restIdx === currentIdx && typeof saved.restEndsAt === "number") {
+      setCurrentIdx(resumeIdx);
+      // retoma o descanso que estava rodando quando saiu da tela.
+      // Comparar com `currentIdx` aqui era o bug: no mount ele ainda é 0,
+      // então o descanso só voltava se o aluno tivesse parado no 1º exercício.
+      if (saved.restIdx === resumeIdx && typeof saved.restEndsAt === "number") {
         const left = Math.ceil((saved.restEndsAt - Date.now()) / 1000);
         if (left > 0 && left <= 600) {
-          restIdxRef.current = currentIdx;
+          restIdxRef.current = resumeIdx;
           startRest(left);
         }
       }

@@ -90,13 +90,15 @@ export type StudentSession = {
 };
 
 /**
- * Auto-finaliza sessões ativas abandonadas (iniciadas há +12h).
+ * Auto-finaliza sessões ativas abandonadas (iniciadas há +4h).
+ * O mesmo teto da sessão local (`MAX_SESSION_HOURS`), para o banco não
+ * continuar mostrando "na academia agora" depois que o aluno já saiu.
  * Marca como auto para o app pedir o feedback do treino anterior.
  */
 export async function completeStaleSessions(studentId: string): Promise<void> {
   try {
     const sb = supabaseBrowser();
-    const cutoff = new Date(Date.now() - 12 * 3600 * 1000).toISOString();
+    const cutoff = new Date(Date.now() - 4 * 3600 * 1000).toISOString();
     const { data } = await sb
       .from("workout_sessions")
       .select("id, meta")
@@ -135,7 +137,12 @@ export async function getLastSessionNeedingFeedback(studentId: string): Promise<
       .order("ended_at", { ascending: false })
       .limit(5);
     const rows = (data ?? []) as StudentSession[];
-    return rows.find((r) => !(r.meta as SessionMeta | null)?.feedback_at) ?? null;
+    // Sessão encerrada por inatividade não vira pergunta de feedback: o aluno
+    // já saiu e não faz sentido pedir "como foi o treino?" horas depois.
+    return rows.find((r) => {
+      const meta = r.meta as SessionMeta | null;
+      return !meta?.feedback_at && !meta?.auto_finished;
+    }) ?? null;
   } catch {
     return null;
   }

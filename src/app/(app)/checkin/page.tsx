@@ -137,7 +137,7 @@ export default function CheckinPage() {
     // TAG DA ENTRADA: check-in de presença + treino do dia liberado
     if (raw.toLowerCase() === "entrada") {
       void (async () => {
-        const ok = await doEntry("nfc");
+        const ok = await doEntry("nfc", { redirect: false });
         if (!ok) {
           toast.info("Aguarde carregar e aproxime de novo", {
             description: "Ou use a senha do dia na tela do treino.",
@@ -310,7 +310,10 @@ export default function CheckinPage() {
   // Decode-once: html5-qrcode dispara onDecode continuamente; sem guard,
   // N inserts duplicados antes de setScannerActive(false) surtir efeito
   const decodingRef = useRef(false);
-  const scanSuccess = async (decodedText: string) => {
+  const scanSuccess = async (
+    decodedText: string,
+    source: "qrcode" | "nfc" = "qrcode"
+  ) => {
     if (decodingRef.current) return;
     decodingRef.current = true;
     try {
@@ -331,12 +334,12 @@ export default function CheckinPage() {
         return;
       }
       if (doorMode) {
-        // tag da PORTARIA: valida entrada e volta ao treino (aluno inicia quando quiser)
+        // Tag da PORTARIA: grava o check-in de verdade antes de liberar o treino.
+        // Antes ela só ligava a sessão local; a linha em `checkins` nunca entrava.
         navigator.vibrate?.([60, 40, 60]);
-        startDaySession();
+        const ok = await doEntry(source, { redirect: false });
         stopScanning();
-        toast.success("Entrada validada! Treino liberado");
-        router.push("/treino");
+        if (ok) router.push("/treino");
         return;
       }
       toast.error("Código não corresponde a nenhum equipamento");
@@ -392,7 +395,7 @@ export default function CheckinPage() {
           text += decoder.decode(record.data ?? new ArrayBuffer(0));
         }
         setNfcActive(false);
-        if (text) scanSuccess(text.trim());
+        if (text) scanSuccess(text.trim(), "nfc");
       });
 
       ndef.addEventListener("readingerror", () => {
@@ -448,7 +451,7 @@ export default function CheckinPage() {
         if (!alive) return;
         const codeReader = new (module.default as any)("scanner-reader");
         codeReaderRef.current = codeReader;
-        const onDecode = (result: string) => scanSuccess(result);
+        const onDecode = (result: string) => scanSuccess(result, "qrcode");
         codeReader
           .start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onDecode, () => {})
           .catch(() => {
@@ -483,12 +486,16 @@ export default function CheckinPage() {
     source: string;
   } | null>(null);
 
-  const doEntry = async (source: "nfc" | "qrcode" | "app" = "app"): Promise<boolean> => {
+  const doEntry = async (
+    source: "nfc" | "qrcode" | "app" = "app",
+    opts?: { redirect?: boolean }
+  ): Promise<boolean> => {
+    const redirect = opts?.redirect !== false;
     if (demo) {
       setGymEntry({ id: "ck-demo-" + Date.now(), checked_at: new Date().toISOString(), source });
       startDaySession();
       toast.success("Check-in de entrada realizado!");
-      router.push("/treino");
+      if (redirect) router.push("/treino");
       return true;
     }
     if (!user || !profile) return false;
@@ -503,6 +510,7 @@ export default function CheckinPage() {
       if (/já realizado hoje/i.test(error.message)) {
         startDaySession();
         toast.success("Bom treino! Entrada de hoje já registrada.");
+        if (redirect) router.push("/treino");
         return true;
       }
       toast.error("Falha no check-in", { description: error.message });
@@ -511,6 +519,7 @@ export default function CheckinPage() {
     setGymEntry(inserted as any);
     startDaySession();
     toast.success("Check-in de entrada realizado!");
+    if (redirect) router.push("/treino");
     return true;
   };
 
@@ -536,6 +545,35 @@ endWorkoutSession();
     endWorkoutSession();
     toast.success("Check-out realizado. Treino concluído!");
   };
+
+  // Restaura o check-in de hoje ao abrir/recarregar a tela. Antes o estado
+  // vivia só em memória: ao dar reload o card voltava a dizer "Entrada na
+  // academia" mesmo com o aluno já dentro, e o botão virava "Fazer check-out"
+  // por causa da sessão local. A fonte agora é a tabela `checkins`.
+  useEffect(() => {
+    if (demo || !user?.id || !profile?.gym_id) return;
+    let cancelled = false;
+    (async () => {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const { data } = await supabaseBrowser()
+        .from("checkins")
+        .select("id, checked_at, source")
+        .eq("student_id", user.id)
+        .eq("gym_id", profile.gym_id)
+        .eq("type", "entrada")
+        .gte("checked_at", start.toISOString())
+        .order("checked_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled && data) {
+        setGymEntry(data as { id: string; checked_at: string; source: string });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [demo, user?.id, profile?.gym_id]);
 
   if (loading) {
     return (

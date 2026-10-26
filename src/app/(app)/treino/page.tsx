@@ -56,7 +56,7 @@ import { assetPath } from "~/lib/asset-path";
 import { findInDatabase } from "~/lib/exercises-database";
 import { libraryMatch } from "~/lib/demo-data";
 import { toast } from "sonner";
-import { enqueueOffline, isOffline, isNetworkError } from "~/lib/offline-queue";
+import { enqueueOffline, isOffline } from "~/lib/offline-queue";
 import { apiPath } from "~/lib/api-path";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
@@ -480,23 +480,12 @@ export default function TreinoHomePage() {
       }
     })();
     setConcludedCount(loggedIds.length || ids.length);
-    endDaySession();
-    clearSessionProgress();
-    try {
-      localStorage.removeItem("gymfit_session_slot_v1");
-    } catch { /* ok */ }
-    if (!demo && user?.id) {
-      const active = await getActiveWorkoutSession(user.id).catch(() => null);
-      setFinishedSessionId(active?.id ?? null);
-      void completeWorkoutSession(user.id);
-      try {
-        const last = await getLastSessionNeedingFeedback(user.id).catch(() => null);
-        if (last) {
-          setPendingFeedback(last);
-          setFeedbackOpen(true);
-        }
-      } catch { /* feedback é bônus */ }
-    }
+    // Sessão do banco é lida antes de gravar (para ligar os logs a ela), mas
+    // só é encerrada depois que o treino entrou no histórico ou na fila.
+    const active = !demo && user?.id
+      ? await getActiveWorkoutSession(user.id).catch(() => null)
+      : null;
+    setFinishedSessionId(active?.id ?? null);
     let inserted = 0;
     let queuedOffline = 0;
     let queuedTotal = 0;
@@ -569,6 +558,7 @@ export default function TreinoHomePage() {
               gym_id: profile.gym_id,
               student_id: user.id,
               workout_id: m?.workoutId || null,
+              session_id: active?.id ?? null,
               exercise_id: exerciseId,
               date: localISO(),
               // workout_logs.weight_kg é NOT NULL: um null (aluno sem carga
@@ -623,21 +613,55 @@ export default function TreinoHomePage() {
                     });
                   })
                   .catch(() => {});
-              } else if (isNetworkError(logErr)) {
+              } else {
+                // Qualquer falha (rede, sessão expirada, RLS) preserva o treino
+                // no aparelho. Antes só erro de rede entrava na fila e o resto
+                // era perdido com um toast que dizia "avisamos seu personal".
                 queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
                 queuedTotal = logRows.length;
               }
             }
           }
-        } catch (err) {
-          // caiu no meio (rede): o que já estava montado vira fila offline
-          if (logRows.length > 0 && (isOffline() || isNetworkError(err))) {
+        } catch {
+          // Caiu no meio: o que já estava montado vira fila offline.
+          if (logRows.length > 0) {
             queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
             queuedTotal = logRows.length;
           }
         }
       }
     }
+    const failedToPersist =
+      !demo && !!user && loggedIds.length > 0 && inserted === 0 && queuedOffline === 0;
+    if (failedToPersist) {
+      toast.error("Treino não entrou no histórico", {
+        description: "Seu progresso está salvo. Toque em Finalizar de novo ou fale com seu personal.",
+      });
+      // Remonta o treino com o progresso salvo: o botão de finalizar do filho
+      // ficou travado em "finishing", então um novo mount libera a tentativa.
+      setRetryKey((k) => k + 1);
+      concludingRef.current = false;
+      return;
+    }
+
+    // Só limpa a sessão local e encerra a sessão do banco depois de gravar
+    // (ou de guardar na fila offline). Falha não pode apagar o treino.
+    endDaySession();
+    clearSessionProgress();
+    try {
+      localStorage.removeItem("gymfit_session_slot_v1");
+    } catch { /* ok */ }
+    if (!demo && user?.id) {
+      await completeWorkoutSession(user.id).catch(() => {});
+      try {
+        const last = await getLastSessionNeedingFeedback(user.id).catch(() => null);
+        if (last) {
+          setPendingFeedback(last);
+          setFeedbackOpen(true);
+        }
+      } catch { /* feedback é bônus */ }
+    }
+
     navigator.vibrate?.([60, 40, 90]);
     setPhase("done");
     // toast HONESTO: só diz "registrado" se realmente entrou no histórico
@@ -647,18 +671,14 @@ export default function TreinoHomePage() {
       toast.success(`Treino registrado! ${inserted} exercício${inserted === 1 ? "" : "s"} no histórico.`);
     } else if (queuedOffline > 0) {
       if (queuedTotal > queuedOffline) {
-        toast.error("Sem internet e o aparelho guardou só parte do treino", {
+        toast.error("O aparelho guardou só parte do treino", {
           description: "O que foi salvo sincroniza quando a conexão voltar.",
         });
       } else {
-        toast("Sem internet: treino guardado no aparelho", {
+        toast("Treino guardado no aparelho", {
           description: "Sincroniza quando a conexão voltar.",
         });
       }
-    } else if (loggedIds.length > 0) {
-      toast.error("Treino finalizado, mas não entrou no histórico", {
-        description: "Sem conexão ou falha no servidor. Avisamos seu personal.",
-      });
     } else {
       toast("Sessão finalizada", { description: "Nenhuma série marcada como feita." });
     }
@@ -762,6 +782,8 @@ export default function TreinoHomePage() {
   const [finishedSessionId, setFinishedSessionId] = useState<string | null>(null);
   // quantos exercícios foram concluídos na sessão que acabou (fonte p/ resumo)
   const [concludedCount, setConcludedCount] = useState<number | null>(null);
+  // remonta o treino quando a gravação falha, sem perder o progresso salvo
+  const [retryKey, setRetryKey] = useState(0);
 
   const startWorkout = (list: typeof DEFAULT_DEMO_EX) => {
     setSession(list);
@@ -914,7 +936,7 @@ export default function TreinoHomePage() {
           exit={{ opacity: 0, scale: 0.98 }}
           transition={{ duration: 0.18 }}
         >
-          <WorkoutInProgress exercises={activeExercises} onFinish={(ids, prog) => { void conclude(ids, prog); setPlanTodayActive(false); }} onProgressChange={(ids) => { completedRef.current = ids; }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
+          <WorkoutInProgress key={retryKey} exercises={activeExercises} onFinish={(ids, prog) => { void conclude(ids, prog); }} onProgressChange={(ids) => { completedRef.current = ids; }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
         </m.div>
       </AnimatePresence>
     );

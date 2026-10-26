@@ -204,11 +204,51 @@ export default function HomePage() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-  // Check-in contextual: lido da MESMA fonte que a aba Check-in grava (localStorage por dia)
-  // SESSÃO ÚNICA (gate por scan) — mesma fonte do Treino e Checkin
+  // SESSÃO ÚNICA do treino em andamento (localStorage).
   const { session } = useWorkoutSession();
-  const isCheckedInToday = !!session;
-  const startedAt = session?.startedAt ?? null;
+  // Check-in REAL do dia: a fonte é a tabela `checkins`, não a sessão local.
+  // Antes, começar um treino sem check-in fazia a home dizer "Check-in feito".
+  const { data: checkinToday, refetch: refetchCheckin } = useAsyncQuery<{
+    id: string;
+    checked_at: string;
+  } | null>(
+    async () => {
+      if (demo || !user?.id || !profile?.gym_id) return { data: null, error: null };
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const { data: row, error } = await supabaseBrowser()
+        .from("checkins")
+        .select("id, checked_at")
+        .eq("student_id", user.id)
+        .eq("gym_id", profile.gym_id)
+        .eq("type", "entrada")
+        .gte("checked_at", start.toISOString())
+        .order("checked_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) return { data: null, error: null };
+      return {
+        data: (row as { id: string; checked_at: string } | null) ?? null,
+        error: null,
+      };
+    },
+    [demo, user?.id, profile?.gym_id],
+    { enabled: !loading && !!user, silentRefetch: true }
+  );
+  const isCheckedInToday = demo ? !!session : !!checkinToday;
+  const startedAt = session?.startedAt ?? (checkinToday ? new Date(checkinToday.checked_at).getTime() : null);
+  // O check-in grava no banco e a sessão local dispara "gymfit-session".
+  // Refaz a leitura para o card não ficar desatualizado ao voltar pra home.
+  useEffect(() => {
+    if (demo) return;
+    const onSession = () => { void refetchCheckin(); };
+    window.addEventListener("gymfit-session", onSession);
+    window.addEventListener("storage", onSession);
+    return () => {
+      window.removeEventListener("gymfit-session", onSession);
+      window.removeEventListener("storage", onSession);
+    };
+  }, [demo, refetchCheckin]);
 
   const heroRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -516,7 +556,26 @@ export default function HomePage() {
         <PendingApprovalBanner />
         {/* CHECK-IN CONTEXTUAL: some após o check-in do dia; foco vai pro treino */}
         <m.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="px-4 pb-5">
-          {isCheckedInToday ? (
+          {session && !isCheckedInToday ? (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-warning/40 bg-warning/10 px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-warning opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-warning" />
+                </span>
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-warning">Treino em andamento</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">Check-in pendente</p>
+                </div>
+              </div>
+              <Link
+                href="/checkin"
+                className="gf-touch tactile shrink-0 rounded-full bg-warning px-4 py-2 text-[12px] font-black text-black transition-transform active:scale-95"
+              >
+                Fazer check-in
+              </Link>
+            </div>
+          ) : isCheckedInToday ? (
             <div className="flex items-center justify-between gap-3 rounded-2xl border border-success/40 bg-success/12 px-4 py-3">
               <div className="flex items-center gap-2.5">
                 <span className="relative flex h-2 w-2">
@@ -527,23 +586,32 @@ export default function HomePage() {
                   <p className="text-[11px] font-bold uppercase tracking-wider text-success">Check-in feito</p>
                   <p className="flex items-baseline gap-1.5 leading-tight">
                     <SessionClock startedAt={startedAt ?? Date.now()} compact fast={demo} />
-                    <span className="text-[10px] font-semibold text-muted-foreground">de treino</span>
+                    <span className="text-[10px] font-semibold text-muted-foreground">{session ? "de treino" : "na academia"}</span>
                   </p>
                 </div>
               </div>
-              <button
-                data-testid="finalizar-treino-home"
-                onClick={() => {
-                  // NÃO finaliza aqui: este botão só limpava a sessão local com
-                  // toast de sucesso e nada era gravado no banco (o aluno via
-                  // "treino finalizado" mas workout_logs ficava vazio). Manda
-                  // pra tela de treino, que retoma e conclui de verdade.
-                  router.push("/treino?resume=1");
-                }}
-                className="gf-touch tactile shrink-0 rounded-full bg-success px-4 py-2 text-[12px] font-black text-black transition-transform active:scale-95"
-              >
-                Finalizar treino
-              </button>
+              {session ? (
+                <button
+                  data-testid="finalizar-treino-home"
+                  onClick={() => {
+                    // NÃO finaliza aqui: este botão só limpava a sessão local com
+                    // toast de sucesso e nada era gravado no banco (o aluno via
+                    // "treino finalizado" mas workout_logs ficava vazio). Manda
+                    // pra tela de treino, que retoma e conclui de verdade.
+                    router.push("/treino?resume=1");
+                  }}
+                  className="gf-touch tactile shrink-0 rounded-full bg-success px-4 py-2 text-[12px] font-black text-black transition-transform active:scale-95"
+                >
+                  Finalizar treino
+                </button>
+              ) : (
+                <Link
+                  href="/treino"
+                  className="gf-touch tactile shrink-0 rounded-full bg-success px-4 py-2 text-[12px] font-black text-black transition-transform active:scale-95"
+                >
+                  Iniciar treino
+                </Link>
+              )}
             </div>
           ) : (
           <Link href="/checkin" className="tactile block rounded-2xl bg-[#F4711E] px-5 py-4 text-center shadow-[0_0_20px_rgba(244,113,30,0.4)] animate-glow" style={{ willChange: "transform" }}>
@@ -744,15 +812,17 @@ export default function HomePage() {
             exerciseCount={heroPlan?.count ?? 0}
             estMin={heroPlan && heroPlan.count > 0 ? Math.max(15, heroPlan.count * 4) : 45}
             sessionsWeek={sessionsWeek}
-            href={isCheckedInToday ? "/treino?resume=1" : undefined}
+            href={session ? "/treino?resume=1" : isCheckedInToday ? "/treino" : undefined}
             sessionLabel={
-              isCheckedInToday
+              session
                 ? "Continuar treino"
-                : heroPlan
-                  ? heroPlan.name
-                  : focusResume
-                    ? "Retomando onde parou"
-                    : "Treino de hoje"
+                : isCheckedInToday
+                  ? "Iniciar treino"
+                  : heroPlan
+                    ? heroPlan.name
+                    : focusResume
+                      ? "Retomando onde parou"
+                      : "Treino de hoje"
             }
             notice={fatigueNotice ?? undefined}
             emptyHint={

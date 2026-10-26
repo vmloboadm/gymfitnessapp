@@ -11,11 +11,11 @@ import { useCallback, useEffect, useState } from "react";
 export type WorkoutSession = { startedAt: number };
 
 /**
- * TEMPORÁRIO (fase de testes com o dono): treinos liberados sem check-in.
- * Quando tudo estiver funcionando, voltar para false e o gate (QR/NFC/senha)
- * volta a valer. NÃO lançar em produção com true.
+ * Gate do treino: com false, o aluno precisa do check-in do dia (QR/NFC/senha
+ * ou botão da tela de check-in) para liberar o treino. Ficou true durante a
+ * fase de testes com o dono; agora o fluxo de check-in grava de verdade.
  */
-export const TRAINING_GATE_OPEN = true;
+export const TRAINING_GATE_OPEN = false;
 
 const KEY = "gymfit_session_v1";
 const EVENT = "gymfit-session";
