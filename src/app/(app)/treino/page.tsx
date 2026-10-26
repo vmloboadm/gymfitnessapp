@@ -60,6 +60,7 @@ import { enqueueOffline, isOffline } from "~/lib/offline-queue";
 import { apiPath } from "~/lib/api-path";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
+import { localDayKey, localDayStartDaysAgoISO } from "~/lib/utils/local-date";
 import { useWorkoutSession, elapsedSeconds, readSessionProgress, clearSessionProgress, isDayUnlocked, markDayUnlocked, TRAINING_GATE_OPEN } from "~/lib/workout-session";
 import { checkDayPassword } from "~/lib/day-pass";
 import { SessionClock } from "~/components/common/SessionClock";
@@ -229,7 +230,7 @@ export default function TreinoHomePage() {
       const [programRes, daysRes, logsRes] = await Promise.all([
         supabase.from("workout_programs").select("id, name, objective").eq("id", programId).maybeSingle(),
         supabase.from("workout_days").select("id, name, day_order").eq("program_id", programId).order("day_order", { ascending: true }),
-        supabase.from("workout_logs").select("date, weight_kg, reps").eq("student_id", user.id).gte("date", new Date(Date.now() - 13 * 86400000).toISOString().slice(0, 10)),
+        supabase.from("workout_logs").select("date, weight_kg, reps").eq("student_id", user.id).gte("date", localDayStartDaysAgoISO(13)),
       ]);
 
       if (programRes.error || daysRes.error || logsRes.error) {
@@ -354,17 +355,9 @@ export default function TreinoHomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, daySession]);
 
-  // dia LOCAL (UTC quebrava treino após 21h: caía no dia seguinte)
-  const todayKey = (() => {
-    const d = new Date();
-    const p = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-  })();
-  const dayOf = (iso: string) => {
-    const d = new Date(iso);
-    const p = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-  };
+  // dia LOCAL de São Paulo (UTC quebrava treino após 21h: caía no dia seguinte)
+  const todayKey = localDayKey(new Date());
+  const dayOf = (iso: string) => localDayKey(iso);
   // MESMA FONTE da home, nunca diverge
   const tw = useMemo(() => (demo ? getTodayWorkout() : resolveFromLogs(data?.logs ?? [])), [demo, data?.logs]);
   function resolveFromLogs(logs: NonNullable<TreinoData["logs"]>) {
@@ -386,7 +379,7 @@ export default function TreinoHomePage() {
   const todayLogs = useMemo(
     () =>
       (data?.logs ?? []).filter(
-        (l) => dayOf(l.date).slice(0, 10) === todayKey && (detailsIds.size === 0 || detailsIds.has((l as { exercise_id?: string }).exercise_id))
+        (l) => dayOf(l.date) === todayKey && (detailsIds.size === 0 || detailsIds.has((l as { exercise_id?: string }).exercise_id))
       ).length,
     [data, todayKey, detailsIds]
   );
@@ -425,13 +418,6 @@ export default function TreinoHomePage() {
 
   // trava anti duplo-toque: finalizar duas vezes gerava log duplicado
   const concludingRef = useRef(false);
-
-  /** Data/hora LOCAL (não UTC): treino das 22h não pode virar "amanhã". */
-  const localISO = () => {
-    const d = new Date();
-    const p = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-  };
 
   const conclude = async (
     completedIds?: string[],
@@ -560,7 +546,7 @@ export default function TreinoHomePage() {
               workout_id: m?.workoutId || null,
               session_id: active?.id ?? null,
               exercise_id: exerciseId,
-              date: localISO(),
+              date: new Date().toISOString(),
               // workout_logs.weight_kg é NOT NULL: um null (aluno sem carga
               // numa série) derrubava o INSERT do lote inteiro e NENHUM log
               // entrava — era por isso que "registrava" mas o histórico ficava
@@ -1751,7 +1737,8 @@ function HistoryList({ logs }: { logs: WorkoutLogs[] }) {
   const sessions = useMemo(() => {
     const map = new Map<string, number>();
     logs.forEach((l) => {
-      const day = l.date.slice(0, 10);
+      const day = localDayKey(l.date);
+      if (!day) return;
       map.set(day, (map.get(day) ?? 0) + 1);
     });
     return [...map.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, 5);

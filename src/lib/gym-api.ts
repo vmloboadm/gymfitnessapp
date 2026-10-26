@@ -12,6 +12,7 @@
 
 import { isDemoMode, demoFallback } from "~/lib/demo-bridge";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { localDayKey, localDayKeyDaysAgo, localDayStartDaysAgoISO } from "~/lib/utils/local-date";
 import { normalizaTecnica } from "~/lib/workout-groups";
 import { demoPersonalStudents, type PersonalStudent } from "~/lib/personal-data";
 import {
@@ -48,7 +49,7 @@ type LogRow = { student_id: string; rpe: number | null; date: string; exercise_n
 
 async function fetchRealStudents(gymId: string): Promise<PersonalStudent[]> {
   const sb = supabaseBrowser();
-  const since = new Date(Date.now() - 30 * 864e5).toISOString();
+  const since = localDayStartDaysAgoISO(30);
 
   const [profRes, checkRes, logRes, swRes, progRes] = await Promise.all([
     sb.from("profiles").select("id, name, avatar_url, phone, whatsapp_consent, goal, medical_risk, medications, surgery_history, sex, experience_level, available_days, emergency_contact, birth_date, daily_intake, approved_at, plan_type, vencimento").eq("gym_id", gymId).eq("role", "student").order("name"),
@@ -66,7 +67,15 @@ async function fetchRealStudents(gymId: string): Promise<PersonalStudent[]> {
 
   const daysAgo = (iso: string | null | undefined): number => {
     if (!iso) return 30;
-    return Math.floor((Date.now() - new Date(iso).getTime()) / 864e5);
+    const day = localDayKey(iso);
+    const today = localDayKey(new Date());
+    if (!day || !today) return 30;
+    return Math.max(
+      0,
+      Math.round(
+        (new Date(`${today}T12:00:00`).getTime() - new Date(`${day}T12:00:00`).getTime()) / 864e5
+      )
+    );
   };
 
   return profiles.map((p) => {
@@ -74,9 +83,9 @@ async function fetchRealStudents(gymId: string): Promise<PersonalStudent[]> {
     const last = myChecks[0] ?? null;
     // streak: dias consecutivos com check-in a partir do último
     let streak = 0;
-    const seen = new Set(myChecks.map((c) => c.slice(0, 10)));
+    const seen = new Set(myChecks.map((c) => localDayKey(c)));
     for (let d = 0; d < 30; d++) {
-      const key = new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
+      const key = localDayKeyDaysAgo(d);
       if (seen.has(key)) streak++;
       else if (d > 0) break;
     }

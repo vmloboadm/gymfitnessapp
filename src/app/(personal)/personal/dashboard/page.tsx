@@ -27,6 +27,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { useAuth } from "~/hooks/useAuth";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { localDayKey, localDayStartDaysAgoISO, localDayStartISO } from "~/lib/utils/local-date";
 import { LivePulse } from "~/components/dashboard/LivePulse";
 import { CountUp } from "~/components/common/CountUp";
 import { StudentSheet } from "~/components/personal/StudentSheet";
@@ -146,18 +147,19 @@ export default function PersonalDashboardPage() {
     (async () => {
       try {
         const sb = supabaseBrowser();
-        const today = new Date().toISOString().slice(0, 10);
-        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-        const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+        const todayStart = localDayStartISO();
+        const yesterdayStart = localDayStartISO(new Date(Date.now() - 86400000));
+        const weekStart = localDayStartDaysAgoISO(6);
+        const todayKey = localDayKey(new Date());
         const threeHoursAgo = new Date(Date.now() - 3 * 3600000).toISOString();
         const [ck, eq, sw, swY, req, ckWeek, logsWeek] = await Promise.all([
-          sb.from("checkins").select("student_id").eq("gym_id", gymId).gte("checked_at", `${today}T00:00:00`).limit(200),
+          sb.from("checkins").select("student_id").eq("gym_id", gymId).gte("checked_at", todayStart).limit(200),
           sb.from("equipment_sessions").select("student_id").eq("gym_id", gymId).eq("status", "active").gte("started_at", threeHoursAgo).limit(200),
-          sb.from("student_workouts").select("student_id, assigned_at").eq("gym_id", gymId).gte("assigned_at", `${today}T00:00:00`).limit(200),
-          sb.from("student_workouts").select("student_id").eq("gym_id", gymId).gte("assigned_at", `${yesterday}T00:00:00`).lt("assigned_at", `${today}T00:00:00`).limit(200),
+          sb.from("student_workouts").select("student_id, assigned_at").eq("gym_id", gymId).gte("assigned_at", todayStart).limit(200),
+          sb.from("student_workouts").select("student_id").eq("gym_id", gymId).gte("assigned_at", yesterdayStart).lt("assigned_at", todayStart).limit(200),
           getRequests(gymId).catch(() => []),
-          sb.from("checkins").select("checked_at").eq("gym_id", gymId).gte("checked_at", `${weekAgo}T00:00:00`).limit(2000),
-          sb.from("workout_logs").select("date").eq("gym_id", gymId).gte("date", weekAgo).limit(2000),
+          sb.from("checkins").select("checked_at").eq("gym_id", gymId).gte("checked_at", weekStart).limit(2000),
+          sb.from("workout_logs").select("date").eq("gym_id", gymId).gte("date", weekStart).limit(2000),
         ]);
         if (!alive) return;
         const present = new Set<string>();
@@ -174,20 +176,22 @@ export default function PersonalDashboardPage() {
         // Atividade REAL por dia (check-ins + treinos concluídos), últimos 7 dias
         const byDay = new Map<string, number>();
         for (const r of ((ckWeek.data ?? []) as Array<{ checked_at: string }>)) {
-          const k = r.checked_at.slice(0, 10);
+          const k = localDayKey(r.checked_at);
           byDay.set(k, (byDay.get(k) ?? 0) + 1);
         }
         for (const r of ((logsWeek.data ?? []) as Array<{ date: string }>)) {
-          const k = r.date.slice(0, 10);
+          const k = localDayKey(r.date);
           byDay.set(k, (byDay.get(k) ?? 0) + 1);
         }
-        setTodayWorkouts(((logsWeek.data ?? []) as Array<{ date: string }>).filter((r) => r.date.slice(0, 10) === today).length);
+        setTodayWorkouts(
+          ((logsWeek.data ?? []) as Array<{ date: string }>).filter((r) => localDayKey(r.date) === todayKey).length
+        );
         const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
         const week: { label: string; count: number; isToday: boolean }[] = [];
         for (let i = 6; i >= 0; i--) {
           const d = new Date();
           d.setDate(d.getDate() - i);
-          const k = d.toISOString().slice(0, 10);
+          const k = localDayKey(d);
           week.push({ label: dayNames[d.getDay()], count: byDay.get(k) ?? 0, isToday: i === 0 });
         }
         setWeeklyReal(week);

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "~/lib/supabase/admin";
+import { localDayKey, localDayStartDaysAgoISO } from "~/lib/utils/local-date";
 
 /**
  * Carga de dados do painel interno (/admin) — só server (service role).
@@ -80,7 +81,7 @@ type ProfileRow = {
 };
 
 const day = (n: number) => new Date(Date.now() - n * 86_400_000);
-const dayKey = (iso: string) => iso.slice(0, 10);
+const dayKey = (iso: string) => localDayKey(iso);
 const shortDay = (iso: string) => iso.slice(8, 10) + "/" + iso.slice(5, 7);
 
 export async function loadAdminData(): Promise<AdminData> {
@@ -104,11 +105,11 @@ export async function loadAdminData(): Promise<AdminData> {
       .limit(500),
     sb.from("checkins")
       .select("student_id, checked_at")
-      .gte("checked_at", day(30).toISOString())
+      .gte("checked_at", localDayStartDaysAgoISO(30))
       .limit(8000),
     sb.from("workout_logs")
       .select("student_id, date")
-      .gte("date", day(30).toISOString().slice(0, 10))
+      .gte("date", localDayStartDaysAgoISO(30))
       .limit(8000),
     sb.from("ai_generation_logs")
       .select("created_at")

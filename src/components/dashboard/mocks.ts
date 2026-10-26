@@ -1,3 +1,5 @@
+import { localDayKey } from "~/lib/utils/local-date";
+
 /* Mocks tipados do Dashboard do Aluno.
    Simulam as tabelas/respostas do Supabase para desenvolvimento.
    Regras de pontuação da constância (comentadas para o backend futuro):
@@ -139,11 +141,11 @@ export function nextWorkoutFromLogs(
   const seq = WORKOUT_SEQUENCE;
   const day = 86400000;
   const now = today.getTime();
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = localDayKey(today);
 
   // último dia com treino (mais recente até ontem, para permitir "continuar de onde parou")
-  const doneDays = [...new Set(logs.map((l) => l.date.slice(0, 10)))]
-    .filter((d) => d < todayStr)
+  const doneDays = [...new Set(logs.map((l) => localDayKey(l.date)))]
+    .filter((d) => d && d < todayStr)
     .sort();
 
   // quantos "ciclos de ficha" foram completados até agora
@@ -151,9 +153,9 @@ export function nextWorkoutFromLogs(
   const next = seq[progress % seq.length];
 
   // faltou ontem → é retomada do treino perdido
-  const yesterday = new Date(now - day).toISOString().slice(0, 10);
-  const trainedYesterday = logs.some((l) => l.date.slice(0, 10) === yesterday);
-  const trainedToday = logs.some((l) => l.date.slice(0, 10) === todayStr);
+  const yesterday = localDayKey(new Date(now - day));
+  const trainedYesterday = logs.some((l) => localDayKey(l.date) === yesterday);
+  const trainedToday = logs.some((l) => localDayKey(l.date) === todayStr);
 
   const resume = !trainedToday && doneDays.length > 0 && !trainedYesterday;
 

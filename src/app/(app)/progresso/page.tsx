@@ -26,6 +26,7 @@ import { GlossaryCard } from "~/components/common/Glossary";
 import { Badge } from "~/components/ui/badge";
 import { calcStreak, totalVolume } from "~/lib/utils/calculations";
 import { formatDate } from "~/lib/utils/format";
+import { localDayKey, localDayKeyDaysAgo, localDayStartDaysAgoISO, localDayStartISO } from "~/lib/utils/local-date";
 import { buildFrequencySeries } from "~/lib/academia";
 import { isDemoMode, demoProgressoData, demoMetricsData } from "~/lib/demo-bridge";
 import type { WorkoutLogs } from "~/lib/types/models";
@@ -68,9 +69,9 @@ export default function ProgressoPage() {
       if (!user || !profile) return { data: null, error: { message: "Sessão indisponível" } };
 
       const today = new Date();
-      const since = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 13).toISOString().slice(0, 10);
+      const since = localDayStartDaysAgoISO(13);
       // check-ins desde o início do mês anterior: sustenta constância e comparativo mensal
-      const checkinsSince = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().slice(0, 10);
+      const checkinsSince = localDayStartISO(new Date(today.getFullYear(), today.getMonth() - 1, 1));
 
       const [last14Res, prev14Res, checkinsRes, metricsRes] = await Promise.all([
         supabase
@@ -130,10 +131,10 @@ export default function ProgressoPage() {
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      buckets[d.toISOString().slice(0, 10)] = 0;
+      buckets[localDayKey(d)] = 0;
     }
     for (const l of data?.logs ?? []) {
-      const day = l.date.slice(0, 10);
+      const day = localDayKey(l.date);
       if (day in buckets) buckets[day] += (l.weight_kg ?? 0) * l.reps;
     }
     return Object.entries(buckets).map(([day, volume]) => ({
@@ -142,17 +143,21 @@ export default function ProgressoPage() {
     }));
   }, [data?.logs]);
 
-  const weekVolume = useMemo(() => totalVolume((data?.logs ?? []).filter((l) => l.date >= new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10))), [data?.logs]);
+  const weekAgo = localDayKeyDaysAgo(6);
+  const weekVolume = useMemo(
+    () => totalVolume((data?.logs ?? []).filter((l) => localDayKey(l.date) >= weekAgo)),
+    [data?.logs, weekAgo]
+  );
   // FONTE ÚNICA com a home: sequência e sessões contam dias TREINADOS
   // (workout_logs), não visitas. Mesma regra em todo o app.
   const allLogDates = useMemo(
-    () => [...(data?.logs ?? []), ...(data?.prevLogs ?? [])].map((l) => l.date),
+    () => [...(data?.logs ?? []), ...(data?.prevLogs ?? [])].map((l) => localDayKey(l.date)),
     [data?.logs, data?.prevLogs]
   );
   const streak = useMemo(() => calcStreak(allLogDates), [allLogDates]);
   const sessionsThisWeek = useMemo(
-    () => new Set(allLogDates.filter((d) => d >= new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10))).size,
-    [allLogDates]
+    () => new Set(allLogDates.filter((d) => d >= weekAgo)).size,
+    [allLogDates, weekAgo]
   );
   const freq = useMemo(
     () => buildFrequencySeries((data?.checkins ?? []) as Array<{ checked_at: string }>),
@@ -171,34 +176,38 @@ export default function ProgressoPage() {
 
   // Métricas reais, direto dos check-ins e logs do aluno.
   const freqMonthly = useMemo(() => {
-    const monthStart = new Date().toISOString().slice(0, 7);
+    const monthStart = localDayKey(new Date()).slice(0, 7);
     return new Set(
       (data?.checkins ?? [])
-        .filter((c) => c.checked_at.startsWith(monthStart))
-        .map((c) => c.checked_at.slice(0, 10))
+        .filter((c) => localDayKey(c.checked_at).startsWith(monthStart))
+        .map((c) => localDayKey(c.checked_at))
     ).size;
   }, [data?.checkins]);
   const freqDays = useMemo(
     () =>
       new Set(
         (data?.checkins ?? [])
-          .filter((c) => c.checked_at >= new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10))
-          .map((c) => c.checked_at.slice(0, 10))
+          .filter((c) => localDayKey(c.checked_at) >= weekAgo)
+          .map((c) => localDayKey(c.checked_at))
       ).size,
-    [data?.checkins]
+    [data?.checkins, weekAgo]
   );
 
   // Comparativo de constância (mês atual vs mês anterior, dias com check-in)
   const constancyDelta = useMemo(() => {
     const now = new Date();
-    const curM = now.toISOString().slice(0, 7);
+    const curM = localDayKey(now).slice(0, 7);
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevM = prev.toISOString().slice(0, 7);
+    const prevM = localDayKey(prev).slice(0, 7);
     const days = new Set(
-      (data?.checkins ?? []).filter((c) => c.checked_at.startsWith(curM)).map((c) => c.checked_at.slice(0, 10))
+      (data?.checkins ?? [])
+        .filter((c) => localDayKey(c.checked_at).startsWith(curM))
+        .map((c) => localDayKey(c.checked_at))
     ).size;
     const prevDays = new Set(
-      (data?.checkins ?? []).filter((c) => c.checked_at.startsWith(prevM)).map((c) => c.checked_at.slice(0, 10))
+      (data?.checkins ?? [])
+        .filter((c) => localDayKey(c.checked_at).startsWith(prevM))
+        .map((c) => localDayKey(c.checked_at))
     ).size;
     return prevDays > 0 && days > 0 ? Math.round(((days - prevDays) / prevDays) * 100) : null;
   }, [data?.checkins]);

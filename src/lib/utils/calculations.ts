@@ -1,3 +1,5 @@
+import { localDayKey, localDayKeyDaysAgo } from "./local-date";
+
 /** IMC = peso (kg) / altura² (m). */
 export function calcBmi(weightKg: number, heightM: number): number {
   if (heightM <= 0) return 0;
@@ -34,11 +36,10 @@ export function deltaPct(current: number, previous: number): number | null {
  * porque nenhum treino era gravado, corrigido na aba Treino. */
 export function calcStreak(days: string[]): number {
   if (days.length === 0) return 0;
-  const unique = [...new Set(days.map((d) => d.slice(0, 10)))].sort();
+  const unique = [...new Set(days.map((d) => localDayKey(d)))].filter(Boolean).sort();
   const lastDay = unique[unique.length - 1];
-  const today = new Date();
-  const yesterday = new Date(today.getTime() - 86400000).toISOString().slice(0, 10);
-  const todayStr = today.toISOString().slice(0, 10);
+  const yesterday = localDayKeyDaysAgo(1);
+  const todayStr = localDayKey(new Date());
   if (lastDay !== todayStr && lastDay !== yesterday) return 0;
   let streak = 1;
   let cursor = new Date(unique[unique.length - 1] + "T12:00:00");

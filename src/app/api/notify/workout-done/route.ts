@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   const admin = supabaseAdmin();
   const { data: student, error: studErr } = await admin
     .from("profiles")
-    .select("id, name, gym_id, phone")
+    .select("id, name, gym_id, phone, whatsapp_consent")
     .eq("id", auth.user.id)
     .maybeSingle();
   if (studErr || !student?.gym_id) {
@@ -92,7 +92,10 @@ export async function POST(request: Request) {
 
   let whatsapp: "sent" | "skipped" | "error" = "skipped";
   const phone = normalizeBRPhone(student.phone);
-  if (phone) {
+  // LGPD: o aviso automático para o aluno só sai com consentimento explícito
+  // (o onboarding grava whatsapp_consent). Sem isso, o push/in-app do staff
+  // continua, mas o WhatsApp do aluno não é enviado.
+  if (phone && student.whatsapp_consent === true) {
     try {
       const detalhe =
         exerciseCount || totalVolumeKg

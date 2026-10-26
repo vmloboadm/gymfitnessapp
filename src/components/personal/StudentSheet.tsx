@@ -16,6 +16,7 @@ import {
   type PersonalStudent,
 } from "~/lib/personal-data";
 import { isDemoMode } from "~/lib/demo-bridge";
+import { localDayKey, localDayStartDaysAgoISO } from "~/lib/utils/local-date";
 import {
   listWorkoutsForStudent,
   streakOverride,
@@ -290,7 +291,7 @@ export function StudentSheet({
         const rows = (lg.data ?? []) as Array<{ date: string; weight_kg: number | null; reps: number | null }>;
         const byDay = new Map<string, { sets: number; volume: number }>();
         for (const r of rows) {
-          const day = r.date.slice(0, 10);
+          const day = localDayKey(r.date);
           const cur = byDay.get(day) ?? { sets: 0, volume: 0 };
           cur.sets += 1;
           cur.volume += (r.weight_kg ?? 0) * (Number(r.reps) || 0);
@@ -327,7 +328,7 @@ export function StudentSheet({
     let cancelled = false;
     (async () => {
       try {
-        const since = new Date(Date.now() - 30 * 864e5).toISOString();
+        const since = localDayStartDaysAgoISO(30);
         const { data, error } = await supabaseBrowser()
           .from("checkins")
           .select("checked_at")
@@ -336,7 +337,7 @@ export function StudentSheet({
           .limit(400);
         if (cancelled) return;
         if (error) { setFreqDays30(null); return; }
-        const days = new Set(((data ?? []) as Array<{ checked_at: string }>).map((r) => r.checked_at.slice(0, 10)));
+        const days = new Set(((data ?? []) as Array<{ checked_at: string }>).map((r) => localDayKey(r.checked_at)));
         setFreqDays30(days.size);
       } catch {
         if (!cancelled) setFreqDays30(null);
@@ -563,7 +564,7 @@ export function StudentSheet({
                   <p
                     className={cn(
                       "mt-0.5 text-[12.5px] font-bold",
-                      student.vencimento < new Date().toISOString().slice(0, 10)
+                      student.vencimento < localDayKey(new Date())
                         ? "text-[#F87171]"
                         : "text-foreground"
                     )}

@@ -1,6 +1,7 @@
 import type { Achievements } from "~/lib/types/models";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { calcStreak } from "~/lib/utils/calculations";
+import { localDayKey, localDayStartDaysAgoISO, localWeekStartKey } from "~/lib/utils/local-date";
 
 /**
  * Fonte única de conquistas do aluno.
@@ -88,7 +89,7 @@ type AchSeed = { id: string; earned_at: string };
  */
 export async function loadEarnedAchievements(studentId: string): Promise<StudentAchievement[]> {
   const sb = supabaseBrowser();
-  const since90 = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+  const since90 = localDayStartDaysAgoISO(90);
 
   const [logsRes, checkinsRes, boardRes] = await Promise.all([
     sb
@@ -123,7 +124,7 @@ export async function loadEarnedAchievements(studentId: string): Promise<Student
     seeds.push({ id: "ach-1", earned_at: logs[0]!.date });
   }
 
-  const logDates = logs.map((l) => l.date.slice(0, 10));
+  const logDates = logs.map((l) => localDayKey(l.date));
   if (calcStreak(logDates) >= 3) {
     seeds.push({ id: "ach-2", earned_at: logDates[logDates.length - 1]! });
   }
@@ -136,7 +137,7 @@ export async function loadEarnedAchievements(studentId: string): Promise<Student
     const diffToMon = (day + 6) % 7;
     const monday = new Date(dt);
     monday.setDate(dt.getDate() - diffToMon);
-    const key = monday.toISOString().slice(0, 10);
+    const key = localWeekStartKey(monday);
     const set = byWeek.get(key) ?? new Set<string>();
     set.add(d);
     byWeek.set(key, set);

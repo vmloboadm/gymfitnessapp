@@ -22,6 +22,7 @@ import {
   demoVariationsFor,
 } from "~/lib/demo-bridge";
 import { cn } from "~/lib/utils";
+import { localDayKey, localDayKeyDaysAgo, localDayStartDaysAgoISO } from "~/lib/utils/local-date";
 
 
 
@@ -58,7 +59,7 @@ export default function CheckinPage() {
         .from("workout_logs")
         .select("date")
         .eq("student_id", user.id)
-        .gte("date", new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10));
+        .gte("date", localDayStartDaysAgoISO(7));
       if (error) return { data: [], error: null };
       return { data: (data ?? []) as Array<{ date: string }>, error: null };
     },
@@ -67,9 +68,13 @@ export default function CheckinPage() {
   );
   const sessionMetrics = useMemo(() => {
     const logs = demo ? (getTodayWorkout().logs as Array<{ date: string }>) : (weekLogs ?? []);
-    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-    const diasSemana = new Set(logs.filter((l) => l.date?.slice(0, 10) >= weekAgo).map((l) => l.date.slice(0, 10)));
-    const hoje = new Date().toISOString().slice(0, 10);
+    const weekAgo = localDayKeyDaysAgo(7);
+    const diasSemana = new Set(
+      logs
+        .map((l) => localDayKey(l.date))
+        .filter((d) => d >= weekAgo)
+    );
+    const hoje = localDayKey(new Date());
     const treinouHoje = diasSemana.has(hoje);
     const progresso = readSessionProgress();
     const entrada = daySession ? new Date(daySession.startedAt) : null;

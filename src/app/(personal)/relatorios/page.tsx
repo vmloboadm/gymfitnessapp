@@ -117,7 +117,7 @@ export default function RelatoriosPage() {
           .from("workout_logs")
           .select("weight_kg, reps")
           .eq("gym_id", profile.gym_id)
-          .gte("date", since.toISOString().slice(0, 10))
+          .gte("date", sinceIso)
           .limit(LOGS_CAP),
       ]);
       if (cRes.error) return { data: null, error: cRes.error };

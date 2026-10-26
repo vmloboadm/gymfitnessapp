@@ -13,6 +13,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { studentStatus, type PersonalStudent } from "~/lib/personal-data";
 import { streakOverride } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
+import { localDayKey, localDayKeyDaysAgo, localDayStartDaysAgoISO, localDayStartISO, localWeekStartKey } from "~/lib/utils/local-date";
 import { hasRole } from "~/lib/utils/roles";
 import { ImageCropModal } from "~/components/common/ImageCropModal";
 
@@ -111,22 +112,18 @@ export default function PersonalPerfilPage() {
     (async () => {
       try {
         const sb = supabaseBrowser();
-        const today = new Date().toISOString().slice(0, 10);
-        const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
-        const monday = (() => {
-          const d = new Date();
-          const day = d.getDay();
-          d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-          return d.toISOString().slice(0, 10);
-        })();
+        const todayStart = localDayStartISO();
+        const weekAgoKey = localDayKeyDaysAgo(6);
+        const weekAgoStart = localDayStartDaysAgoISO(6);
+        const monday = localWeekStartKey();
         const monthStart = new Date();
         monthStart.setDate(1);
         monthStart.setHours(0, 0, 0, 0);
         const [stRes, ckRes, logsRes, cardioRes, swRes, profRes, lbRes, maRes] = await Promise.all([
           sb.from("profiles").select("id, name, role, avatar_url").eq("gym_id", profile.gym_id).in("role", ["trainer", "manager", "admin"]).order("name"),
-          sb.from("checkins").select("id").eq("gym_id", profile.gym_id).gte("checked_at", today),
-          sb.from("workout_logs").select("student_id, date").eq("gym_id", profile.gym_id).gte("date", weekAgo).limit(2000),
-          sb.from("cardio_logs").select("minutes").eq("gym_id", profile.gym_id).gte("date", weekAgo).limit(2000),
+          sb.from("checkins").select("id").eq("gym_id", profile.gym_id).gte("checked_at", todayStart),
+          sb.from("workout_logs").select("student_id, date").eq("gym_id", profile.gym_id).gte("date", weekAgoStart).limit(2000),
+          sb.from("cardio_logs").select("minutes").eq("gym_id", profile.gym_id).gte("date", weekAgoKey).limit(2000),
           sb.from("student_workouts").select("student_id").eq("gym_id", profile.gym_id).eq("status", "active").limit(500),
           sb.from("profiles").select("id, approved_at, created_at").eq("gym_id", profile.gym_id).eq("role", "student"),
           sb.from("leaderboard").select("streak").eq("gym_id", profile.gym_id).eq("period", "week").eq("week_start", monday).eq("rank_type", "load").limit(100),
@@ -139,8 +136,8 @@ export default function PersonalPerfilPage() {
         })));
         setTodayCount((ckRes.data ?? []).length);
         const logs = (logsRes.data ?? []) as Array<{ student_id: string; date: string }>;
-        const days = new Set(logs.map((l) => l.date.slice(0, 10)));
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const days = new Set(logs.map((l) => localDayKey(l.date)));
+        const todayStr = localDayKey(new Date());
         const withPlanIds = new Set(((swRes.data ?? []) as Array<{ student_id: string }>).map((r) => r.student_id));
         const students = (profRes.data ?? []) as Array<{ id: string; approved_at: string | null; created_at: string }>;
         const approved = students.filter((s) => s.approved_at);
@@ -148,13 +145,13 @@ export default function PersonalPerfilPage() {
         setWeek({
           trainings: days.size,
           trainingsToday: new Set(
-            logs.filter((l) => l.date.slice(0, 10) === todayStr).map((l) => l.student_id)
+            logs.filter((l) => localDayKey(l.date) === todayStr).map((l) => l.student_id)
           ).size,
           cardioMin: ((cardioRes.data ?? []) as Array<{ minutes: number }>).reduce((a, r) => a + (r.minutes ?? 0), 0),
           withPlan: approved.filter((s) => withPlanIds.has(s.id)).length,
           noPlan: approved.filter((s) => !withPlanIds.has(s.id)).length,
           pending: students.filter((s) => !s.approved_at).length,
-          newcomers: students.filter((s) => (s.created_at ?? "").slice(0, 10) >= weekAgo).length,
+          newcomers: students.filter((s) => localDayKey(s.created_at ?? "") >= weekAgoKey).length,
           avgStreak: streaks.length ? Math.round((streaks.reduce((a, b) => a + b, 0) / streaks.length) * 10) / 10 : 0,
         });
       } catch { /* mantém vazio */ }

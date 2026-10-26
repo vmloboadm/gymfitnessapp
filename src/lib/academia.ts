@@ -30,6 +30,8 @@ export type OccupancySnapshot = {
 };
 
 /** Normaliza a saída do banco para um contrato limpo de frequência. */
+import { localDayKey } from "~/lib/utils/local-date";
+
 export function buildFrequencySeries(
   checkins: Array<{ checked_at: string }>,
   days = WEEK_DAYS
@@ -41,7 +43,7 @@ export function buildFrequencySeries(
   for (let d = days - 1; d >= 0; d--) {
     const date = new Date(now);
     date.setDate(date.getDate() - d);
-    const key = date.toISOString().slice(0, 10);
+    const key = localDayKey(date);
     idx.set(key, buckets.length);
     buckets.push({
       day: key,
@@ -50,7 +52,7 @@ export function buildFrequencySeries(
     });
   }
   for (const c of checkins) {
-    const key = (c.checked_at ?? "").slice(0, 10);
+    const key = localDayKey(c.checked_at ?? "");
     const i = idx.get(key);
     if (i != null) buckets[i].checkins += 1;
   }

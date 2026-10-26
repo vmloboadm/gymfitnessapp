@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { enqueuePremiumRequest, isNetworkError, isOffline } from "~/lib/offline-queue";
 import { cn } from "~/lib/utils";
 import { calcStreak, weekdayName, startOfWeek } from "~/lib/utils/calculations";
+import { localDayKey, localDayKeyDaysAgo } from "~/lib/utils/local-date";
 import { cap } from "~/lib/utils/format";
 import { leagueFor } from "~/lib/utils/leagues";
 import { useWorkoutSession } from "~/lib/workout-session";
@@ -397,10 +398,11 @@ export default function HomePage() {
   const logs = useMemo<WorkoutLogs[]>(() => (demo ? twSingleton!.logs : data?.logs ?? []), [demo, twSingleton, data]);
   const streak = useMemo(() => calcStreak(logs.map((l) => l.date)), [logs]);
   const sessionsWeek = useMemo(() => {
-    const days = new Set();
+    const days = new Set<string>();
+    const weekAgo = localDayKeyDaysAgo(6);
     logs.forEach((l) => {
-      const d = l.date.slice(0, 10);
-      if (d >= new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10)) days.add(d);
+      const d = localDayKey(l.date);
+      if (d >= weekAgo) days.add(d);
     });
     return days.size;
   }, [logs]);
@@ -426,7 +428,8 @@ export default function HomePage() {
   const monthDays = useMemo(() => {
     const vol = new Map<string, number>();
     logs.forEach((l) => {
-      const k = l.date.slice(0, 10);
+      const k = localDayKey(l.date);
+      if (!k) return;
       vol.set(k, (vol.get(k) ?? 0) + ((l.weight_kg ?? 0) * (l.reps ?? 1) || 1));
     });
     const now = new Date();
@@ -439,7 +442,7 @@ export default function HomePage() {
     const first = new Date(year, month, 1);
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, month, d);
-      const key = date.toISOString().slice(0, 10);
+      const key = localDayKey(date);
       const v = vol.get(key) ?? 0;
       days.push({
         day: d,
@@ -499,7 +502,8 @@ export default function HomePage() {
   const dayStats = useMemo(() => {
     const map = new Map<string, { count: number; volume: number }>();
     logs.forEach((l) => {
-      const k = l.date.slice(0, 10);
+      const k = localDayKey(l.date);
+      if (!k) return;
       const cur = map.get(k) ?? { count: 0, volume: 0 };
       cur.count += 1;
       cur.volume += (l.weight_kg ?? 0) * (l.reps ?? 1);
