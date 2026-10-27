@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { m } from "framer-motion";
-import { Camera, CheckCircle2, Copy, MessageCircle, Timer, Dumbbell, Trophy, Bell, BellRing } from "lucide-react";
+import { Camera, CheckCircle2, Copy, MessageCircle, Timer, Dumbbell, Trophy, Bell } from "lucide-react";
 import { usePush } from "~/hooks/usePush";
 import { TopBar } from "~/components/layout/TopBar";
 import { formatMMSS } from "~/lib/workout-session";
@@ -66,12 +67,13 @@ export default function WorkoutSummary({
 }) {
   const [achievement] = useState<StudentAchievement | null>(() => nextToUnlock());
   const [unlocked, setUnlocked] = useState(false);
-  const [rewardOpen, setRewardOpen] = useState(true);
+  const [rewardOpen, setRewardOpen] = useState(false);
   const [rpe, setRpe] = useState<string | null>(null);
   const [note, setNote] = useState("");
-  const [saving, setSaving] = useState(false);
   const push = usePush();
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (achievement) {
@@ -102,6 +104,20 @@ export default function WorkoutSummary({
 
   const whatsappHref = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
+  const handleDone = () => {
+    const hasFeedback = !!rpe || note.trim().length > 0;
+    // Feedback é opcional e não bloqueia a saída. Salvamos em segundo plano.
+    if (sessionId && hasFeedback) {
+      void saveSessionFeedback(sessionId, {
+        feeling: rpe ?? "na_medida",
+        note: note.trim() || null,
+        duration_min: Math.max(1, Math.round(seconds / 60)),
+        finished_by: "student",
+      });
+    }
+    onDone();
+  };
+
   return (
     <>
       <RewardModal
@@ -113,7 +129,7 @@ export default function WorkoutSummary({
         shareText={shareText}
       />
       <TopBar title="Resumo do treino" subtitle="Bom trabalho hoje" />
-      <div className="mx-auto max-w-md space-y-5 p-4 pb-10">
+      <div className="mx-auto max-w-md space-y-5 p-4 pb-28">
         {/* stats */}
         <m.div
           initial={{ opacity: 0, y: 16 }}
@@ -158,7 +174,7 @@ export default function WorkoutSummary({
             >
               <Trophy className="h-10 w-10 text-[#FBBF24]" strokeWidth={1.8} fill="rgba(251, 191, 36, 0.25)" aria-hidden />
             </m.span>
-            <h2 className="relative mt-3 font-display text-xl font-black text-foreground">Missão cumprida! 🏆</h2>
+            <h2 className="relative mt-3 font-display text-xl font-black text-foreground">Missão cumprida!</h2>
             <p className="relative mt-1 gf-card-text">Treino concluído com determinação. A constância tá construindo você.</p>
             <p className="relative mt-2 inline-flex rounded-full bg-brand/15 px-3 py-1 text-[11px] font-black text-brand">
               +{done * 5} pts · próxima conquista a caminho
@@ -321,26 +337,23 @@ export default function WorkoutSummary({
           ) : null}
         </div>
 
-        <button
-          onClick={async () => {
-            const feeling = rpe ?? "na_medida";
-            if (sessionId && !saving) {
-              setSaving(true);
-              await saveSessionFeedback(sessionId, {
-                feeling,
-                note: note.trim() || null,
-                duration_min: Math.max(1, Math.round(seconds / 60)),
-                finished_by: "student",
-              });
-              setSaving(false);
-            }
-            onDone();
-          }}
-          className="gf-touch tactile flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-bold text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <CheckCircle2 className="h-4 w-4" /> {saving ? "Salvando..." : "Concluir e voltar ao início"}
-        </button>
       </div>
+      {mounted
+        ? createPortal(
+            <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+              <div className="mx-auto max-w-md">
+                <button
+                  onClick={handleDone}
+                  className="gf-touch tactile flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-sm font-black text-brand-foreground shadow-lg shadow-brand/25"
+                >
+                  <CheckCircle2 className="h-4 w-4" /> Concluir e voltar ao início
+                </button>
+                <p className="mt-1.5 text-center text-[10px] text-muted-foreground">RPE e nota são opcionais.</p>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </>
   );
 }

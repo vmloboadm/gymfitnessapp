@@ -62,6 +62,7 @@ export default function WorkoutInProgress({
   const [detailEx, setDetailEx] = useState<ExerciseDetail | null>(null);
   const [videoEx, setVideoEx] = useState<{ name: string; poster?: string | null; url: string } | null>(null);
   const [showFinish, setShowFinish] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [restLeft, setRestLeft] = useState<number | null>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -318,16 +319,15 @@ export default function WorkoutInProgress({
               />
             </div>
           </div>
-          {onMinimize && (
-            <button
-              onClick={onMinimize}
-              aria-label="Minimizar treino (continua em segundo plano)"
-              title="Minimizar · o treino continua rodando"
-              className="gf-touch flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
-            >
-              <ChevronDown className="h-5 w-5" />
-            </button>
-          )}
+          <button
+            onClick={() => setShowSummary(true)}
+            aria-label="Abrir resumo do treino"
+            aria-expanded={showSummary}
+            title="Resumo do treino"
+            className="gf-touch flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-brand hover:text-brand"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </button>
           <button
             onClick={() => setShowFinish(true)}
             className="shrink-0 rounded-full bg-success px-3.5 py-1.5 text-[11px] font-black text-black"
@@ -615,6 +615,70 @@ export default function WorkoutInProgress({
         poster={videoEx?.poster ?? null}
         videoUrl={videoEx?.url ?? null}
       />
+      <BottomSheet open={showSummary} onClose={() => setShowSummary(false)}>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-base font-black text-foreground">Resumo do treino</p>
+              <p className="text-[11px] text-muted-foreground">{doneSets} de {totalSets} séries feitas</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSummary(false)}
+              aria-label="Fechar resumo"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <ul className="max-h-[48vh] space-y-1.5 overflow-y-auto pr-1">
+            {exercises.map((ex, i) => {
+              const p = progress[ex.id];
+              const done = p?.sets.filter((s) => s.done).length ?? 0;
+              const total = p?.sets.length ?? ex.sets;
+              return (
+                <li key={ex.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentIdx(i);
+                      setShowSummary(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left",
+                      i === currentIdx ? "border-brand/40 bg-brand/[0.08]" : "border-border bg-card/40"
+                    )}
+                  >
+                    <span className={cn(
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black",
+                      done === total && total > 0 ? "bg-success text-black" : "bg-muted text-muted-foreground"
+                    )}>
+                      {done === total && total > 0 ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-semibold text-foreground">{ex.name}</span>
+                      <span className="block text-[10px] text-muted-foreground">{done}/{total} séries</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {onMinimize ? (
+            <button
+              type="button"
+              onClick={() => {
+                setShowSummary(false);
+                onMinimize();
+              }}
+              className="tactile w-full rounded-xl border border-white/[0.08] py-3 text-[12px] font-bold text-muted-foreground"
+            >
+              Minimizar treino
+            </button>
+          ) : null}
+        </div>
+      </BottomSheet>
       <BottomSheet open={!!detailEx} onClose={() => setDetailEx(null)}>
         {detailEx ? (
           <div className="space-y-3">

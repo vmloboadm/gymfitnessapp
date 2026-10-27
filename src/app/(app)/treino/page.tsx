@@ -8,6 +8,7 @@ import {
   Dumbbell,
   CalendarDays,
   ChevronRight,
+  ChevronDown,
   ThumbsUp,
   Meh,
   Frown,
@@ -66,6 +67,7 @@ import { checkDayPassword } from "~/lib/day-pass";
 import { SessionClock } from "~/components/common/SessionClock";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
 import { stableWorkoutLogId } from "~/lib/workout/log-id";
+import { resolveTrainingDay } from "~/lib/workout/training-day";
 
 /* mapa exercício→grupo para dados reais (categories canônicas) */
 const DEMO_EX_GROUP_REAL: Record<string, string> = {
@@ -359,6 +361,30 @@ export default function TreinoHomePage() {
   // dia LOCAL de São Paulo (UTC quebrava treino após 21h: caía no dia seguinte)
   const todayKey = localDayKey(new Date());
   const dayOf = (iso: string) => localDayKey(iso);
+  const plan = planActive[0] ?? null;
+  // MESMA resposta que a Home usa. daysSelected manda; rotação só sem dias fixos.
+  const trainingDay = useMemo(
+    () =>
+      demo
+        ? null
+        : resolveTrainingDay({
+            plan,
+            today: new Date(),
+            logs: data?.logs ?? [],
+            slotChecks: slotChecks ?? [],
+            fallbackDays: profile?.available_days ?? undefined,
+          }),
+    [demo, plan, data?.logs, slotChecks, profile?.available_days]
+  );
+  const scheduledDayId =
+    trainingDay?.status === "scheduled" ? data?.days?.[trainingDay.dayIdx]?.id ?? null : null;
+  const suggestedIdx =
+    trainingDay?.status === "scheduled" ? trainingDay.dayIdx : trainingDay?.optionalDayIdx ?? 0;
+  const dayDetails = useMemo(() => {
+    if (demo) return data?.details ?? [];
+    if (!scheduledDayId) return [];
+    return (data?.details ?? []).filter((d) => d.day_id === scheduledDayId);
+  }, [demo, data?.details, scheduledDayId]);
   // MESMA FONTE da home, nunca diverge
   const tw = useMemo(() => (demo ? getTodayWorkout() : resolveFromLogs(data?.logs ?? [])), [demo, data?.logs]);
   function resolveFromLogs(logs: NonNullable<TreinoData["logs"]>) {
@@ -374,8 +400,8 @@ export default function TreinoHomePage() {
   // "Concluído hoje" só conta os exercícios DO PLANO DE HOJE (os details),
   // não logs de qualquer exercício: fazer o slot A não podia travar o B.
   const detailsIds = useMemo(
-    () => new Set(((data?.details ?? []) as Array<{ exercise_id?: string | null }>).map((d) => d.exercise_id).filter(Boolean)),
-    [data?.details]
+    () => new Set((dayDetails as Array<{ exercise_id?: string | null }>).map((d) => d.exercise_id).filter(Boolean)),
+    [dayDetails]
   );
   const todayLogs = useMemo(
     () =>
@@ -384,7 +410,7 @@ export default function TreinoHomePage() {
       ).length,
     [data, todayKey, detailsIds]
   );
-  const totalToday = data?.details.length ?? 0;
+  const totalToday = dayDetails.length;
   const finishedToday = totalToday > 0 && todayLogs >= totalToday;
 
 
@@ -467,230 +493,210 @@ export default function TreinoHomePage() {
       }
     })();
     setConcludedCount(loggedIds.length || ids.length);
-    // Sessão do banco é lida antes de gravar (para ligar os logs a ela), mas
-    // só é encerrada depois que o treino entrou no histórico ou na fila.
-    const active = !demo && user?.id
-      ? await getActiveWorkoutSession(user.id).catch(() => null)
-      : null;
-    setFinishedSessionId(active?.id ?? null);
-    let inserted = 0;
-    let queuedOffline = 0;
-    let queuedTotal = 0;
     if (loggedIds.length) {
       setDoneIds((prev) => new Set([...prev, ...loggedIds]));
-      // produção: grava workout_logs reais das séries que o aluno FEZ,
-      // com as reps e a carga que ele DIGITOU (não as do plano).
-      if (!demo && user && profile) {
-        let logRows: Array<Record<string, unknown>> = [];
-        try {
-          const supabase = supabaseBrowser();
-          const offline = isOffline();
-          const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
-          const sessList = (session ?? savedExList) as Array<{ id?: string; name: string; reps?: string }>;
-          const missing = loggedIds.filter(
-            (id) => !(planExerciseMap && planExerciseMap[id]?.exerciseId)
-          );
-          // 1) tenta os details do plano ativo (fonte mais confiável)
-          const detailIds: Record<string, string> = {};
-          const stillMissing = missing.filter((id) => {
-            const s = sessList.find((x) => x.id === id);
-            const resolved = s ? detailsExerciseId(s.name) : null;
-            if (resolved) {
-              detailIds[id] = resolved;
-              return false;
-            }
-            return true;
-          });
-          const nameToId: Record<string, string> = {};
-          if (stillMissing.length > 0 && !offline) {
-            const names = stillMissing.map((id) => sessList.find((s) => s.id === id)?.name).filter(Boolean) as string[];
-            if (names.length > 0) {
-              const orFilter = names.map((n) => `name.ilike.%${n.replace(/[%_,]/g, "").slice(0, 24)}%`).join(",");
-              const { data: found } = await supabase
-                .from("exercises")
-                .select("id, name")
-                .or(orFilter)
-                .limit(names.length * 3);
-              for (const f of (found ?? []) as Array<{ id: string; name: string }>) {
-                if (!nameToId[norm(f.name)]) nameToId[norm(f.name)] = f.id;
-              }
-            }
-          }
-          const findId = (name: string): string | null => {
-            const n = norm(name);
-            const words = n.split(" ").filter(Boolean);
-            for (const [k, v] of Object.entries(nameToId)) {
-              if (k.includes(n) || n.includes(k)) return v;
-            }
-            for (const [k, v] of Object.entries(nameToId)) {
-              if (words.slice(0, 2).every((w) => k.includes(w))) return v;
-            }
-            return null;
-          };
-          const rows = loggedIds.flatMap((id) => {
-            const m = planExerciseMap?.[id];
-            const s = sessList.find((x) => x.id === id);
-            const exerciseId = m?.exerciseId ?? detailIds[id] ?? (s ? findId(s.name) : null);
-            if (!exerciseId) return [];
-            // reps/carga REAIS: última série feita desse exercício
-            const doneSets = (progMap[id]?.sets ?? []).filter((x) => x?.done);
-            const lastSet = doneSets[doneSets.length - 1];
-            const realReps = lastSet?.reps != null && String(lastSet.reps).trim() !== ""
-              ? parseReps(String(lastSet.reps))
-              : m?.reps
-                ? parseReps(m.reps)
-                : parseReps(s?.reps ?? "0");
-            const realWeight = lastSet?.weight != null ? parseWeight(String(lastSet.weight)) : null;
-            return [{
-              gym_id: profile.gym_id,
-              student_id: user.id,
-              workout_id: m?.workoutId || null,
-              workout_session_id: active?.id ?? null,
-              exercise_id: exerciseId,
-              date: new Date().toISOString(),
-              // workout_logs.weight_kg é NOT NULL: um null (aluno sem carga
-              // numa série) derrubava o INSERT do lote inteiro e NENHUM log
-              // entrava — era por isso que "registrava" mas o histórico ficava
-              // vazio. 0 = sem carga, mesmo valor do default da coluna.
-              weight_kg: realWeight ?? 0,
-              reps: realReps,
-              rpe: m?.rpe ?? null,
-            }];
-          });
-          logRows = await Promise.all(rows.map(async (row) => ({
-            ...row,
-            id: await stableWorkoutLogId([
-              active?.id ?? `${user.id}:${todayKey}`,
-              user.id,
-              String(row.exercise_id ?? ""),
-              String(row.workout_id ?? ""),
-              todayKey,
-            ]),
-          })));
-          if (logRows.length > 0) {
-            if (offline) {
-              // sem sinal: nada de tentar rede, guarda tudo no aparelho
-              queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
-              queuedTotal = logRows.length;
-            } else {
-              const { error: logErr } = await supabase.from("workout_logs").insert(logRows as never);
-              // 23505 = o retry encontrou a linha que ele mesmo já tinha
-              // gravado (timeout de rede). É sucesso, não erro.
-              if (!logErr || logErr.code === "23505") {
-                inserted = logRows.length;
-                const programId = planActive[0]?.programId;
-                if (activeSlot && programId) {
-                  const { data: already } = await supabase
-                    .from("slot_checks")
-                    .select("id")
-                    .eq("student_id", user.id)
-                    .eq("program_id", programId)
-                    .eq("slot", activeSlot)
-                    .gte("checked_at", localDayStartDaysAgoISO(0))
-                    .limit(1);
-                  if (!already?.length) {
-                    await supabase.from("slot_checks").insert({
-                      gym_id: profile.gym_id,
-                      student_id: user.id,
-                      program_id: programId,
-                      slot: activeSlot,
-                    } as never).then(() => {});
-                  }
-                }
-                // avisa o personal (in-app + push + WhatsApp quando configurado)
-                const totalVolumeKg = logRows.reduce((sum, r) => {
-                  const w = typeof r.weight_kg === "number" ? r.weight_kg : null;
-                  const reps = typeof r.reps === "number" ? r.reps : 0;
-                  return w && reps ? sum + w * reps : sum;
-                }, 0);
-                void supabase.auth
-                  .getSession()
-                  .then(({ data: sess }) => {
-                    const token = sess.session?.access_token;
-                    if (!token) return null;
-                    return fetch(apiPath("/api/notify/workout-done"), {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({
-                        workoutName: planActive[0]?.name ?? data?.program?.name ?? undefined,
-                        exerciseCount: inserted,
-                        ...(totalVolumeKg > 0 ? { totalVolumeKg } : {}),
-                      }),
-                    });
-                  })
-                  .catch(() => {});
-              } else {
-                // Qualquer falha (rede, sessão expirada, RLS) preserva o treino
-                // no aparelho. Antes só erro de rede entrava na fila e o resto
-                // era perdido com um toast que dizia "avisamos seu personal".
-                queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
-                queuedTotal = logRows.length;
-              }
-            }
-          }
-        } catch {
-          // Caiu no meio: o que já estava montado vira fila offline.
-          if (logRows.length > 0) {
-            queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
-            queuedTotal = logRows.length;
-          }
-        }
-      }
-    }
-    const failedToPersist =
-      !demo && !!user && loggedIds.length > 0 && inserted === 0 && queuedOffline === 0;
-    if (failedToPersist) {
-      toast.error("Treino não entrou no histórico", {
-        description: "Seu progresso está salvo. Toque em Finalizar de novo ou fale com seu personal.",
-      });
-      // Remonta o treino com o progresso salvo: o botão de finalizar do filho
-      // ficou travado em "finishing", então um novo mount libera a tentativa.
-      setRetryKey((k) => k + 1);
-      concludingRef.current = false;
-      return;
     }
 
-    // Só limpa a sessão local e encerra a sessão do banco depois de gravar
-    // (ou de guardar na fila offline). Falha não pode apagar o treino.
+    // 1) O resumo aparece AGORA. Nada de esperar rede para encerrar a tela:
+    // o cronômetro congela, a sessão local fecha e a persistência segue em
+    // segundo plano (com outbox se a conexão cair).
+    setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
+    const sessSnapshot = session;
+    const slotSnapshot = activeSlot;
+    const planSnapshot = planActive[0] ?? null;
+    const profileSnapshot = profile;
     endDaySession();
     clearSessionProgress();
     try {
       localStorage.removeItem("gymfit_session_slot_v1");
     } catch { /* ok */ }
-    if (!demo && user?.id) {
-      await completeWorkoutSession(user.id).catch(() => {});
-      try {
-        const last = await getLastSessionNeedingFeedback(user.id).catch(() => null);
-        if (last) {
-          setPendingFeedback(last);
-          setFeedbackOpen(true);
-        }
-      } catch { /* feedback é bônus */ }
-    }
-
-    navigator.vibrate?.([60, 40, 90]);
     setPhase("done");
-    // toast HONESTO: só diz "registrado" se realmente entrou no histórico
-    if (demo || !user) {
+    navigator.vibrate?.([60, 40, 90]);
+    toast("Treino finalizado", { description: "Seu resumo já está aqui." });
+
+    // 2) Persistência em background. Só diz "registrado" quando entra de
+    // verdade; qualquer falha vira fila offline.
+    if (!demo && user?.id) {
+      void (async () => {
+        const active = isOffline()
+          ? null
+          : await getActiveWorkoutSession(user.id).catch(() => null);
+        setFinishedSessionId(active?.id ?? null);
+        let inserted = 0;
+        let queuedOffline = 0;
+        let queuedTotal = 0;
+        if (loggedIds.length && profileSnapshot) {
+          let logRows: Array<Record<string, unknown>> = [];
+          try {
+            const supabase = supabaseBrowser();
+            const offline = isOffline();
+            const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, "").trim();
+            const sessList = (sessSnapshot ?? savedExList) as Array<{ id?: string; name: string; reps?: string }>;
+            const missing = loggedIds.filter(
+              (id) => !(planExerciseMap && planExerciseMap[id]?.exerciseId)
+            );
+            const detailIds: Record<string, string> = {};
+            const stillMissing = missing.filter((id) => {
+              const s = sessList.find((x) => x.id === id);
+              const resolved = s ? detailsExerciseId(s.name) : null;
+              if (resolved) {
+                detailIds[id] = resolved;
+                return false;
+              }
+              return true;
+            });
+            const nameToId: Record<string, string> = {};
+            if (stillMissing.length > 0 && !offline) {
+              const names = stillMissing.map((id) => sessList.find((s) => s.id === id)?.name).filter(Boolean) as string[];
+              if (names.length > 0) {
+                const orFilter = names.map((n) => `name.ilike.%${n.replace(/[%_,]/g, "").slice(0, 24)}%`).join(",");
+                const { data: found } = await supabase
+                  .from("exercises")
+                  .select("id, name")
+                  .or(orFilter)
+                  .limit(names.length * 3);
+                for (const f of (found ?? []) as Array<{ id: string; name: string }>) {
+                  if (!nameToId[norm(f.name)]) nameToId[norm(f.name)] = f.id;
+                }
+              }
+            }
+            const findId = (name: string): string | null => {
+              const n = norm(name);
+              const words = n.split(" ").filter(Boolean);
+              for (const [k, v] of Object.entries(nameToId)) {
+                if (k.includes(n) || n.includes(k)) return v;
+              }
+              for (const [k, v] of Object.entries(nameToId)) {
+                if (words.slice(0, 2).every((w) => k.includes(w))) return v;
+              }
+              return null;
+            };
+            const rows = loggedIds.flatMap((id) => {
+              const m = planExerciseMap?.[id];
+              const s = sessList.find((x) => x.id === id);
+              const exerciseId = m?.exerciseId ?? detailIds[id] ?? (s ? findId(s.name) : null);
+              if (!exerciseId) return [];
+              const doneSets = (progMap[id]?.sets ?? []).filter((x) => x?.done);
+              const lastSet = doneSets[doneSets.length - 1];
+              const realReps = lastSet?.reps != null && String(lastSet.reps).trim() !== ""
+                ? parseReps(String(lastSet.reps))
+                : m?.reps
+                  ? parseReps(m.reps)
+                  : parseReps(s?.reps ?? "0");
+              const realWeight = lastSet?.weight != null ? parseWeight(String(lastSet.weight)) : null;
+              return [{
+                gym_id: profileSnapshot.gym_id,
+                student_id: user.id,
+                workout_id: m?.workoutId || null,
+                workout_session_id: active?.id ?? null,
+                exercise_id: exerciseId,
+                date: new Date().toISOString(),
+                weight_kg: realWeight ?? 0,
+                reps: realReps,
+                rpe: m?.rpe ?? null,
+              }];
+            });
+            logRows = await Promise.all(rows.map(async (row) => ({
+              ...row,
+              id: await stableWorkoutLogId([
+                active?.id ?? `${user.id}:${todayKey}`,
+                user.id,
+                String(row.exercise_id ?? ""),
+                String(row.workout_id ?? ""),
+                todayKey,
+              ]),
+            })));
+            if (logRows.length > 0) {
+              if (offline) {
+                queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
+                queuedTotal = logRows.length;
+              } else {
+                const { error: logErr } = await supabase.from("workout_logs").insert(logRows as never);
+                if (!logErr || logErr.code === "23505") {
+                  inserted = logRows.length;
+                  const programId = planSnapshot?.programId;
+                  if (slotSnapshot && programId) {
+                    const { data: already } = await supabase
+                      .from("slot_checks")
+                      .select("id")
+                      .eq("student_id", user.id)
+                      .eq("program_id", programId)
+                      .eq("slot", slotSnapshot)
+                      .gte("checked_at", localDayStartDaysAgoISO(0))
+                      .limit(1);
+                    if (!already?.length) {
+                      await supabase.from("slot_checks").insert({
+                        gym_id: profileSnapshot.gym_id,
+                        student_id: user.id,
+                        program_id: programId,
+                        slot: slotSnapshot,
+                      } as never).then(() => {});
+                    }
+                  }
+                  const totalVolumeKg = logRows.reduce((sum, r) => {
+                    const w = typeof r.weight_kg === "number" ? r.weight_kg : null;
+                    const reps = typeof r.reps === "number" ? r.reps : 0;
+                    return w && reps ? sum + w * reps : sum;
+                  }, 0);
+                  void supabase.auth
+                    .getSession()
+                    .then(({ data: sess }) => {
+                      const token = sess.session?.access_token;
+                      if (!token) return null;
+                      return fetch(apiPath("/api/notify/workout-done"), {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                          workoutName: planSnapshot?.name ?? data?.program?.name ?? undefined,
+                          exerciseCount: inserted,
+                          ...(totalVolumeKg > 0 ? { totalVolumeKg } : {}),
+                        }),
+                      });
+                    })
+                    .catch(() => {});
+                } else {
+                  queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
+                  queuedTotal = logRows.length;
+                }
+              }
+            }
+          } catch {
+            if (logRows.length > 0) {
+              queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
+              queuedTotal = logRows.length;
+            }
+          }
+        }
+
+        const failedToPersist =
+          !!profileSnapshot && loggedIds.length > 0 && inserted === 0 && queuedOffline === 0;
+        if (failedToPersist) {
+          toast.error("Treino finalizado, mas não entrou no histórico", {
+            description: "O progresso ficou no aparelho. Fale com seu personal se não aparecer.",
+          });
+        } else if (inserted > 0) {
+          toast.success(`Treino registrado! ${inserted} exercício${inserted === 1 ? "" : "s"} no histórico.`);
+        } else if (queuedOffline > 0) {
+          if (queuedTotal > queuedOffline) {
+            toast.error("O aparelho guardou só parte do treino", {
+              description: "O que foi salvo sincroniza quando a conexão voltar.",
+            });
+          } else {
+            toast("Treino guardado no aparelho", {
+              description: "Sincroniza quando a conexão voltar.",
+            });
+          }
+        }
+
+        if (!isOffline()) await completeWorkoutSession(user.id).catch(() => {});
+      })();
+    } else if (demo) {
       toast.success("Treino registrado!");
-    } else if (inserted > 0) {
-      toast.success(`Treino registrado! ${inserted} exercício${inserted === 1 ? "" : "s"} no histórico.`);
-    } else if (queuedOffline > 0) {
-      if (queuedTotal > queuedOffline) {
-        toast.error("O aparelho guardou só parte do treino", {
-          description: "O que foi salvo sincroniza quando a conexão voltar.",
-        });
-      } else {
-        toast("Treino guardado no aparelho", {
-          description: "Sincroniza quando a conexão voltar.",
-        });
-      }
-    } else {
-      toast("Sessão finalizada", { description: "Nenhuma série marcada como feita." });
     }
+    concludingRef.current = false;
     concludingRef.current = false;
   };
 
@@ -702,6 +708,7 @@ export default function TreinoHomePage() {
       const list = (saved?.exercises ?? []) as Array<{ id?: string }>;
       if (list.length > 0) {
         setSession(list as typeof DEFAULT_DEMO_EX);
+        setActiveTotal(list.length);
         try {
           const slotRaw = localStorage.getItem("gymfit_session_slot_v1");
           const parsed = slotRaw ? (JSON.parse(slotRaw) as { slot?: string }) : null;
@@ -791,11 +798,14 @@ export default function TreinoHomePage() {
   const [finishedSessionId, setFinishedSessionId] = useState<string | null>(null);
   // quantos exercícios foram concluídos na sessão que acabou (fonte p/ resumo)
   const [concludedCount, setConcludedCount] = useState<number | null>(null);
-  // remonta o treino quando a gravação falha, sem perder o progresso salvo
-  const [retryKey, setRetryKey] = useState(0);
+  // total do treino que está rodando (pode ser o dia opcional de descanso)
+  const [activeTotal, setActiveTotal] = useState(0);
+  // ficha completa é opcional: o CTA de iniciar fica antes dela
+  const [showFicha, setShowFicha] = useState(false);
 
   const startWorkout = (list: typeof DEFAULT_DEMO_EX) => {
     setSession(list);
+    setActiveTotal(list.length);
     if (!demo && user?.id && profile?.gym_id) {
       void startWorkoutSession(profile.gym_id, user.id);
     }
@@ -867,7 +877,10 @@ export default function TreinoHomePage() {
         className="tactile flex w-full items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning/[0.08] px-4 py-2.5 text-left"
       >
         <span className="flex items-center gap-2 text-[12px] font-bold text-warning">
-          <Lock className="h-4 w-4" /> Faça check-in na academia para ver o treino de hoje
+          <Lock className="h-4 w-4" />{" "}
+          {trainingDay?.status === "rest"
+            ? "Hoje é descanso. Faça check-in só se quiser treinar mesmo assim."
+            : "Faça check-in na academia para ver o treino de hoje"}
         </span>
         <ScanLine className="h-4 w-4 shrink-0 text-warning" />
       </button>
@@ -945,7 +958,7 @@ export default function TreinoHomePage() {
           exit={{ opacity: 0, scale: 0.98 }}
           transition={{ duration: 0.18 }}
         >
-          <WorkoutInProgress key={retryKey} exercises={activeExercises} onFinish={(ids, prog) => { void conclude(ids, prog); }} onProgressChange={(ids) => { completedRef.current = ids; }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
+          <WorkoutInProgress exercises={activeExercises} onFinish={(ids, prog) => { void conclude(ids, prog); }} onProgressChange={(ids) => { completedRef.current = ids; }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
         </m.div>
       </AnimatePresence>
     );
@@ -954,26 +967,18 @@ export default function TreinoHomePage() {
   // Tela de encerramento, pós-treino. ANTES do "sem treino": quem fez um
   // treino livre/provisório (sem student_workouts) também merece o resumo.
   if (phase === "done") {
+    // Sem wrapper com transform: o CTA do resumo é position: fixed e precisa
+    // ficar na viewport, não preso ao container animado.
     return (
-      <AnimatePresence mode="wait">
-        <m.div
-          key="treino-done"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.22 }}
-        >
-          <WorkoutSummary
-            seconds={summarySeconds ?? 0}
-            done={concludedCount ?? Math.min(todayLogs, totalToday)}
-            total={totalToday || Math.max(concludedCount ?? 0, 1)}
-            sessionId={finishedSessionId}
-            onDone={() => {
-              router.replace("/");
-            }}
-          />
-        </m.div>
-      </AnimatePresence>
+      <WorkoutSummary
+        seconds={summarySeconds ?? 0}
+        done={concludedCount ?? Math.min(todayLogs, totalToday)}
+        total={activeTotal || totalToday || Math.max(concludedCount ?? 0, 1)}
+        sessionId={finishedSessionId}
+        onDone={() => {
+          router.replace("/");
+        }}
+      />
     );
   }
 
@@ -1026,30 +1031,21 @@ export default function TreinoHomePage() {
     );
   }
 
-  // PLANO DO PERSONAL: rotação por slots (A, B, C...) sem dia fixo.
-  // Faltou quarta? Faz na quinta: cada slot tem check contínuo (slot_checks)
-  // e o sugerido de hoje é o próximo da rotação após o último concluído.
-  const WEEK_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  const plan = planActive[0] ?? null;
-  const daysSel = plan?.plan?.daysSelected ?? [];
-  const todayLabel = WEEK_PT[new Date().getDay()];
+  // PLANO DO PERSONAL: o dia de hoje vem do mesmo resolvedor da Home.
+  // Dia não programado é descanso; a rotação só vale sem dias fixos.
   const dias = plan?.plan?.dias ?? [];
   const splitType = plan?.plan?.splitType ?? "ABCDEF".slice(0, Math.min(Math.max(dias.length, 2), 6));
   const diaSlot = (d: { slot?: string }, i: number) => d.slot ?? "ABCDEF"[i] ?? String(i + 1);
-
   const lastBySlot: Record<string, string> = {};
   (slotChecks ?? []).forEach((c) => {
     if (!lastBySlot[c.slot]) lastBySlot[c.slot] = c.checked_at;
   });
-  // próximo da rotação após o último concluído; sem histórico, começa no A
-  let suggestedIdx = 0;
-  const lastCheck = (slotChecks ?? [])[0] ?? null;
-  if (lastCheck && dias.length > 0) {
-    const lastIdx = dias.findIndex((d, i) => diaSlot(d, i) === lastCheck.slot);
-    suggestedIdx = lastIdx >= 0 ? (lastIdx + 1) % dias.length : 0;
-  }
-  const sugDay = dias.length > 0 ? dias[suggestedIdx] ?? dias[0] : null;
-  const sugSlot = sugDay ? diaSlot(sugDay, suggestedIdx) : "";
+  const isRestDay = trainingDay?.status === "rest";
+  const sugDay = (trainingDay?.status === "scheduled" ? trainingDay.day : null) as (typeof dias)[number] | null;
+  const sugSlot = trainingDay?.slot ?? "";
+  const optionalIdx = trainingDay?.optionalDayIdx ?? 0;
+  const optionalDay = dias[optionalIdx] ?? null;
+  const optionalSlot = trainingDay?.optionalSlot ?? (optionalDay ? diaSlot(optionalDay, optionalIdx) : "");
   const fmtSlotDay = (iso?: string | null) =>
     iso ? new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "";
   // TREINO PROVISÓRIO: modelo de referência para quem ainda não tem plano.
@@ -1071,8 +1067,8 @@ export default function TreinoHomePage() {
       return;
     }
     // Trava: só um treino por vez (com retomada, nunca beco sem saída)
-    if (!demo && !opts?.force && user?.id) {
-      const active = await getActiveWorkoutSession(user.id);
+    if (!demo && !opts?.force && user?.id && !isOffline()) {
+      const active = await getActiveWorkoutSession(user.id).catch(() => null);
       if (active) {
         pendingStartRef.current = { kind: "template", tpl };
         setBlockedSession(active);
@@ -1131,6 +1127,7 @@ export default function TreinoHomePage() {
       })();
     }
     setSession(exList);
+    setActiveTotal(exList.length);
     setPlanTodayActive(true);
     setActiveSlot(null);
     try {
@@ -1152,8 +1149,8 @@ export default function TreinoHomePage() {
       return;
     }
     // Trava: só um treino por vez (com retomada, nunca beco sem saída)
-    if (!demo && !opts?.force && user?.id) {
-      const active = await getActiveWorkoutSession(user.id);
+    if (!demo && !opts?.force && user?.id && !isOffline()) {
+      const active = await getActiveWorkoutSession(user.id).catch(() => null);
       if (active) {
         pendingStartRef.current = { kind: "plan", dayIdx: idx };
         setBlockedSession(active);
@@ -1239,6 +1236,7 @@ export default function TreinoHomePage() {
       })();
     }
     setSession(exList);
+    setActiveTotal(exList.length);
     setPlanTodayActive(true);
     startDaySession();
     if (!demo && user?.id && profile?.gym_id) {
@@ -1326,7 +1324,39 @@ export default function TreinoHomePage() {
         {/* 2. MEU TREINO — rotação por slots (A, B, C...), sem dia fixo.
             Faltou quarta? Faz na quinta: o sugerido é o próximo da rotação,
             e qualquer slot pode ser feito a qualquer dia. */}
-        {plan && dias.length > 0 && sugDay ? (
+        {plan && dias.length > 0 && isRestDay ? (
+          <div className="rounded-2xl border border-border bg-card/60 p-5">
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Hoje é descanso</p>
+            <h2 className="mt-1 font-display text-xl font-black text-foreground">Seu corpo agradece.</h2>
+            <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+              Hoje não está na sua programação.
+              {trainingDay?.scheduledWeekdays.length
+                ? ` Seus dias são ${trainingDay.scheduledWeekdays.join(", ")}.`
+                : ""}
+            </p>
+            {trainingDay?.missed ? (
+              <p className="mt-3 rounded-xl border border-warning/30 bg-warning/[0.07] p-3 text-[12px] leading-snug text-warning">
+                Faltou {trainingDay.missed.weekday} ({trainingDay.missed.slot}). O treino ficou pendente, sem drama.
+              </p>
+            ) : null}
+            {optionalDay ? (
+              <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                <p className="text-[11px] font-semibold text-muted-foreground">Próximo treino</p>
+                <p className="mt-0.5 truncate text-[13px] font-bold text-foreground">
+                  {optionalSlot} · {optionalDay.nome}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => startPlanSession(optionalIdx)}
+                  className="tactile mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-brand/35 bg-brand/10 py-3 text-[13px] font-black text-brand"
+                >
+                  <Play className="h-4 w-4 fill-current" />
+                  {needsCheckin ? "Check-in para treinar mesmo assim" : "Treinar mesmo assim"}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : plan && dias.length > 0 && sugDay ? (
           <div>
             <div className="mb-2 flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-foreground">Meu treino</h2>
@@ -1353,6 +1383,36 @@ export default function TreinoHomePage() {
                       </p>
                     </div>
                   </div>
+                  <m.button
+                    onClick={() => startPlanSession(suggestedIdx)}
+                    whileHover={{ scale: 1.015 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="gf-touch relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-brand py-3.5 text-[15px] font-black text-brand-foreground shadow-lg shadow-brand/35"
+                  >
+                    <m.span
+                      className="absolute inset-0"
+                      style={{
+                        background: "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.15) 45%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0.15) 55%, transparent 70%)",
+                      }}
+                      animate={{ x: ["-120%", "220%"] }}
+                      transition={{ duration: 3.5, repeat: Infinity, repeatDelay: 2.5, ease: "easeInOut" }}
+                    />
+                    {needsCheckin ? (
+                      <><Lock className="relative h-5 w-5" /> <span className="relative">Check-in para liberar</span></>
+                    ) : (
+                      <><Play className="relative h-5 w-5 fill-current" /> <span className="relative">Iniciar treino {sugSlot}</span></>
+                    )}
+                  </m.button>
+                    <button
+                      type="button"
+                      aria-expanded={showFicha}
+                      onClick={() => setShowFicha((v) => !v)}
+                      className="tactile flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] py-2.5 text-[11px] font-bold text-muted-foreground"
+                    >
+                      {showFicha ? "Ocultar ficha" : "Ver ficha completa"}
+                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showFicha && "rotate-180")} />
+                    </button>
+                    {showFicha ? (<>
                     {sugDay.aquecimento?.length ? (
                       <p className="rounded-xl border border-[#4ADE80]/20 bg-[#4ADE80]/[0.06] p-2.5 text-[10.5px] leading-snug text-[#4ADE80]">
                         Aquecimento: {sugDay.aquecimento.join(" · ")}
@@ -1417,32 +1477,13 @@ export default function TreinoHomePage() {
                         Finalizador: {sugDay.finalizador}
                       </p>
                     ) : null}
+                    </>) : null}
                   </div>
                   {needsCheckin ? (
                     <p className="flex items-center justify-center gap-1.5 rounded-xl border border-warning/40 bg-warning/[0.07] px-3 py-2.5 text-center text-[11px] font-bold text-warning">
                       <Lock className="h-3.5 w-3.5 shrink-0" /> Check-in do dia para ver e iniciar o treino
                     </p>
                   ) : null}
-                  <m.button
-                    onClick={() => startPlanSession(suggestedIdx)}
-                    whileHover={{ scale: 1.015 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="gf-touch relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-brand py-3.5 text-[15px] font-black text-brand-foreground shadow-lg shadow-brand/35"
-                  >
-                    <m.span
-                      className="absolute inset-0"
-                      style={{
-                        background: "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.15) 45%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0.15) 55%, transparent 70%)",
-                      }}
-                      animate={{ x: ["-120%", "220%"] }}
-                      transition={{ duration: 3.5, repeat: Infinity, repeatDelay: 2.5, ease: "easeInOut" }}
-                    />
-                    {needsCheckin ? (
-                      <><Lock className="relative h-5 w-5" /> <span className="relative">Check-in para liberar</span></>
-                    ) : (
-                      <><Play className="relative h-5 w-5 fill-current" /> <span className="relative">Iniciar treino {sugSlot}</span></>
-                    )}
-                  </m.button>
                 </div>
               </div>
             {/* demais slots da rotação: qualquer um pode ser feito hoje */}
@@ -1479,9 +1520,9 @@ export default function TreinoHomePage() {
                 })}
               </div>
             ) : null}
-            {daysSel.length > 0 && !daysSel.includes(todayLabel) ? (
-              <p className="mt-2 text-center text-[10px] text-muted-foreground">
-                Hoje não está nos seus dias ({daysSel.join(", ")}), mas a rotação segue valendo.
+            {trainingDay?.missed ? (
+              <p className="mt-2 text-center text-[10px] text-warning">
+                Faltou {trainingDay.missed.weekday} ({trainingDay.missed.slot}). Hoje é {sugSlot}, sem pular a ficha.
               </p>
             ) : null}
           </div>

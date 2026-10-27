@@ -12,7 +12,7 @@ import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { toast } from "sonner";
 import type { Equipment, EquipmentSessions } from "~/lib/types/models";
 import { useSessionTimeout } from "~/hooks/useSessionTimeout";
-import { useWorkoutSession, endWorkoutSession, readSessionProgress, formatMMSS, elapsedSeconds } from "~/lib/workout-session";
+import { useWorkoutSession, readSessionProgress, formatMMSS, elapsedSeconds, markDayUnlocked } from "~/lib/workout-session";
 import { getTodayWorkout } from "~/lib/today-workout";
 import { WorkoutLogModal } from "~/components/workout-log-modal";
 import {
@@ -30,12 +30,17 @@ import { localDayKey, localDayKeyDaysAgo, localDayStartDaysAgoISO } from "~/lib/
 export default function CheckinPage() {
   const { user, profile } = useAuth();
   const [session, setSession] = useState<EquipmentSessions | null>(null);
+  const [gymEntry, setGymEntry] = useState<{
+    id: string;
+    checked_at: string;
+    source: string;
+  } | null>(null);
   const [scannerActive, setScannerActive] = useState(false);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
   const [variationPicker, setVariationPicker] = useState<string | null>(null);
   /** Aparelho detectado por deep link de tag NFC (iPhone/Android) aguardando confirmação. */
   const [pendingEq, setPendingEq] = useState<Equipment | null>(null);
-  const { session: daySession, start: startDaySession } = useWorkoutSession();
+  const { session: daySession } = useWorkoutSession();
   const router = useRouter();
   /** Chegou via gate (?scan=1&from=...): scanner abre sozinho e qualquer leitura valida a entrada. */
   const [doorMode, setDoorMode] = useState(false);
@@ -47,10 +52,10 @@ export default function CheckinPage() {
   // ---- métricas "Sua sessão hoje" ----
   const [nowTick, setNowTick] = useState(() => Date.now());
   useEffect(() => {
-    if (!daySession) return;
+    if (!gymEntry && !daySession) return;
     const t = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [daySession]);
+  }, [gymEntry, daySession]);
   // Produção: logs REAIS dos últimos 7 dias (demo usa o singleton local)
   const { data: weekLogs } = useAsyncQuery<Array<{ date: string }>>(
     async () => {
@@ -77,14 +82,16 @@ export default function CheckinPage() {
     const hoje = localDayKey(new Date());
     const treinouHoje = diasSemana.has(hoje);
     const progresso = readSessionProgress();
-    const entrada = daySession ? new Date(daySession.startedAt) : null;
+    // Tempo na academia é PRESENÇA: começa no check-in, não no cronômetro do
+    // treino. O treino pode nem ter sido iniciado ainda.
+    const entrada = gymEntry ? new Date(gymEntry.checked_at) : null;
     return {
       entradaHora: entrada ? entrada.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null,
-      tempoNa: daySession ? formatMMSS(elapsedSeconds(daySession.startedAt, nowTick)) : null,
-      treinoHoje: progresso ? "Em andamento" : treinouHoje ? "Concluído" : "Não iniciado",
+      tempoNa: entrada ? formatMMSS(elapsedSeconds(entrada.getTime(), nowTick)) : null,
+      treinoHoje: daySession || progresso ? "Em andamento" : treinouHoje ? "Concluído" : "Não iniciado",
       semana: diasSemana.size,
     };
-  }, [daySession, nowTick, weekLogs, demo]);
+  }, [gymEntry, daySession, nowTick, weekLogs, demo]);
 
   const { data, loading, error, refetch } = useAsyncQuery<{
     equipment: Equipment[];
@@ -179,7 +186,9 @@ export default function CheckinPage() {
 
     if (eq) {
       setPendingEq(eq);
-      startDaySession();
+      // Aparelho não é entrada: libera o dia, mas o cronômetro do treino
+      // só começa quando o aluno toca em "Iniciar treino".
+      markDayUnlocked("nfc");
       navigator.vibrate?.(60);
       // limpa a query da barra de endereço para não reabrir no refresh
       window.history.replaceState({}, "", window.location.pathname);
@@ -485,12 +494,6 @@ export default function CheckinPage() {
   // ---------------------------------------------------------------------------
   // Check-in de entrada / check-out de saída da academia (tabela checkins)
   // ---------------------------------------------------------------------------
-  const [gymEntry, setGymEntry] = useState<{
-    id: string;
-    checked_at: string;
-    source: string;
-  } | null>(null);
-
   const doEntry = async (
     source: "nfc" | "qrcode" | "app" = "app",
     opts?: { redirect?: boolean }
@@ -498,7 +501,7 @@ export default function CheckinPage() {
     const redirect = opts?.redirect !== false;
     if (demo) {
       setGymEntry({ id: "ck-demo-" + Date.now(), checked_at: new Date().toISOString(), source });
-      startDaySession();
+      markDayUnlocked(source);
       toast.success("Check-in de entrada realizado!");
       if (redirect) router.push("/treino");
       return true;
@@ -513,7 +516,18 @@ export default function CheckinPage() {
     if (error) {
       // Entrada de hoje já existe: libera mesmo assim (volta do almoço, segundo turno, etc.)
       if (/já realizado hoje/i.test(error.message)) {
-        startDaySession();
+        const { data: existing } = await supabase
+          .from("checkins")
+          .select("id, checked_at, source")
+          .eq("student_id", user.id)
+          .eq("gym_id", profile.gym_id)
+          .eq("type", "entrada")
+          .gte("checked_at", localDayStartDaysAgoISO(0))
+          .order("checked_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (existing) setGymEntry(existing as { id: string; checked_at: string; source: string });
+        markDayUnlocked(source);
         toast.success("Bom treino! Entrada de hoje já registrada.");
         if (redirect) router.push("/treino");
         return true;
@@ -521,8 +535,8 @@ export default function CheckinPage() {
       toast.error("Falha no check-in", { description: error.message });
       return false;
     }
-    setGymEntry(inserted as any);
-    startDaySession();
+    setGymEntry(inserted as { id: string; checked_at: string; source: string });
+    markDayUnlocked(source);
     toast.success("Check-in de entrada realizado!");
     if (redirect) router.push("/treino");
     return true;
@@ -533,8 +547,7 @@ export default function CheckinPage() {
     if (session) await endSession();
     if (demo) {
       setGymEntry(null);
-endWorkoutSession();
-      toast.success("Check-out realizado. Treino concluído!");
+      toast.success("Check-out realizado. Bom descanso!");
       return;
     }
     if (!user || !profile) return;
@@ -547,8 +560,9 @@ endWorkoutSession();
       return;
     }
     setGymEntry(null);
-    endWorkoutSession();
-    toast.success("Check-out realizado. Treino concluído!");
+    // Check-out é saída da academia, não fim do treino. Quem encerra o
+    // treino é o botão Finalizar na tela de treino.
+    toast.success("Check-out realizado. Bom descanso!");
   };
 
   // Restaura o check-in de hoje ao abrir/recarregar a tela. Antes o estado
@@ -559,15 +573,13 @@ endWorkoutSession();
     if (demo || !user?.id || !profile?.gym_id) return;
     let cancelled = false;
     (async () => {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
       const { data } = await supabaseBrowser()
         .from("checkins")
         .select("id, checked_at, source")
         .eq("student_id", user.id)
         .eq("gym_id", profile.gym_id)
         .eq("type", "entrada")
-        .gte("checked_at", start.toISOString())
+        .gte("checked_at", localDayStartDaysAgoISO(0))
         .order("checked_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -625,20 +637,26 @@ endWorkoutSession();
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-0.5">
               <p className="text-sm font-bold text-foreground">
-                {gymEntry ? "Você está na academia" : "Entrada na academia"}
+                {gymEntry ? "Você está na academia" : daySession ? "Treino em andamento" : "Entrada na academia"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {gymEntry || session
-                  ? `Check-in ${gymEntry?.source === "nfc" ? "via NFC" : gymEntry?.source === "qrcode" ? "via QR" : "validado"} · treino liberado`
-                  : doorMode
-                    ? "Aponte a câmera para o QR da portaria ou use o NFC"
-                    : "Escaneie o QR/NFC da entrada para iniciar seu treino"}
+                {gymEntry
+                  ? `Check-in ${gymEntry.source === "nfc" ? "via NFC" : gymEntry.source === "qrcode" ? "via QR" : "validado"} · treino liberado`
+                  : daySession
+                    ? "Check-out feito. Seu treino continua até você finalizar na tela de treino."
+                    : doorMode
+                      ? "Aponte a câmera para o QR da portaria ou use o NFC"
+                      : "Escaneie o QR/NFC da entrada para iniciar seu treino"}
               </p>
             </div>
-            {gymEntry || daySession || session ? (
+            {gymEntry || session ? (
               <Button size="sm" variant="outline" onClick={doExit}>
                 <LogOut className="mr-1 h-3.5 w-3.5" />
                 Fazer check-out
+              </Button>
+            ) : daySession ? (
+              <Button size="sm" onClick={() => router.push("/treino?resume=1")}>
+                Voltar ao treino
               </Button>
             ) : mockValidating ? (
               <span className="flex shrink-0 items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-4 py-2 text-[12px] font-bold text-brand">
@@ -654,7 +672,8 @@ endWorkoutSession();
                 {doorMode && demo ? (
                   <MockPortariaButton
                     onValidated={() => {
-                      startDaySession();
+                      setGymEntry({ id: "ck-demo-" + Date.now(), checked_at: new Date().toISOString(), source: "portaria" });
+                      markDayUnlocked("portaria");
                       toast.success("Entrada validada! Treino liberado");
                       backToOrigin();
                     }}
@@ -666,7 +685,7 @@ endWorkoutSession();
           {gymEntry && (
             <div className="flex items-center gap-2 rounded-xl bg-card/50 px-3 py-2 text-xs text-success">
               <span className="hero-live-dot" />
-              Treino em andamento, ao sair, o treino inteiro é finalizado.
+              Você está na academia. O treino continua até você finalizar na tela de treino.
             </div>
           )}
         </div>

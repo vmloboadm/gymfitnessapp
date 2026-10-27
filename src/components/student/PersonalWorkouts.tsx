@@ -108,8 +108,6 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
               </div>
             </div>
 
-            <PlanDays w={w} />
-
             {w.notes ? (
               <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-brand/25 bg-brand/[0.08] p-2.5 text-[11px] leading-snug text-brand">
                 <MessageSquareText className="mt-0.5 h-3.5 w-3.5 shrink-0" />

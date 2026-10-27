@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { X, ArrowLeft, ArrowRight, Check, MapPin } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { cn } from "~/lib/utils";
@@ -114,7 +114,7 @@ export function StudentTour() {
     <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="Tour guiado do aluno">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeLater} />
       <AnimatePresence mode="wait">
-        <motion.div
+        <m.div
           key={idx}
           initial={{ opacity: 0, y: 32 }}
           animate={{ opacity: 1, y: 0 }}
@@ -193,7 +193,7 @@ export function StudentTour() {
               Ver depois
             </button>
           </div>
-        </motion.div>
+        </m.div>
       </AnimatePresence>
     </div>
   );

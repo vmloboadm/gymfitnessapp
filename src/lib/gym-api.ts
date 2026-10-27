@@ -359,6 +359,21 @@ export async function assignExistingPlan(opts: {
   return { ok, failed };
 }
 
+/** Mantém o nome da cópia também dentro do ai_draft, não só na coluna name. */
+function renameDraft(raw: string | null, finalName: string): string | null {
+  if (!raw) return raw;
+  try {
+    const draft = JSON.parse(raw) as { nome?: string; observacao_geral?: string };
+    draft.nome = finalName;
+    if (typeof draft.observacao_geral === "string") {
+      draft.observacao_geral = draft.observacao_geral.replace(/Bruna(?:\s+Gomes)?/gi, finalName);
+    }
+    return JSON.stringify(draft);
+  } catch {
+    return raw;
+  }
+}
+
 /**
  * Repete um plano criando uma CÓPIA independente por aluno, já com o nome
  * escolhido pelo personal. Resolve o caso "ficha da Bruna chegando pra Thalia":
@@ -428,7 +443,7 @@ export async function assignCopiedPlan(opts: {
         name: finalName,
         objective: (prog as { objective: string | null }).objective,
         created_via: "manual",
-        ai_draft: (prog as { ai_draft: string | null }).ai_draft,
+        ai_draft: renameDraft((prog as { ai_draft: string | null }).ai_draft, finalName),
         reviewed_by: opts.trainerId,
       } as never))
       .select("id")

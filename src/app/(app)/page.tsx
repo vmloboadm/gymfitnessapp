@@ -20,11 +20,12 @@ import { toast } from "sonner";
 import { enqueuePremiumRequest, isNetworkError, isOffline } from "~/lib/offline-queue";
 import { cn } from "~/lib/utils";
 import { calcStreak, weekdayName, startOfWeek } from "~/lib/utils/calculations";
-import { localDayKey, localDayKeyDaysAgo } from "~/lib/utils/local-date";
+import { localDayKey, localDayKeyDaysAgo, localDayStartDaysAgoISO } from "~/lib/utils/local-date";
 import { cap } from "~/lib/utils/format";
 import { leagueFor } from "~/lib/utils/leagues";
 import { useWorkoutSession } from "~/lib/workout-session";
 import { getTodayWorkout } from "~/lib/today-workout";
+import { resolveTrainingDay, type TrainingDayState } from "~/lib/workout/training-day";
 import { SessionClock } from "~/components/common/SessionClock";
 import { TIPS_STRUCTURED } from "~/components/dashboard/mocks";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
@@ -215,15 +216,13 @@ export default function HomePage() {
   } | null>(
     async () => {
       if (demo || !user?.id || !profile?.gym_id) return { data: null, error: null };
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
       const { data: row, error } = await supabaseBrowser()
         .from("checkins")
         .select("id, checked_at")
         .eq("student_id", user.id)
         .eq("gym_id", profile.gym_id)
         .eq("type", "entrada")
-        .gte("checked_at", start.toISOString())
+        .gte("checked_at", localDayStartDaysAgoISO(0))
         .order("checked_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -314,16 +313,18 @@ export default function HomePage() {
   // Realtime: refetch workout_logs when any student in the gym logs a workout
   useWorkoutLogsRealtime(profile?.gym_id, user?.id, refetchLogs);
 
-  // Hero dinâmico: próximo slot da rotação do plano real (letra, foco,
-  // quantidade) + imagem de fundo conforme o treino. Sem plano, cai no
-  // comportamento anterior (sugestão por histórico).
-  const { data: heroPlan } = useAsyncQuery<{
+  // Hero do treino de hoje: usa o MESMO resolvedor da aba Treino. A
+  // programação do personal manda; sem plano, cai no comportamento anterior.
+  type HeroPlan = {
+    state: TrainingDayState;
     name: string;
+    title: string;
     slot: string;
     foco: string;
     count: number;
     image: string;
-  } | null>(
+  };
+  const { data: heroPlan } = useAsyncQuery<HeroPlan | null>(
     async () => {
       if (demo || !user || !profile?.gym_id) return { data: null, error: null };
       const plans = await fetchMyAssignedPlans(user.id, profile.gym_id).catch(() => []);
@@ -332,19 +333,33 @@ export default function HomePage() {
       if (!p || dias.length === 0) return { data: null, error: null };
       const { data: checks } = await supabaseBrowser()
         .from("slot_checks")
-        .select("slot")
+        .select("slot, checked_at")
         .eq("student_id", user.id)
         .eq("program_id", p.programId ?? "")
         .order("checked_at", { ascending: false })
-        .limit(1);
-      const lastSlot = ((checks?.[0] ?? null) as { slot?: string } | null)?.slot ?? null;
-      let idx = 0;
-      if (lastSlot) {
-        const li = dias.findIndex((d, i) => ((d as { slot?: string }).slot ?? "ABCDEF"[i]) === lastSlot);
-        idx = li >= 0 ? (li + 1) % dias.length : 0;
+        .limit(20);
+      const state = resolveTrainingDay({
+        plan: p,
+        today: new Date(),
+        logs: data?.logs ?? [],
+        slotChecks: (checks ?? []) as Array<{ slot: string; checked_at: string }>,
+        fallbackDays: profile?.available_days ?? undefined,
+      });
+      const day = state.day as { nome: string; foco: string; slot?: string; exercicios: unknown[] } | null;
+      if (!day) {
+        return {
+          data: {
+            state,
+            name: "Descanso",
+            title: "Hoje é descanso",
+            slot: "",
+            foco: "",
+            count: 0,
+            image: assetPath("/workout/workout-hero.jpg"),
+          },
+          error: null,
+        };
       }
-      const day = dias[idx] as { nome: string; foco: string; slot?: string; exercicios: unknown[] };
-      const slot = day.slot ?? "ABCDEF"[idx] ?? "";
       const foco = day.foco ?? "";
       const n = foco.toLowerCase();
       const key = /perna|quadr|glute|posterior|panturrilha/.test(n)
@@ -362,8 +377,10 @@ export default function HomePage() {
                   : "";
       return {
         data: {
+          state,
           name: day.nome,
-          slot,
+          title: `Treino ${state.slot} · ${foco}`,
+          slot: state.slot,
           foco,
           count: day.exercicios.length,
           image: (key && FOCUS_IMAGE[key]) || assetPath("/workout/workout-hero.jpg"),
@@ -371,7 +388,7 @@ export default function HomePage() {
         error: null,
       };
     },
-    [user?.id, profile?.gym_id, demo],
+    [user?.id, profile?.gym_id, demo, data?.logs, profile?.available_days],
     { enabled: !loading && !!user }
   );
 
@@ -490,12 +507,13 @@ export default function HomePage() {
   const activeDays = monthDays.days.filter((d) => d.level > 0).length;
   // Título pelo dado REAL do mês (dias treinados), não mock.
   const titulo = titleFor(inferGender(profile?.name), activeDays, streak);
-  // Meta da semana = dias que o próprio aluno marcou no cadastro (ex.: 5).
-  // O anel mostra X/meta e atualiza a cada treino gravado.
+  // Meta da semana = dias do PLANO ativo (a programação do personal). Só cai
+  // no available_days quando o plano não tem dias fixos.
   const weeklyGoal =
-    profile?.available_days && profile.available_days.length > 0
+    heroPlan?.state.weeklyGoal ||
+    (profile?.available_days && profile.available_days.length > 0
       ? profile.available_days.length
-      : META_SEMANAL_PADRAO;
+      : META_SEMANAL_PADRAO);
   const remaining = Math.max(0, weeklyGoal - sessionsWeek);
 
   // Detalhe por dia do heatmap (#6): nº de séries + volume movido
@@ -513,10 +531,15 @@ export default function HomePage() {
   }, [logs]);
   const selectedDetail = selectedDay ? dayStats.get(selectedDay) ?? null : null;
 
-  // Aviso complementar de fadiga (não muda o treino sugerido)
-  const fatigueNotice = focusResume
-    ? "Você faltou ontem, este treino ficou pendente da ficha, segue de onde parou."
-    : null;
+  // Aviso só quando a programação realmente tinha um dia perdido. Nada de
+  // "faltou ontem" em domingo ou em dia que não estava na ficha.
+  const fatigueNotice = demo
+    ? focusResume
+      ? "Você faltou ontem, este treino ficou pendente da ficha, segue de onde parou."
+      : null
+    : heroPlan?.state.missed
+      ? `Faltou ${heroPlan.state.missed.weekday} (${heroPlan.state.missed.slot}). O treino ficou pendente, sem drama.`
+      : null;
 
   const isMilestone = streak >= 7 && (streak === 7 || streak === 30 || streak === 100 || streak % 7 === 0);
   const [firedMilestone, setFiredMilestone] = useState<string | null>(null);
@@ -812,7 +835,7 @@ export default function HomePage() {
         <m.div variants={item} ref={heroRef} className="pt-2">
           <HeroWorkout
             image={heroPlan?.image ?? FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
-            title={heroPlan ? `Treino ${heroPlan.slot} · ${heroPlan.foco}` : todayLabel}
+            title={heroPlan?.title ?? todayLabel}
             exerciseCount={heroPlan?.count ?? 0}
             estMin={heroPlan && heroPlan.count > 0 ? Math.max(15, heroPlan.count * 4) : 45}
             sessionsWeek={sessionsWeek}
@@ -820,19 +843,23 @@ export default function HomePage() {
             sessionLabel={
               session
                 ? "Continuar treino"
-                : isCheckedInToday
-                  ? "Iniciar treino"
-                  : heroPlan
-                    ? heroPlan.name
-                    : focusResume
-                      ? "Retomando onde parou"
-                      : "Treino de hoje"
+                : heroPlan?.state.status === "rest"
+                  ? "Dia de descanso"
+                  : isCheckedInToday
+                    ? "Iniciar treino"
+                    : heroPlan
+                      ? heroPlan.name
+                      : focusResume
+                        ? "Retomando onde parou"
+                        : "Treino de hoje"
             }
             notice={fatigueNotice ?? undefined}
             emptyHint={
-              heroPlan && heroPlan.count > 0
-                ? undefined
-                : "Seu personal ainda não montou seu treino. Enquanto isso, dê uma olhada nos treinos livres e faça seu check-in."
+              heroPlan?.state.status === "rest"
+                ? "Hoje não está na sua programação. Se quiser, dá para treinar mesmo assim na aba Treino."
+                : heroPlan && heroPlan.count > 0
+                  ? undefined
+                  : "Seu personal ainda não montou seu treino. Enquanto isso, dê uma olhada nos treinos livres e faça seu check-in."
             }
             ready={!!heroPlan && heroPlan.count > 0}
           />
