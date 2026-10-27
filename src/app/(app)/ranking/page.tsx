@@ -49,10 +49,10 @@ function LeagueGlyph({ id, className, size = 16 }: { id: string; className?: str
 }
 
 const PERIODS = [
+  { id: "all", label: "Geral" },
   { id: "week", label: "Semana" },
   { id: "month", label: "Mês" },
   { id: "quarter", label: "90 dias" },
-  { id: "all", label: "Geral" },
 ] as const;
 type PeriodId = (typeof PERIODS)[number]["id"];
 
@@ -74,7 +74,7 @@ type RankRow = {
 export default function RankingPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const demo = isDemoMode();
-  const [period, setPeriod] = useState<PeriodId>("week");
+  const [period, setPeriod] = useState<PeriodId>("all");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState<string | null>(null);
   const [query, setQuery] = useState("");

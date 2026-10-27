@@ -965,7 +965,12 @@ export async function getRankingRows(gymId: string, students: PersonalStudent[])
 
   const sb = supabaseBrowser();
   const [{ data: lb }, { data: adj }] = await Promise.all([
-    sb.from("leaderboard").select("student_id, points").eq("gym_id", gymId),
+    sb.from("leaderboard")
+      .select("student_id, points")
+      .eq("gym_id", gymId)
+      .eq("period", "all")
+      .eq("week_start", "2000-01-01")
+      .eq("rank_type", "load"),
     sb.from("leaderboard_adjustments").select("student_id, kind, points, reason, created_at").eq("gym_id", gymId),
   ]);
 
