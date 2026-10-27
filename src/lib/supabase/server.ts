@@ -9,7 +9,7 @@ type ServerClient = SupabaseClient<Database>;
  * Cliente Supabase para Server Components / actions.
  * Cria um cliente novo por request (não cacheadável, usa cookies()).
  */
-export function supabaseServer(): ServerClient {
+export async function supabaseServer(): Promise<ServerClient> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -19,7 +19,7 @@ export function supabaseServer(): ServerClient {
     );
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies(); // Next 15: cookies() é assíncrono
 
   return createServerClient<Database>(url, anonKey, {
     cookies: {
@@ -44,6 +44,6 @@ export function supabaseServer(): ServerClient {
   });
 }
 
-export function getSupabaseServer(): ServerClient {
+export function getSupabaseServer(): Promise<ServerClient> {
   return supabaseServer();
 }

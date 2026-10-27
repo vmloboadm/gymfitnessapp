@@ -14,11 +14,13 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams?: { erro?: string };
+  searchParams?: Promise<{ erro?: string }>;
 }) {
-  const cookie = cookies().get("gf_admin")?.value;
+  // Next 15: cookies() e searchParams são assíncronos
+  const params = await searchParams;
+  const cookie = (await cookies()).get("gf_admin")?.value;
   if (!validAdminCookie(cookie)) {
-    return <AdminLogin erro={searchParams?.erro === "1"} />;
+    return <AdminLogin erro={params?.erro === "1"} />;
   }
 
   try {

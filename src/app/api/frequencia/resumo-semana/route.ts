@@ -15,7 +15,7 @@ const TTL_MS = 10 * 60 * 1000;
  * estadísticos construídos no módulo (sem chamada externa, não há o que falhar).
  */
 export async function GET() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies(); // Next 15: assíncrono
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
