@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import type { Notifications } from "~/lib/types/models";
 
@@ -20,6 +20,10 @@ export function registerServiceWorker() {
 
 /** Central de notificações in-app (blueprint §5.4, canal por usuário). */
 export function useNotifications(userId?: string) {
+  // TopBar e a página de notificações usam o hook ao mesmo tempo. O Supabase
+  // devolve o MESMO canal quando o nome repete, e o segundo `.on()` depois
+  // do `.subscribe()` derruba a tela. Um sufixo por instância resolve.
+  const channelId = useRef(`n${Math.random().toString(36).slice(2, 10)}`);
   const [items, setItems] = useState<Notifications[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -52,7 +56,7 @@ export function useNotifications(userId?: string) {
     // Realtime canal por usuário
     const supabase = supabaseBrowser();
     const channel = supabase
-      .channel(`notifications-${userId}`)
+      .channel(`notifications-${userId}-${channelId.current}`)
       .on(
         "postgres_changes",
         {
