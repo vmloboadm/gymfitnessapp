@@ -8,6 +8,7 @@ import { Label } from "~/components/ui/label";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { toast } from "sonner";
 import { calcBmi } from "~/lib/utils/calculations";
+import { localDayStartISO } from "~/lib/utils/local-date";
 import type { Profiles } from "~/lib/types/models";
 
 /**
@@ -60,15 +61,19 @@ export function IntentInput({
     setSaving(true);
 
     const supabase = supabaseBrowser();
-    const today = new Date().toISOString().slice(0, 10);
+    // "hoje" no fuso da academia (em UTC, depois das 21h já seria amanhã)
+    const dayStart = localDayStartISO();
+    const dayEnd = new Date(new Date(dayStart).getTime() + 86_400_000).toISOString();
 
     // Deduplicar: checar se já existe medição hoje
     const { data: existing } = await supabase
       .from("body_metrics")
       .select("id")
       .eq("student_id", profile.id)
-      .gte("recorded_at", today)
-      .lt("recorded_at", today + "T23:59:59")
+      .gte("recorded_at", dayStart)
+      .lt("recorded_at", dayEnd)
+      .order("recorded_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (existing) {

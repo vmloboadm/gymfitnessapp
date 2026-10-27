@@ -26,6 +26,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { usePendingClearances } from "~/hooks/usePendingClearances";
+import { openMedicalDoc } from "~/lib/medical-doc";
 import {
   useCheckinsRealtime,
   useEquipmentSessionsRealtime,
@@ -664,14 +665,17 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <div className="flex gap-1.5 shrink-0 ml-2">
-                  <a
-                    href={c.document_url}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openMedicalDoc(c.document_url).catch((e) =>
+                        toast.error(e instanceof Error ? e.message : "Erro ao abrir o laudo")
+                      )
+                    }
                     className="tactile rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold text-muted-foreground transition-colors hover:text-foreground"
                   >
                     Ver laudo
-                  </a>
+                  </button>
                   <button
                     onClick={async () => {
                       if (!profile) return;

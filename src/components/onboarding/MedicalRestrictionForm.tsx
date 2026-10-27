@@ -46,12 +46,11 @@ export function MedicalRestrictionForm({
       return;
     }
 
-    const { data: urlData } = supabase.storage.from("medical").getPublicUrl(path);
-
+    // bucket privado: grava o caminho; a equipe abre com link assinado (lib/medical-doc)
     const { error: insertError } = await supabase.from("medical_clearances").insert({
       gym_id: profile.gym_id,
       student_id: profile.id,
-      document_url: urlData?.publicUrl ?? path,
+      document_url: path,
     } as never);
     if (insertError) {
       toast.error("Falha ao registrar laudo", { description: insertError.message });

@@ -7,6 +7,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { cn } from "~/lib/utils";
+import { localWeekStartKey } from "~/lib/utils/local-date";
 
 const MODALITIES = [
   { id: "corrida", label: "Corrida" },
@@ -36,12 +37,8 @@ export function CardioQuickAdd() {
   const { data: weekMin, refetch } = useAsyncQuery<number>(
     async () => {
       if (!user || !profile?.gym_id) return { data: 0, error: null };
-      const monday = (() => {
-        const d = new Date();
-        const day = d.getDay();
-        d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-        return d.toISOString().slice(0, 10);
-      })();
+      // segunda-feira no fuso da academia (toISOString virava terça depois das 21h)
+      const monday = new Date(`${localWeekStartKey()}T00:00:00-03:00`).toISOString();
       const { data, error } = await supabaseBrowser()
         .from("cardio_logs")
         .select("minutes")
