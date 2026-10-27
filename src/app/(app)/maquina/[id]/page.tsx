@@ -8,7 +8,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
-import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
+import { SkeletonList, ErrorState } from "~/components/common/AsyncStates";
 import { ExerciseCard } from "~/components/common/ExerciseCard";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { cn } from "~/lib/utils";

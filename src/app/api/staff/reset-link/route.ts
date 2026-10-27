@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { tokenFromRequest } from "~/lib/auth-guard";
 
 /**
  * POST /api/staff/reset-link — gera um link de redefinição de senha para um
@@ -19,38 +20,12 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "https://gymfitnesscampos.com.br/app").replace(/\/$/, "");
 
-function jwtFromRequest(request: Request): string {
-  const authHeader = request.headers.get("Authorization") ?? "";
-  const jwt = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (jwt) return jwt;
-  const cookieHeader = request.headers.get("Cookie") ?? "";
-  const single = cookieHeader.match(/sb-[\w-]*auth-token=([^;]+)/);
-  let raw = single?.[1] ?? "";
-  if (!raw) {
-    const chunks: Array<{ i: number; v: string }> = [];
-    const re = /sb-[\w-]*auth-token\.(\d+)=([^;]+)/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(cookieHeader))) chunks.push({ i: Number(m[1]), v: m[2] });
-    if (chunks.length) raw = chunks.sort((a, b) => a.i - b.i).map((c) => c.v).join("");
-  }
-  if (raw) {
-    const candidate = raw.startsWith("base64-") ? raw.slice(7) : raw;
-    try {
-      const decoded = JSON.parse(Buffer.from(candidate, "base64").toString());
-      if (decoded?.access_token) return decoded.access_token;
-    } catch {
-      return raw;
-    }
-  }
-  return "";
-}
-
 export async function POST(request: Request) {
   if (!SUPABASE_URL || !SRK) {
     return NextResponse.json({ ok: false, error: "Supabase não configurado." }, { status: 500 });
   }
 
-  const jwt = jwtFromRequest(request);
+  const jwt = tokenFromRequest(request);
   if (!jwt) {
     return NextResponse.json({ ok: false, error: "Sessão necessária." }, { status: 401 });
   }

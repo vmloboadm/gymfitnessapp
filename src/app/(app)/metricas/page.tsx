@@ -15,7 +15,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
-import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
+import { SkeletonList, ErrorState } from "~/components/common/AsyncStates";
 import { StatCard } from "~/components/common/StatCard";
 import { GlossaryTip } from "~/components/common/Glossary";
 import { Badge } from "~/components/ui/badge";

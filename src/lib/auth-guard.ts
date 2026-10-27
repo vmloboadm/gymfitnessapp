@@ -61,19 +61,20 @@ function tokenFromCookie(cookieHeader: string): string {
   return raw;
 }
 
+/** JWT do request: header Authorization ou, sem ele, o cookie de sessão. */
+export function tokenFromRequest(request: Request): string {
+  const authHeader = request.headers.get("Authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (token) return token;
+  return tokenFromCookie(request.headers.get("Cookie") ?? "");
+}
+
 /**
  * Valida sessão a partir de cookies do request (Server Components / Route Handlers).
  * Tenta extrair o JWT do header Authorization ou do cookie sb-*-auth-token (SSR).
  */
 export async function requireAuth(request: Request): Promise<AuthResult> {
-  const authHeader = request.headers.get("Authorization") ?? "";
-  let token = authHeader.replace(/^Bearer\s+/i, "").trim();
-
-  // Se não tem Authorization header, tenta cookie
-  if (!token) {
-    const cookieHeader = request.headers.get("Cookie") ?? "";
-    token = tokenFromCookie(cookieHeader);
-  }
+  const token = tokenFromRequest(request);
 
   if (!token) {
     throw new Response(
@@ -114,13 +115,7 @@ export async function requireAuth(request: Request): Promise<AuthResult> {
  * Útil para endpoints que só precisam saber "está logado?".
  */
 export async function validateSession(request: Request): Promise<AuthUser> {
-  const authHeader = request.headers.get("Authorization") ?? "";
-  let token = authHeader.replace(/^Bearer\s+/i, "").trim();
-
-  if (!token) {
-    const cookieHeader = request.headers.get("Cookie") ?? "";
-    token = tokenFromCookie(cookieHeader);
-  }
+  const token = tokenFromRequest(request);
 
   if (!token) {
     throw new Response(

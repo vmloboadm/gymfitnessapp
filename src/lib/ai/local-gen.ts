@@ -623,7 +623,6 @@ export function validateAndFixExercises(
 ): WorkoutPlan {
   if (!dbExercises.length) return plan;
 
-  const exNames = dbExercises.map((e) => e.name.toLowerCase());
   const exMap = new Map(dbExercises.map((e) => [e.name.toLowerCase(), e.name]));
 
   function fuzzyMatch(name: string): string {

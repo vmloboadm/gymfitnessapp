@@ -156,6 +156,19 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  // Rotas /api/* validam a sessão por conta própria (todas as 14 conferem o
+  // token e respondem 401 JSON). Checar aqui também dobrava a ida ao Supabase
+  // Auth em toda chamada de API.
+  if (request.nextUrl.pathname === "/api" || request.nextUrl.pathname.startsWith("/api/")) {
+    return response;
+  }
+
+  // Painel interno do dev (/admin): a senha é validada na própria página,
+  // então não exige sessão Supabase (nem é pra aparecer pro staff/aluno).
+  if (request.nextUrl.pathname === "/admin" || request.nextUrl.pathname.startsWith("/admin/")) {
+    return response;
+  }
+
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -173,25 +186,14 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims valida a assinatura do JWT localmente (chaves assimétricas, JWKS
+  // em cache) e só cai no getUser() de rede quando a chave é simétrica.
+  // Antes: uma chamada ao Supabase Auth em toda navegação.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const sub = claimsData?.claims?.sub;
+  const user = typeof sub === "string" && sub ? { id: sub } : null;
 
   const pathname = request.nextUrl.pathname;
-
-  // Rotas /api/* validam a sessão por conta própria e sempre respondem JSON
-  // (401 quando sem sessão). O middleware nunca pode redirecioná-las para
-  // página HTML: o front faz res.json() e um 307 vira SyntaxError "<!DOCTYPE".
-  // Caso real: aluno no onboarding faz upload da foto (/api/avatar) com
-  // onboarding_completed=false — sem esta exceção ele caía no redirect de
-  // "force onboarding" abaixo e o upload quebrava.
-  const isApiRoute = pathname === "/api" || pathname.startsWith("/api/");
-
-  // Painel interno do dev (/admin): a senha é validada na própria página,
-  // então não exige sessão Supabase (nem é pra aparecer pro staff/aluno).
-  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
-    return response;
-  }
 
   // Logado em rotas de auth → home da role (ou onboarding se sem profile)
   if (user && (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password")) {
@@ -209,20 +211,10 @@ export async function middleware(request: NextRequest) {
   }
 
   // Sem login e em rota protegida → login com next param
-  // (API responde 401 JSON em vez de redirect para página HTML)
   if (!user && !PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
-    // Rotas /api/staff/* validam o JWT do Bearer dentro da própria rota
-    // (ações do staff). O cookie pode não vir em chamadas via fetch com
-    // Authorization, então liberamos apenas esse prefixo.
-    if (pathname.startsWith("/api/staff/") && (request.headers.get("authorization") ?? "").toLowerCase().startsWith("bearer ")) {
-      return response;
-    }
     if (pathname === "/") {
       // produção: visitante não vê a home do aluno — vai pro login
       return redirectTo(request, "/login");
-    }
-    if (isApiRoute) {
-      return NextResponse.json({ ok: false, error: "Sessão necessária." }, { status: 401 });
     }
     return redirectToWithNext(request, "/login", pathname);
   }
@@ -234,17 +226,15 @@ export async function middleware(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle();
 
-    // Falta profile → force onboarding (páginas; API resolve por conta própria)
-    if (!p && !isApiRoute && !pathname.startsWith("/onboarding")) {
+    // Falta profile → force onboarding
+    if (!p && !pathname.startsWith("/onboarding")) {
       return redirectTo(request, "/onboarding");
     }
 
-    // Aluno com onboarding incompleto → força onboarding (páginas; API passa
-    // direto para que upload da foto e outras chamadas funcionem no cadastro)
     // Aluno com onboarding incompleto → força onboarding, EXCETO se já tem
     // treino ativo: a ficha é o que ele precisa ver, e travar no cadastro
     // escondia o plano (alunos ficavam presos no último passo).
-    if (p && p.role === "student" && !p.onboarding_completed && !isApiRoute && !pathname.startsWith("/onboarding")) {
+    if (p && p.role === "student" && !p.onboarding_completed && !pathname.startsWith("/onboarding")) {
       const { data: activePlan } = await supabase
         .from("student_workouts")
         .select("id")

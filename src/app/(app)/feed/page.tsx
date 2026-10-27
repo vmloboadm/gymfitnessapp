@@ -329,8 +329,6 @@ export default function FeedPage() {
     }
   };
 
-  const toggleLike = async (post: PostRow) => react(post, "like");
-
   const addComment = async (postId: string) => {
     if (!commentDraft.trim() || sendingComment) return;
     setSendingComment(true);

@@ -70,6 +70,30 @@ export async function POST(request: Request) {
   ];
 
   const nomeAluno = (student.name ?? "").trim() || "Um aluno";
+
+  // Anti-spam: só avisa se o aluno registrou treino de verdade há pouco
+  // e no máximo uma vez a cada 30 min (a rota é chamada pelo próprio aluno).
+  const { count: recentLogs } = await admin
+    .from("workout_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("student_id", student.id)
+    .gte("date", new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString());
+  if (!recentLogs) {
+    return NextResponse.json({ ok: true, skipped: "sem_treino_recente", whatsapp: "skipped" });
+  }
+  if (staffIds.length > 0) {
+    const { count: recentNotifs } = await admin
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", staffIds[0])
+      .eq("title", "Treino concluído")
+      .like("body", `"${nomeAluno.replace(/[%_\\]/g, "\\$&")}" concluiu%`)
+      .gte("created_at", new Date(Date.now() - 30 * 60 * 1000).toISOString());
+    if (recentNotifs) {
+      return NextResponse.json({ ok: true, skipped: "ja_avisado", whatsapp: "skipped" });
+    }
+  }
+
   const treinoLabel = workoutName ?? "o treino de hoje";
   const extras: string[] = [];
   if (exerciseCount && exerciseCount > 0) {

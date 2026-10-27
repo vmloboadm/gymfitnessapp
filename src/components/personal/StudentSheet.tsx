@@ -154,10 +154,11 @@ export function StudentSheet({
   };
 
   // reseta pra aba Resumo a cada aluno aberto
+  const studentId = student?.id;
   useEffect(() => {
-    if (student) setTab("resumo");
+    if (studentId) setTab("resumo");
     setResetLink(null);
-  }, [student?.id]);
+  }, [studentId]);
 
   // Gera link de redefinição de senha do aluno (staff do mesmo gym).
   const gerarLinkSenha = async () => {
@@ -246,9 +247,11 @@ export function StudentSheet({
   // Nível editável pelo personal (só leitura para os dados clínicos)
   const [levelEdit, setLevelEdit] = useState<string | null>(null);
   const [savingLevel, setSavingLevel] = useState(false);
+  // também acompanha o nível se a ficha for recarregada com valor novo
+  const studentLevel = student?.experience_level ?? null;
   useEffect(() => {
-    if (student) setLevelEdit(student.experience_level ?? null);
-  }, [student?.id]);
+    if (studentId) setLevelEdit(studentLevel);
+  }, [studentId, studentLevel]);
   const saveLevel = async (v: string) => {
     if (!student || savingLevel || v === levelEdit) return;
     setSavingLevel(true);
