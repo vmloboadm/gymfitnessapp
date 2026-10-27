@@ -443,7 +443,74 @@ export default function TreinoHomePage() {
     return fuzzy?.exercise_id ?? null;
   };
 
+  // Se o app foi fechado depois de finalizar e antes da rede confirmar, o
+  // progresso bruto ainda está aqui. Recoloca na fila em vez de perder.
+  useEffect(() => {
+    if (demo || !data || !user || !profile || daySession) return;
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem("gymfit_session_progress_v1");
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    let saved: {
+      exercises?: Array<{ id?: string; name?: string }>;
+      progress?: Record<string, { sets?: Array<{ reps?: string; weight?: string; done?: boolean }> }>;
+      savedAt?: number;
+    } | null = null;
+    try {
+      saved = JSON.parse(raw);
+    } catch {
+      clearSessionProgress();
+      return;
+    }
+    const progress = saved?.progress ?? {};
+    const ids = Object.keys(progress).filter((id) =>
+      (progress[id]?.sets ?? []).some((s) => s?.done)
+    );
+    if (ids.length === 0) {
+      clearSessionProgress();
+      return;
+    }
+    void (async () => {
+      let queued = 0;
+      for (const id of ids) {
+        const ex = (saved?.exercises ?? []).find((x) => x.id === id);
+        if (!ex?.name) continue;
+        const exerciseId = detailsExerciseId(ex.name);
+        if (!exerciseId) continue;
+        const doneSets = (progress[id]?.sets ?? []).filter((s) => s?.done);
+        const last = doneSets[doneSets.length - 1];
+        const reps = String(last?.reps ?? "").match(/\d+/)?.[0] ?? "0";
+        const weight = String(last?.weight ?? "").match(/\d+(?:[.,]\d+)?/)?.[0]?.replace(",", ".") ?? "0";
+        const row = {
+          id: await stableWorkoutLogId([
+            user.id,
+            exerciseId,
+            planActive[0]?.id ?? "",
+            String(saved?.savedAt ?? ""),
+            todayKey,
+          ]),
+          gym_id: profile.gym_id,
+          student_id: user.id,
+          workout_id: planActive[0]?.id ?? null,
+          workout_session_id: null,
+          exercise_id: exerciseId,
+          date: new Date(saved?.savedAt ?? Date.now()).toISOString(),
+          weight_kg: Math.round(parseFloat(weight) * 10) / 10 || 0,
+          reps: Math.min(999, parseInt(reps, 10) || 0),
+          rpe: null,
+        };
+        if (enqueueOffline("workout_logs", row)) queued++;
+      }
+      if (queued > 0) clearSessionProgress();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demo, data, daySession, user?.id, profile?.gym_id, planActive, todayKey]);
+
   // trava anti duplo-toque: finalizar duas vezes gerava log duplicado
+  const activeSessionIdRef = useRef<string | null>(null);
   const concludingRef = useRef(false);
 
   const conclude = async (
@@ -477,21 +544,24 @@ export default function TreinoHomePage() {
       progressMap ?? {};
     // registra TODO exercício com pelo menos 1 série feita (não só 100% completo:
     // fazer 2 de 3 séries e finalizar É treino, e antes virava "registrado" sem log)
-    const loggedIds = ids.length
-      ? ids
-      : Object.entries(progMap)
-          .filter(([, v]) => (v.sets ?? []).some((s) => s?.done))
-          .map(([k]) => k);
+    const loggedIds = Array.from(new Set([
+      ...ids,
+      ...Object.entries(progMap)
+        .filter(([, v]) => (v.sets ?? []).some((s) => s?.done))
+        .map(([k]) => k),
+    ]));
     // snapshot das exercícios ANTES de limpar: no reload da página o state
     // `session` volta null e sem a lista nenhum exercise_id resolve (o log
     // ficava de "não entrou no histórico" mesmo com séries marcadas)
-    const savedExList = (() => {
+    const savedProgress = (() => {
       try {
-        return (readSessionProgress()?.exercises ?? []) as Array<{ id?: string; name?: string }>;
+        return readSessionProgress();
       } catch {
-        return [];
+        return null;
       }
     })();
+    const savedExList = (savedProgress?.exercises ?? []) as Array<{ id?: string; name?: string }>;
+    const savedAt = savedProgress?.savedAt ?? Date.now();
     setConcludedCount(loggedIds.length || ids.length);
     if (loggedIds.length) {
       setDoneIds((prev) => new Set([...prev, ...loggedIds]));
@@ -501,12 +571,14 @@ export default function TreinoHomePage() {
     // o cronômetro congela, a sessão local fecha e a persistência segue em
     // segundo plano (com outbox se a conexão cair).
     setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
+    setFinishedSessionId(activeSessionIdRef.current);
     const sessSnapshot = session;
     const slotSnapshot = activeSlot;
     const planSnapshot = planActive[0] ?? null;
     const profileSnapshot = profile;
     endDaySession();
-    clearSessionProgress();
+    // O progresso bruto fica no aparelho até a persistência confirmar. Se o
+    // app fechar no meio, a recuperação abaixo recoloca o treino na fila.
     try {
       localStorage.removeItem("gymfit_session_slot_v1");
     } catch { /* ok */ }
@@ -521,12 +593,17 @@ export default function TreinoHomePage() {
         const active = isOffline()
           ? null
           : await getActiveWorkoutSession(user.id).catch(() => null);
-        setFinishedSessionId(active?.id ?? null);
+        const sessionId = active?.id ?? activeSessionIdRef.current;
+        setFinishedSessionId(sessionId);
+        // Fecha a sessão do banco ANTES de gravar os logs. Se o aluno iniciar
+        // outro treino em seguida, a trava não encontra uma sessão fantasma.
+        if (!isOffline()) await completeWorkoutSession(user.id).catch(() => {});
         let inserted = 0;
         let queuedOffline = 0;
         let queuedTotal = 0;
         if (loggedIds.length && profileSnapshot) {
           let logRows: Array<Record<string, unknown>> = [];
+          let slotRow: Record<string, unknown> | null = null;
           try {
             const supabase = supabaseBrowser();
             const offline = isOffline();
@@ -588,7 +665,7 @@ export default function TreinoHomePage() {
                 gym_id: profileSnapshot.gym_id,
                 student_id: user.id,
                 workout_id: m?.workoutId || null,
-                workout_session_id: active?.id ?? null,
+                workout_session_id: sessionId,
                 exercise_id: exerciseId,
                 date: new Date().toISOString(),
                 weight_kg: realWeight ?? 0,
@@ -599,38 +676,56 @@ export default function TreinoHomePage() {
             logRows = await Promise.all(rows.map(async (row) => ({
               ...row,
               id: await stableWorkoutLogId([
-                active?.id ?? `${user.id}:${todayKey}`,
+                sessionId ?? `${user.id}:${todayKey}`,
                 user.id,
                 String(row.exercise_id ?? ""),
                 String(row.workout_id ?? ""),
+                String(savedAt),
                 todayKey,
               ]),
             })));
+            const programId = planSnapshot?.programId;
+            slotRow = slotSnapshot && programId
+              ? {
+                  id: await stableWorkoutLogId([
+                    "slot",
+                    user.id,
+                    programId,
+                    slotSnapshot,
+                    todayKey,
+                  ]),
+                  gym_id: profileSnapshot.gym_id,
+                  student_id: user.id,
+                  program_id: programId,
+                  slot: slotSnapshot,
+                }
+              : null;
             if (logRows.length > 0) {
               if (offline) {
                 queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
                 queuedTotal = logRows.length;
+                if (slotRow) enqueueOffline("slot_checks", slotRow);
               } else {
-                const { error: logErr } = await supabase.from("workout_logs").insert(logRows as never);
-                if (!logErr || logErr.code === "23505") {
-                  inserted = logRows.length;
-                  const programId = planSnapshot?.programId;
-                  if (slotSnapshot && programId) {
+                // Insere linha a linha: um conflito não pode derrubar o lote
+                // inteiro (o aluno perderia todos os exercícios do dia).
+                const failedRows: Array<Record<string, unknown>> = [];
+                for (const row of logRows) {
+                  const { error: logErr } = await supabase.from("workout_logs").insert(row as never);
+                  if (!logErr || logErr.code === "23505") inserted++;
+                  else failedRows.push(row);
+                }
+                if (inserted > 0) {
+                  if (slotRow) {
                     const { data: already } = await supabase
                       .from("slot_checks")
                       .select("id")
                       .eq("student_id", user.id)
-                      .eq("program_id", programId)
-                      .eq("slot", slotSnapshot)
+                      .eq("program_id", String(slotRow.program_id))
+                      .eq("slot", String(slotRow.slot))
                       .gte("checked_at", localDayStartDaysAgoISO(0))
                       .limit(1);
                     if (!already?.length) {
-                      await supabase.from("slot_checks").insert({
-                        gym_id: profileSnapshot.gym_id,
-                        student_id: user.id,
-                        program_id: programId,
-                        slot: slotSnapshot,
-                      } as never).then(() => {});
+                      await supabase.from("slot_checks").insert(slotRow as never).then(() => {});
                     }
                   }
                   const totalVolumeKg = logRows.reduce((sum, r) => {
@@ -657,9 +752,11 @@ export default function TreinoHomePage() {
                       });
                     })
                     .catch(() => {});
-                } else {
-                  queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
+                }
+                if (failedRows.length > 0) {
+                  queuedOffline = failedRows.filter((r) => enqueueOffline("workout_logs", r)).length;
                   queuedTotal = logRows.length;
+                  if (slotRow) enqueueOffline("slot_checks", slotRow);
                 }
               }
             }
@@ -667,6 +764,7 @@ export default function TreinoHomePage() {
             if (logRows.length > 0) {
               queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
               queuedTotal = logRows.length;
+              if (slotRow) enqueueOffline("slot_checks", slotRow);
             }
           }
         }
@@ -675,7 +773,7 @@ export default function TreinoHomePage() {
           !!profileSnapshot && loggedIds.length > 0 && inserted === 0 && queuedOffline === 0;
         if (failedToPersist) {
           toast.error("Treino finalizado, mas não entrou no histórico", {
-            description: "O progresso ficou no aparelho. Fale com seu personal se não aparecer.",
+            description: "Vamos tentar de novo quando você abrir o treino. Se não aparecer, fale com seu personal.",
           });
         } else if (inserted > 0) {
           toast.success(`Treino registrado! ${inserted} exercício${inserted === 1 ? "" : "s"} no histórico.`);
@@ -691,12 +789,10 @@ export default function TreinoHomePage() {
           }
         }
 
-        if (!isOffline()) await completeWorkoutSession(user.id).catch(() => {});
       })();
     } else if (demo) {
       toast.success("Treino registrado!");
     }
-    concludingRef.current = false;
     concludingRef.current = false;
   };
 
@@ -804,10 +900,13 @@ export default function TreinoHomePage() {
   const [showFicha, setShowFicha] = useState(false);
 
   const startWorkout = (list: typeof DEFAULT_DEMO_EX) => {
+    activeSessionIdRef.current = null;
     setSession(list);
     setActiveTotal(list.length);
     if (!demo && user?.id && profile?.gym_id) {
-      void startWorkoutSession(profile.gym_id, user.id);
+      void startWorkoutSession(profile.gym_id, user.id).then((id) => {
+        if (id) activeSessionIdRef.current = id;
+      });
     }
     setPhase("active");
   };
@@ -1126,6 +1225,7 @@ export default function TreinoHomePage() {
         }
       })();
     }
+    activeSessionIdRef.current = null;
     setSession(exList);
     setActiveTotal(exList.length);
     setPlanTodayActive(true);
@@ -1135,7 +1235,9 @@ export default function TreinoHomePage() {
     } catch { /* provisório não marca slot */ }
     startDaySession();
     if (!demo && user?.id && profile?.gym_id) {
-      void startWorkoutSession(profile.gym_id, user.id, null, { kind: "template", templateDay: day });
+      void startWorkoutSession(profile.gym_id, user.id, null, { kind: "template", templateDay: day }).then((id) => {
+        if (id) activeSessionIdRef.current = id;
+      });
     }
     setPhase("active");
   };
@@ -1235,6 +1337,7 @@ export default function TreinoHomePage() {
         }
       })();
     }
+    activeSessionIdRef.current = null;
     setSession(exList);
     setActiveTotal(exList.length);
     setPlanTodayActive(true);
@@ -1246,6 +1349,8 @@ export default function TreinoHomePage() {
         dayIdx: idx,
         programId: plan?.programId ?? null,
         workout_name: plan?.name ?? null,
+      }).then((id) => {
+        if (id) activeSessionIdRef.current = id;
       });
     }
     setPhase("active");

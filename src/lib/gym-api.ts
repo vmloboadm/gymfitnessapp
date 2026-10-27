@@ -662,6 +662,7 @@ export async function fetchMyAssignedPlans(
       objective: string;
       ai_draft: string | null;
       workout_days: Array<{
+        id: string;
         name: string;
         day_order: number;
         workout_exercises: Array<{ sets: number; reps: string; rest_seconds: number; rpe: number | null; notes: string | null; technique?: string | null; ord: number; exercises?: { name: string } | null }>;
@@ -674,7 +675,7 @@ export async function fetchMyAssignedPlans(
     .filter((r): r is SwRow => !!r?.workout_programs)
     .map((r) => {
       const prog = r.workout_programs!;
-      const days = [...(prog.workout_days ?? [])].sort((a, b) => a.day_order - b.day_order);
+      const days = [...(prog.workout_days ?? [])].sort((a, b) => a.day_order - b.day_order || a.id.localeCompare(b.id));
       let daysSelected: string[] | undefined;
       let splitType: string | undefined;
       let draftDias: Array<{ slot?: string }> | undefined;
@@ -687,9 +688,6 @@ export async function fetchMyAssignedPlans(
         draftDias = draft?.dias;
       } catch {
         daysSelected = undefined;
-      }
-      if (!daysSelected?.length) {
-        daysSelected = ["Seg", "Ter", "Qua", "Qui", "Sex"].slice(0, Math.min(days.length, 5));
       }
       if (!splitType) {
         splitType = "ABCDEF".slice(0, Math.min(Math.max(days.length, 2), 6));

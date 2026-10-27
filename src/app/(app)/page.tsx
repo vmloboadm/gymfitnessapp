@@ -294,7 +294,7 @@ export default function HomePage() {
       if (!user) return { data: null, error: { message: "Sessão indisponível" } };
       const gymId = profile?.gym_id ?? "";
       const [lRes, rRes] = await Promise.all([
-        supabase.from("workout_logs").select("date, weight_kg, reps").eq("student_id", user.id).order("date", { ascending: false }).limit(60),
+        supabase.from("workout_logs").select("date, exercise_id, weight_kg, reps").eq("student_id", user.id).order("date", { ascending: false }).limit(60),
         gymId
           ? supabase.from("leaderboard").select("points").eq("student_id", user.id).eq("gym_id", gymId).eq("week_start", startOfWeek().toISOString()).eq("rank_type", "load").maybeSingle()
           : Promise.resolve({ data: null, error: null }),
@@ -331,13 +331,15 @@ export default function HomePage() {
       const p = plans[0];
       const dias = p?.plan?.dias ?? [];
       if (!p || dias.length === 0) return { data: null, error: null };
-      const { data: checks } = await supabaseBrowser()
-        .from("slot_checks")
-        .select("slot, checked_at")
-        .eq("student_id", user.id)
-        .eq("program_id", p.programId ?? "")
-        .order("checked_at", { ascending: false })
-        .limit(20);
+      const checks = p.programId
+        ? (await supabaseBrowser()
+            .from("slot_checks")
+            .select("slot, checked_at")
+            .eq("student_id", user.id)
+            .eq("program_id", p.programId)
+            .order("checked_at", { ascending: false })
+            .limit(20)).data
+        : [];
       const state = resolveTrainingDay({
         plan: p,
         today: new Date(),
@@ -414,6 +416,13 @@ export default function HomePage() {
   const twSingleton = demo ? getTodayWorkout() : null;
   const logs = useMemo<WorkoutLogs[]>(() => (demo ? twSingleton!.logs : data?.logs ?? []), [demo, twSingleton, data]);
   const streak = useMemo(() => calcStreak(logs.map((l) => l.date)), [logs]);
+  const todayDoneCount = useMemo(() => {
+    const key = localDayKey(new Date());
+    return new Set(
+      logs.filter((l) => localDayKey(l.date) === key).map((l) => l.exercise_id).filter(Boolean)
+    ).size;
+  }, [logs]);
+  const heroFinishedToday = !!heroPlan?.state.day && heroPlan.count > 0 && todayDoneCount >= heroPlan.count;
   const sessionsWeek = useMemo(() => {
     const days = new Set<string>();
     const weekAgo = localDayKeyDaysAgo(6);
@@ -845,8 +854,10 @@ export default function HomePage() {
                 ? "Continuar treino"
                 : heroPlan?.state.status === "rest"
                   ? "Dia de descanso"
-                  : isCheckedInToday
-                    ? "Iniciar treino"
+                  : heroFinishedToday
+                    ? "Concluído hoje"
+                    : isCheckedInToday
+                      ? "Iniciar treino"
                     : heroPlan
                       ? heroPlan.name
                       : focusResume

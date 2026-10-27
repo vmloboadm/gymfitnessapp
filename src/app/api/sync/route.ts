@@ -12,6 +12,7 @@ type SyncAction = {
 
 const ALLOWED_TABLES = [
   "workout_logs",
+  "slot_checks",
   "body_metrics",
   "checkins",
   "feed_posts",

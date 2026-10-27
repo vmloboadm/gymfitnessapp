@@ -29,24 +29,30 @@ export async function startWorkoutSession(
   studentId: string,
   workoutId?: string | null,
   meta?: { slot?: string | null; dayIdx?: number | null; programId?: string | null; kind?: string | null; templateDay?: unknown; workout_name?: string | null } | null
-): Promise<void> {
+): Promise<string | null> {
   try {
     const existing = await getActiveWorkoutSession(studentId);
-    if (existing) return;
+    if (existing) return existing.id;
     const sb = supabaseBrowser();
-    await sb.from("workout_sessions").insert({
-      gym_id: gymId,
-      student_id: studentId,
-      workout_id: workoutId ?? null,
-      status: "active",
-      started_at: new Date().toISOString(),
-      meta: {
-        ...(meta ?? {}),
-        workout_name: meta?.workout_name ?? null,
-      },
-    } as never);
+    const { data } = await sb
+      .from("workout_sessions")
+      .insert({
+        gym_id: gymId,
+        student_id: studentId,
+        workout_id: workoutId ?? null,
+        status: "active",
+        started_at: new Date().toISOString(),
+        meta: {
+          ...(meta ?? {}),
+          workout_name: meta?.workout_name ?? null,
+        },
+      } as never)
+      .select("id")
+      .single();
+    return (data as { id?: string } | null)?.id ?? null;
   } catch {
     /* sessão de treino é observabilidade — nunca bloqueia o treino */
+    return null;
   }
 }
 

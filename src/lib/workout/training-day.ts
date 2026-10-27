@@ -25,6 +25,8 @@ export type TrainingPlanDay = {
 
 export type TrainingPlan = {
   id?: string;
+  /** assigned_at do student_workouts; evita cobrar falta de antes do plano. */
+  created_at?: string;
   plan?: {
     daysSelected?: string[];
     dias?: TrainingPlanDay[];
@@ -213,6 +215,7 @@ export function resolveTrainingDay(input: TrainingDayInput): TrainingDayState {
     // semana e não pode aparecer como "faltou".
     const daysSinceMonday = (todayIdx + 6) % 7;
     const weekStart = dayKey(new Date(input.today.getTime() - daysSinceMonday * 86_400_000));
+    const assignedKey = input.plan.created_at ? dayKey(new Date(input.plan.created_at)) : "";
     let best: { weekday: Weekday; daysAgo: number; idx: number } | null = null;
     for (const w of scheduledWeekdays) {
       const wi = WEEKDAYS.indexOf(w);
@@ -220,6 +223,7 @@ export function resolveTrainingDay(input: TrainingDayInput): TrainingDayState {
       if (daysAgo === 0 || daysAgo > 6) continue;
       const key = dayKey(new Date(input.today.getTime() - daysAgo * 86_400_000));
       if (key < weekStart) continue;
+      if (assignedKey && key < assignedKey) continue;
       if (logDays.has(key)) continue;
       if (!best || daysAgo < best.daysAgo) {
         best = { weekday: w, daysAgo, idx: mapWeekdayToIndex(w, explicit, scheduledWeekdays, days.length) };

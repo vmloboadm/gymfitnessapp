@@ -125,3 +125,10 @@ test("daysSelected manda mesmo quando os dias têm nome de todos os dias", () =>
   assert.equal(r.day, null);
   assert.equal(r.optionalSlot, "C");
 });
+
+test("não cobra falta de antes do plano ser atribuído", () => {
+  const novo = { ...plan, created_at: "2026-10-27T08:00:00-03:00" };
+  const r = resolveTrainingDay({ plan: novo, today: new Date("2026-10-27T12:00:00-03:00"), logs: [] });
+  assert.equal(r.status, "scheduled");
+  assert.equal(r.missed, null);
+});
