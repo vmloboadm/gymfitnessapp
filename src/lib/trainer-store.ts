@@ -21,6 +21,8 @@ export type AssignedWorkout = {
   studentId: string;
   studentName: string;
   name: string;
+  /** id do workout_programs (o `id` acima é o student_workouts). */
+  programId?: string;
   notes: string | null;
   frequency: string;
   level: string;

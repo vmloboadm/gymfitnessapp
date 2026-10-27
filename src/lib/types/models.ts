@@ -251,6 +251,8 @@ export type WorkoutLogs = {
   workout_id: string | null;
   exercise_id: string;
   session_id: string | null;
+  /** Sessão de treino (workout_sessions). session_id é equipamento. */
+  workout_session_id?: string | null;
   date: string;
   weight_kg: number;
   reps: number;

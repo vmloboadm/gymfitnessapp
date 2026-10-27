@@ -65,6 +65,7 @@ import { useWorkoutSession, elapsedSeconds, readSessionProgress, clearSessionPro
 import { checkDayPassword } from "~/lib/day-pass";
 import { SessionClock } from "~/components/common/SessionClock";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
+import { stableWorkoutLogId } from "~/lib/workout/log-id";
 
 /* mapa exercício→grupo para dados reais (categories canônicas) */
 const DEMO_EX_GROUP_REAL: Record<string, string> = {
@@ -310,7 +311,7 @@ export default function TreinoHomePage() {
   }, [demo, user?.id, profile?.gym_id]);
 
   // Checks dos slots do plano ativo (hook no topo: nunca após early return)
-  const activeProgramId = planActive[0]?.id ?? null;
+  const activeProgramId = planActive[0]?.programId ?? null;
   const { data: slotChecks, refetch: refetchSlotChecks } = useAsyncQuery<Array<{ slot: string; checked_at: string }>>(
     async () => {
       if (demo || !user || !profile?.gym_id || !activeProgramId) return { data: [], error: null };
@@ -544,7 +545,7 @@ export default function TreinoHomePage() {
               gym_id: profile.gym_id,
               student_id: user.id,
               workout_id: m?.workoutId || null,
-              session_id: active?.id ?? null,
+              workout_session_id: active?.id ?? null,
               exercise_id: exerciseId,
               date: new Date().toISOString(),
               // workout_logs.weight_kg é NOT NULL: um null (aluno sem carga
@@ -556,26 +557,48 @@ export default function TreinoHomePage() {
               rpe: m?.rpe ?? null,
             }];
           });
-          logRows = rows;
-          if (rows.length > 0) {
+          logRows = await Promise.all(rows.map(async (row) => ({
+            ...row,
+            id: await stableWorkoutLogId([
+              active?.id ?? `${user.id}:${todayKey}`,
+              user.id,
+              String(row.exercise_id ?? ""),
+              String(row.workout_id ?? ""),
+              todayKey,
+            ]),
+          })));
+          if (logRows.length > 0) {
             if (offline) {
               // sem sinal: nada de tentar rede, guarda tudo no aparelho
               queuedOffline = logRows.filter((r) => enqueueOffline("workout_logs", r)).length;
               queuedTotal = logRows.length;
             } else {
-              const { error: logErr } = await supabase.from("workout_logs").insert(rows as never);
-              if (!logErr) {
-                inserted = rows.length;
-                if (activeSlot && planActive[0]?.id) {
-                  await supabase.from("slot_checks").insert({
-                    gym_id: profile.gym_id,
-                    student_id: user.id,
-                    program_id: planActive[0].id,
-                    slot: activeSlot,
-                  } as never).then(() => {});
+              const { error: logErr } = await supabase.from("workout_logs").insert(logRows as never);
+              // 23505 = o retry encontrou a linha que ele mesmo já tinha
+              // gravado (timeout de rede). É sucesso, não erro.
+              if (!logErr || logErr.code === "23505") {
+                inserted = logRows.length;
+                const programId = planActive[0]?.programId;
+                if (activeSlot && programId) {
+                  const { data: already } = await supabase
+                    .from("slot_checks")
+                    .select("id")
+                    .eq("student_id", user.id)
+                    .eq("program_id", programId)
+                    .eq("slot", activeSlot)
+                    .gte("checked_at", localDayStartDaysAgoISO(0))
+                    .limit(1);
+                  if (!already?.length) {
+                    await supabase.from("slot_checks").insert({
+                      gym_id: profile.gym_id,
+                      student_id: user.id,
+                      program_id: programId,
+                      slot: activeSlot,
+                    } as never).then(() => {});
+                  }
                 }
                 // avisa o personal (in-app + push + WhatsApp quando configurado)
-                const totalVolumeKg = rows.reduce((sum, r) => {
+                const totalVolumeKg = logRows.reduce((sum, r) => {
                   const w = typeof r.weight_kg === "number" ? r.weight_kg : null;
                   const reps = typeof r.reps === "number" ? r.reps : 0;
                   return w && reps ? sum + w * reps : sum;
@@ -1223,7 +1246,8 @@ export default function TreinoHomePage() {
         kind: "plan",
         slot: diaSlot(day, idx % plan.plan.dias.length),
         dayIdx: idx,
-        programId: plan?.id ?? null,
+        programId: plan?.programId ?? null,
+        workout_name: plan?.name ?? null,
       });
     }
     setPhase("active");

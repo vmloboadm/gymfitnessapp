@@ -108,8 +108,8 @@ export async function POST(request: Request) {
       .insert(action.data as never);
     results.push({
       id: action.id,
-      ok: !error,
-      error: error?.message ?? null,
+      ok: !error || error.code === "23505",
+      error: error && error.code !== "23505" ? error.message : null,
     });
   }
 

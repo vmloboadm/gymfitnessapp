@@ -334,7 +334,7 @@ export default function HomePage() {
         .from("slot_checks")
         .select("slot")
         .eq("student_id", user.id)
-        .eq("program_id", p.id)
+        .eq("program_id", p.programId ?? "")
         .order("checked_at", { ascending: false })
         .limit(1);
       const lastSlot = ((checks?.[0] ?? null) as { slot?: string } | null)?.slot ?? null;

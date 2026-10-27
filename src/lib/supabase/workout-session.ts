@@ -28,7 +28,7 @@ export async function startWorkoutSession(
   gymId: string,
   studentId: string,
   workoutId?: string | null,
-  meta?: { slot?: string | null; dayIdx?: number | null; programId?: string | null; kind?: string | null; templateDay?: unknown } | null
+  meta?: { slot?: string | null; dayIdx?: number | null; programId?: string | null; kind?: string | null; templateDay?: unknown; workout_name?: string | null } | null
 ): Promise<void> {
   try {
     const existing = await getActiveWorkoutSession(studentId);
@@ -42,7 +42,7 @@ export async function startWorkoutSession(
       started_at: new Date().toISOString(),
       meta: {
         ...(meta ?? {}),
-        workout_name: (meta as { workout_name?: string } | null)?.workout_name ?? null,
+        workout_name: meta?.workout_name ?? null,
       },
     } as never);
   } catch {

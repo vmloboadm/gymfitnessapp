@@ -642,6 +642,7 @@ export async function fetchMyAssignedPlans(
     id: string;
     assigned_at: string;
     workout_programs: {
+      id: string;
       name: string;
       objective: string;
       ai_draft: string | null;
@@ -682,6 +683,7 @@ export async function fetchMyAssignedPlans(
         id: r.id,
         studentId: userId,
         studentName: "Você",
+        programId: prog.id,
         name: prog.name,
         notes: null,
         frequency: `${days.length}x semana`,
