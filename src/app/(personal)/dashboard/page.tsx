@@ -94,8 +94,8 @@ type DashboardData = {
   awaitingWorkout: number;
 };
 
-/** Presença expira depois de 4h sem saída (aluno esqueceu o checkout). */
-const PRESENT_WINDOW_MS = 4 * 3600000;
+/** Presença expira depois de 3h sem saída (aluno esqueceu o checkout). */
+const PRESENT_WINDOW_MS = 3 * 3600000;
 
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -227,7 +227,7 @@ export default function DashboardPage() {
     const checkins7d = (ckRes.data ?? []) as unknown as TodayCheckin[];
     const entradasHoje = checkins7d.filter((r) => new Date(r.checked_at) >= startToday);
 
-    // presença: último evento do dia por aluno; presente se entrada (janela 4h)
+    // presença: último evento do dia por aluno; presente se entrada (janela 3h)
     const lastByStudent = new Map<string, TodayCheckin>();
     for (const r of entradasHoje) {
       const cur = lastByStudent.get(r.student_id);

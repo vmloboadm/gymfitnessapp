@@ -3,15 +3,16 @@
 import { m } from "framer-motion";
 
 /**
- * Transição premium de entrada em TODAS as telas do app:
- * fade + subida suave + saída de blur. Rápido (0.28s) pra não travar navegação.
+ * Transição de entrada em TODAS as telas do app.
+ * Apenas opacidade: transform/filter aqui criariam um containing block e
+ * quebrariam bottom sheets, modais e CTAs `fixed` no celular.
  */
 export default function AppTemplate({ children }: { children: React.ReactNode }) {
   return (
     <m.div
-      initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
-      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-      transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
     >
       {children}
     </m.div>

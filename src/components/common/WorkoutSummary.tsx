@@ -7,11 +7,9 @@ import { Camera, CheckCircle2, Copy, MessageCircle, Timer, Dumbbell, Trophy, Bel
 import { usePush } from "~/hooks/usePush";
 import { TopBar } from "~/components/layout/TopBar";
 import { formatMMSS } from "~/lib/workout-session";
-import { nextToUnlock, unlockAchievement, type StudentAchievement } from "~/lib/achievements";
 import { saveSessionFeedback } from "~/lib/supabase/workout-session";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
-import { RewardModal } from "~/components/common/RewardModal";
 import { FEEDBACK_EXAMPLES } from "~/components/student/WorkoutFeedbackSheet";
 
 /**
@@ -65,23 +63,12 @@ export default function WorkoutSummary({
   /** Id da workout_sessions ativa (para salvar RPE + nota + duração). */
   sessionId?: string | null;
 }) {
-  const [achievement] = useState<StudentAchievement | null>(() => nextToUnlock());
-  const [unlocked, setUnlocked] = useState(false);
-  const [rewardOpen, setRewardOpen] = useState(false);
   const [rpe, setRpe] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const push = usePush();
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-
-  useEffect(() => {
-    if (achievement) {
-      unlockAchievement(achievement.id);
-      setUnlocked(true);
-      navigator.vibrate?.([60, 40, 90]);
-    }
-  }, [achievement]);
 
   const shareText = `Acabei de esmagar meu treino na GymFitness! ${formatMMSS(seconds)} de treino · ${done}/${total} exercícios`;
 
@@ -120,14 +107,6 @@ export default function WorkoutSummary({
 
   return (
     <>
-      <RewardModal
-        open={!!achievement && rewardOpen}
-        onClose={() => setRewardOpen(false)}
-        icon={achievement?.icon ?? "🏆"}
-        name={achievement?.name ?? ""}
-        points={achievement?.points ?? 0}
-        shareText={shareText}
-      />
       <TopBar title="Resumo do treino" subtitle="Bom trabalho hoje" />
       <div className="mx-auto max-w-md space-y-5 p-4 pb-28">
         {/* stats */}
@@ -153,9 +132,8 @@ export default function WorkoutSummary({
           </div>
         </m.div>
 
-        {/* celebração SEMPRE: conquista desbloqueada OU missão cumprida */}
-        {!achievement ? (
-          <m.div
+        {/* celebração sempre: missão cumprida, sem conquista inventada */}
+        <m.div
             initial={{ scale: 0.8, opacity: 0, rotate: -2 }}
             animate={{ scale: 1, opacity: 1, rotate: 0 }}
             transition={{ type: "spring", stiffness: 220, damping: 15, delay: 0.15 }}
@@ -176,50 +154,7 @@ export default function WorkoutSummary({
             </m.span>
             <h2 className="relative mt-3 font-display text-xl font-black text-foreground">Missão cumprida!</h2>
             <p className="relative mt-1 gf-card-text">Treino concluído com determinação. A constância tá construindo você.</p>
-            <p className="relative mt-2 inline-flex rounded-full bg-brand/15 px-3 py-1 text-[11px] font-black text-brand">
-              +{done * 5} pts · próxima conquista a caminho
-            </p>
           </m.div>
-        ) : null}
-
-        {/* conquista desbloqueada */}
-        {achievement ? (
-          <m.div
-            initial={{ scale: 0.8, opacity: 0, rotate: -2 }}
-            animate={{ scale: 1, opacity: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 220, damping: 15, delay: 0.15 }}
-            className={cn(
-              "relative overflow-hidden rounded-[22px] border p-6 text-center",
-              unlocked ? "border-warning/50 bg-gradient-to-b from-warning/20 via-card to-card" : "border-border bg-card/40"
-            )}
-          >
-            <ConfettiBurst />
-            <span
-              className="pointer-events-none absolute inset-x-0 top-0 h-24"
-              style={{ background: "radial-gradient(60% 80% at 50% 0%, rgba(255,194,77,0.35), transparent)", filter: "blur(8px)" }}
-              aria-hidden
-            />
-            <m.p
-              className="relative text-[10px] font-black uppercase tracking-[0.2em] text-warning"
-              animate={unlocked ? { opacity: [0.7, 1, 0.7] } : undefined}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              Conquista Desbloqueada
-            </m.p>
-            <m.span
-              className="relative mx-auto mt-3 flex h-20 w-20 items-center justify-center rounded-full bg-warning/15 text-5xl"
-              animate={{ rotate: [0, -8, 8, 0], scale: [1, 1.08, 1] }}
-              transition={{ duration: 1.2, delay: 0.35 }}
-            >
-              <Trophy className="mx-auto h-10 w-10 text-[#FBBF24]" strokeWidth={1.8} fill="rgba(251, 191, 36, 0.2)" aria-hidden />
-            </m.span>
-            <h2 className="relative mt-3 font-display text-xl font-black text-foreground">{achievement.name}</h2>
-            <p className="relative mt-1 gf-card-text">{achievement.description}</p>
-            <p className="relative mt-2 inline-flex rounded-full bg-brand/15 px-3 py-1 text-[11px] font-black text-brand">
-              +{achievement.points} pts
-            </p>
-          </m.div>
-        ) : null}
 
         {/* RPE rápido */}
         <div className="gf-card gf-glass !py-4">

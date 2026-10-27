@@ -38,6 +38,30 @@ try {
   check(col.has("workout_session_id"), "workout_logs.workout_session_id não existe");
   check(col.get("workout_session_id")?.is_nullable === "YES", "workout_session_id deveria aceitar null (treino sem sessão de banco)");
 
+
+  const checkinCols = await client.query(`
+    select column_name from information_schema.columns
+    where table_schema = 'public' and table_name = 'checkins'
+  `);
+  check(
+    checkinCols.rows.some((r) => r.column_name === "workout_session_id"),
+    "checkins.workout_session_id não existe"
+  );
+
+  const fn = await client.query(`
+    select proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname in ('start_checkin','close_checkin','auto_close_stale_workouts')
+  `);
+  const names = new Set(fn.rows.map((r) => r.proname));
+  check(names.has("start_checkin"), "função start_checkin não existe");
+  check(names.has("close_checkin"), "função close_checkin não existe");
+  check(names.has("auto_close_stale_workouts"), "função auto_close_stale_workouts não existe");
+
+  const cron = await client.query(`
+    select 1 from cron.job where jobname = 'auto-close-workouts-3h' and active = true
+  `).catch(() => ({ rows: [] }));
+  check(cron.rows.length === 1, "cron de auto-fechamento de 3h não está ativo");
+
   const fks = await client.query(`
     select conname, confrelid::regclass::text as target
     from pg_constraint

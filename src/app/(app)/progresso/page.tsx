@@ -58,6 +58,7 @@ export default function ProgressoPage() {
     sessions: StudentSession[];
     lastReportAt: string | null;
     metrics: Array<{ recorded_at: string; weight_kg?: number | null; body_fat_pct?: number | null }>;
+    streak: number;
   }>(
     async () => {
       if (demo) {
@@ -101,10 +102,12 @@ export default function ProgressoPage() {
       if (checkinsRes.error) return { data: null, error: checkinsRes.error };
       if (metricsRes.error) return { data: null, error: metricsRes.error };
 
-      const [sessions, lastReportAt] = await Promise.all([
+      const [sessions, lastReportAt, streakRes] = await Promise.all([
         getRecentSessions(user.id, 10),
         getLastReportRequest(profile.gym_id, user.id).catch(() => null),
+        supabaseBrowser().rpc("day_streak" as never, { p_student: user.id } as never),
       ]);
+      const serverStreak = Number((streakRes as { data?: unknown }).data ?? 0) || 0;
 
       return {
         data: {
@@ -118,6 +121,7 @@ export default function ProgressoPage() {
             weight_kg?: number | null;
             body_fat_pct?: number | null;
           }>,
+          streak: serverStreak,
         },
         error: null,
       };
@@ -154,7 +158,8 @@ export default function ProgressoPage() {
     () => [...(data?.logs ?? []), ...(data?.prevLogs ?? [])].map((l) => localDayKey(l.date)),
     [data?.logs, data?.prevLogs]
   );
-  const streak = useMemo(() => calcStreak(allLogDates), [allLogDates]);
+  const fallbackStreak = useMemo(() => calcStreak(allLogDates), [allLogDates]);
+  const streak = data?.streak ?? fallbackStreak;
   const sessionsThisWeek = useMemo(
     () => new Set(allLogDates.filter((d) => d >= weekAgo)).size,
     [allLogDates, weekAgo]

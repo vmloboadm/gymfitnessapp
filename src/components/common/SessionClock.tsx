@@ -12,7 +12,7 @@ import {
 /**
  * Cronômetro AUTO-CONTIDO da sessão: o tick de 1s re-renderiza SÓ este
  * componente (não a árvore inteira). Três fases:
- *   verde <2h · âmbar pulsante >=2h com pergunta obrigatória · encerra em 4h.
+ *   verde <2h · âmbar pulsante >=2h com pergunta obrigatória · encerra em 3h.
  */
 export function SessionClock({
   startedAt,
@@ -45,7 +45,7 @@ export function SessionClock({
   if (phase === "expirada") {
     return (
       <span className="text-[11px] font-bold text-warning">
-        Encerrada automaticamente após 4h
+        Encerrada automaticamente após 3h
       </span>
     );
   }

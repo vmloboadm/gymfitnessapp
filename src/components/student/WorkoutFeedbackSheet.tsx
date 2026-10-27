@@ -161,7 +161,7 @@ export default function WorkoutFeedbackSheet({
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="sticky bottom-0 -mx-5 flex items-center gap-2 border-t border-white/[0.06] bg-background px-5 pb-1 pt-3">
           <button
             type="button"
             onClick={onClose}

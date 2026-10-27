@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { AnimatePresence,m } from "framer-motion";
 
@@ -13,7 +15,12 @@ export function BottomSheet({
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  return (
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {open ? (
         <m.div
@@ -47,6 +54,7 @@ export function BottomSheet({
           </m.div>
         </m.div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

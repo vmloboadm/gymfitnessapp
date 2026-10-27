@@ -2,16 +2,13 @@
 
 import { m } from "framer-motion";
 
-/**
- * Transição premium de entrada em TODAS as telas da área do personal,
- * idêntica à do app do aluno: fade + subida suave + saída de blur.
- */
+/** Mesma regra do app: sem transform/filter no wrapper de página. */
 export default function PersonalTemplate({ children }: { children: React.ReactNode }) {
   return (
     <m.div
-      initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
-      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-      transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
     >
       {children}
     </m.div>

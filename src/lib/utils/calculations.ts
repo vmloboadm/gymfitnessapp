@@ -56,6 +56,40 @@ export function calcStreak(days: string[]): number {
   return streak;
 }
 
+
+const WEEK_LABEL = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
+
+/** Sequência respeitando os dias programados. Descanso não quebra. */
+export function calcScheduledStreak(days: string[], scheduledWeekdays: string[] = []): number {
+  const unique = [...new Set(days.map((d) => localDayKey(d)))].filter(Boolean).sort();
+  if (unique.length === 0) return 0;
+  if (scheduledWeekdays.length === 0) return calcStreak(unique);
+
+  const set = new Set(unique);
+  const allowed = new Set(scheduledWeekdays);
+  const today = localDayKey(new Date());
+  let cursor = set.has(today) ? today : localDayKeyDaysAgo(1);
+  let streak = 0;
+
+  const previous = (key: string): string => {
+    const d = new Date(`${key}T12:00:00`);
+    d.setDate(d.getDate() - 1);
+    return localDayKey(d);
+  };
+
+  for (let guard = 0; guard < 370; guard++) {
+    const label = WEEK_LABEL[new Date(`${cursor}T12:00:00`).getDay()];
+    if (!allowed.has(label)) {
+      cursor = previous(cursor);
+      continue;
+    }
+    if (!set.has(cursor)) break;
+    streak++;
+    cursor = previous(cursor);
+  }
+  return streak;
+}
+
 /** "Segunda-feira" de uma data pt-BR. */
 export function weekdayName(date: string | Date = new Date()): string {
   return new Date(date).toLocaleDateString("pt-BR", { weekday: "long" });

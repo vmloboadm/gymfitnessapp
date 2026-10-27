@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence,m, type Variants } from "framer-motion";
-import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLine, Bell, MessageCircle } from "lucide-react";
+import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLine, Bell, MessageCircle, CheckCircle2 } from "lucide-react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
@@ -19,11 +19,12 @@ import { SkeletonList } from "~/components/common/AsyncStates";
 import { toast } from "sonner";
 import { enqueuePremiumRequest, isNetworkError, isOffline } from "~/lib/offline-queue";
 import { cn } from "~/lib/utils";
-import { calcStreak, weekdayName, startOfWeek } from "~/lib/utils/calculations";
+import { calcScheduledStreak, weekdayName, startOfWeek } from "~/lib/utils/calculations";
 import { localDayKey, localDayKeyDaysAgo, localDayStartDaysAgoISO } from "~/lib/utils/local-date";
 import { cap } from "~/lib/utils/format";
 import { leagueFor } from "~/lib/utils/leagues";
 import { useWorkoutSession } from "~/lib/workout-session";
+import { completeStaleSessions } from "~/lib/supabase/workout-session";
 import { getTodayWorkout } from "~/lib/today-workout";
 import { resolveTrainingDay, type TrainingDayState } from "~/lib/workout/training-day";
 import { SessionClock } from "~/components/common/SessionClock";
@@ -216,19 +217,18 @@ export default function HomePage() {
   } | null>(
     async () => {
       if (demo || !user?.id || !profile?.gym_id) return { data: null, error: null };
-      const { data: row, error } = await supabaseBrowser()
+      const { data: rows, error } = await supabaseBrowser()
         .from("checkins")
-        .select("id, checked_at")
+        .select("id, checked_at, type")
         .eq("student_id", user.id)
         .eq("gym_id", profile.gym_id)
-        .eq("type", "entrada")
         .gte("checked_at", localDayStartDaysAgoISO(0))
         .order("checked_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(5);
       if (error) return { data: null, error: null };
+      const last = (rows ?? [])[0] as { id: string; checked_at: string; type: string } | undefined;
       return {
-        data: (row as { id: string; checked_at: string } | null) ?? null,
+        data: last?.type === "entrada" ? { id: last.id, checked_at: last.checked_at } : null,
         error: null,
       };
     },
@@ -310,6 +310,19 @@ export default function HomePage() {
     { enabled: !loading && !!user, silentRefetch: true }
   );
 
+  // Fecha treino/check-in esquecidos mesmo se o cron do banco atrasar.
+  useEffect(() => {
+    if (demo || !user?.id) return;
+    let alive = true;
+    void completeStaleSessions(user.id).then(() => {
+      if (alive) {
+        void refetchCheckin();
+        void refetchLogs();
+      }
+    });
+    return () => { alive = false; };
+  }, [demo, user?.id, refetchCheckin, refetchLogs]);
+
   // Realtime: refetch workout_logs when any student in the gym logs a workout
   useWorkoutLogsRealtime(profile?.gym_id, user?.id, refetchLogs);
 
@@ -323,23 +336,38 @@ export default function HomePage() {
     foco: string;
     count: number;
     image: string;
+    streak: number;
+    completedToday: boolean;
   };
-  const { data: heroPlan } = useAsyncQuery<HeroPlan | null>(
+  const { data: heroPlan, refetch: refetchHero } = useAsyncQuery<HeroPlan | null>(
     async () => {
       if (demo || !user || !profile?.gym_id) return { data: null, error: null };
       const plans = await fetchMyAssignedPlans(user.id, profile.gym_id).catch(() => []);
       const p = plans[0];
       const dias = p?.plan?.dias ?? [];
       if (!p || dias.length === 0) return { data: null, error: null };
-      const checks = p.programId
-        ? (await supabaseBrowser()
-            .from("slot_checks")
-            .select("slot, checked_at")
-            .eq("student_id", user.id)
-            .eq("program_id", p.programId)
-            .order("checked_at", { ascending: false })
-            .limit(20)).data
-        : [];
+      const [checksRes, streakRes, completedRes] = await Promise.all([
+        p.programId
+          ? supabaseBrowser()
+              .from("slot_checks")
+              .select("slot, checked_at")
+              .eq("student_id", user.id)
+              .eq("program_id", p.programId)
+              .order("checked_at", { ascending: false })
+              .limit(20)
+          : Promise.resolve({ data: [] as Array<{ slot: string; checked_at: string }> }),
+        supabaseBrowser().rpc("day_streak" as never, { p_student: user.id } as never),
+        supabaseBrowser()
+          .from("workout_sessions")
+          .select("id")
+          .eq("student_id", user.id)
+          .eq("status", "completed")
+          .gte("ended_at", localDayStartDaysAgoISO(0))
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      const checks = checksRes.data;
+      const serverStreak = Number((streakRes as { data?: unknown }).data ?? 0) || 0;
       const state = resolveTrainingDay({
         plan: p,
         today: new Date(),
@@ -347,6 +375,7 @@ export default function HomePage() {
         slotChecks: (checks ?? []) as Array<{ slot: string; checked_at: string }>,
         fallbackDays: profile?.available_days ?? undefined,
       });
+      const completedToday = !!completedRes.data || state.completedToday;
       const day = state.day as { nome: string; foco: string; slot?: string; exercicios: unknown[] } | null;
       if (!day) {
         return {
@@ -358,6 +387,8 @@ export default function HomePage() {
             foco: "",
             count: 0,
             image: assetPath("/workout/workout-hero.jpg"),
+            streak: serverStreak,
+            completedToday,
           },
           error: null,
         };
@@ -386,6 +417,8 @@ export default function HomePage() {
           foco,
           count: day.exercicios.length,
           image: (key && FOCUS_IMAGE[key]) || assetPath("/workout/workout-hero.jpg"),
+          streak: serverStreak,
+          completedToday,
         },
         error: null,
       };
@@ -393,6 +426,29 @@ export default function HomePage() {
     [user?.id, profile?.gym_id, demo, data?.logs, profile?.available_days],
     { enabled: !loading && !!user }
   );
+
+  // Um único evento atualiza o painel inteiro depois do treino.
+  useEffect(() => {
+    if (demo) return;
+    const refresh = () => {
+      void refetchCheckin();
+      void refetchLogs();
+      void refetchHero();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("gymfit-workout-finished", refresh);
+    window.addEventListener("gymfit-checkin-updated", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("gymfit-workout-finished", refresh);
+      window.removeEventListener("gymfit-checkin-updated", refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [demo, refetchCheckin, refetchLogs, refetchHero]);
 
   // Frase motivacional editada pelo staff, atualiza ao vivo para todos
   const { data: motivation, refetch: refetchMotivation } = useAsyncQuery<{ phrase: string | null }>(
@@ -415,14 +471,22 @@ export default function HomePage() {
   // FONTE ÚNICA: no demo, o MESMO objeto de logs da aba Treino (singleton).
   const twSingleton = demo ? getTodayWorkout() : null;
   const logs = useMemo<WorkoutLogs[]>(() => (demo ? twSingleton!.logs : data?.logs ?? []), [demo, twSingleton, data]);
-  const streak = useMemo(() => calcStreak(logs.map((l) => l.date)), [logs]);
+  const streak = useMemo(
+    () => heroPlan?.streak ?? calcScheduledStreak(logs.map((l) => l.date), heroPlan?.state.scheduledWeekdays ?? []),
+    [logs, heroPlan?.streak, heroPlan?.state.scheduledWeekdays]
+  );
   const todayDoneCount = useMemo(() => {
     const key = localDayKey(new Date());
     return new Set(
       logs.filter((l) => localDayKey(l.date) === key).map((l) => l.exercise_id).filter(Boolean)
     ).size;
   }, [logs]);
-  const heroFinishedToday = !!heroPlan?.state.day && heroPlan.count > 0 && todayDoneCount >= heroPlan.count;
+  const heroFinishedToday =
+    !session &&
+    !isCheckedInToday &&
+    !!heroPlan?.state.day &&
+    heroPlan.count > 0 &&
+    (todayDoneCount > 0 || !!heroPlan?.completedToday);
   const sessionsWeek = useMemo(() => {
     const days = new Set<string>();
     const weekAgo = localDayKeyDaysAgo(6);
@@ -609,6 +673,22 @@ export default function HomePage() {
                 className="gf-touch tactile shrink-0 rounded-full bg-warning px-4 py-2 text-[12px] font-black text-black transition-transform active:scale-95"
               >
                 Fazer check-in
+              </Link>
+            </div>
+          ) : heroFinishedToday ? (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-success/40 bg-success/12 px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-success">Treino concluído hoje</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">Check-in encerrado. Bom descanso.</p>
+                </div>
+              </div>
+              <Link
+                href="/progresso"
+                className="gf-touch tactile shrink-0 rounded-full bg-success px-4 py-2 text-[12px] font-black text-black transition-transform active:scale-95"
+              >
+                Ver resumo
               </Link>
             </div>
           ) : isCheckedInToday ? (
@@ -848,7 +928,8 @@ export default function HomePage() {
             exerciseCount={heroPlan?.count ?? 0}
             estMin={heroPlan && heroPlan.count > 0 ? Math.max(15, heroPlan.count * 4) : 45}
             sessionsWeek={sessionsWeek}
-            href={session ? "/treino?resume=1" : isCheckedInToday ? "/treino" : undefined}
+            href={heroFinishedToday ? "/progresso" : session ? "/treino?resume=1" : isCheckedInToday ? "/treino" : undefined}
+            ctaLabel={heroFinishedToday ? "Ver resumo" : heroPlan?.state.status === "rest" ? "Ver opções de descanso" : undefined}
             sessionLabel={
               session
                 ? "Continuar treino"

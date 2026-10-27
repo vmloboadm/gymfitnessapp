@@ -32,6 +32,9 @@ import {
   completeStaleSessions,
   getLastSessionNeedingFeedback,
   getActiveWorkoutSession,
+  startCheckin,
+  closeCheckinForSession,
+  updateWorkoutSession,
   type ActiveSession,
   type StudentSession,
   type SessionMeta,
@@ -62,7 +65,7 @@ import { apiPath } from "~/lib/api-path";
 import WorkoutSummary from "~/components/common/WorkoutSummary";
 import { weekdayName } from "~/lib/utils/calculations";
 import { localDayKey, localDayStartDaysAgoISO } from "~/lib/utils/local-date";
-import { useWorkoutSession, elapsedSeconds, readSessionProgress, clearSessionProgress, isDayUnlocked, markDayUnlocked, TRAINING_GATE_OPEN } from "~/lib/workout-session";
+import { useWorkoutSession, elapsedSeconds, readSessionProgress, clearSessionProgress, isDayUnlocked, markDayUnlocked, clearDayUnlocked, MAX_SESSION_HOURS, TRAINING_GATE_OPEN } from "~/lib/workout-session";
 import { checkDayPassword } from "~/lib/day-pass";
 import { SessionClock } from "~/components/common/SessionClock";
 import { nextWorkoutFromLogs } from "~/components/dashboard/mocks";
@@ -96,6 +99,8 @@ type TreinoData = {
   details: TreinoDay[];
   logs: WorkoutLogs[];
   days: WorkoutDays[];
+  completedSessionToday?: boolean;
+  activeSessionToday?: boolean;
 };
 
 type FetchResult<T> = { data: T | null; error: { message: string } | null };
@@ -177,7 +182,6 @@ export default function TreinoHomePage() {
       if (cancelled) return;
       if (last) {
         setPendingFeedback(last);
-        setFeedbackOpen(true);
       }
     })();
     return () => {
@@ -230,15 +234,17 @@ export default function TreinoHomePage() {
       }
 
       const programId = (workouts as StudentWorkouts).program_id;
-      const [programRes, daysRes, logsRes] = await Promise.all([
+      const [programRes, daysRes, logsRes, sessionRes] = await Promise.all([
         supabase.from("workout_programs").select("id, name, objective").eq("id", programId).maybeSingle(),
         supabase.from("workout_days").select("id, name, day_order").eq("program_id", programId).order("day_order", { ascending: true }),
-        supabase.from("workout_logs").select("date, weight_kg, reps").eq("student_id", user.id).gte("date", localDayStartDaysAgoISO(13)),
+        supabase.from("workout_logs").select("date, exercise_id, weight_kg, reps").eq("student_id", user.id).gte("date", localDayStartDaysAgoISO(13)),
+        supabase.from("workout_sessions").select("id, status").eq("student_id", user.id).in("status", ["active", "completed"]).gte("started_at", localDayStartDaysAgoISO(0)).order("started_at", { ascending: false }).limit(5),
       ]);
 
-      if (programRes.error || daysRes.error || logsRes.error) {
-        return errorResult(programRes.error?.message ?? daysRes.error?.message ?? logsRes.error?.message ?? "Erro");
+      if (programRes.error || daysRes.error || logsRes.error || sessionRes.error) {
+        return errorResult(programRes.error?.message ?? daysRes.error?.message ?? logsRes.error?.message ?? sessionRes.error?.message ?? "Erro");
       }
+      const sessionRows = (sessionRes.data ?? []) as Array<{ id: string; status: string }>;
 
       const days = (daysRes.data ?? []) as WorkoutDays[];
       let details: TreinoDay[] = [];
@@ -267,6 +273,8 @@ export default function TreinoHomePage() {
           details,
           logs: (logsRes.data ?? []) as WorkoutLogs[],
           days,
+          completedSessionToday: sessionRows.some((r) => r.status === "completed"),
+          activeSessionToday: sessionRows.some((r) => r.status === "active"),
         },
         error: null,
       };
@@ -411,7 +419,7 @@ export default function TreinoHomePage() {
     [data, todayKey, detailsIds]
   );
   const totalToday = dayDetails.length;
-  const finishedToday = totalToday > 0 && todayLogs >= totalToday;
+  const finishedToday = !daySession && !data?.activeSessionToday && (totalToday > 0 && todayLogs > 0 || !!data?.completedSessionToday);
 
 
 
@@ -511,6 +519,17 @@ export default function TreinoHomePage() {
 
   // trava anti duplo-toque: finalizar duas vezes gerava log duplicado
   const activeSessionIdRef = useRef<string | null>(null);
+  // Check-in já abre a sessão no banco. Guarda o id para o feedback do
+  // resumo mesmo se o aluno finalizar sem escolher a ficha.
+  useEffect(() => {
+    if (demo || !daySession || !user?.id) return;
+    let alive = true;
+    getActiveWorkoutSession(user.id)
+      .then((s) => { if (alive && s) activeSessionIdRef.current = s.id; })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [demo, daySession, user?.id]);
+
   const concludingRef = useRef(false);
 
   const conclude = async (
@@ -577,11 +596,14 @@ export default function TreinoHomePage() {
     const planSnapshot = planActive[0] ?? null;
     const profileSnapshot = profile;
     endDaySession();
+    clearDayUnlocked();
     // O progresso bruto fica no aparelho até a persistência confirmar. Se o
     // app fechar no meio, a recuperação abaixo recoloca o treino na fila.
     try {
       localStorage.removeItem("gymfit_session_slot_v1");
     } catch { /* ok */ }
+    window.dispatchEvent(new Event("gymfit-workout-finished"));
+    window.dispatchEvent(new Event("gymfit-checkin-updated"));
     setPhase("done");
     navigator.vibrate?.([60, 40, 90]);
     toast("Treino finalizado", { description: "Seu resumo já está aqui." });
@@ -595,8 +617,29 @@ export default function TreinoHomePage() {
           : await getActiveWorkoutSession(user.id).catch(() => null);
         const sessionId = active?.id ?? activeSessionIdRef.current;
         setFinishedSessionId(sessionId);
-        // Fecha a sessão do banco ANTES de gravar os logs. Se o aluno iniciar
-        // outro treino em seguida, a trava não encontra uma sessão fantasma.
+        // Fecha a presença e a sessão juntas. Offline vira item da fila.
+        let checkinClosed = false;
+        if (!isOffline()) {
+          checkinClosed = await closeCheckinForSession(sessionId).catch(() => false);
+        }
+        if (!checkinClosed && profileSnapshot) {
+          void enqueueOffline("checkins", {
+            id: await stableWorkoutLogId([
+              "saida",
+              user.id,
+              sessionId ?? String(savedAt),
+              todayKey,
+            ]),
+            gym_id: profileSnapshot.gym_id,
+            student_id: user.id,
+            type: "saida",
+            source: "app",
+            checked_at: new Date().toISOString(),
+            workout_session_id: sessionId,
+          });
+        }
+        // Fecha a sessão do banco. Se o aluno iniciar outro treino em seguida,
+        // a trava não encontra uma sessão fantasma.
         if (!isOffline()) await completeWorkoutSession(user.id).catch(() => {});
         let inserted = 0;
         let queuedOffline = 0;
@@ -855,6 +898,24 @@ export default function TreinoHomePage() {
     void conclude([...completedRef.current], saved);
   };
 
+  // Se o aluno esquecer o app aberto, o treino fecha no teto de 3h.
+  useEffect(() => {
+    if (phase !== "active" || !daySession) return;
+    const remaining = daySession.startedAt + MAX_SESSION_HOURS * 3600_000 - Date.now();
+    if (remaining <= 0) {
+      finishNow();
+      return;
+    }
+    const t = setTimeout(() => {
+      toast("Tempo máximo de 3h atingido", {
+        description: "Seu treino foi encerrado automaticamente.",
+      });
+      finishNow();
+    }, remaining);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, daySession?.startedAt]);
+
   // Nudge aos 45min de sessão: pergunta se está tudo bem e oferece finalizar
   const nudgedRef = useRef(false);
   useEffect(() => {
@@ -967,7 +1028,8 @@ export default function TreinoHomePage() {
 
   // Sem check-in do dia o conteúdo fica BORRADO + bloqueado (QR, NFC ou senha).
   // TEMPORÁRIO: TRAINING_GATE_OPEN libera tudo para os testes do dono.
-  const unlockedToday = demo || TRAINING_GATE_OPEN || !!daySession || dayUnlockedLocal || finishedToday;
+  const unlockedToday =
+    demo || TRAINING_GATE_OPEN || !!daySession || dayUnlockedLocal || finishedToday || !!data?.activeSessionToday;
   const needsCheckin = !unlockedToday;
   const checkinBanner = needsCheckin ? (
     <div className="mx-auto max-w-md px-4 pt-3">
@@ -1052,9 +1114,9 @@ export default function TreinoHomePage() {
       <AnimatePresence mode="wait">
         <m.div
           key="treino-active"
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.98 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
         >
           <WorkoutInProgress exercises={activeExercises} onFinish={(ids, prog) => { void conclude(ids, prog); }} onProgressChange={(ids) => { completedRef.current = ids; }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
@@ -1116,7 +1178,11 @@ export default function TreinoHomePage() {
             <h2 className="mt-2 font-display text-lg font-bold text-foreground">
               {todayLogs} de {totalToday} exercícios
             </h2>
-            <p className="mt-1 gf-card-text">Tudo feito! A recuperação também faz parte do plano.</p>
+            <p className="mt-1 gf-card-text">
+              {todayLogs >= totalToday
+                ? "Tudo feito! A recuperação também faz parte do plano."
+                : "Sessão encerrada. Faça um novo check-in se quiser completar o restante."}
+            </p>
             <Link
               href="/progresso"
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-brand-foreground shadow-lg shadow-brand/25"
@@ -1160,18 +1226,35 @@ export default function TreinoHomePage() {
   async function startTemplateSession(tpl: TemplateInput, opts?: { force?: boolean }) {
     const day = tpl.days?.[0];
     if (!day || day.exercicios.length === 0) return;
-    // Gate: sem check-in do dia o treino fica borrado (igual ao plano)
-    if (!demo && !unlockedToday) {
+    // Gate de INÍCIO: precisa de check-in aberto ou sessão local viva.
+    if (!demo && !daySession && !dayUnlockedLocal && !data?.activeSessionToday) {
       setUnlockOpen(true);
       return;
     }
-    // Trava: só um treino por vez (com retomada, nunca beco sem saída)
+    // Sessão aberta no check-in é adotada; outra ficha ativa pede retomada.
+    let adoptedSession = false;
     if (!demo && !opts?.force && user?.id && !isOffline()) {
       const active = await getActiveWorkoutSession(user.id).catch(() => null);
       if (active) {
-        pendingStartRef.current = { kind: "template", tpl };
-        setBlockedSession(active);
-        return;
+        const activeMeta = (active.meta ?? {}) as SessionMeta;
+        if (activeMeta.kind === "checkin") {
+          const adopted = await updateWorkoutSession(active.id, null, {
+            ...activeMeta,
+            kind: "template",
+            templateDay: day,
+            started_by: "checkin",
+          } as SessionMeta);
+          if (adopted) {
+            activeSessionIdRef.current = active.id;
+            adoptedSession = true;
+            if (!daySession) startDaySession(new Date(active.started_at).getTime());
+          }
+        }
+        if (!adoptedSession) {
+          pendingStartRef.current = { kind: "template", tpl };
+          setBlockedSession(active);
+          return;
+        }
       }
     }
     const exList = day.exercicios.map((e, i) => {
@@ -1225,7 +1308,7 @@ export default function TreinoHomePage() {
         }
       })();
     }
-    activeSessionIdRef.current = null;
+    if (!adoptedSession) activeSessionIdRef.current = null;
     setSession(exList);
     setActiveTotal(exList.length);
     setPlanTodayActive(true);
@@ -1233,8 +1316,8 @@ export default function TreinoHomePage() {
     try {
       localStorage.removeItem("gymfit_session_slot_v1");
     } catch { /* provisório não marca slot */ }
-    startDaySession();
-    if (!demo && user?.id && profile?.gym_id) {
+    if (!daySession) startDaySession();
+    if (!demo && user?.id && profile?.gym_id && !adoptedSession) {
       void startWorkoutSession(profile.gym_id, user.id, null, { kind: "template", templateDay: day }).then((id) => {
         if (id) activeSessionIdRef.current = id;
       });
@@ -1245,22 +1328,43 @@ export default function TreinoHomePage() {
   const startPlanSession = async (dayIdx?: number, opts?: { force?: boolean }) => {
     if (!plan?.plan?.dias || plan.plan.dias.length === 0) return;
     const idx = dayIdx ?? suggestedIdx;
-    // Gate: sem check-in do dia (QR/NFC/senha) o treino fica borrado
-    if (!demo && !unlockedToday) {
+    // Gate de INÍCIO: precisa de check-in aberto ou sessão local viva.
+    if (!demo && !daySession && !dayUnlockedLocal && !data?.activeSessionToday) {
       setUnlockOpen(true);
       return;
     }
-    // Trava: só um treino por vez (com retomada, nunca beco sem saída)
+    const day = plan.plan.dias[idx % plan.plan.dias.length];
+    const plannedSlot = diaSlot(day, idx % plan.plan.dias.length);
+
+    // Sessão aberta no check-in é adotada; outra ficha ativa pede retomada.
+    let adoptedSession = false;
     if (!demo && !opts?.force && user?.id && !isOffline()) {
       const active = await getActiveWorkoutSession(user.id).catch(() => null);
       if (active) {
-        pendingStartRef.current = { kind: "plan", dayIdx: idx };
-        setBlockedSession(active);
-        return;
+        const activeMeta = (active.meta ?? {}) as SessionMeta;
+        if (activeMeta.kind === "checkin") {
+          const adopted = await updateWorkoutSession(active.id, plan.id, {
+            ...activeMeta,
+            kind: "plan",
+            slot: plannedSlot,
+            dayIdx: idx,
+            programId: plan.programId ?? null,
+            workout_name: plan.name ?? null,
+          } as SessionMeta);
+          if (adopted) {
+            activeSessionIdRef.current = active.id;
+            adoptedSession = true;
+            if (!daySession) startDaySession(new Date(active.started_at).getTime());
+          }
+        }
+        if (!adoptedSession) {
+          pendingStartRef.current = { kind: "plan", dayIdx: idx };
+          setBlockedSession(active);
+          return;
+        }
       }
     }
-    const day = plan.plan.dias[idx % plan.plan.dias.length];
-    setActiveSlot(diaSlot(day, idx % plan.plan.dias.length));
+    setActiveSlot(plannedSlot);
     try {
       localStorage.setItem("gymfit_session_slot_v1", JSON.stringify({ slot: diaSlot(day, idx % plan.plan.dias.length), at: Date.now() }));
     } catch { /* ok */ }
@@ -1337,12 +1441,12 @@ export default function TreinoHomePage() {
         }
       })();
     }
-    activeSessionIdRef.current = null;
+    if (!adoptedSession) activeSessionIdRef.current = null;
     setSession(exList);
     setActiveTotal(exList.length);
     setPlanTodayActive(true);
-    startDaySession();
-    if (!demo && user?.id && profile?.gym_id) {
+    if (!daySession) startDaySession();
+    if (!demo && user?.id && profile?.gym_id && !adoptedSession) {
       void startWorkoutSession(profile.gym_id, user.id, plan?.id ?? null, {
         kind: "plan",
         slot: diaSlot(day, idx % plan.plan.dias.length),
@@ -1362,6 +1466,21 @@ export default function TreinoHomePage() {
       <TopBar title="Treino" subtitle={cap(weekdayName())} />
       {checkinBanner}
       {sessionBar}
+      {pendingFeedback && !feedbackOpen ? (
+        <div className="mx-auto max-w-md px-4 pt-3">
+          <button
+            type="button"
+            onClick={() => setFeedbackOpen(true)}
+            className="tactile flex w-full items-center justify-between gap-3 rounded-xl border border-brand/30 bg-brand/[0.07] px-4 py-2.5 text-left"
+          >
+            <span>
+              <span className="block text-[11px] font-black uppercase tracking-wider text-brand">Feedback pendente</span>
+              <span className="block text-[11px] text-muted-foreground">Como foi o treino {feedbackDateLabel}?</span>
+            </span>
+            <span className="shrink-0 rounded-full bg-brand px-3 py-1.5 text-[11px] font-black text-brand-foreground">Responder</span>
+          </button>
+        </div>
+      ) : null}
       <div className="space-y-8 p-4">
         {/* 1. STATUS ATUAL, linha compacta sem card pesado */}
         <div className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 backdrop-blur">
@@ -1505,7 +1624,7 @@ export default function TreinoHomePage() {
                     {needsCheckin ? (
                       <><Lock className="relative h-5 w-5" /> <span className="relative">Check-in para liberar</span></>
                     ) : (
-                      <><Play className="relative h-5 w-5 fill-current" /> <span className="relative">Iniciar treino {sugSlot}</span></>
+                      <><Play className="relative h-5 w-5 fill-current" /> <span className="relative">{daySession ? "Continuar treino" : "Iniciar treino"} {sugSlot}</span></>
                     )}
                   </m.button>
                     <button
@@ -1830,17 +1949,22 @@ export default function TreinoHomePage() {
           onClose={() => setUnlockOpen(false)}
           onUnlocked={() => {
             setUnlockOpen(false);
-            setDayUnlockedLocal(true);
-            markDayUnlocked("senha");
-            // Check-in do dia conta para streak/ranking (a senha é uma forma
-            // de check-in; duplicidade é barrada pelo trigger do banco)
-            if (!demo && user?.id && profile?.gym_id) {
-              void supabaseBrowser()
-                .from("checkins")
-                .insert({ gym_id: profile.gym_id, student_id: user.id, type: "entrada", source: "app" } as never)
-                .then(() => {}, () => {});
-            }
-            toast.success("Treino liberado! Toque em Iniciar.");
+            void (async () => {
+              if (!demo && user?.id) {
+                const started = await startCheckin("app");
+                if (!started) {
+                  toast.error("Check-in não abriu", { description: "Tente de novo na tela de check-in." });
+                  return;
+                }
+                startDaySession(new Date(started.started_at).getTime());
+                activeSessionIdRef.current = started.session_id;
+              } else {
+                startDaySession();
+              }
+              setDayUnlockedLocal(true);
+              markDayUnlocked("senha");
+              toast.success("Treino liberado! Seu tempo já começou.");
+            })();
           }}
         />
       ) : null}

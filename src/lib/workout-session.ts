@@ -20,8 +20,8 @@ export const TRAINING_GATE_OPEN = false;
 const KEY = "gymfit_session_v1";
 const EVENT = "gymfit-session";
 
-export const MAX_SESSION_HOURS = 4;
-export const SESSION_WARN_HOURS = 2; // sessão órfã (celular reiniciou, esqueceu de finalizar) expira sozinha
+export const MAX_SESSION_HOURS = 3;
+export const SESSION_WARN_HOURS = 2; // sessão órfã (celular reiniciou, esqueceu de finalizar) expira sozinha em 3h
 
 function read(): WorkoutSession | null {
   try {
@@ -49,16 +49,17 @@ function write(s: WorkoutSession | null) {
   window.dispatchEvent(new Event(EVENT));
 }
 
-/** Inicia a sessão APENAS após scan/leitura validada. */
-export function startWorkoutSession() {
-  write({ startedAt: Date.now() });
+/** Inicia a sessão APENAS após scan/check-in validado. */
+export function startWorkoutSession(startedAt: number = Date.now()) {
+  const safe = Number.isFinite(startedAt) && startedAt > 0 ? startedAt : Date.now();
+  write({ startedAt: safe });
   markDayUnlocked("checkin");
 }
 
 // ---------------------------------------------------------------------------
 // Check-in DO DIA: libera o treino (conteúdo borrado → visível) até a
-// meia-noite. QR, NFC e senha do dia marcam este carimbo local; o 4h da
-// sessão acima é só o relógio do treino em andamento.
+// meia-noite. QR, NFC e senha do dia marcam este carimbo local; o teto de 3h
+// da sessão acima é só o relógio do treino em andamento.
 // ---------------------------------------------------------------------------
 const DAY_KEY = "gymfit_day_unlock_v1";
 
@@ -73,6 +74,15 @@ export function markDayUnlocked(via: string = "senha") {
   try {
     localStorage.setItem(DAY_KEY, JSON.stringify({ date: todayLocal(), via }));
   } catch {}
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("gymfit-day-unlock"));
+}
+
+/** Fecha a liberação local do dia. O próximo treino exige novo check-in. */
+export function clearDayUnlocked(): void {
+  try {
+    localStorage.removeItem(DAY_KEY);
+  } catch {}
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("gymfit-day-unlock"));
 }
 
 /** true se o aluno já liberou o treino de hoje (qualquer forma). */
@@ -107,7 +117,7 @@ export function useWorkoutSession() {
     };
   }, []);
 
-  const start = useCallback(() => startWorkoutSession(), []);
+  const start = useCallback((startedAt?: number) => startWorkoutSession(startedAt), []);
   const end = useCallback(() => endWorkoutSession(), []);
   return { session, start, end };
 }
@@ -122,7 +132,7 @@ export function formatMMSS(totalSec: number): string {
   return `${m}:${s}`;
 }
 
-/** Fase da sessão para UI: normal <2h · alerta >=2h · null já expirou (>=4h). */
+/** Fase da sessão para UI: normal <2h · alerta >=2h · expirada em 3h. */
 export function sessionPhase(startedAt: number, now: number): "ativa" | "alerta" | "expirada" | null {
   const hours = (now - startedAt) / 3600000;
   if (!Number.isFinite(hours) || hours < 0) return null;
@@ -134,7 +144,7 @@ export function sessionPhase(startedAt: number, now: number): "ativa" | "alerta"
 // ---------------------------------------------------------------------------
 // Progresso da sessão em execução (séries marcadas) — sobrevive à navegação:
 // o aluno pode circular pelo app com o treino rolando e voltar sem perder nada.
-// Guardado junto da sessão-do-dia; expira com ela (4h) e limpa ao finalizar.
+// Guardado junto da sessão-do-dia; expira com ela (3h) e limpa ao finalizar.
 // ---------------------------------------------------------------------------
 
 const KEY_PROGRESS = "gymfit_session_progress_v1";
@@ -162,7 +172,7 @@ export function readSessionProgress(): SavedExerciseProgress | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SavedExerciseProgress;
     if (!parsed?.exercises?.length || typeof parsed.currentIdx !== "number") return null;
-    // expira junto com a sessão do dia (4h)
+    // expira junto com a sessão do dia (3h)
     if (!read() || Date.now() - parsed.savedAt > MAX_SESSION_HOURS * 3600000) {
       localStorage.removeItem(KEY_PROGRESS);
       return null;

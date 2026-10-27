@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import type { Equipment, EquipmentSessions } from "~/lib/types/models";
 import { useSessionTimeout } from "~/hooks/useSessionTimeout";
 import { useWorkoutSession, readSessionProgress, formatMMSS, elapsedSeconds, markDayUnlocked } from "~/lib/workout-session";
+import { startCheckin, closeCheckinForSession, completeWorkoutSession } from "~/lib/supabase/workout-session";
 import { getTodayWorkout } from "~/lib/today-workout";
 import { WorkoutLogModal } from "~/components/workout-log-modal";
 import {
@@ -40,7 +41,7 @@ export default function CheckinPage() {
   const [variationPicker, setVariationPicker] = useState<string | null>(null);
   /** Aparelho detectado por deep link de tag NFC (iPhone/Android) aguardando confirmação. */
   const [pendingEq, setPendingEq] = useState<Equipment | null>(null);
-  const { session: daySession } = useWorkoutSession();
+  const { session: daySession, start: startDaySession, end: endDaySession } = useWorkoutSession();
   const router = useRouter();
   /** Chegou via gate (?scan=1&from=...): scanner abre sozinho e qualquer leitura valida a entrada. */
   const [doorMode, setDoorMode] = useState(false);
@@ -71,6 +72,23 @@ export default function CheckinPage() {
     [user?.id, demo, daySession?.startedAt],
     { silentRefetch: true }
   );
+  const { data: completedSessionToday } = useAsyncQuery<boolean>(
+    async () => {
+      if (demo || !user?.id) return { data: false, error: null };
+      const { data: row, error } = await supabaseBrowser()
+        .from("workout_sessions")
+        .select("id")
+        .eq("student_id", user.id)
+        .eq("status", "completed")
+        .gte("ended_at", localDayStartDaysAgoISO(0))
+        .limit(1)
+        .maybeSingle();
+      return { data: !!row && !error, error: null };
+    },
+    [demo, user?.id, daySession?.startedAt],
+    { enabled: !demo && !!user, silentRefetch: true }
+  );
+
   const sessionMetrics = useMemo(() => {
     const logs = demo ? (getTodayWorkout().logs as Array<{ date: string }>) : (weekLogs ?? []);
     const weekAgo = localDayKeyDaysAgo(7);
@@ -507,37 +525,22 @@ export default function CheckinPage() {
       return true;
     }
     if (!user || !profile) return false;
-    const supabase = supabaseBrowser();
-    const { data: inserted, error } = await supabase
-      .from("checkins")
-      .insert({ gym_id: profile.gym_id, student_id: user.id, type: "entrada", source } as never)
-      .select("id, checked_at, source")
-      .maybeSingle();
-    if (error) {
-      // Entrada de hoje já existe: libera mesmo assim (volta do almoço, segundo turno, etc.)
-      if (/já realizado hoje/i.test(error.message)) {
-        const { data: existing } = await supabase
-          .from("checkins")
-          .select("id, checked_at, source")
-          .eq("student_id", user.id)
-          .eq("gym_id", profile.gym_id)
-          .eq("type", "entrada")
-          .gte("checked_at", localDayStartDaysAgoISO(0))
-          .order("checked_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (existing) setGymEntry(existing as { id: string; checked_at: string; source: string });
-        markDayUnlocked(source);
-        toast.success("Bom treino! Entrada de hoje já registrada.");
-        if (redirect) router.push("/treino");
-        return true;
-      }
-      toast.error("Falha no check-in", { description: error.message });
+    // O check-in abre presença E sessão de treino no banco, no mesmo ato.
+    const started = await startCheckin(source);
+    if (!started) {
+      toast.error("Falha no check-in", {
+        description: "Não foi possível abrir sua sessão agora. Tente de novo.",
+      });
       return false;
     }
-    setGymEntry(inserted as { id: string; checked_at: string; source: string });
+    setGymEntry({
+      id: started.checkin_id,
+      checked_at: started.checked_at,
+      source,
+    });
+    startDaySession(new Date(started.started_at).getTime());
     markDayUnlocked(source);
-    toast.success("Check-in de entrada realizado!");
+    toast.success(started.existing ? "Treino já estava em andamento." : "Check-in feito! Seu treino já começou.");
     if (redirect) router.push("/treino");
     return true;
   };
@@ -547,22 +550,18 @@ export default function CheckinPage() {
     if (session) await endSession();
     if (demo) {
       setGymEntry(null);
-      toast.success("Check-out realizado. Bom descanso!");
+      endDaySession();
+      toast.success("Check-out realizado. Treino encerrado!");
       return;
     }
     if (!user || !profile) return;
-    const supabase = supabaseBrowser();
-    const { error } = await supabase
-      .from("checkins")
-      .insert({ gym_id: profile.gym_id, student_id: user.id, type: "saida", source: "app" } as never);
-    if (error) {
-      toast.error("Falha no check-out", { description: error.message });
-      return;
-    }
+    await closeCheckinForSession(null);
+    await completeWorkoutSession(user.id).catch(() => {});
+    endDaySession();
     setGymEntry(null);
-    // Check-out é saída da academia, não fim do treino. Quem encerra o
-    // treino é o botão Finalizar na tela de treino.
-    toast.success("Check-out realizado. Bom descanso!");
+    window.dispatchEvent(new Event("gymfit-workout-finished"));
+    window.dispatchEvent(new Event("gymfit-checkin-updated"));
+    toast.success("Check-out realizado. Treino encerrado.");
   };
 
   // Restaura o check-in de hoje ao abrir/recarregar a tela. Antes o estado
@@ -575,20 +574,49 @@ export default function CheckinPage() {
     (async () => {
       const { data } = await supabaseBrowser()
         .from("checkins")
-        .select("id, checked_at, source")
+        .select("id, checked_at, source, type")
         .eq("student_id", user.id)
         .eq("gym_id", profile.gym_id)
-        .eq("type", "entrada")
         .gte("checked_at", localDayStartDaysAgoISO(0))
         .order("checked_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!cancelled && data) {
-        setGymEntry(data as { id: string; checked_at: string; source: string });
+        .limit(5);
+      const last = (data ?? [])[0] as { id: string; checked_at: string; source: string; type: string } | undefined;
+      if (!cancelled) {
+        if (last?.type === "entrada") {
+          setGymEntry({ id: last.id, checked_at: last.checked_at, source: last.source });
+        } else {
+          setGymEntry(null);
+        }
       }
     })();
     return () => {
       cancelled = true;
+    };
+  }, [demo, user?.id, profile?.gym_id]);
+
+  // O treino finalizado fecha a presença; atualiza esta tela sem reload.
+  useEffect(() => {
+    if (demo || !user?.id || !profile?.gym_id) return;
+    let cancelled = false;
+    const refresh = async () => {
+      const { data } = await supabaseBrowser()
+        .from("checkins")
+        .select("id, checked_at, source, type")
+        .eq("student_id", user.id)
+        .eq("gym_id", profile.gym_id)
+        .gte("checked_at", localDayStartDaysAgoISO(0))
+        .order("checked_at", { ascending: false })
+        .limit(5);
+      if (cancelled) return;
+      const last = (data ?? [])[0] as { id: string; checked_at: string; source: string; type: string } | undefined;
+      setGymEntry(last?.type === "entrada" ? { id: last.id, checked_at: last.checked_at, source: last.source } : null);
+    };
+    window.addEventListener("gymfit-checkin-updated", refresh);
+    window.addEventListener("gymfit-workout-finished", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("gymfit-checkin-updated", refresh);
+      window.removeEventListener("gymfit-workout-finished", refresh);
     };
   }, [demo, user?.id, profile?.gym_id]);
 
@@ -616,6 +644,10 @@ export default function CheckinPage() {
   }
 
   const equipment = data?.equipment ?? [];
+  const treinouHoje =
+    sessionMetrics.treinoHoje === "Concluído" ||
+    sessionMetrics.treinoHoje === "Em andamento" ||
+    !!completedSessionToday;
 
   return (
     <>
@@ -637,14 +669,22 @@ export default function CheckinPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-0.5">
               <p className="text-sm font-bold text-foreground">
-                {gymEntry ? "Você está na academia" : daySession ? "Treino em andamento" : "Entrada na academia"}
+                {gymEntry
+                  ? "Você está na academia"
+                  : daySession
+                    ? "Treino em andamento"
+                    : treinouHoje
+                      ? "Treino concluído hoje"
+                      : "Entrada na academia"}
               </p>
               <p className="text-xs text-muted-foreground">
                 {gymEntry
                   ? `Check-in ${gymEntry.source === "nfc" ? "via NFC" : gymEntry.source === "qrcode" ? "via QR" : "validado"} · treino liberado`
                   : daySession
-                    ? "Check-out feito. Seu treino continua até você finalizar na tela de treino."
-                    : doorMode
+                    ? "Seu treino está em andamento. Finalize na tela de treino."
+                    : treinouHoje
+                      ? "Treino encerrado. Para treinar de novo, faça um novo check-in."
+                      : doorMode
                       ? "Aponte a câmera para o QR da portaria ou use o NFC"
                       : "Escaneie o QR/NFC da entrada para iniciar seu treino"}
               </p>
@@ -673,8 +713,9 @@ export default function CheckinPage() {
                   <MockPortariaButton
                     onValidated={() => {
                       setGymEntry({ id: "ck-demo-" + Date.now(), checked_at: new Date().toISOString(), source: "portaria" });
+                      startDaySession();
                       markDayUnlocked("portaria");
-                      toast.success("Entrada validada! Treino liberado");
+                      toast.success("Entrada validada! Treino começou");
                       backToOrigin();
                     }}
                   />

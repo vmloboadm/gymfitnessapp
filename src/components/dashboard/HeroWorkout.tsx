@@ -19,6 +19,8 @@ interface HeroWorkoutProps {
   notice?: string;
   /** Destino do toque (padrão: treino de hoje). */
   href?: string;
+  /** Texto do CTA principal. */
+  ctaLabel?: string;
   /** Quando ainda não há plano: substitui o bloco de números por um recado honesto. */
   emptyHint?: string;
 }
@@ -46,6 +48,7 @@ export function HeroWorkout({
   ready,
   notice,
   href,
+  ctaLabel,
   emptyHint,
 }: HeroWorkoutProps) {
   return (
@@ -148,7 +151,7 @@ export function HeroWorkout({
                   animate={{ x: ["-120%", "220%"] }}
                   transition={{ duration: 3, repeat: Infinity, repeatDelay: 2, ease: "easeInOut" }}
                 />
-                <span className="relative font-display text-[17px] font-extrabold tracking-wide text-white">Começar agora</span>
+                <span className="relative font-display text-[17px] font-extrabold tracking-wide text-white">{ctaLabel ?? "Começar agora"}</span>
                 <span className="relative flex h-10 w-10 items-center justify-center rounded-full bg-black/25">
                   <Play className="h-5 w-5 fill-white text-white" />
                 </span>
