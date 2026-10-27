@@ -12,6 +12,9 @@
 import { demoLib } from "~/lib/demo-bridge";
 
 export type PlanExercise = {
+  /** ID estável da biblioteca. Fichas antigas podem ter só o nome. */
+  exerciseId?: string;
+  variationId?: string;
   exercicio: string;
   series: number;
   reps: string;

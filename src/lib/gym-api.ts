@@ -144,133 +144,23 @@ async function assignReal(
   trainerId: string,
   student: PersonalStudent,
   plan: WorkoutPlan,
-  _notes: string | null
+  notes: string | null,
+  previousWorkoutId?: string | null
 ): Promise<string> {
   const sb = supabaseBrowser();
-
-  const { data: prog, error: progErr } = await sb
-    .from("workout_programs")
-    .insert(({
-      gym_id: gymId,
-      trainer_id: trainerId,
-      name: plan.nome,
-      objective: plan.objetivo,
-      created_via: "ia",
-      ai_draft: JSON.stringify(plan),
-      reviewed_by: trainerId,
-    } as never))
-    .select("id")
-    .single();
-  if (progErr || !prog) throw new Error(progErr?.message ?? "falha ao criar programa");
-
-  const programId = (prog as { id: string }).id;
-
-  const rollback = async (): Promise<boolean> => {
-    const daysRes = await sb.from("workout_days").delete().eq("program_id", programId);
-    const progRes = await sb.from("workout_programs").delete().eq("id", programId);
-    return !daysRes.error && !progRes.error;
-  };
-  const orphanNote = (base: string, ok: boolean): Error =>
-    new Error(ok ? base : `${base} (não foi possível desfazer o plano criado; pode ter ficado registro órfão)`);
-
-  // resolve ids reais dos exercícios pelo nome (biblioteca global + do gym)
-  const { data: exRows, error: exLibErr } = await sb.from("exercises").select("id, name").or(`gym_id.is.null,gym_id.eq.${gymId}`);
-  if (exLibErr) throw orphanNote("Falha ao carregar a biblioteca de exercícios: " + exLibErr.message, await rollback());
-  const exList = (exRows ?? []) as Array<{ id: string; name: string }>;
-  const normalize = (s: string): string =>
-    s
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9\s]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  const normEntries = exList.map((e) => ({ norm: normalize(e.name), id: e.id }));
-  const byExact = new Map<string, string>();
-  for (const e of normEntries) if (!byExact.has(e.norm)) byExact.set(e.norm, e.id);
-  const resolveExerciseId = (original: string): string | null => {
-    const norm = normalize(original);
-    if (!norm) return null;
-    const exact = byExact.get(norm);
-    if (exact) return exact;
-    const prefixed = normEntries.filter((e) => e.norm.startsWith(norm + " ") || norm.startsWith(e.norm + " "));
-    if (prefixed.length === 1) return prefixed[0].id;
-    const firstWord = norm.split(" ")[0];
-    const byWord = normEntries.filter((e) => e.norm === firstWord || e.norm.startsWith(firstWord + " "));
-    if (byWord.length === 1) return byWord[0].id;
-    return null;
-  };
-
-  const dayFailures: string[] = [];
-  for (let di = 0; di < plan.dias.length; di++) {
-    const day = plan.dias[di];
-    const { data: dayRow, error: dayErr } = await sb
-      .from("workout_days")
-      .insert(({ gym_id: gymId, program_id: programId, name: day.nome, day_order: di + 1 } as never))
-      .select("id")
-      .single();
-    if (dayErr || !dayRow) {
-      dayFailures.push(dayErr ? `${day.nome}: ${dayErr.message}` : day.nome);
-      continue;
-    }
-    const dayId = (dayRow as { id: string }).id;
-
-    const rows: Array<Record<string, unknown>> = [];
-    let missing: string | null = null;
-    for (let i = 0; i < day.exercicios.length; i++) {
-      const e = day.exercicios[i];
-      const exerciseId = resolveExerciseId(e.exercicio);
-      if (!exerciseId) {
-        missing = e.exercicio;
-        break;
-      }
-      rows.push({
-        gym_id: gymId,
-        day_id: dayId,
-        exercise_id: exerciseId,
-        sets: e.series,
-        reps: e.reps,
-        rest_seconds: parseInt(e.descanso) || 60,
-        rpe: e.rpe,
-        technique: e.tecnica ?? "normal",
-        notes: `${e.exercicio}${e.dica ? `. ${e.dica}` : ""}`,
-        ord: i + 1,
-      });
-    }
-    if (missing !== null) {
-      throw orphanNote(`Exercício não encontrado: "${missing}"`, await rollback());
-    }
-    if (rows.length) {
-      const { error: wexErr } = await sb.from("workout_exercises").insert(rows as never);
-      if (wexErr) {
-        throw orphanNote(`Falha ao salvar os exercícios do dia "${day.nome}": ${wexErr.message}`, await rollback());
-      }
-    }
+  const { data, error } = await sb.rpc("save_student_plan" as never, {
+    p_student: student.id,
+    p_plan: plan as never,
+    p_notes: notes,
+    p_previous_workout: previousWorkoutId ?? null,
+  } as never);
+  if (error || !data) {
+    throw new Error(error?.message ?? "Não foi possível salvar a ficha.");
   }
-  if (dayFailures.length) {
-    throw orphanNote(`Falha ao criar dias do treino: ${dayFailures.join("; ")}`, await rollback());
-  }
-
-  const { data: swRow, error: swErr } = await sb.from("student_workouts").insert(({
-    gym_id: gymId,
-    student_id: student.id,
-    program_id: programId,
-    status: "active",
-  } as never)).select("id").single();
-  if (swErr || !swRow) {
-    throw orphanNote(`Falha ao atribuir o plano ao aluno: ${swErr?.message ?? "sem registro"}`, await rollback());
-  }
-  // um plano ativo por aluno: aposenta os anteriores (vira histórico)
-  const { error: retireErr } = await sb.from("student_workouts")
-    .update({ status: "completed", completed_at: new Date().toISOString() } as never)
-    .eq("student_id", student.id)
-    .eq("status", "active")
-    .neq("id", (swRow as { id: string }).id);
-  if (retireErr) {
-    throw new Error(`Plano salvo, mas falhou ao aposentar os treinos ativos anteriores de ${student.name}: ${retireErr.message}`);
-  }
+  const out = data as { program_id?: string };
+  if (!out.program_id) throw new Error("A ficha foi salva sem retorno do programa.");
   notifyStaffPush([student.id], NEW_WORKOUT_PUSH.title, NEW_WORKOUT_PUSH.body, NEW_WORKOUT_PUSH.url).catch(() => {});
-  return programId;
+  return out.program_id;
 }
 
 /** Aprovar plano do Co-Pilot: demo → local; produção → banco. Devolve o id do programa (null no demo). */
@@ -280,6 +170,7 @@ export async function approvePlan(opts: {
   student: PersonalStudent;
   plan: WorkoutPlan;
   notes: string | null;
+  previousWorkoutId?: string | null;
 }): Promise<string | null> {
   if (isDemoMode()) {
     saveAssignedWorkout({
@@ -297,7 +188,7 @@ export async function approvePlan(opts: {
     });
     return null;
   }
-  return assignReal(opts.gymId, opts.trainerId, opts.student, opts.plan, opts.notes);
+  return assignReal(opts.gymId, opts.trainerId, opts.student, opts.plan, opts.notes, opts.previousWorkoutId);
 }
 
 /** Marca um student_workout como concluído (ao gerar v2 ajustada). */
@@ -405,7 +296,7 @@ export async function assignCopiedPlan(opts: {
   const sb = supabaseBrowser();
   const { data: prog, error: pErr } = await sb
     .from("workout_programs")
-    .select("id, objective, ai_draft")
+    .select("id, objective, ai_draft, notes")
     .eq("id", opts.programId)
     .single();
   if (pErr || !prog) throw new Error("Plano original não encontrado.");
@@ -444,6 +335,7 @@ export async function assignCopiedPlan(opts: {
         objective: (prog as { objective: string | null }).objective,
         created_via: "manual",
         ai_draft: renameDraft((prog as { ai_draft: string | null }).ai_draft, finalName),
+        notes: (prog as { notes: string | null }).notes,
         reviewed_by: opts.trainerId,
       } as never))
       .select("id")
@@ -641,9 +533,9 @@ export async function fetchMyAssignedPlans(
     .select(`
       id, status, assigned_at,
       workout_programs (
-        id, name, objective, ai_draft, created_at,
+        id, name, objective, ai_draft, notes, created_at,
         workout_days ( id, name, day_order,
-          workout_exercises ( exercise_id, sets, reps, rest_seconds, rpe, notes, technique, ord, exercises ( name ) )
+          workout_exercises ( exercise_id, variation_id, sets, reps, rest_seconds, rpe, notes, technique, ord, exercises ( name ) )
         )
       )
     `)
@@ -661,11 +553,12 @@ export async function fetchMyAssignedPlans(
       name: string;
       objective: string;
       ai_draft: string | null;
+      notes: string | null;
       workout_days: Array<{
         id: string;
         name: string;
         day_order: number;
-        workout_exercises: Array<{ sets: number; reps: string; rest_seconds: number; rpe: number | null; notes: string | null; technique?: string | null; ord: number; exercises?: { name: string } | null }>;
+        workout_exercises: Array<{ exercise_id: string; variation_id?: string | null; sets: number; reps: string; rest_seconds: number; rpe: number | null; notes: string | null; technique?: string | null; ord: number; exercises?: { name: string } | null }>;
       }>;
     };
   };
@@ -698,7 +591,7 @@ export async function fetchMyAssignedPlans(
         studentName: "Você",
         programId: prog.id,
         name: prog.name,
-        notes: null,
+        notes: prog.notes ?? null,
         frequency: `${days.length}x semana`,
         level: prog.objective ?? "Treino",
         exercises: days.flatMap((d) => d.workout_exercises.map((e) => ({ name: e.exercises?.name ?? e.notes?.split(".")[0] ?? "Exercício", sets: e.sets, reps: e.reps, rest: `${e.rest_seconds}s` }))),
@@ -718,6 +611,8 @@ export async function fetchMyAssignedPlans(
             exercicios: d.workout_exercises
               .sort((a, b) => a.ord - b.ord)
               .map((e) => ({
+                exerciseId: e.exercise_id,
+                variationId: e.variation_id ?? undefined,
                 exercicio: e.exercises?.name ?? e.notes?.split(".")[0] ?? "Exercício",
                 series: e.sets,
                 reps: e.reps,

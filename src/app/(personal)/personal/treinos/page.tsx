@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import {
   Send,
   Sparkles,
@@ -571,7 +571,7 @@ function PersonalTreinosContent() {
 
   /** Troca o exercício mantendo séries/reps/RPE/dica do original.
    *  Com exIdx -1, ADICIONA um exercício avulso no dia (3x10-12 padrão). */
-  const swapExercise = (newName: string) => {
+  const swapExercise = (newName: string, newExerciseId?: string) => {
     if (!plan || !swapTarget) return;
     setPlan({
       ...plan,
@@ -583,10 +583,10 @@ function PersonalTreinosContent() {
                 swapTarget.exIdx === -1
                   ? [
                       ...d.exercicios,
-                      { exercicio: newName, series: 3, reps: "10-12", descanso: "60s", rpe: 7, dica: "" },
+                      { exerciseId: newExerciseId, exercicio: newName, series: 3, reps: "10-12", descanso: "60s", rpe: 7, dica: "" },
                     ]
                   : d.exercicios.map((x, xi) =>
-                      xi === swapTarget.exIdx ? { ...x, exercicio: newName } : x
+                      xi === swapTarget.exIdx ? { ...x, exerciseId: newExerciseId, exercicio: newName } : x
                     ),
             }
           : d
@@ -612,7 +612,7 @@ function PersonalTreinosContent() {
     return (
       <li key={ex.id}>
         <button
-          onClick={() => swapExercise(ex.name)}
+          onClick={() => swapExercise(ex.name, ex.id)}
           className={cn(
             "flex w-full items-center gap-3 rounded-2xl border p-2.5 text-left transition-colors",
             current ? "border-brand/40 bg-brand/10" : "border-white/[0.06] bg-white/[0.03] hover:border-brand/30"
@@ -892,6 +892,50 @@ function PersonalTreinosContent() {
     });
   };
 
+  const dayLetter = (idx: number) => "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[idx] ?? String(idx + 1);
+
+  const addDay = () => {
+    setPlan((prev) => {
+      if (!prev) return prev;
+      const nextIdx = prev.dias.length;
+      const letter = dayLetter(nextIdx);
+      return {
+        ...prev,
+        dias: [
+          ...prev.dias,
+          { nome: `Treino ${letter}`, foco: "Personalizado", aquecimento: [], exercicios: [], finalizador: "", slot: letter },
+        ],
+      };
+    });
+    setActiveDay((prev) => (plan ? Math.max(prev, plan.dias.length) : prev));
+    setExpandAll(false);
+  };
+
+  const removeDay = (idx: number) => {
+    if (!plan) return;
+    if (plan.dias.length <= 1) {
+      toast.error("A ficha precisa de pelo menos um dia");
+      return;
+    }
+    const targetDay = plan.dias[idx];
+    if (targetDay?.exercicios.length && !window.confirm(`Remover "${targetDay.nome}" e seus ${targetDay.exercicios.length} exercícios?`)) {
+      return;
+    }
+    setPlan({ ...plan, dias: plan.dias.filter((_, i) => i !== idx) });
+    setActiveDay((cur) => Math.max(0, cur >= idx ? cur - 1 : cur));
+    setExpandAll(false);
+  };
+
+  const moveDay = (idx: number, dir: -1 | 1) => {
+    if (!plan) return;
+    const nextIdx = idx + dir;
+    if (nextIdx < 0 || nextIdx >= plan.dias.length) return;
+    const next = [...plan.dias];
+    [next[idx], next[nextIdx]] = [next[nextIdx], next[idx]];
+    setPlan({ ...plan, dias: next });
+    setActiveDay(nextIdx);
+  };
+
   // Esqueleto guiado: a estrutura (grupos + quantos exercícios) vem das
   // respostas do assistente; o personal escolhe os exercícios por categoria.
   const startSkeletonPlan = () => {
@@ -979,6 +1023,7 @@ function PersonalTreinosContent() {
     const novos = dbExercises
       .filter((e) => pickSel.has(e.id))
       .map((e) => ({
+        exerciseId: e.id,
         exercicio: e.name,
         series: rx.series,
         reps: rx.reps,
@@ -1007,7 +1052,18 @@ function PersonalTreinosContent() {
   // ===== PASSO 5: aprovar e atribuir (ou salvar edição / ajuste v2) =====
   const approve = async () => {
     if (approving) return;
-    if (!plan || !target || !profile || !user) return;
+    if (!plan) {
+      toast.error("Nenhuma ficha carregada", { description: "Abra a ficha do aluno novamente." });
+      return;
+    }
+    if (!target) {
+      toast.error("Aluno ainda não carregou", { description: "Aguarde a lista de alunos e tente de novo." });
+      return;
+    }
+    if (!profile || !user) {
+      toast.error("Sessão indisponível", { description: "Entre novamente para salvar a ficha." });
+      return;
+    }
     const emptyDays = plan.dias
       .map((d, i) => ({ d, i }))
       .filter(({ d }) => d.exercicios.length === 0)
@@ -1047,11 +1103,12 @@ function PersonalTreinosContent() {
             dias: plan.dias.map((d, i) => ({ ...d, slot: split[i] ?? String(i + 1) })),
           },
           notes: notes.trim() || null,
+          previousWorkoutId: editId && !editId.startsWith("aw-") ? editId : null,
         });
         toast.success(adjustSwId ? "Plano ajustado com sucesso!" : editId ? "Plano atualizado com sucesso!" : "Plano enviado com sucesso!", {
           description: `${target.name} recebeu "${plan.nome}" com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
         });
-        if (newProgramId) {
+        if (newProgramId && !editId && !adjustSwId) {
           setRepeatSheet({ programId: newProgramId, planName: plan.nome, excludeId: target.id });
           setRepeatName(`Treino de {aluno}`);
           setRepeatSelected(new Set());
@@ -1079,6 +1136,17 @@ function PersonalTreinosContent() {
       setApproving(false);
     }
   };
+
+  // Alterações não salvas: o navegador avisa antes de fechar/recarregar.
+  useEffect(() => {
+    if (!plan || savedOk) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [plan, savedOk]);
 
   // Depois de salvar: o personal avisa o aluno (se der) e só então volta.
   const finishSave = () => {
@@ -1797,7 +1865,7 @@ function PersonalTreinosContent() {
         {/* Estado de geração */}
         <AnimatePresence>
           {loading ? (
-            <motion.section
+            <m.section
               key="thinking"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1815,14 +1883,14 @@ function PersonalTreinosContent() {
                   <span className="h-2.5 w-14 animate-pulse rounded-full bg-white/[0.07]" />
                 </div>
               ))}
-            </motion.section>
+            </m.section>
           ) : null}
         </AnimatePresence>
 
         {/* Passo 4: plano editável multi-dias */}
         <AnimatePresence mode="wait">
           {plan && day ? (
-            <motion.section
+            <m.section
               key={plan.nome + plan.dias.length}
               initial={{ opacity: 0, y: 24, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1980,6 +2048,46 @@ function PersonalTreinosContent() {
                   })}
                 </div>
               ) : null}
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={addDay}
+                  className="tactile flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/40 bg-brand/[0.04] py-2 text-[11px] font-bold text-brand"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Adicionar dia
+                </button>
+                {plan.dias.length > 1 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => moveDay(activeDay, -1)}
+                      disabled={activeDay === 0}
+                      aria-label="Mover dia para cima"
+                      className="tactile flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] text-muted-foreground disabled:opacity-25"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveDay(activeDay, 1)}
+                      disabled={activeDay === plan.dias.length - 1}
+                      aria-label="Mover dia para baixo"
+                      className="tactile flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] text-muted-foreground disabled:opacity-25"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeDay(activeDay)}
+                      aria-label="Remover dia"
+                      className="tactile flex h-9 w-9 items-center justify-center rounded-xl border border-[#F87171]/25 text-[#F87171]"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </>
+                ) : null}
+              </div>
 
               {/* ver tudo de uma vez (revisão rápida sem trocar de aba) */}
               {plan.dias.length > 1 ? (
@@ -2287,9 +2395,41 @@ function PersonalTreinosContent() {
                           aria-label={`Repetições de ${e.exercicio}`}
                           className="h-9 w-16 shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[12px] text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
                         />
-                        <span className="shrink-0 rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-bold tabular-nums text-muted-foreground">
-                          RPE {e.rpe}
-                        </span>
+                        <label className="flex shrink-0 flex-col items-center gap-0.5">
+                          <span className="text-[8px] font-black uppercase tracking-wide text-muted-foreground">descanso</span>
+                          <input
+                            value={e.descanso}
+                            onChange={(ev) =>
+                              updateDay(activeDay, {
+                                exercicios: day.exercicios.map((x, xi) =>
+                                  xi === i ? { ...x, descanso: ev.target.value } : x
+                                ),
+                              })
+                            }
+                            aria-label={`Descanso de ${e.exercicio}`}
+                            placeholder="60s"
+                            className="h-9 w-14 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[11px] tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
+                          />
+                        </label>
+                        <label className="flex shrink-0 flex-col items-center gap-0.5">
+                          <span className="text-[8px] font-black uppercase tracking-wide text-muted-foreground">rpe</span>
+                          <select
+                            value={e.rpe}
+                            onChange={(ev) =>
+                              updateDay(activeDay, {
+                                exercicios: day.exercicios.map((x, xi) =>
+                                  xi === i ? { ...x, rpe: Number(ev.target.value) } : x
+                                ),
+                              })
+                            }
+                            aria-label={`RPE de ${e.exercicio}`}
+                            className="h-9 w-12 rounded-lg border border-white/[0.08] bg-white/[0.05] text-center text-[11px] font-bold text-foreground focus-visible:outline-none focus-visible:ring-brand/50"
+                          >
+                            {Array.from({ length: 10 }, (_, n) => n + 1).map((n) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </label>
                         <select
                           value={e.tecnica ?? "normal"}
                           onChange={(ev) =>
@@ -2309,9 +2449,19 @@ function PersonalTreinosContent() {
                           <option value="dropset">Drop-set</option>
                         </select>
                       </div>
-                      {e.dica ? (
-                        <p className="mt-1.5 break-words pl-6 text-[10px] leading-snug text-muted-foreground">{e.dica}</p>
-                      ) : null}
+                      <input
+                        value={e.dica ?? ""}
+                        onChange={(ev) =>
+                          updateDay(activeDay, {
+                            exercicios: day.exercicios.map((x, xi) =>
+                              xi === i ? { ...x, dica: ev.target.value } : x
+                            ),
+                          })
+                        }
+                        aria-label={`Dica de ${e.exercicio}`}
+                        placeholder="Dica / orientação de execução"
+                        className="mt-2 h-9 w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 text-[11px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-brand/50"
+                      />
                     </div>
                     );
                   })}
@@ -2368,11 +2518,11 @@ function PersonalTreinosContent() {
                 ) : (
                   <ClipboardCheck className="mr-2 h-4.5 w-4.5" />
                 )}
-                {approving ? "Atribuindo..." : editId ? "Salvar Alterações" : "Aprovar e Atribuir"}
+                {approving ? (editId ? "Salvando..." : "Atribuindo...") : editId ? "Salvar Alterações" : "Aprovar e Atribuir"}
               </Button>
                 </>
               )}
-            </motion.section>
+            </m.section>
           ) : null}
         </AnimatePresence>
 

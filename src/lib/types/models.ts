@@ -205,6 +205,7 @@ export type WorkoutPrograms = {
   created_via: "manual" | "ia" | "foto" | "template";
   ai_model: string | null;
   ai_draft: string | null;
+  notes: string | null;
   reviewed_by: string | null;
   created_at: string;
   updated_at: string;

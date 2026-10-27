@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { Sparkles, ListChecks, History, ChevronRight, ChevronLeft, Check } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 
@@ -62,7 +62,7 @@ export function TreinoGuide() {
 
   return (
     <AnimatePresence>
-      <motion.div
+      <m.div
         key="guide"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -72,7 +72,7 @@ export function TreinoGuide() {
         aria-modal="true"
         aria-label="Como montar um treino"
       >
-        <motion.div
+        <m.div
           initial={{ y: 40, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 40, opacity: 0 }}
@@ -139,8 +139,8 @@ export function TreinoGuide() {
               {!last ? <ChevronRight className="h-4 w-4" /> : null}
             </button>
           </div>
-        </motion.div>
-      </motion.div>
+        </m.div>
+      </m.div>
     </AnimatePresence>
   );
 }

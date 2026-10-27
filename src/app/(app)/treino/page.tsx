@@ -290,6 +290,11 @@ export default function TreinoHomePage() {
   useStudentWorkoutsRealtime(profile?.gym_id, () => {
     if (phaseRef.current === "active") return;
     void refetch();
+    if (user?.id && profile?.gym_id) {
+      fetchMyAssignedPlans(user.id, profile.gym_id)
+        .then((rows) => setPlanActive(rows))
+        .catch(() => {});
+    }
   });
 
   const router = useRouter();

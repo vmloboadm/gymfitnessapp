@@ -11,7 +11,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
 import { useOnlineCount } from "~/hooks/useOnlineCount";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
-import { useWorkoutLogsRealtime, useGymMotivationRealtime } from "~/hooks/useRealtimeSubscriptions";
+import { useWorkoutLogsRealtime, useGymMotivationRealtime, useStudentWorkoutsRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { assetPath } from "~/lib/asset-path";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { fetchMyAssignedPlans } from "~/lib/gym-api";
@@ -426,6 +426,12 @@ export default function HomePage() {
     [user?.id, profile?.gym_id, demo, data?.logs, profile?.available_days],
     { enabled: !loading && !!user }
   );
+
+  // Ficha editada pelo personal: atualiza o Hero sem esperar reload.
+  useStudentWorkoutsRealtime(profile?.gym_id, () => {
+    void refetchHero();
+    void refetchCheckin();
+  });
 
   // Um único evento atualiza o painel inteiro depois do treino.
   useEffect(() => {
