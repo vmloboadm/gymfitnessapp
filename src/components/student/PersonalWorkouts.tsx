@@ -91,11 +91,6 @@ export function PersonalWorkouts({ studentId }: { studentId?: string }) {
         {workouts.map((w, idx) => (
           idx === 0 ? (
           <m.article key={w.id} variants={item} className="gf-card gf-glass !p-4">
-            {idx === 0 ? (
-              <span className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-brand-foreground">
-                Novo
-              </span>
-            ) : null}
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="flex items-center gap-1.5 text-[13px] font-bold text-foreground">

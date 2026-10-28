@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Bell, CloudOff } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
@@ -15,13 +16,20 @@ import { cn } from "~/lib/utils";
 export function TopBar({
   title,
   subtitle,
+  hideOnline,
 }: {
   title: string;
   subtitle?: string;
+  /** Esconde o contador mesmo nas telas onde ele aparece (ex.: resumo do treino). */
+  hideOnline?: boolean;
   offlineCount?: number;
 }) {
   const { user, profile } = useAuth();
   const { unread } = useNotifications(user?.id);
+  // "X treinando agora" só onde ajuda a decidir ir treinar; nas outras telas
+  // espremia o título (ex.: "Resumo do treino" quebrava em duas linhas).
+  const pathname = usePathname();
+  const showOnline = !hideOnline && (pathname === "/checkin" || pathname === "/treino");
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-[#020D21]/90 backdrop-blur supports-[backdrop-filter]:bg-[#020D21]/70">
@@ -41,7 +49,7 @@ export function TopBar({
         </div>
 
         <div className="flex items-center gap-2">
-          <OnlineCounter gymId={profile?.gym_id} />
+          {showOnline ? <OnlineCounter gymId={profile?.gym_id} /> : null}
           <Link
             href="/notificacoes"
             className={cn(

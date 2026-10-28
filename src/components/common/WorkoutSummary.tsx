@@ -113,7 +113,7 @@ export default function WorkoutSummary({
 
   return (
     <>
-      <TopBar title="Resumo do treino" subtitle="Bom trabalho hoje" />
+      <TopBar title="Resumo do treino" subtitle="Bom trabalho hoje" hideOnline />
       <div className="mx-auto max-w-md space-y-5 p-4 pb-28">
         {/* stats */}
         <m.div

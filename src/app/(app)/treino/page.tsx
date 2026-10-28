@@ -211,6 +211,7 @@ export default function TreinoHomePage() {
   const [session, setSession] = useState<typeof DEFAULT_DEMO_EX | null>(null);
   const [hasSavedProgress, setHasSavedProgress] = useState(false);
   const [libCat, setLibCat] = useState<string | null>(null);
+  const [showBodyMap, setShowBodyMap] = useState(false);
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
 
   // Feedback do treino anterior: sessão concluída sem feedback → pede ao abrir
@@ -1969,14 +1970,32 @@ export default function TreinoHomePage() {
         <PersonalWorkouts />
 
         {/* 3. BIBLIOTECA POR MÚSCULO, mapa navy/laranja com escala de recuperação */}
-        <BodyMap
-          counts={BODY_COUNTS}
-          onSelect={(catId) => {
-            setLibCat((prev) => (prev === catId ? null : catId));
-          }}
-          activeCat={libCat ?? ""}
-          lastTrained={tw.lastTrained}
-        />
+        {/* Recolhido por padrão: ocupava quase uma tela no meio da aba. */}
+        {showBodyMap ? (
+          <BodyMap
+            counts={BODY_COUNTS}
+            onSelect={(catId) => {
+              setLibCat((prev) => (prev === catId ? null : catId));
+            }}
+            activeCat={libCat ?? ""}
+            lastTrained={tw.lastTrained}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowBodyMap(true)}
+            className="gf-card gf-glass tactile flex w-full items-center gap-3 !p-4 text-left"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/15 text-brand">
+              <Dumbbell className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-bold text-foreground">Explorar exercícios por músculo</span>
+              <span className="block text-[11px] text-muted-foreground">Mapa do corpo com a recuperação de cada grupo</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </button>
+        )}
 
         {/* CARDIO: registro rápido de tempo + intensidade (trilha própria) */}
         <CardioQuickAdd />

@@ -78,6 +78,7 @@ export default function RankingPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [showZeros, setShowZeros] = useState(false);
 
   const inviteTogether = async (id: string, name?: string) => {
     if (demo || inviting) return;
@@ -276,6 +277,12 @@ export default function RankingPage() {
     .filter(({ row, pos }) =>
       q ? (row.student?.name ?? "").toLowerCase().includes(q) : pos >= 3
     );
+  // Quem ainda não pontuou vira uma linha só no fim (eram ~40 linhas de 0 pts).
+  const meId = user?.id ?? ME;
+  const zeroRows = listRows.filter(({ row }) => row.points <= 0 && row.student_id !== meId);
+  const collapseZeros = !q && !showZeros && zeroRows.length > 3;
+  const visibleRows = collapseZeros ? listRows.filter((r) => !zeroRows.includes(r)) : listRows;
+  const hiddenZeros = collapseZeros ? zeroRows.length : 0;
 
   return (
     <>
@@ -632,7 +639,7 @@ export default function RankingPage() {
             ) : null}
           </div>
           <p className="mb-2 text-[10px] text-muted-foreground">
-            4º lugar em diante · todo mundo aparece, mesmo zerado
+            4º lugar em diante · quem ainda não pontuou fica agrupado no fim
           </p>
 
           {/* Busca rápida: 56 atletas, achar alguém sem rolar a lista toda */}
@@ -667,7 +674,8 @@ export default function RankingPage() {
                   Ninguém encontrado com “{query.trim()}”.
                 </p>
               ) : (
-                listRows.map(({ row, pos }, i) => {
+                <>
+                {visibleRows.map(({ row, pos }, i) => {
                 const league = leagueFor(row.points);
                 const glyphC = LEAGUE_GLYPHS[league.id]?.color ?? "#B8C4D8";
                 const streak = data?.streakById[row.student_id] ?? 0;
@@ -707,7 +715,17 @@ export default function RankingPage() {
                     <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" aria-hidden />
                   </Link>
                 );
-                })
+                })}
+                {hiddenZeros > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowZeros(true)}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/[0.1] bg-white/[0.02] py-3 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    + {hiddenZeros} atletas começando agora (0 pts) · ver todos
+                  </button>
+                ) : null}
+                </>
               )}
             </div>
           )}

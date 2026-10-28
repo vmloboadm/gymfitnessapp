@@ -5,10 +5,8 @@ import { m, type Variants } from "framer-motion";
 import {
   Search,
   ChevronRight,
-  UserCheck,
   Sparkles,
   CalendarClock,
-  Dumbbell,
   Flame,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -91,7 +89,13 @@ export default function PersonalAlunosPage() {
     return () => { sb.removeChannel(channel); };
   }, [profile?.gym_id, loadStudents]);
   const [q, setQ] = useState("");
-  const [showAllPending, setShowAllPending] = useState(false);
+  type Tab = "todos" | "aprovar" | "sem-treino" | "com-treino";
+  const [tab, setTab] = useState<Tab>("todos");
+  // Atalho vindo do painel: ?aba=aprovar | sem-treino
+  useEffect(() => {
+    const aba = new URLSearchParams(window.location.search).get("aba");
+    if (aba === "aprovar" || aba === "sem-treino" || aba === "com-treino") setTab(aba);
+  }, []);
   const [selected, setSelected] = useState<PersonalStudent | null>(null);
 
   // Link "Abrir ficha do aluno" vindo de Aprovações: ?aluno=<id>
@@ -114,9 +118,22 @@ export default function PersonalAlunosPage() {
   const approved = students.filter((s) => !!s.approved_at);
   const awaiting = approved.filter((s) => needsWorkout(s) && matches(s));
   const filtered = approved.filter(matches);
-  // com muitas aprovações a lista empurrava o resto pra baixo: mostra 3
-  const PENDING_PREVIEW = 3;
-  const pendingShown = showAllPending || query ? pending : pending.slice(0, PENDING_PREVIEW);
+  const withPlan = approved.filter((s) => !needsWorkout(s) && matches(s));
+  const TABS: Array<{ id: Tab; label: string; count: number; tone?: string }> = [
+    { id: "todos", label: "Todos", count: filtered.length + pending.length },
+    { id: "aprovar", label: "Aprovar", count: pending.length, tone: "bg-brand text-brand-foreground" },
+    { id: "sem-treino", label: "Sem treino", count: awaiting.length, tone: "bg-[#FFC24D] text-black" },
+    { id: "com-treino", label: "Com treino", count: withPlan.length },
+  ];
+  // Na aba Todos: quem precisa de ação primeiro (aprovar, sem treino), depois o resto.
+  const list: PersonalStudent[] =
+    tab === "aprovar"
+      ? pending
+      : tab === "sem-treino"
+        ? awaiting
+        : tab === "com-treino"
+          ? withPlan
+          : [...pending, ...awaiting, ...withPlan];
 
   /** Aprova o aluno novo e leva o personal direto para criar o treino dele. */
   const approve = async (s: PersonalStudent) => {
@@ -172,121 +189,60 @@ export default function PersonalAlunosPage() {
         </div>
       </header>
 
-      {/* Busca */}
-      <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar aluno por nome..."
-          aria-label="Buscar aluno"
-          className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-        />
+      {/* Busca + abas fixas no topo: a lista é longa */}
+      <div className="sticky top-0 z-20 -mx-4 space-y-2.5 bg-background/90 px-4 pb-2.5 pt-1 backdrop-blur">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar aluno por nome..."
+            aria-label="Buscar aluno"
+            className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+          />
+        </div>
+        <div role="tablist" aria-label="Filtrar alunos" className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-bold transition-colors",
+                tab === t.id
+                  ? "border-brand/50 bg-brand/15 text-foreground"
+                  : "border-white/[0.06] bg-white/[0.03] text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {t.label}
+              <span
+                className={cn(
+                  "rounded-full px-1.5 text-[10px] font-black tabular-nums",
+                  t.tone && t.count > 0 ? t.tone : "bg-white/[0.08] text-muted-foreground"
+                )}
+              >
+                {t.count}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Aprovações: aluno novo chega aqui antes de entrar na lista */}
-      {!loading && pending.length > 0 ? (
-        <section aria-labelledby="approvals-title" className="space-y-2">
-          <h2 id="approvals-title" className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <UserCheck className="h-4 w-4 text-brand" />
-            Aprovações
-            <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-black text-brand-foreground">
-              {pending.length}
-            </span>
-          </h2>
-          {pendingShown.map((s) => (
-            <div key={s.id} className="gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-3.5">
-              <Avatar className="h-10 w-10 shrink-0 border border-white/[0.08]">
-                <AvatarImage src={s.avatar ?? undefined} alt="" />
-                <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
-                  {s.name[0]}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-bold text-foreground">{s.name}</p>
-                <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                  {goalLabel(s.goal) ?? "Objetivo a definir"}
-                  {s.experience_level ? ` · ${s.experience_level}` : ""}
-                  {s.whatsapp_consent && s.phone ? ` · ${s.phone}` : ""}
-                </p>
-                {vencBadge(s) ? <div className="mt-1.5 flex">{vencBadge(s)}</div> : null}
-              </div>
-              <button
-                onClick={() => approve(s)}
-                disabled={approvingId === s.id}
-                aria-label={`Aprovar ${s.name} e criar treino`}
-                className="tactile flex shrink-0 items-center gap-1.5 rounded-xl bg-brand px-3 py-2 text-[11.5px] font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-60"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                {approvingId === s.id ? "Aprovando..." : "Aprovar"}
-              </button>
-            </div>
-          ))}
-          {pending.length > pendingShown.length ? (
-            <button
-              type="button"
-              onClick={() => setShowAllPending(true)}
-              className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.03] py-2.5 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Ver todas as {pending.length} aprovações
-            </button>
-          ) : null}
-        </section>
+      {tab === "sem-treino" && awaiting.length > 0 ? (
+        <p className="text-[11px] text-muted-foreground">Aprovados sem treino. Crie o treino para liberar no app deles.</p>
       ) : null}
 
-      {/* Aguardando treino: aprovado sem treino criado, botão para criar */}
-      {!loading && awaiting.length > 0 ? (
-        <section aria-labelledby="awaiting-title" className="space-y-2">
-          <h2 id="awaiting-title" className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <Dumbbell className="h-4 w-4 text-[#FFC24D]" />
-            Aguardando treino
-            <span className="rounded-full bg-[#FFC24D] px-2 py-0.5 text-[10px] font-black text-black">
-              {awaiting.length}
-            </span>
-          </h2>
-          <p className="text-[11px] text-muted-foreground">
-            Alunos aprovados ainda sem treino criado. Crie o treino para liberar no app deles.
-          </p>
-          {awaiting.map((s) => (
-            <div key={s.id} className="gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-3.5">
-              <Avatar className="h-10 w-10 shrink-0 border border-white/[0.08]">
-                <AvatarImage src={s.avatar ?? undefined} alt="" />
-                <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
-                  {s.name[0]}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-bold text-foreground">{s.name}</p>
-                <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                  {goalLabel(s.goal) ?? "Objetivo a definir"}
-                  {s.experience_level ? ` · ${s.experience_level}` : ""}
-                  {s.sex ? ` · ${s.sex === "F" ? "Fem" : "Masc"}` : ""}
-                </p>
-              </div>
-              <button
-                onClick={() => router.push(`/personal/treinos?aluno=${s.id}`)}
-                className="tactile flex shrink-0 items-center gap-1.5 rounded-xl bg-brand px-3 py-2 text-[11.5px] font-black text-brand-foreground shadow-lg shadow-brand/25"
-              >
-                <Sparkles className="h-3.5 w-3.5" /> Criar treino
-              </button>
-            </div>
-          ))}
-        </section>
-      ) : null}
-
-      {/* Lista com stagger (limitado em listas grandes) */}
       {loading ? (
         <div className="space-y-2">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/[0.04]" />
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-14 animate-pulse rounded-2xl bg-white/[0.04]" />
           ))}
         </div>
       ) : loadError ? (
         <div className="rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.06] p-6 text-center">
           <p className="text-[13px] font-bold text-foreground">Não foi possível carregar os alunos</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            Falha de conexão com o servidor. Tente novamente.
-          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Falha de conexão com o servidor. Tente novamente.</p>
           <button
             onClick={loadStudents}
             className="tactile mt-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-2 text-[12px] font-bold text-foreground transition-colors hover:text-brand"
@@ -295,63 +251,92 @@ export default function PersonalAlunosPage() {
           </button>
         </div>
       ) : (
-      <m.ul
-        variants={{ hidden: {}, show: { transition: { staggerChildren: Math.min(0.06, 0.4 / Math.max(1, filtered.length)), delayChildren: 0.04 } } }}
-        initial="hidden"
-        animate="show"
-        className="space-y-2"
-      >
-        {filtered.map((s) => {
-          const status = studentStatus(s);
-          return (
-            <m.li key={s.id} variants={row}>
-              <button
-                onClick={() => setSelected(s)}
-                className="gf-card gf-glass flex w-full items-center gap-3 !rounded-2xl !p-3.5 text-left transition-transform active:scale-[0.985]"
-              >
-                <Avatar className="h-11 w-11 border border-white/[0.08]">
-                  <AvatarImage src={s.avatar ?? undefined} alt="" />
-                  <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
-                    {s.name[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-bold text-foreground">{s.name}</p>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <span className={cn("h-1.5 w-1.5 rounded-full", TONE[status.tone])} aria-hidden />
-                    {status.label}
-                  </p>
-                  <p className="mt-1 truncate text-[10px] text-muted-foreground">
-                    {s.lastWorkout ? (
-                      <>Último: <span className="font-semibold text-foreground/80">{s.lastWorkout}</span></>
-                    ) : (
-                      "Sem registro de treino"
-                    )}
-                  </p>
-                </div>
-                {s.streak > 0 ? (
+        <m.ul
+          key={tab}
+          variants={{ hidden: {}, show: { transition: { staggerChildren: Math.min(0.04, 0.3 / Math.max(1, list.length)) } } }}
+          initial="hidden"
+          animate="show"
+          className="divide-y divide-white/[0.05] overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]"
+        >
+          {list.map((s) => {
+            const isPending = !s.approved_at;
+            const noPlan = !isPending && needsWorkout(s);
+            const status = studentStatus(s);
+            return (
+              <m.li key={s.id} variants={row} className="flex items-center gap-3 px-3 py-2.5">
+                <button
+                  onClick={() => setSelected(s)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  aria-label={`Abrir ${s.name}`}
+                >
+                  <Avatar className="h-9 w-9 shrink-0 border border-white/[0.08]">
+                    <AvatarImage src={s.avatar ?? undefined} alt="" />
+                    <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-[11px] font-black text-brand-foreground">
+                      {s.name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-bold text-foreground">{s.name}</p>
+                    <p className="mt-0.5 flex items-center gap-1.5 truncate text-[10.5px] text-muted-foreground">
+                      {isPending ? (
+                        <>
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden />
+                          Aguardando aprovação · {goalLabel(s.goal) ?? "objetivo a definir"}
+                        </>
+                      ) : noPlan ? (
+                        <>
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FFC24D]" aria-hidden />
+                          Sem treino · {goalLabel(s.goal) ?? "objetivo a definir"}
+                          {s.experience_level ? ` · ${s.experience_level}` : ""}
+                        </>
+                      ) : (
+                        <>
+                          <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", TONE[status.tone])} aria-hidden />
+                          {status.label}
+                          {s.lastWorkout ? ` · último: ${s.lastWorkout}` : ""}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </button>
+                {isPending ? (
+                  <button
+                    onClick={() => approve(s)}
+                    disabled={approvingId === s.id}
+                    aria-label={`Aprovar ${s.name} e criar treino`}
+                    className="tactile shrink-0 rounded-xl bg-brand px-3 py-1.5 text-[11px] font-black text-brand-foreground disabled:opacity-60"
+                  >
+                    {approvingId === s.id ? "..." : "Aprovar"}
+                  </button>
+                ) : noPlan ? (
+                  <button
+                    onClick={() => router.push(`/personal/treinos?aluno=${s.id}`)}
+                    className="tactile flex shrink-0 items-center gap-1 rounded-xl border border-[#FFC24D]/40 bg-[#FFC24D]/10 px-2.5 py-1.5 text-[11px] font-black text-[#FFC24D]"
+                  >
+                    <Sparkles className="h-3 w-3" /> Criar
+                  </button>
+                ) : s.streak > 0 ? (
                   <span className="flex shrink-0 items-center gap-1 rounded-full border border-[#FFC24D]/25 bg-[#FFC24D]/10 px-2 py-1 text-[10px] font-bold text-[#FFC24D]">
-                    <Flame className="h-3 w-3" /> {s.streak} {s.streak === 1 ? "dia" : "dias"}
+                    <Flame className="h-3 w-3" /> {s.streak}d
                   </span>
-                ) : vencBadge(s) ? (
-                  vencBadge(s)
                 ) : (
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  vencBadge(s) ?? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
-              </button>
-            </m.li>
-          );
-        })}
-        {filtered.length === 0 ? (
-          <li className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 text-center text-xs text-muted-foreground">
-            {approved.length === 0
-              ? pending.length > 0
-                ? "Nenhum aluno aprovado ainda. Aprove os novos acima."
-                : "Nenhum aluno matriculado na academia ainda."
-              : `Nenhum aluno encontrado para "${q}".`}
-          </li>
-        ) : null}
-      </m.ul>
+              </m.li>
+            );
+          })}
+          {list.length === 0 ? (
+            <li className="p-6 text-center text-xs text-muted-foreground">
+              {query
+                ? `Nenhum aluno encontrado para "${q}".`
+                : tab === "aprovar"
+                  ? "Ninguém esperando aprovação."
+                  : tab === "sem-treino"
+                    ? "Todo aluno aprovado já tem treino."
+                    : "Nenhum aluno aqui ainda."}
+            </li>
+          ) : null}
+        </m.ul>
       )}
 
       {/* Bottom Sheet de detalhes */}

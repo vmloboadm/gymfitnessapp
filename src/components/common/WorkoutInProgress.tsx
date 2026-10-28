@@ -72,6 +72,8 @@ export default function WorkoutInProgress({
   const [showSummary, setShowSummary] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [restLeft, setRestLeft] = useState<number | null>(null);
+  // Bi-set: rodada reaberta à mão para corrigir reps/carga (as outras ficam recolhidas).
+  const [openRound, setOpenRound] = useState<number | null>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const restInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const restIdxRef = useRef(-1);
@@ -224,6 +226,8 @@ export default function WorkoutInProgress({
   const currentAllDone = blockItems.length > 0 && blockItems.every(exDone);
   const nextEx = exercises[groupEndIdx + 1];
   const isLast = groupEndIdx >= exercises.length - 1;
+
+  useEffect(() => setOpenRound(null), [groupStartIdx]);
 
   // retomada no meio de um bloco: sempre abre no começo dele
   useEffect(() => {
@@ -518,6 +522,36 @@ export default function WorkoutInProgress({
                     {Array.from({ length: Math.max(...blockItems.map((ex) => progress[ex.id]?.sets.length ?? 0), 0) }, (_, r) => {
                       const roundItems = blockItems.filter((ex) => (progress[ex.id]?.sets.length ?? 0) > r);
                       const roundDone = roundItems.every((ex) => progress[ex.id]?.sets[r]?.done);
+                      // Só a rodada atual fica aberta; feitas viram resumo, próximas viram "a seguir".
+                      const currentRound = nextPending?.idx ?? -1;
+                      if (r !== currentRound && r !== openRound) {
+                        return (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => setOpenRound(r)}
+                            className={cn(
+                              "flex w-full items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-left",
+                              roundDone ? "border-success/30 bg-success/[0.04]" : "border-border/60 bg-card/20"
+                            )}
+                          >
+                            <span className={cn("text-[10px] font-black uppercase tracking-widest", roundDone ? "text-success" : "text-muted-foreground/70")}>
+                              Rodada {r + 1}
+                            </span>
+                            {roundDone ? <Check className="h-3.5 w-3.5 stroke-[3] text-success" /> : null}
+                            <span className="min-w-0 flex-1 truncate text-right text-[11px] font-semibold tabular-nums text-muted-foreground">
+                              {roundDone
+                                ? roundItems
+                                    .map((ex) => {
+                                      const st = progress[ex.id]!.sets[r];
+                                      return `${st.reps || "-"}×${st.weight || "-"}`;
+                                    })
+                                    .join(" · ")
+                                : "a seguir"}
+                            </span>
+                          </button>
+                        );
+                      }
                       return (
                         <div key={r} className={cn("rounded-2xl border p-2", roundDone ? "border-success/40 bg-success/[0.05]" : "border-border bg-card/30")}>
                           <p className={cn("px-1.5 pb-1.5 pt-0.5 text-[10px] font-black uppercase tracking-widest", roundDone ? "text-success" : "text-muted-foreground")}>
