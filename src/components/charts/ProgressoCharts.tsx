@@ -24,8 +24,8 @@ export default function ProgressoCharts({
         <div className="h-28">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={freqCompare} margin={{ top: 4, right: 6, bottom: 0, left: -26 }}>
-              <Line type="monotone" dataKey="media" name="Média 4 sem" stroke="var(--muted-foreground)" strokeWidth={1.5} strokeDasharray="4 4" dot={false} animationBegin={250} animationDuration={600} />
-              <Line type="monotone" dataKey="atual" name="Esta semana" stroke="var(--brand)" strokeWidth={2.5} dot={{ r: 3 }} animationBegin={150} animationDuration={700} />
+              <Line type="monotone" dataKey="media" name="Média 4 sem" stroke="var(--muted-foreground)" strokeWidth={1.5} strokeDasharray="4 4" dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="atual" name="Esta semana" stroke="var(--brand)" strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive={false} />
               <XAxis dataKey="day" tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
               <YAxis allowDecimals={false} tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, fontSize: 12 }} />
@@ -46,7 +46,7 @@ export default function ProgressoCharts({
               labelStyle={{ color: "var(--foreground)" }}
               formatter={(value: any) => [`${Number(value).toLocaleString("pt-BR")} kg`, "Volume"]}
             />
-            <Bar dataKey="volume" fill="var(--brand)" radius={[4, 4, 0, 0]} maxBarSize={22} animationBegin={200} animationDuration={700} />
+            <Bar dataKey="volume" fill="var(--brand)" radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
         <p className="mt-2 text-[11px] text-muted-foreground">
