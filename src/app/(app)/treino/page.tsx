@@ -1188,12 +1188,23 @@ export default function TreinoHomePage() {
                 ? "Tudo feito! A recuperação também faz parte do plano."
                 : "Sessão encerrada. Faça um novo check-in se quiser completar o restante."}
             </p>
-            <Link
-              href="/progresso"
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-brand-foreground shadow-lg shadow-brand/25"
-            >
-              Ver resumo do treino <ChevronRight className="h-4 w-4" />
-            </Link>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                href="/progresso"
+                className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-brand-foreground shadow-lg shadow-brand/25"
+              >
+                Ver resumo do treino <ChevronRight className="h-4 w-4" />
+              </Link>
+              {todayLogs < totalToday ? (
+                // o texto pede um novo check-in para completar: dá o atalho
+                <Link
+                  href="/checkin"
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-card/60 px-5 py-3 text-sm font-bold text-foreground"
+                >
+                  Completar o restante
+                </Link>
+              ) : null}
+            </div>
           </div>
         </div>
         <AiCoach />

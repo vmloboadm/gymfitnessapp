@@ -91,6 +91,7 @@ export default function PersonalAlunosPage() {
     return () => { sb.removeChannel(channel); };
   }, [profile?.gym_id, loadStudents]);
   const [q, setQ] = useState("");
+  const [showAllPending, setShowAllPending] = useState(false);
   const [selected, setSelected] = useState<PersonalStudent | null>(null);
 
   // Link "Abrir ficha do aluno" vindo de Aprovações: ?aluno=<id>
@@ -106,13 +107,16 @@ export default function PersonalAlunosPage() {
     }
   }, [students]);
 
-  const pending = students.filter((s) => !s.approved_at);
+  // a busca vale para as três seções (aprovação, aguardando treino e lista)
+  const query = q.trim().toLowerCase();
+  const matches = (s: PersonalStudent) => !query || s.name.toLowerCase().includes(query);
+  const pending = students.filter((s) => !s.approved_at && matches(s));
   const approved = students.filter((s) => !!s.approved_at);
-  const awaiting = approved.filter(needsWorkout);
-
-  const filtered = approved.filter((s) =>
-    s.name.toLowerCase().includes(q.trim().toLowerCase())
-  );
+  const awaiting = approved.filter((s) => needsWorkout(s) && matches(s));
+  const filtered = approved.filter(matches);
+  // com muitas aprovações a lista empurrava o resto pra baixo: mostra 3
+  const PENDING_PREVIEW = 3;
+  const pendingShown = showAllPending || query ? pending : pending.slice(0, PENDING_PREVIEW);
 
   /** Aprova o aluno novo e leva o personal direto para criar o treino dele. */
   const approve = async (s: PersonalStudent) => {
@@ -168,6 +172,18 @@ export default function PersonalAlunosPage() {
         </div>
       </header>
 
+      {/* Busca */}
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar aluno por nome..."
+          aria-label="Buscar aluno"
+          className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+        />
+      </div>
+
       {/* Aprovações: aluno novo chega aqui antes de entrar na lista */}
       {!loading && pending.length > 0 ? (
         <section aria-labelledby="approvals-title" className="space-y-2">
@@ -178,38 +194,43 @@ export default function PersonalAlunosPage() {
               {pending.length}
             </span>
           </h2>
-          {pending.map((s) => (
-            <div key={s.id} className="gf-card gf-glass space-y-3 !rounded-2xl !p-3.5">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-11 w-11 border border-white/[0.08]">
-                  <AvatarImage src={s.avatar ?? undefined} alt="" />
-                  <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
-                    {s.name[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-bold text-foreground">{s.name}</p>
-                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                    Novo aluno · aguardando aprovação
-                  </p>
-                  <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                    {s.goal ?? "Objetivo a definir"}
-                    {s.experience_level ? ` · ${s.experience_level}` : ""}
-                    {s.whatsapp_consent && s.phone ? ` · ${s.phone}` : ""}
-                  </p>
-                </div>
-                {vencBadge(s)}
+          {pendingShown.map((s) => (
+            <div key={s.id} className="gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-3.5">
+              <Avatar className="h-10 w-10 shrink-0 border border-white/[0.08]">
+                <AvatarImage src={s.avatar ?? undefined} alt="" />
+                <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-xs font-black text-brand-foreground">
+                  {s.name[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-bold text-foreground">{s.name}</p>
+                <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                  {s.goal ?? "Objetivo a definir"}
+                  {s.experience_level ? ` · ${s.experience_level}` : ""}
+                  {s.whatsapp_consent && s.phone ? ` · ${s.phone}` : ""}
+                </p>
+                {vencBadge(s) ? <div className="mt-1.5 flex">{vencBadge(s)}</div> : null}
               </div>
               <button
                 onClick={() => approve(s)}
                 disabled={approvingId === s.id}
-                className="tactile flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3 text-[13px] font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-60"
+                aria-label={`Aprovar ${s.name} e criar treino`}
+                className="tactile flex shrink-0 items-center gap-1.5 rounded-xl bg-brand px-3 py-2 text-[11.5px] font-black text-brand-foreground shadow-lg shadow-brand/25 disabled:opacity-60"
               >
-                <Sparkles className="h-4 w-4" />
-                {approvingId === s.id ? "Aprovando..." : "Aprovar e criar treino"}
+                <Sparkles className="h-3.5 w-3.5" />
+                {approvingId === s.id ? "Aprovando..." : "Aprovar"}
               </button>
             </div>
           ))}
+          {pending.length > pendingShown.length ? (
+            <button
+              type="button"
+              onClick={() => setShowAllPending(true)}
+              className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.03] py-2.5 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Ver todas as {pending.length} aprovações
+            </button>
+          ) : null}
         </section>
       ) : null}
 
@@ -252,18 +273,6 @@ export default function PersonalAlunosPage() {
           ))}
         </section>
       ) : null}
-
-      {/* Busca */}
-      <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar aluno por nome..."
-          aria-label="Buscar aluno"
-          className="h-11 w-full rounded-2xl border border-white/[0.06] bg-white/[0.05] pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-        />
-      </div>
 
       {/* Lista com stagger (limitado em listas grandes) */}
       {loading ? (

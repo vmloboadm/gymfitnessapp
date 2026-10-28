@@ -214,7 +214,8 @@ export default function ProgressoPage() {
         .filter((c) => localDayKey(c.checked_at).startsWith(prevM))
         .map((c) => localDayKey(c.checked_at))
     ).size;
-    return prevDays > 0 && days > 0 ? Math.round(((days - prevDays) / prevDays) * 100) : null;
+    // diferença em DIAS: percentual sobre base pequena enganava (1 → 15 dias = +1.400%)
+    return prevDays > 0 ? days - prevDays : null;
   }, [data?.checkins]);
   const prevMonthLabel = useMemo(() => {
     const prev = new Date();
@@ -275,6 +276,11 @@ export default function ProgressoPage() {
             label="Constância do mês"
             value={`${freqMonthly} ${freqMonthly === 1 ? "presença" : "presenças"}`}
             delta={constancyDelta}
+            deltaLabel={
+              constancyDelta == null
+                ? undefined
+                : `${constancyDelta > 0 ? "+" : ""}${constancyDelta} ${Math.abs(constancyDelta) === 1 ? "dia" : "dias"}`
+            }
             icon={CalendarClock}
             context={`dias com check-in · vs ${prevMonthLabel}`}
           />

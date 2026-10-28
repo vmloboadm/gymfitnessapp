@@ -300,12 +300,12 @@ export default function PersonalDashboardPage() {
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1 text-[10px] font-bold text-foreground ring-1 ring-white/[0.08]">
             <Flame className="h-3 w-3 text-[#FFC24D]" />
-            {stats.prescribedToday} prescritos hoje
+            {stats.prescribedToday} {stats.prescribedToday === 1 ? "prescrito" : "prescritos"} hoje
           </span>
           {stats.missesWeek > 0 ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F87171]/10 px-2.5 py-1 text-[10px] font-bold text-[#F87171] ring-1 ring-[#F87171]/30">
               <UserRoundX className="h-3 w-3" />
-              {stats.missesWeek} sumidos
+              {stats.missesWeek} {stats.missesWeek === 1 ? "sumido" : "sumidos"}
             </span>
           ) : null}
           {profile?.gym_id ? (

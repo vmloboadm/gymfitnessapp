@@ -15,7 +15,9 @@ export function LivePulse({ online }: { online: number }) {
     setHour(new Date().getHours());
   }, []);
   const { phrase, occupancy } = livePulse(hour ?? 12, online);
-  const pct = Math.max(8, Math.round(occupancy * 100));
+  // número mostrado é o real; só o arco tem um mínimo para não sumir
+  const pct = Math.round(occupancy * 100);
+  const arcPct = Math.max(4, pct);
 
   return (
     <section className="pm-surface">
@@ -44,7 +46,7 @@ export function LivePulse({ online }: { online: number }) {
             pathLength={1}
             strokeDasharray="1 1"
             initial={{ strokeDashoffset: 1 }}
-            animate={{ strokeDashoffset: 1 - pct / 100 }}
+            animate={{ strokeDashoffset: 1 - arcPct / 100 }}
             transition={{ duration: 1.1, ease: [0.2, 0.8, 0.2, 1] }}
             transform="rotate(-90 22 22)"
           />

@@ -11,6 +11,7 @@ export function StatCard({
   label,
   value,
   delta,
+  deltaLabel,
   context,
   icon: Icon,
   className,
@@ -18,6 +19,8 @@ export function StatCard({
   label: string;
   value: string;
   delta?: number | null;
+  /** Texto no lugar do percentual (ex.: "+3 dias"); a cor segue o sinal de delta. */
+  deltaLabel?: string;
   context?: string;
   icon?: LucideIcon;
   className?: string;
@@ -37,7 +40,7 @@ export function StatCard({
         </p>
         {Icon ? <Icon className="h-4 w-4 text-brand/70" strokeWidth={1.75} /> : null}
       </div>
-      <div className="mt-2 flex items-baseline gap-2">
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className="gf-hero-num text-2xl">
           {value}
         </span>
@@ -55,7 +58,7 @@ export function StatCard({
             ) : (
               <Minus className="h-3 w-3" />
             )}
-            {formatPercent(delta)}
+            {deltaLabel ?? formatPercent(delta)}
           </span>
         ) : null}
       </div>

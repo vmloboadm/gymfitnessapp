@@ -33,19 +33,11 @@ const STROKE = 7;
 /** Anel de meta semanal refinado — estilo fitness tracker.
  *  Traço fino, gradiente suave, sem efeitos exagerados. */
 export function PerformanceRing({ done, goal }: { done: number; goal: number }) {
-  const pct = Math.min(1, done / goal);
+  const pct = goal > 0 ? Math.min(1, done / goal) : 0;
   const r = 100;
   const c = 115;
   const val = useCountUp(done);
   const doneGoal = done >= goal;
-
-  const theta = pct * 2 * Math.PI;
-  const startX = c;
-  const startY = c - r;
-  const endX = c - r * Math.sin(theta);
-  const endY = c - r * Math.cos(theta);
-  const largeArc = pct > 0.5 ? 1 : 0;
-  const arcPath = `M ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 0 ${endX} ${endY}`;
 
   return (
     <div className="relative mx-auto h-[132px] w-[132px] sm:h-[144px] sm:w-[144px]">
@@ -75,8 +67,10 @@ export function PerformanceRing({ done, goal }: { done: number; goal: number }) 
         {pct > 0 && (
           <>
             {/* glow suave */}
-            <m.path
-              d={arcPath}
+            <m.circle
+              cx={c}
+              cy={c}
+              r={r}
               fill="none"
               stroke={doneGoal ? "url(#pm-ringdone)" : "url(#pm-ringfill)"}
               strokeWidth={STROKE}
@@ -90,8 +84,10 @@ export function PerformanceRing({ done, goal }: { done: number; goal: number }) 
               opacity={0.35}
             />
             {/* traço principal */}
-            <m.path
-              d={arcPath}
+            <m.circle
+              cx={c}
+              cy={c}
+              r={r}
               fill="none"
               stroke={doneGoal ? "url(#pm-ringdone)" : "url(#pm-ringfill)"}
               strokeWidth={STROKE}
@@ -111,7 +107,7 @@ export function PerformanceRing({ done, goal }: { done: number; goal: number }) 
           {val}
           <span className="ml-0.5 text-[16px] font-semibold text-[#5E6A80]">/{goal}</span>
         </span>
-        <span className="mt-1 text-[10px] font-medium uppercase tracking-widest text-[#5E6A80]">treinos · semana</span>
+        <span className="mt-1 text-[9px] font-medium uppercase tracking-wider text-[#5E6A80]">treinos · semana</span>
       </div>
     </div>
   );

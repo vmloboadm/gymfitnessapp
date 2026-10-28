@@ -737,11 +737,11 @@ export default function CheckinPage() {
           <div className="mt-3 grid grid-cols-2 gap-2.5">
             <div className="rounded-xl border border-border bg-card/40 p-3">
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Entrada</p>
-              <p className="pm-num mt-1 text-xl font-black text-foreground">{sessionMetrics.entradaHora ?? "·"}</p>
+              <p className={cn("pm-num mt-1 text-xl font-black", sessionMetrics.entradaHora ? "text-foreground" : "text-muted-foreground/50")}>{sessionMetrics.entradaHora ?? "--:--"}</p>
             </div>
             <div className="rounded-xl border border-border bg-card/40 p-3">
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Tempo na academia</p>
-              <p className="pm-num mt-1 text-xl font-black tabular-nums text-brand">{sessionMetrics.tempoNa ?? "·"}</p>
+              <p className={cn("pm-num mt-1 text-xl font-black tabular-nums", sessionMetrics.tempoNa ? "text-brand" : "text-muted-foreground/50")}>{sessionMetrics.tempoNa ?? "--"}</p>
             </div>
             <div className="rounded-xl border border-border bg-card/40 p-3">
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Treino de hoje</p>
@@ -751,7 +751,7 @@ export default function CheckinPage() {
             </div>
             <div className="rounded-xl border border-border bg-card/40 p-3">
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Treinos na semana</p>
-              <p className="pm-num mt-1 text-xl font-black text-foreground">{sessionMetrics.semana}<span className="text-xs text-muted-foreground">/7</span></p>
+              <p className="pm-num mt-1 text-xl font-black text-foreground">{sessionMetrics.semana}</p>
             </div>
           </div>
         </div>
@@ -876,11 +876,12 @@ export default function CheckinPage() {
             </Button>
           ) : (
             <>
+              {/* rótulos curtos: o texto longo empurrava "Ler QR Code" pra fora da tela */}
               <Button size="sm" onClick={startNfcScan} className="flex-1">
                 <ScanLine className="mr-1.5 h-3.5 w-3.5" />
-                Ler tag pelo app (Android)
+                Ler tag NFC
               </Button>
-              <Button size="sm" variant="outline" onClick={startScanning}>
+              <Button size="sm" variant="outline" onClick={startScanning} className="flex-1">
                 Ler QR Code
               </Button>
             </>

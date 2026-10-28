@@ -84,22 +84,27 @@ export function inferGender(name?: string | null): Gender {
   return /a$/.test(first) ? "feminino" : "masculino";
 }
 
-/** Situação da academia no momento, frases por horário (mock de ocupação). */
+/** Lotação de referência para o % de ocupação (pessoas treinando ao mesmo tempo). */
+const CAPACIDADE_REFERENCIA = 30;
+
+/**
+ * Situação da academia agora, pelo número REAL de pessoas treinando.
+ * Antes a frase e o % vinham só do horário (ex.: 9h-18h sempre "pouca gente"
+ * e 30%), mesmo com a academia cheia ou vazia.
+ */
 export function livePulse(hour: number, online: number): { phrase: string; occupancy: number } {
-  const occ = Math.min(1, online / 30);
-  if (hour >= 18 && hour < 21) {
-    return { phrase: `${online} atletas ficando no shape agora. Sinta a energia e inspire-se!`, occupancy: occ };
+  const n = Math.max(0, Math.round(online));
+  const occupancy = Math.min(1, n / CAPACIDADE_REFERENCIA);
+  if (n === 0) {
+    return {
+      phrase: hour < 6 || hour >= 22 ? "Academia vazia agora." : "Ninguém treinando agora: ótimo horário pra chegar!",
+      occupancy,
+    };
   }
-  if (hour < 7) {
-    return { phrase: "A academia está vazia. Domine os pesos em silêncio!", occupancy: 0.08 };
-  }
-  if (hour >= 7 && hour < 9) {
-    return { phrase: "Ninguém chegou ainda, aproveite e corra pra cá!", occupancy: 0.15 };
-  }
-  if (hour >= 21) {
-    return { phrase: `${online} persistindo no treino da noite. Respeita!`, occupancy: occ };
-  }
-  return { phrase: "Tem pouca gente, venha treinar e faça novas amizades!", occupancy: 0.3 };
+  const pessoas = n === 1 ? "1 pessoa treinando" : `${n} pessoas treinando`;
+  if (occupancy < 0.25) return { phrase: `${pessoas} agora. Horário tranquilo, aproveite!`, occupancy };
+  if (occupancy < 0.6) return { phrase: `${pessoas} agora. Movimento bom, bora somar!`, occupancy };
+  return { phrase: `${pessoas} agora. Horário de pico, sinta a energia!`, occupancy };
 }
 
 /** Mock de score mensal + carga (kg) movida no mês. */

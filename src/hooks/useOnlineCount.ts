@@ -16,7 +16,19 @@ export function useOnlineCount(gymId?: string) {
   const [loading, setLoading] = useState(true);
   const since = () => new Date(Date.now() - 3 * 3600000).toISOString();
 
-  const recount = (gym: string) =>
+  // 1º: função do banco (065) que conta a academia toda. Direto nas tabelas a
+  // RLS só mostra ao aluno os registros dele (contador ficava em 0 ou 1).
+  // Sem a função (migration ainda não aplicada), cai na contagem antiga.
+  const recount = async (gym: string): Promise<number> => {
+    const rpc = (await supabaseBrowser().rpc("gym_online_count" as never)) as unknown as {
+      data: unknown;
+      error: unknown;
+    };
+    if (!rpc.error && typeof rpc.data === "number") return rpc.data;
+    return recountFromTables(gym);
+  };
+
+  const recountFromTables = (gym: string) =>
     Promise.all([
       supabaseBrowser()
         .from("equipment_sessions")
@@ -80,6 +92,18 @@ export function useOnlineCount(gymId?: string) {
       recount(gymId).then(setCount).catch(() => {});
     }
   );
+
+  // O realtime também passa pela RLS: o aluno só recebe eventos dos próprios
+  // registros. Atualiza a cada minuto com a aba visível.
+  useEffect(() => {
+    if (!gymId) return;
+    const tick = () => {
+      if (document.visibilityState === "visible") recount(gymId).then(setCount).catch(() => {});
+    };
+    const t = setInterval(tick, 60_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gymId]);
 
   return { count, loading };
 }

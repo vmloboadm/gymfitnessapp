@@ -582,7 +582,6 @@ export default function HomePage() {
   // focus derivado da MESMA fonte, label idêntico ao da aba Treino
   const focusLabel = twSingleton ? twSingleton.focusLabel : nextWorkoutFromLogs(logs).label;
   const focusResume = twSingleton ? twSingleton.resume : nextWorkoutFromLogs(logs).resume;
-  const todayLabel = `Treino do dia · ${focusLabel}`;
   const activeDays = monthDays.days.filter((d) => d.level > 0).length;
   // Título pelo dado REAL do mês (dias treinados), não mock.
   const titulo = titleFor(inferGender(profile?.name), activeDays, streak);
@@ -828,10 +827,11 @@ export default function HomePage() {
           <div className="px-2 pb-6 pt-1">
             <div className="relative">
               <PerformanceRing done={sessionsWeek} goal={weeklyGoal} />
-              {/* Pulse ring - lightweight visual feedback */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {/* Pulse ring - lightweight visual feedback. Mesmo tamanho do anel:
+                  com inset-0 ele esticava na largura do card e virava um oval. */}
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <m.div
-                  className="absolute inset-0 rounded-full border-2 border-[#FF6F16]/30"
+                  className="h-[132px] w-[132px] rounded-full border-2 border-[#FF6F16]/30 sm:h-[144px] sm:w-[144px]"
                   animate={{ scale: [1, 1.02, 1], opacity: [0.4, 0.1, 0.4] }}
                   transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                   style={{ borderRadius: "50%" }}
@@ -930,7 +930,11 @@ export default function HomePage() {
         <m.div variants={item} ref={heroRef} className="pt-2">
           <HeroWorkout
             image={heroPlan?.image ?? FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
-            title={heroPlan?.title ?? todayLabel}
+            title={
+              heroPlan?.title ??
+              // sem ficha do personal: o foco é só sugestão de treino livre
+              `Treino livre · ${focusLabel}`
+            }
             exerciseCount={heroPlan?.count ?? 0}
             estMin={heroPlan && heroPlan.count > 0 ? Math.max(15, heroPlan.count * 4) : 45}
             sessionsWeek={sessionsWeek}
