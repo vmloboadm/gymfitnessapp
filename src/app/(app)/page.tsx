@@ -939,11 +939,11 @@ export default function HomePage() {
             </div>
 
             {/* Streak + Liga, mesma vitrine, células respiradas */}
-            <div className="mt-7 grid grid-cols-2 gap-3 px-4">
+            <div className="mt-4 grid grid-cols-2 gap-3 px-4">
               <m.div
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.94 }}
-                className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[20px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] px-3 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_30px_-18px_rgba(0,0,0,0.8)] after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
+                className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[20px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] px-3 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_30px_-18px_rgba(0,0,0,0.8)] after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
                 style={{ animationDelay: "80ms" }}
                 transition={{ type: "spring", stiffness: 400, damping: 22 }}
               >
@@ -958,7 +958,7 @@ export default function HomePage() {
               <m.div
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.94 }}
-                className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[20px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] px-3 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_30px_-18px_rgba(0,0,0,0.8)] after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
+                className="gf-rise relative flex flex-col items-center gap-1.5 overflow-hidden rounded-[20px] border border-white/[0.07] bg-gradient-to-b from-white/[0.055] to-white/[0.015] px-3 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_30px_-18px_rgba(0,0,0,0.8)] after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent"
                 style={{ animationDelay: "160ms" }}
                 transition={{ type: "spring", stiffness: 400, damping: 22 }}
               >

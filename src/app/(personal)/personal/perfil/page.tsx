@@ -10,7 +10,7 @@ import { supabaseBrowser } from "~/lib/supabase/client";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { useAuth } from "~/hooks/useAuth";
-import { studentStatus, type PersonalStudent } from "~/lib/personal-data";
+import { type PersonalStudent } from "~/lib/personal-data";
 import { streakOverride } from "~/lib/trainer-store";
 import { cn } from "~/lib/utils";
 import { localDayKey, localDayKeyDaysAgo, localDayStartDaysAgoISO, localDayStartISO, localWeekStartKey } from "~/lib/utils/local-date";
@@ -19,7 +19,6 @@ import { ImageCropModal } from "~/components/common/ImageCropModal";
 
 import { apiPath } from "~/lib/api-path";
 const TABS_BASE = [
-  { id: "alunos", label: "Meus Alunos", icon: Users },
   { id: "stats", label: "Estatísticas", icon: BarChart3 },
 ] as const;
 
@@ -49,7 +48,7 @@ const MOTIVATION_PRESETS = [
 export default function PersonalPerfilPage() {
   const { profile, user } = useAuth();
   const [students, setStudents] = useState<PersonalStudent[]>([]);
-  const [tab, setTab] = useState<TabId>("alunos");
+  const [tab, setTab] = useState<TabId>("stats");
   const [demoAvatar, setDemoAvatar] = useState<string | null>(null);
   const [bio, setBio] = useState("");
   useEffect(() => {
@@ -491,53 +490,7 @@ export default function PersonalPerfilPage() {
         })}
       </div>
 
-      {tab === "alunos" ? (
-        studentsError ? (
-          <div className="rounded-2xl border border-[#F87171]/30 bg-[#F87171]/[0.06] p-6 text-center">
-            <p className="text-[13px] font-bold text-foreground">Não foi possível carregar os alunos</p>
-            <button
-              onClick={() => setStudentsReload((t) => t + 1)}
-              className="tactile mt-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-2 text-[12px] font-bold text-foreground transition-colors hover:text-brand"
-            >
-              Tentar novamente
-            </button>
-          </div>
-        ) : students.length === 0 ? (
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 text-center">
-            <Users className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-            <p className="text-[13px] font-bold text-foreground">Nenhum aluno na academia ainda</p>
-          </div>
-        ) : (
-        <div className="grid grid-cols-3 gap-2.5">
-          {students.map((s) => {
-            const st = studentStatus(s);
-            return (
-              <div key={s.id} className="gf-card gf-glass !rounded-2xl !p-3 text-center">
-                <div className="relative mx-auto w-fit">
-                  <Avatar className="h-14 w-14 border-2 border-white/[0.08]">
-                    <AvatarImage src={s.avatar ?? undefined} alt={s.name} />
-                    <AvatarFallback className="bg-gradient-to-br from-brand to-brand-dark text-sm font-black text-brand-foreground">
-                      {s.name[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span
-                    className={cn(
-                      "absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#0B1220]",
-                      st.tone === "green" ? "bg-[#4ADE80]" : st.tone === "amber" ? "bg-[#FFC24D]" : "bg-[#F87171]"
-                    )}
-                    aria-hidden
-                  />
-                </div>
-                <p className="mt-2 truncate text-[11px] font-bold text-foreground">
-                  {s.name.split(" ")[0]}
-                </p>
-                <p className="truncate text-[9px] text-muted-foreground">{s.activeWorkout ?? "Sem treino"}</p>
-              </div>
-            );
-          })}
-        </div>
-        )
-      ) : tab === "equipe" && hasRole(profile?.role, "manager") ? (
+      {tab === "equipe" && hasRole(profile?.role, "manager") ? (
         /* aba Equipe (gestor) — staff real do gym + contagens reais */
         <div className="space-y-3">
           <div className="gf-card gf-glass !rounded-2xl !p-4">

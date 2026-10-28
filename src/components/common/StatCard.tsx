@@ -10,6 +10,7 @@ import { formatPercent } from "~/lib/utils/format";
 export function StatCard({
   label,
   value,
+  unit,
   delta,
   deltaLabel,
   context,
@@ -18,6 +19,8 @@ export function StatCard({
 }: {
   label: string;
   value: string;
+  /** Unidade em letra menor ao lado do número (ex.: "presenças"), evita quebrar linha. */
+  unit?: string;
   delta?: number | null;
   /** Texto no lugar do percentual (ex.: "+3 dias"); a cor segue o sinal de delta. */
   deltaLabel?: string;
@@ -43,6 +46,7 @@ export function StatCard({
       <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className="gf-hero-num text-2xl">
           {value}
+          {unit ? <span className="ml-1 text-[12px] font-semibold text-muted-foreground">{unit}</span> : null}
         </span>
         {delta != null ? (
           <span

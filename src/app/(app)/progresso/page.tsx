@@ -279,7 +279,8 @@ export default function ProgressoPage() {
         <div className="gf-rise grid grid-cols-2 gap-3">
           <StatCard
             label="Constância do mês"
-            value={`${freqMonthly} ${freqMonthly === 1 ? "presença" : "presenças"}`}
+            value={`${freqMonthly}`}
+            unit={freqMonthly === 1 ? "presença" : "presenças"}
             delta={constancyDelta}
             deltaLabel={
               constancyDelta == null
@@ -291,7 +292,8 @@ export default function ProgressoPage() {
           />
           <StatCard
             label="Sequência"
-            value={`${streak} ${streak === 1 ? "dia" : "dias"}`}
+            value={`${streak}`}
+            unit={streak === 1 ? "dia" : "dias"}
             icon={Flame}
             context="Dias consecutivos dentro do seu plano"
           />
@@ -321,6 +323,9 @@ export default function ProgressoPage() {
             ) : null}
           </>
         )}
+
+        {/* Diário de treinos: sessões com feedback */}
+        <SessionDiary sessions={data?.sessions ?? []} />
 
         {/* Evolução corporal (peso/bioimpedância) */}
         <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "240ms" }}>
@@ -358,8 +363,6 @@ export default function ProgressoPage() {
         {/* Fotos de evolução (antes/depois) */}
         <ProgressPhotos />
 
-        {/* Diário de treinos: sessões com feedback */}
-        <SessionDiary sessions={data?.sessions ?? []} />
 
         {/* Relatório de evolução detalhado (pedido a cada 15 dias) */}
         <ReportRequestCard

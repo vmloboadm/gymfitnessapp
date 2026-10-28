@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Bell,
   Users,
-  ClipboardList,
   UserRoundX,
   Trophy as TrophyIcon,
   Newspaper,
@@ -363,7 +362,7 @@ export default function PersonalDashboardPage() {
         if (pend.length === 0 && venc.length === 0) return null;
         return (
           <Link
-            href="/personal/alunos"
+            href={pend.length > 0 ? "/personal/alunos?aba=aprovar" : "/personal/alunos"}
             className="tactile gf-card gf-glass flex items-center gap-3 !rounded-2xl !p-3.5 transition-transform active:scale-[0.985]"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-brand/30 bg-brand/10 text-brand">
@@ -474,77 +473,6 @@ export default function PersonalDashboardPage() {
           </p>
         ) : null}
       </m.section>
-
-      {/* Métricas de gestão (count-up) */}
-      {!studentsError && !studentsLoading ? (
-      <m.div variants={item} initial="hidden" animate="show" className="grid grid-cols-3 gap-2">
-        <Link href="/personal/alunos" className="gf-card gf-glass relative overflow-hidden !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand to-brand/20" aria-hidden />
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
-            <Users className="h-3.5 w-3.5 text-brand" />
-          </span>
-          <p className="mt-2 font-display text-2xl font-black leading-none tracking-tight text-foreground">
-            <CountUp value={stats.activeStudents} />
-            <span className="text-[11px] font-bold text-muted-foreground">/{stats.totalStudents}</span>
-          </p>
-          <p className="mt-1 text-[9.5px] font-semibold leading-tight text-muted-foreground">
-            Ativos hoje
-          </p>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-            <div
-              className="h-full origin-left rounded-full bg-gradient-to-r from-brand to-[#FFC24D] transition-transform duration-700"
-              style={{
-                transform: `scaleX(${stats.totalStudents ? stats.activeStudents / stats.totalStudents : 0})`,
-              }}
-            />
-          </div>
-        </Link>
-        <Link href="/personal/treinos" className="gf-card gf-glass relative overflow-hidden !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#4ADE80] to-[#4ADE80]/20" aria-hidden />
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#4ADE80]/25 bg-[#4ADE80]/10">
-            <ClipboardList className="h-3.5 w-3.5 text-[#4ADE80]" />
-          </span>
-          <p className="mt-2 font-display text-2xl font-black leading-none tracking-tight text-foreground">
-            <CountUp value={stats.prescribedToday} />
-          </p>
-          <p className="mt-1 text-[9.5px] font-semibold leading-tight text-muted-foreground">
-            Prescritos hoje
-          </p>
-          {stats.prescribedYesterday > 0 ? (
-            <p
-              className={cn(
-                "mt-0.5 text-[9px] font-bold",
-                stats.prescribedToday >= stats.prescribedYesterday ? "text-[#4ADE80]" : "text-[#FFC24D]"
-              )}
-            >
-              {stats.prescribedToday >= stats.prescribedYesterday ? "▲" : "▼"} ontem:{" "}
-              {stats.prescribedYesterday}
-            </p>
-          ) : (
-            <p className="mt-0.5 text-[9px] font-bold text-muted-foreground/70">toque p/ prescrever</p>
-          )}
-        </Link>
-        <Link href="/personal/alunos" className="gf-card gf-glass relative overflow-hidden !rounded-2xl !p-3 transition-transform active:scale-[0.97]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#F87171] to-[#F87171]/20" aria-hidden />
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#F87171]/25 bg-[#F87171]/10">
-            <UserRoundX className="h-3.5 w-3.5 text-[#F87171]" />
-          </span>
-          <p className="mt-2 font-display text-2xl font-black leading-none tracking-tight text-foreground">
-            <CountUp value={stats.missesWeek} />
-          </p>
-          <p className="mt-1 text-[9.5px] font-semibold leading-tight text-muted-foreground">
-            Faltas da semana
-          </p>
-          {stats.missesWeek > 0 ? (
-            <p className="mt-0.5 text-[9px] font-bold text-[#F87171]">
-              {Math.round((stats.missesWeek / Math.max(1, stats.totalStudents)) * 100)}% da turma
-            </p>
-          ) : (
-            <p className="mt-0.5 text-[9px] font-bold text-[#4ADE80]">turma em dia</p>
-          )}
-        </Link>
-      </m.div>
-      ) : null}
 
       {/* Pulso da academia (mesmo componente do aluno) */}
       <m.div variants={item} initial="hidden" animate="show">
@@ -819,11 +747,15 @@ function QueueRow({
       variants={rowItem}
       initial="hidden"
       animate="show"
-      className={cn("gf-card gf-glass !p-3.5", tone.ring)}
+      className={cn("gf-card gf-glass", compact ? "flex items-center gap-2 !px-3 !py-2.5" : "!p-3.5", tone.ring)}
     >
       <button
         onClick={runAction}
-        className={cn("flex w-full items-start gap-3 text-left", queueItem.action.kind === "student" && "transition-transform active:scale-[0.985]")}
+        className={cn(
+          "flex min-w-0 text-left",
+          compact ? "flex-1 items-center gap-2.5" : "w-full items-start gap-3",
+          queueItem.action.kind === "student" && "transition-transform active:scale-[0.985]"
+        )}
       >
         <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border", tone.icon)}>
           <Icon className="h-4 w-4" />
@@ -836,7 +768,7 @@ function QueueRow({
         </div>
       </button>
 
-      <div className="mt-2.5">
+      <div className={compact ? "shrink-0" : "mt-2.5"}>
         {queueItem.action.kind === "whatsapp" ? (
           (() => {
             const href = waHref(queueItem.action.phone, queueItem.action.text);
