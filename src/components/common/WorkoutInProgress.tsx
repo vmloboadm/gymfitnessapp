@@ -349,7 +349,7 @@ export default function WorkoutInProgress({
 
   const primaryLabel = nextPending
     ? isBlock
-      ? `${nextPending.ex.name.split(" ").slice(0, 2).join(" ")} · série ${nextPending.idx + 1} feita ✓`
+      ? `${String.fromCharCode(65 + (groups.indexOf(currentGroup!) % 26))}${blockItems.indexOf(nextPending.ex) + 1} · rodada ${nextPending.idx + 1} feita ✓`
       : `Série ${nextPending.idx + 1} de ${progress[nextPending.ex.id]?.sets.length ?? nextPending.ex.sets} feita ✓`
     : isLast
       ? "Finalizar treino"
