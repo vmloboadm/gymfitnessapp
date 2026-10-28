@@ -23,6 +23,10 @@ interface HeroWorkoutProps {
   ctaLabel?: string;
   /** Quando ainda não há plano: substitui o bloco de números por um recado honesto. */
   emptyHint?: string;
+  /** Linha discreta abaixo do título (ex: "Próximo: Treino B"). */
+  subtitle?: string;
+  /** Legenda do número grande (padrão: "exercícios"). */
+  countLabel?: string;
 }
 
 /** Stagger interno do hero: cada bloco entra em cascata (label → título → números → CTA). */
@@ -50,6 +54,8 @@ export function HeroWorkout({
   href,
   ctaLabel,
   emptyHint,
+  subtitle,
+  countLabel,
 }: HeroWorkoutProps) {
   return (
     <m.div variants={item} whileTap={{ scale: 0.985 }} className="relative">
@@ -99,6 +105,9 @@ export function HeroWorkout({
             <m.h2 variants={rise} className="mt-5 font-display text-[28px] font-extrabold leading-[1.05] tracking-tight text-white">
               {title}
             </m.h2>
+            {subtitle ? (
+              <m.p variants={rise} className="mt-2 text-[13px] font-semibold text-[#FFB27A]">{subtitle}</m.p>
+            ) : null}
 
             {notice ? (
               <m.p
@@ -118,7 +127,7 @@ export function HeroWorkout({
                   <p className="pm-num text-[64px] leading-none text-white tabular-nums">
                     <CountUp value={exerciseCount} />
                   </p>
-                  <p className="mt-2 text-[12px] font-medium text-[#9AA5B8]">exercícios hoje</p>
+                  <p className="mt-2 text-[12px] font-medium text-[#9AA5B8]">{countLabel ?? "exercícios"}</p>
                 </div>
                 <div className="flex gap-8 text-right">
                   <div>

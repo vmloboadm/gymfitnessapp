@@ -147,6 +147,13 @@ function errorResult<T>(message: string): FetchResult<T> {
   return { data: null, error: { message } };
 }
 
+/* categoria da biblioteca → grupo do mapa corporal */
+const BODY_GROUP_OF: Record<string, string> = {
+  peito: "peito", costas: "costas", ombro: "ombro", biceps: "braco", triceps: "braco",
+  antebraco: "braco", perna: "perna", inferiores: "perna", panturrilha: "perna", gluteo: "perna",
+  core: "abdomen", abdomen: "abdomen",
+};
+
 /* contagem de exercícios por grupo p/ o balão do mapa corporal */
 const BODY_COUNTS: Record<string, number> = (() => {
   const CATS: Record<string, string[]> = {
@@ -408,6 +415,26 @@ export default function TreinoHomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, daySession]);
 
+  // Início em 1 toque vindo da Home (?start=1): abre direto a execução do
+  // treino sugerido, sem o aluno ter que tocar em "Iniciar" de novo.
+  const startPlanRef = useRef<((idx?: number) => void) | null>(null);
+  const autoStartRef = useRef(false);
+  useEffect(() => {
+    if (loading || autoStartRef.current || typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("start") !== "1") return;
+    // espera os checks da rotação: sem eles o sugerido cairia sempre no A
+    if (planActive.length === 0 || !startPlanRef.current || slotChecks == null) return;
+    autoStartRef.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    if (phase !== "idle") return;
+    if (daySession || (readSessionProgress()?.exercises ?? []).length > 0) {
+      resumeSession();
+      return;
+    }
+    startPlanRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, planActive, phase, daySession, slotChecks]);
+
   // dia LOCAL de São Paulo (UTC quebrava treino após 21h: caía no dia seguinte)
   const todayKey = localDayKey(new Date());
   const dayOf = (iso: string) => localDayKey(iso);
@@ -436,12 +463,19 @@ export default function TreinoHomePage() {
     return (data?.details ?? []).filter((d) => d.day_id === scheduledDayId);
   }, [demo, data?.details, scheduledDayId]);
   // MESMA FONTE da home, nunca diverge
-  const tw = useMemo(() => (demo ? getTodayWorkout() : resolveFromLogs(data?.logs ?? [])), [demo, data?.logs]);
+  const tw = useMemo(() => (demo ? getTodayWorkout() : resolveFromLogs(data?.logs ?? [])), [demo, data?.logs, data?.details]);
   function resolveFromLogs(logs: NonNullable<TreinoData["logs"]>) {
     const f = nextWorkoutFromLogs(logs);
     const lastTrained: Record<string, string | null> = {};
+    // grupo muscular real de cada exercício (categoria da biblioteca). Antes
+    // só reconhecia ids de demonstração e o mapa ficava sempre "descansado".
+    const catById: Record<string, string> = {};
+    for (const d of data?.details ?? []) {
+      const c = BODY_GROUP_OF[(d.exercise?.category ?? "").toLowerCase()];
+      if (d.exercise_id && c) catById[d.exercise_id] = c;
+    }
     for (const l of logs as Array<NonNullable<TreinoData["logs"]>[number] & { exercise_id?: string }>) {
-      const cat = DEMO_EX_GROUP_REAL[l.exercise_id ?? ""] ?? null;
+      const cat = catById[l.exercise_id ?? ""] ?? DEMO_EX_GROUP_REAL[l.exercise_id ?? ""] ?? null;
       if (!cat) continue;
       if (!lastTrained[cat] || l.date > (lastTrained[cat] ?? "")) lastTrained[cat] = l.date;
     }
@@ -1565,6 +1599,8 @@ export default function TreinoHomePage() {
     }
     setPhase("active");
   };
+
+  startPlanRef.current = (idx?: number) => void startPlanSession(idx);
 
   // Idle normal: pré-treino com sessão ativa.
   return (

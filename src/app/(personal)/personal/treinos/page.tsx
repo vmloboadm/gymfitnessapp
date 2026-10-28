@@ -306,6 +306,9 @@ function PersonalTreinosContent() {
   const [assignedTotal, setAssignedTotal] = useState(0);
   const [assignedLoadingMore, setAssignedLoadingMore] = useState(false);
   const [adjustSwId, setAdjustSwId] = useState<string | null>(null);
+  // Ficha que o aluno já tem: o personal abria o aluno e só via "montar
+  // treino novo", sem caminho para editar o que já estava valendo.
+  const [currentPlan, setCurrentPlan] = useState<{ id: string; name: string; split: string; days: number; at: string } | null>(null);
   // trava dos botões que disparam escrita no banco (nada de duplo toque)
   const [approving, setApproving] = useState(false);
   const [massSaving, setMassSaving] = useState(false);
@@ -467,6 +470,27 @@ function PersonalTreinosContent() {
       setLibReady(true);
     }).catch(() => { setLibError(true); setLibReady(true); });
   }, [gymId, libTick]);
+
+  useEffect(() => {
+    setCurrentPlan(null);
+    if (!targetId || !gymId || editId || params.get("adjust")) return;
+    let alive = true;
+    fetchMyAssignedPlans(targetId, gymId)
+      .then((rows) => {
+        const w = rows[0];
+        if (!alive || !w) return;
+        setCurrentPlan({
+          id: w.id,
+          name: w.name,
+          split: w.plan?.splitType ?? "",
+          days: w.plan?.dias?.length ?? 0,
+          at: w.created_at,
+        });
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetId, gymId, editId]);
 
   // modo edição/ajuste: carrega o plano (demo via localStorage, produção via banco)
   const adjustId = params.get("adjust") ?? "";
@@ -1263,6 +1287,36 @@ function PersonalTreinosContent() {
             Trocar
           </Button>
         </header>
+
+        {currentPlan && !editId && !adjustSwId ? (
+          <section className="gf-card gf-glass !rounded-2xl !p-4" aria-label="Ficha atual do aluno">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-success">Ficha atual</p>
+            <p className="mt-1 truncate text-[15px] font-black text-foreground">{currentPlan.name}</p>
+            <p className="text-[11px] text-muted-foreground">
+              {currentPlan.split ? `Divisão ${currentPlan.split} · ` : ""}
+              {currentPlan.days} {currentPlan.days === 1 ? "treino" : "treinos"}
+              {currentPlan.at ? ` · enviada em ${new Date(currentPlan.at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : ""}
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Button
+                className="h-10 rounded-xl text-[12px] font-black"
+                onClick={() => router.push(`/personal/treinos?aluno=${targetId}&edit=${currentPlan.id}`)}
+              >
+                <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar ficha
+              </Button>
+              <Button
+                variant="secondary"
+                className="h-10 rounded-xl text-[12px] font-bold"
+                onClick={() => router.push(`/personal/treinos?aluno=${targetId}&adjust=${currentPlan.id}`)}
+              >
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Ajustar com IA
+              </Button>
+            </div>
+            <p className="mt-2.5 text-[10.5px] text-muted-foreground">
+              Ou monte uma ficha nova abaixo. Ela substitui a atual quando você enviar.
+            </p>
+          </section>
+        ) : null}
 
         {/* Passo 3: assistente guiado — a IA faz perguntas antes de gerar */}
         <section className="gf-card gf-glass !p-4" aria-label="Assistente de montagem">

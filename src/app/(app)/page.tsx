@@ -353,6 +353,8 @@ export default function HomePage() {
     image: string;
     streak: number;
     completedToday: boolean;
+    /** "Feito pela última vez em 22/10" do slot sugerido */
+    lastDoneLabel?: string;
   };
   const { data: heroPlan, refetch: refetchHero } = useAsyncQuery<HeroPlan | null>(
     async () => {
@@ -434,6 +436,12 @@ export default function HomePage() {
           image: (key && FOCUS_IMAGE[key]) || assetPath("/workout/workout-hero.jpg"),
           streak: serverStreak,
           completedToday,
+          lastDoneLabel: (() => {
+            const last = ((checks ?? []) as Array<{ slot: string; checked_at: string }>).find((c) => c.slot === state.slot);
+            return last
+              ? `Último ${state.slot}: ${new Date(last.checked_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`
+              : `Primeira vez do treino ${state.slot}`;
+          })(),
         },
         error: null,
       };
@@ -505,12 +513,14 @@ export default function HomePage() {
   const heroFinishedToday =
     !session &&
     !isCheckedInToday &&
-    !!heroPlan?.state.day &&
-    heroPlan.count > 0 &&
+    !!heroPlan &&
     (todayDoneCount > 0 || !!heroPlan?.completedToday);
+  // Semana de calendário (segunda a domingo), igual à meta do plano. Antes
+  // eram os últimos 7 dias: na quarta mostrava "3/3 esta semana" contando
+  // treinos da semana passada.
   const sessionsWeek = useMemo(() => {
     const days = new Set<string>();
-    const weekAgo = localDayKeyDaysAgo(6);
+    const weekAgo = localDayKeyDaysAgo((new Date().getDay() + 6) % 7);
     logs.forEach((l) => {
       const d = localDayKey(l.date);
       if (d >= weekAgo) days.add(d);
@@ -946,34 +956,53 @@ export default function HomePage() {
           <HeroWorkout
             image={heroPlan?.image ?? FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
             title={
-              // concluiu hoje: o card já mostra o próximo da divisão
-              (heroFinishedToday && heroPlan?.slot ? `Próximo: ${heroPlan.title}` : heroPlan?.title) ??
-              // sem ficha do personal: o foco é só sugestão de treino livre
-              `Treino livre · ${focusLabel}`
+              session
+                ? heroPlan?.title ?? "Treino em andamento"
+                : heroFinishedToday
+                  ? "Treino de hoje feito"
+                  : heroPlan?.title ??
+                    // sem ficha do personal: o foco é só sugestão de treino livre
+                    `Treino livre · ${focusLabel}`
             }
-            exerciseCount={heroPlan?.count ?? 0}
+            subtitle={
+              heroFinishedToday && heroPlan?.slot
+                ? `Próximo: ${heroPlan.title}`
+                : !session && heroPlan?.lastDoneLabel
+                  ? heroPlan.lastDoneLabel
+                  : undefined
+            }
+            exerciseCount={heroFinishedToday || session ? todayDoneCount : heroPlan?.count ?? 0}
+            countLabel={heroFinishedToday || session ? (todayDoneCount === 1 ? "exercício feito" : "exercícios feitos") : "exercícios"}
             estMin={heroPlan && heroPlan.count > 0 ? Math.max(15, heroPlan.count * 4) : 45}
             sessionsWeek={sessionsWeek}
-            href={heroFinishedToday ? "/progresso" : session ? "/treino?resume=1" : isCheckedInToday ? "/treino" : undefined}
-            ctaLabel={heroFinishedToday ? "Ver resumo" : heroPlan?.state.status === "rest" ? "Ver opções de descanso" : undefined}
-            sessionLabel={
+            href={session ? "/treino?resume=1" : heroFinishedToday ? "/progresso" : heroPlan?.state.status === "rest" ? "/treino" : "/treino?start=1"}
+            ctaLabel={
               session
                 ? "Continuar treino"
-                : heroPlan?.state.status === "rest"
-                  ? "Dia de descanso"
-                  : heroFinishedToday
-                    ? "Concluído hoje"
-                    : isCheckedInToday
-                      ? "Iniciar treino"
+                : heroFinishedToday
+                  ? "Ver minha evolução"
+                  : heroPlan?.state.status === "rest"
+                    ? "Ver opções de descanso"
                     : heroPlan
-                      ? heroPlan.name
+                      ? `Iniciar treino ${heroPlan.slot}`.trim()
+                      : undefined
+            }
+            sessionLabel={
+              session
+                ? "Treino em andamento"
+                : heroFinishedToday
+                  ? "Concluído hoje"
+                  : heroPlan?.state.status === "rest"
+                    ? "Dia de descanso"
+                    : heroPlan
+                      ? "Treino de hoje"
                       : focusResume
                         ? "Retomando onde parou"
                         : "Treino de hoje"
             }
             notice={fatigueNotice ?? undefined}
             emptyHint={
-              heroPlan?.state.status === "rest"
+              heroPlan?.state.status === "rest" && !heroFinishedToday
                 ? "Hoje não está na sua programação. Se quiser, dá para treinar mesmo assim na aba Treino."
                 : heroPlan && heroPlan.count > 0
                   ? undefined

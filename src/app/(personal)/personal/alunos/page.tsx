@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { StudentSheet } from "~/components/personal/StudentSheet";
 import { useAuth } from "~/hooks/useAuth";
-import { studentStatus, needsWorkout, type PersonalStudent } from "~/lib/personal-data";
+import { studentStatus, needsWorkout, goalLabel, type PersonalStudent } from "~/lib/personal-data";
 import { getGymStudents } from "~/lib/gym-api";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { cn } from "~/lib/utils";
@@ -205,7 +205,7 @@ export default function PersonalAlunosPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-bold text-foreground">{s.name}</p>
                 <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                  {s.goal ?? "Objetivo a definir"}
+                  {goalLabel(s.goal) ?? "Objetivo a definir"}
                   {s.experience_level ? ` · ${s.experience_level}` : ""}
                   {s.whatsapp_consent && s.phone ? ` · ${s.phone}` : ""}
                 </p>
@@ -258,7 +258,7 @@ export default function PersonalAlunosPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-bold text-foreground">{s.name}</p>
                 <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                  {s.goal ?? "Objetivo a definir"}
+                  {goalLabel(s.goal) ?? "Objetivo a definir"}
                   {s.experience_level ? ` · ${s.experience_level}` : ""}
                   {s.sex ? ` · ${s.sex === "F" ? "Fem" : "Masc"}` : ""}
                 </p>

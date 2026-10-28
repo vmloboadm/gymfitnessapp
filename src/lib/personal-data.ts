@@ -188,6 +188,20 @@ export function studentStatus(s: PersonalStudent): { label: string; tone: "green
 }
 
 /** Aluno aprovado que ainda não tem treino ativo criado. */
+const GOAL_LABEL: Record<string, string> = {
+  perder_peso: "Perder peso",
+  ganhar_massa: "Ganhar massa",
+  definir: "Definir músculos",
+  condicionamento: "Condicionamento",
+  saude: "Saúde geral",
+};
+
+/** Objetivo legível: o banco guarda a chave do onboarding ("perder_peso"). */
+export function goalLabel(goal: string | null | undefined): string | null {
+  if (!goal) return null;
+  return GOAL_LABEL[goal] ?? goal.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+}
+
 export function needsWorkout(s: PersonalStudent): boolean {
   return !!s.approved_at && !s.activeWorkout;
 }

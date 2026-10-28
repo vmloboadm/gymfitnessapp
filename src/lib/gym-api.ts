@@ -91,7 +91,9 @@ async function fetchRealStudents(gymId: string): Promise<PersonalStudent[]> {
     }
     const myLogs = logs.filter((l) => l.student_id === p.id);
     const lastLog = myLogs.sort((a, b) => (a.date < b.date ? 1 : -1))[0] ?? null;
-    const active = assignments.filter((a) => a.student_id === p.id)[0];
+    // só a ficha ATIVA conta. Sem permissão para ler o nome do programa
+    // (ficha de outro personal), ainda assim o aluno TEM treino.
+    const active = assignments.find((a) => a.student_id === p.id && a.status === "active");
     return {
       id: p.id,
       profile_id: p.id,
@@ -101,7 +103,7 @@ async function fetchRealStudents(gymId: string): Promise<PersonalStudent[]> {
       whatsapp_consent: p.whatsapp_consent ?? false,
       lastTrainingDaysAgo: last ? daysAgo(last) : null,
       streak,
-      activeWorkout: active ? progNames.get(active.program_id) ?? null : null,
+      activeWorkout: active ? progNames.get(active.program_id) ?? "Treino ativo" : null,
       lastWorkout: null,
       lastRpe: lastLog?.rpe ?? undefined,
       freq: 3,

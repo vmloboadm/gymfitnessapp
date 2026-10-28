@@ -204,20 +204,31 @@ export default function WorkoutInProgress({
 
   const current = exercises[currentIdx];
   const currentProgress = current ? progress[current.id] : null;
-  const currentAllDone = !!currentProgress?.sets.length && currentProgress.sets.every((s) => s.done);
-  // Bloco conjugado: agrupa igual ao editor (marcar 1 ou os 2 dá no mesmo)
+  // Bi-set/tri-set: o bloco inteiro aparece numa tela só, em rodadas
+  // (A1 → A2 → descanso). Antes cada exercício era uma tela e o descanso
+  // disparava entre eles, o contrário do que o personal prescreveu.
+  const groups = useMemo(() => groupByTecnica(exercises), [exercises]);
   const currentGroup = useMemo(
-    () => groupByTecnica(exercises).find((g) => g.items.some((x) => x.index === currentIdx)) ?? null,
-    [exercises, currentIdx]
+    () => groups.find((g) => g.items.some((x) => x.index === currentIdx)) ?? null,
+    [groups, currentIdx]
   );
-  const isGroupStart = !!currentGroup && currentGroup.items[0]?.index === currentIdx;
-  const upNext =
-    currentGroup && currentGroup.items.length > 1 && isGroupStart
-      ? currentGroup.items.slice(1).map((x) => x.item)
-      : [];
-  const groupLabel = currentGroup && currentGroup.items.length > 1 ? tecnicaLabel(currentGroup.tecnica) : null;
-  const nextEx = exercises[currentIdx + 1];
-  const isLast = currentIdx === exercises.length - 1;
+  const isBlock = !!currentGroup && currentGroup.items.length > 1;
+  const blockItems: WExercise[] = isBlock ? currentGroup!.items.map((x) => x.item) : current ? [current] : [];
+  const groupStartIdx = currentGroup?.items[0]?.index ?? currentIdx;
+  const groupEndIdx = currentGroup?.items[currentGroup.items.length - 1]?.index ?? currentIdx;
+  const groupLabel = isBlock ? tecnicaLabel(currentGroup!.tecnica) : null;
+  const exDone = (ex: WExercise) => {
+    const p = progress[ex.id];
+    return !!p?.sets.length && p.sets.every((st) => st.done);
+  };
+  const currentAllDone = blockItems.length > 0 && blockItems.every(exDone);
+  const nextEx = exercises[groupEndIdx + 1];
+  const isLast = groupEndIdx >= exercises.length - 1;
+
+  // retomada no meio de um bloco: sempre abre no começo dele
+  useEffect(() => {
+    if (isBlock && currentIdx !== groupStartIdx) setCurrentIdx(groupStartIdx);
+  }, [isBlock, currentIdx, groupStartIdx]);
 
   const cancelRest = useCallback(() => {
     if (restInterval.current) clearInterval(restInterval.current);
@@ -225,57 +236,68 @@ export default function WorkoutInProgress({
     setRestLeft(null);
   }, []);
 
-  const toggleSet = (idx: number) => {
-    if (!current) return;
-    const willBeDone = !currentProgress?.sets[idx]?.done;
+  const toggleSetFor = (ex: WExercise, idx: number) => {
+    const p = progress[ex.id];
+    if (!p) return;
+    const willBeDone = !p.sets[idx]?.done;
     navigator.vibrate?.(willBeDone ? 15 : 8);
     setProgress((prev) => {
-      const p = prev[current.id];
-      if (!p) return prev;
-      const sets = p.sets.map((s, i) => (i === idx ? { ...s, done: !s.done } : s));
-      return { ...prev, [current.id]: { sets } };
+      const cur = prev[ex.id];
+      if (!cur) return prev;
+      const sets = cur.sets.map((st, i) => (i === idx ? { ...st, done: !st.done } : st));
+      return { ...prev, [ex.id]: { sets } };
     });
-    if (willBeDone) {
-      restIdxRef.current = currentIdx;
-      startRest(current.rest);
-    } else {
+    if (!willBeDone) {
       // desmarcou por engano: para o descanso que não faz mais sentido
       cancelRest();
+      return;
     }
+    if (isBlock) {
+      // descanso só quando a rodada inteira do bloco fecha
+      const roundClosed = blockItems.every((it) =>
+        it.id === ex.id ? true : idx >= (progress[it.id]?.sets.length ?? 0) || !!progress[it.id]?.sets[idx]?.done
+      );
+      if (roundClosed) {
+        restIdxRef.current = groupStartIdx;
+        startRest(Math.max(...blockItems.map((it) => it.rest || 0)));
+      } else {
+        cancelRest();
+      }
+      return;
+    }
+    restIdxRef.current = currentIdx;
+    startRest(ex.rest);
   };
 
-  const setReps = (idx: number, reps: string) => {
-    if (!current) return;
+  const setFieldFor = (ex: WExercise, idx: number, field: "reps" | "weight", value: string) => {
     setProgress((prev) => {
-      const p = prev[current.id];
+      const p = prev[ex.id];
       if (!p) return prev;
-      const sets = p.sets.map((s, i) => (i === idx ? { ...s, reps } : s));
-      return { ...prev, [current.id]: { sets } };
-    });
-  };
-
-  const setWeight = (idx: number, weight: string) => {
-    if (!current) return;
-    setProgress((prev) => {
-      const p = prev[current.id];
-      if (!p) return prev;
-      const sets = p.sets.map((s, i) => (i === idx ? { ...s, weight } : s));
-      return { ...prev, [current.id]: { sets } };
+      // carga digitada na série vale para as próximas ainda não feitas
+      const sets = p.sets.map((st, i) =>
+        i === idx || (field === "weight" && i > idx && !st.done && (st.weight === p.sets[idx]?.weight || !st.weight))
+          ? { ...st, [field]: value }
+          : st
+      );
+      return { ...prev, [ex.id]: { sets } };
     });
   };
 
   const markAll = () => {
     if (!current) return;
     navigator.vibrate?.(25);
-    const allDone = currentProgress?.sets.every((s) => s.done) ?? false;
+    const allDone = currentAllDone;
     setProgress((prev) => {
-      const p = prev[current.id];
-      if (!p) return prev;
-      return { ...prev, [current.id]: { sets: p.sets.map((s) => ({ ...s, done: !allDone })) } };
+      const next = { ...prev };
+      for (const ex of blockItems) {
+        const p = prev[ex.id];
+        if (p) next[ex.id] = { sets: p.sets.map((st) => ({ ...st, done: !allDone })) };
+      }
+      return next;
     });
     if (!allDone) {
-      restIdxRef.current = currentIdx;
-      startRest(current.rest);
+      restIdxRef.current = groupStartIdx;
+      startRest(Math.max(...blockItems.map((it) => it.rest || 0)));
     } else {
       cancelRest();
     }
@@ -284,13 +306,14 @@ export default function WorkoutInProgress({
   const goNext = () => {
     if (!isLast) {
       navigator.vibrate?.(20);
-      setCurrentIdx((i) => i + 1);
+      setCurrentIdx(groupEndIdx + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
   const goPrev = () => {
-    if (currentIdx > 0) {
-      setCurrentIdx((i) => i - 1);
+    if (groupStartIdx > 0) {
+      const prevGroup = groups.find((g) => g.items.some((x) => x.index === groupStartIdx - 1));
+      setCurrentIdx(prevGroup?.items[0]?.index ?? groupStartIdx - 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
@@ -300,8 +323,9 @@ export default function WorkoutInProgress({
       setShowFinish(true);
       return;
     }
-    if (!currentAllDone && currentProgress?.sets.some((s) => s.done)) {
-      reportDone(current);
+    const partial = blockItems.filter((ex) => !exDone(ex) && progress[ex.id]?.sets.some((st) => st.done));
+    partial.forEach((ex) => reportDone(ex));
+    if (!currentAllDone && partial.length > 0) {
       toast("Exercício pulado · o que marcou continua valendo");
     } else if (!currentAllDone) {
       toast("Exercício pulado");
@@ -339,7 +363,7 @@ export default function WorkoutInProgress({
         <div className="mx-auto flex max-w-md items-center gap-2 px-3 py-2.5">
           <button
             onClick={goPrev}
-            disabled={currentIdx === 0}
+            disabled={groupStartIdx === 0}
             aria-label="Exercício anterior"
             className="flex h-9 w-9 gf-touch shrink-0 items-center justify-center rounded-full text-muted-foreground disabled:opacity-25"
           >
@@ -347,12 +371,14 @@ export default function WorkoutInProgress({
           </button>
           <div className="min-w-0 flex-1">
             <p className="text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              Exercício {currentIdx + 1} de {exercises.length}
+              {isBlock
+                ? `Exercícios ${groupStartIdx + 1}–${groupEndIdx + 1} de ${exercises.length}`
+                : `Exercício ${currentIdx + 1} de ${exercises.length}`}
             </p>
             <div className="mx-auto mt-1 h-1 w-full max-w-[180px] overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-brand transition-all duration-300"
-                style={{ width: `${((currentIdx + 1) / exercises.length) * 100}%` }}
+                style={{ width: `${((groupEndIdx + 1) / exercises.length) * 100}%` }}
               />
             </div>
           </div>
@@ -410,6 +436,122 @@ export default function WorkoutInProgress({
               transition={{ duration: 0.18 }}
               className="mx-auto max-w-md"
             >
+              {isBlock ? (
+                <div>
+                  <div className="mb-4 rounded-2xl border border-brand/40 bg-brand/[0.06] p-3">
+                    <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-brand">
+                      <Link2 className="h-3.5 w-3.5" /> {groupLabel} · {blockItems.length} exercícios
+                    </p>
+                    <p className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">
+                      Faça um e vá direto para o outro. Descanse só quando fechar a rodada.
+                    </p>
+                    <ul className="mt-2.5 space-y-2">
+                      {blockItems.map((ex, k) => {
+                        const img = ex.thumbUrl ?? ex.imageUrl ?? null;
+                        const vid = ex.videoUrlMale ?? ex.videoUrl ?? ex.videoUrlFemale ?? null;
+                        return (
+                          <li key={ex.id} className="flex items-center gap-2.5">
+                            <span className="flex h-6 w-7 shrink-0 items-center justify-center rounded-md bg-brand text-[10px] font-black text-brand-foreground">
+                              {String.fromCharCode(65 + groups.indexOf(currentGroup!) % 26)}{k + 1}
+                            </span>
+                            {img ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={assetPath(img)} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg border border-white/[0.08] bg-white object-cover" />
+                            ) : (
+                              <FitnessIcon glyph={fitnessForName(ex.name)} size={40} />
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[13.5px] font-black text-foreground">{ex.name}</span>
+                              <span className="block text-[11px] font-semibold text-muted-foreground">
+                                {ex.sets}× {ex.reps}
+                                {ex.last?.weight ? (
+                                  <span className="text-brand"> · última: {String(ex.last.weight).replace(".", ",")} kg</span>
+                                ) : null}
+                              </span>
+                            </span>
+                            {vid ? (
+                              <button
+                                type="button"
+                                onClick={() => setVideoEx({ name: ex.name, poster: img, url: vid })}
+                                aria-label={`Vídeo de ${ex.name}`}
+                                className="gf-touch flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground"
+                              >
+                                <PlayCircle className="h-4 w-4" />
+                              </button>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                  <div className="space-y-3">
+                    {Array.from({ length: Math.max(...blockItems.map((ex) => progress[ex.id]?.sets.length ?? 0), 0) }, (_, r) => {
+                      const roundItems = blockItems.filter((ex) => (progress[ex.id]?.sets.length ?? 0) > r);
+                      const roundDone = roundItems.every((ex) => progress[ex.id]?.sets[r]?.done);
+                      return (
+                        <div key={r} className={cn("rounded-2xl border p-2", roundDone ? "border-success/40 bg-success/[0.05]" : "border-border bg-card/30")}>
+                          <p className={cn("px-1.5 pb-1.5 pt-0.5 text-[10px] font-black uppercase tracking-widest", roundDone ? "text-success" : "text-muted-foreground")}>
+                            Rodada {r + 1}{roundDone ? " · feita, descanse" : ""}
+                          </p>
+                          <div className="space-y-1.5">
+                            {roundItems.map((ex) => {
+                              const st = progress[ex.id]!.sets[r];
+                              return (
+                                <div
+                                  key={ex.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => toggleSetFor(ex, r)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      toggleSetFor(ex, r);
+                                    }
+                                  }}
+                                  aria-pressed={st.done}
+                                  aria-label={`Série ${r + 1} de ${ex.name}: toque para ${st.done ? "desmarcar" : "marcar como feita"}`}
+                                  className={cn(
+                                    "flex min-h-[60px] cursor-pointer select-none items-center gap-2.5 rounded-xl border px-2.5 transition-all active:scale-[0.99]",
+                                    st.done ? "border-success/45 bg-success/[0.09]" : "border-border bg-background/60"
+                                  )}
+                                >
+                                  <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-black", st.done ? "bg-success text-black" : "bg-muted text-muted-foreground")}>
+                                    {st.done ? <Check className="h-4 w-4 stroke-[3]" /> : `${String.fromCharCode(65 + groups.indexOf(currentGroup!) % 26)}${blockItems.indexOf(ex) + 1}`}
+                                  </span>
+                                  <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-foreground">{ex.name}</span>
+                                  <label className="flex shrink-0 flex-col items-center gap-0.5">
+                                    <span className="text-[8px] font-black uppercase tracking-wide text-muted-foreground">reps</span>
+                                    <input type="tel" inputMode="numeric" value={st.reps}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => setFieldFor(ex, r, "reps", e.target.value)}
+                                      aria-label={`Reps da série ${r + 1} de ${ex.name}`}
+                                      className="h-8 w-11 rounded-lg border border-border bg-background text-center text-[15px] font-black tabular-nums text-foreground outline-none focus:border-brand" />
+                                  </label>
+                                  <label className="flex shrink-0 flex-col items-center gap-0.5">
+                                    <span className="text-[8px] font-black uppercase tracking-wide text-muted-foreground">kg</span>
+                                    <input type="tel" inputMode="decimal" value={st.weight} placeholder="—"
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => setFieldFor(ex, r, "weight", e.target.value)}
+                                      aria-label={`Carga em kg da série ${r + 1} de ${ex.name}`}
+                                      className="h-8 w-12 rounded-lg border border-border bg-background text-center text-[15px] font-black tabular-nums text-foreground outline-none focus:border-brand placeholder:text-muted-foreground/40" />
+                                  </label>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={markAll}
+                    className="mt-3 w-full rounded-xl border border-border py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-card"
+                  >
+                    {currentAllDone ? "Desmarcar todas" : "Marcar todas como feitas"}
+                  </button>
+                </div>
+              ) : (
+              <>
               {/* Hero do exercício */}
               <div className="mb-5 flex items-center gap-4">
                 {photo ? (
@@ -428,11 +570,6 @@ export default function WorkoutInProgress({
                   <h1 className="text-xl font-black leading-tight text-foreground">{current.name}</h1>
                   <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] font-semibold text-muted-foreground">
                     {current.sets} séries × {current.reps} reps
-                    {groupLabel ? (
-                      <span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-brand">
-                        {groupLabel}
-                      </span>
-                    ) : null}
                   </p>
                   {current.last && (current.last.weight || current.last.reps) ? (
                     <p className="mt-1 text-[12px] font-semibold text-brand">
@@ -442,26 +579,6 @@ export default function WorkoutInProgress({
                         {" "}· {new Date(current.last.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
                       </span>
                     </p>
-                  ) : null}
-                  {upNext.length > 0 ? (
-                    <div className="mt-2 rounded-xl border border-brand/35 bg-brand/[0.08] px-2.5 py-2">
-                      <p className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-brand">
-                        <Link2 className="h-3 w-3" /> {groupLabel} · sem descanso
-                      </p>
-                      <p className="mt-0.5 text-[11px] font-semibold text-foreground">
-                        Em seguida: {upNext.map((e) => e.name).join(" → ")}
-                      </p>
-                    </div>
-                  ) : null}
-                  {groupLabel && !isGroupStart ? (
-                    <div className="mt-2 rounded-xl border border-brand/35 bg-brand/[0.08] px-2.5 py-2">
-                      <p className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-brand">
-                        <Link2 className="h-3 w-3" /> {groupLabel} · sem descanso
-                      </p>
-                      <p className="mt-0.5 text-[11px] font-semibold text-foreground">
-                        Conjugado com o exercício anterior. Descanso só ao fechar o bloco.
-                      </p>
-                    </div>
                   ) : null}
                   <div className="mt-2 flex gap-2">
                     <button
@@ -500,11 +617,11 @@ export default function WorkoutInProgress({
                     key={i}
                     role="button"
                     tabIndex={0}
-                    onClick={() => toggleSet(i)}
+                    onClick={() => toggleSetFor(current, i)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        toggleSet(i);
+                        toggleSetFor(current, i);
                       }
                     }}
                     aria-pressed={s.done}
@@ -537,7 +654,7 @@ export default function WorkoutInProgress({
                         inputMode="numeric"
                         value={s.reps}
                         onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => setReps(i, e.target.value)}
+                        onChange={(e) => setFieldFor(current, i, "reps", e.target.value)}
                         aria-label={`Reps da série ${i + 1}`}
                         className="h-9 w-12 rounded-lg border border-border bg-background text-center text-base font-black tabular-nums text-foreground outline-none focus:border-brand"
                       />
@@ -550,7 +667,7 @@ export default function WorkoutInProgress({
                         value={s.weight}
                         placeholder="—"
                         onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => setWeight(i, e.target.value)}
+                        onChange={(e) => setFieldFor(current, i, "weight", e.target.value)}
                         aria-label={`Carga em kg da série ${i + 1}`}
                         className="h-9 w-14 rounded-lg border border-border bg-background text-center text-base font-black tabular-nums text-foreground outline-none focus:border-brand placeholder:text-muted-foreground/40"
                       />
@@ -565,6 +682,9 @@ export default function WorkoutInProgress({
               >
                 {currentAllDone ? "Desmarcar todas" : "Marcar todas como feitas"}
               </button>
+
+              </>
+              )}
 
               {/* Próximo exercício */}
               {nextEx && (

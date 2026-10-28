@@ -13,6 +13,7 @@ import {
   mockWeightSeries,
   mockWorkoutHistory,
   studentStatus,
+  goalLabel,
   type PersonalStudent,
 } from "~/lib/personal-data";
 import { isDemoMode } from "~/lib/demo-bridge";
@@ -681,7 +682,7 @@ export function StudentSheet({
                   </p>
                 </div>
               ) : null}
-              <InfoRow label="Objetivo" value={student.goal} />
+              <InfoRow label="Objetivo" value={goalLabel(student.goal)} />
               <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">Nível (editável)</span>
