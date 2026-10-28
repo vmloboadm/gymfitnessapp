@@ -11,11 +11,11 @@ import { useCallback, useEffect, useState } from "react";
 export type WorkoutSession = { startedAt: number };
 
 /**
- * Gate do treino: com false, o aluno precisa do check-in do dia (QR/NFC/senha
- * ou botão da tela de check-in) para liberar o treino. Ficou true durante a
- * fase de testes com o dono; agora o fluxo de check-in grava de verdade.
+ * Gate do treino: com true (fase de testes), o aluno inicia o treino direto,
+ * sem senha do dia nem QR: o próprio "Iniciar treino" faz o check-in pelo
+ * app (presença + sessão no banco). Com false, volta a exigir QR/NFC/senha.
  */
-export const TRAINING_GATE_OPEN = false;
+export const TRAINING_GATE_OPEN = true;
 
 const KEY = "gymfit_session_v1";
 const EVENT = "gymfit-session";
@@ -157,12 +157,15 @@ export type SavedExerciseProgress = {
   restIdx?: number;
   /** timestamp (ms) de quando o descanso termina; permite retomar o contador */
   restEndsAt?: number | null;
+  /** início da sessão local: forma o id estável dos logs (sem duplicar) */
+  sessionStartedAt?: number | null;
   savedAt: number;
 };
 
 export function saveSessionProgress(data: Omit<SavedExerciseProgress, "savedAt">): void {
   try {
-    localStorage.setItem(KEY_PROGRESS, JSON.stringify({ ...data, savedAt: Date.now() }));
+    const sessionStartedAt = data.sessionStartedAt ?? read()?.startedAt ?? null;
+    localStorage.setItem(KEY_PROGRESS, JSON.stringify({ ...data, sessionStartedAt, savedAt: Date.now() }));
   } catch {}
 }
 

@@ -118,7 +118,7 @@ export default function RankingPage() {
         }
         const rows: RankRow[] = ranks.map((r) => ({
           student_id: r.student_id,
-          points: PINNED_BELOW_PODIUM.includes(r.student_id) ? 0 : r.points,
+          points: r.points,
           sessions: r.sessions,
           streak: r.streak ?? 0,
           student: profiles.find((p) => p.id === r.student_id) ?? (r.student_id === ME ? { id: ME, name: "Atleta Demo" } as any : null),
@@ -137,7 +137,7 @@ export default function RankingPage() {
       if (!user || !profile) return { data: null, error: { message: "Sessão indisponível" } };
       // roster: todos os alunos aprovados entram com bolinha, mesmo sem
       // histórico (0 pts no fim da lista). É o que puxa para o pódio.
-      // Perfis em PINNED_BELOW_PODIUM ficam fora do pódio (empurrados para 4º).
+      // Perfis em PINNED_BELOW_PODIUM ficam travados no 5º (ver gym-api).
       const rpcRes = await supabase.rpc("gym_roster", { p_gym_id: profile.gym_id });
       if (rpcRes.error) return { data: null, error: rpcRes.error };
       const mates = ((rpcRes.data ?? []) as Array<Profiles & { role?: string }>).filter(
@@ -199,11 +199,9 @@ export default function RankingPage() {
       const allRows: RankRow[] = mates
         .map((m) => {
           const b = byId.get(m.id);
-          // criador aparece sem pontos (exibição zerada; real fica no banco)
-          const pinned = PINNED_BELOW_PODIUM.includes(m.id);
           return {
             student_id: m.id,
-            points: pinned ? 0 : (b?.points ?? 0),
+            points: b?.points ?? 0,
             sessions: b?.sessions ?? 0,
             streak: streakById[m.id] ?? b?.streak ?? 0,
             student: m as Profiles,
@@ -213,8 +211,8 @@ export default function RankingPage() {
           (a, b) =>
             b.points - a.points || (a.student?.name ?? "").localeCompare(b.student?.name ?? "")
         );
-      // rede de segurança: se o pino cair no top 3 (empate de 0 pts em
-      // ordem alfabética), empurra pra 4º. `mine` sai da lista completa.
+      // trava do criador: desce para o 5º com pontos condizentes na lista.
+      // `mine` sai da lista completa, com os pontos reais.
       const rows = pinBelowPodium([...allRows], (r) => r.student_id);
       const mine = allRows.find((r) => r.student_id === user.id) ?? null;
       // destaque do cardio na semana (top 3 em minutos)

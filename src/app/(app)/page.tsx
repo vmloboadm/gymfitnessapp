@@ -14,7 +14,7 @@ import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { useWorkoutLogsRealtime, useGymMotivationRealtime, useStudentWorkoutsRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { assetPath } from "~/lib/asset-path";
 import { supabaseBrowser } from "~/lib/supabase/client";
-import { fetchMyAssignedPlans } from "~/lib/gym-api";
+import { fetchMyAssignedPlans, pinBelowPodium } from "~/lib/gym-api";
 import { SkeletonList } from "~/components/common/AsyncStates";
 import { toast } from "sonner";
 import { enqueuePremiumRequest, isNetworkError, isOffline } from "~/lib/offline-queue";
@@ -293,16 +293,31 @@ export default function HomePage() {
       const supabase = supabaseBrowser();
       if (!user) return { data: null, error: { message: "Sessão indisponível" } };
       const gymId = profile?.gym_id ?? "";
+      // Mesmo placar da aba Ranking (acumulado, aba padrão): pontos e posição
+      // batem com o "ver classificação". Antes a consulta usava a data com
+      // hora e sem período, voltava vazia e a posição ficava sempre "-".
       const [lRes, rRes] = await Promise.all([
         supabase.from("workout_logs").select("date, exercise_id, weight_kg, reps").eq("student_id", user.id).order("date", { ascending: false }).limit(60),
         gymId
-          ? supabase.from("leaderboard").select("points").eq("student_id", user.id).eq("gym_id", gymId).eq("week_start", startOfWeek().toISOString()).eq("rank_type", "load").maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
+          ? supabase
+              .from("leaderboard")
+              .select("student_id, points")
+              .eq("gym_id", gymId)
+              .eq("period", "all")
+              .eq("week_start", "2000-01-01")
+              .eq("rank_type", "load")
+              .order("points", { ascending: false })
+              .limit(200)
+          : Promise.resolve({ data: [], error: null }),
       ]);
-      const pts = (rRes.data as { points?: number } | null)?.points ?? 0;
+      const board = ((rRes.data ?? []) as Array<{ student_id: string; points: number }>).filter((r) => r.points > 0);
+      const mineRow = board.find((r) => r.student_id === user.id);
+      const pts = mineRow?.points ?? 0;
+      const ranked = pinBelowPodium(board, (r) => r.student_id);
+      const pos = ranked.findIndex((r) => r.student_id === user.id);
       const rows = (lRes.data ?? []) as WorkoutLogs[];
       return {
-        data: { logs: rows, points: pts, rank: 0 },
+        data: { logs: rows, points: pts, rank: pos >= 0 ? pos + 1 : 0 },
         error: null,
       };
     },
@@ -901,7 +916,7 @@ export default function HomePage() {
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[#4ADE80]" />
               </span>
               <p className="text-[11px] font-semibold text-[#B8C4D8]">
-                <span className="font-black text-[#F4F6FB]">{online} pessoas</span> treinando agora, 
+                <span className="font-black text-[#F4F6FB]">{online} {online === 1 ? "pessoa" : "pessoas"}</span> treinando agora,
                 <span className="text-[#FF9A5C]"> {motivationPhrase}</span>
               </p>
             </m.div>
@@ -931,7 +946,8 @@ export default function HomePage() {
           <HeroWorkout
             image={heroPlan?.image ?? FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
             title={
-              heroPlan?.title ??
+              // concluiu hoje: o card já mostra o próximo da divisão
+              (heroFinishedToday && heroPlan?.slot ? `Próximo: ${heroPlan.title}` : heroPlan?.title) ??
               // sem ficha do personal: o foco é só sugestão de treino livre
               `Treino livre · ${focusLabel}`
             }

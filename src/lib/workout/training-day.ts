@@ -174,25 +174,31 @@ export function resolveTrainingDay(input: TrainingDayInput): TrainingDayState {
   const logDays = new Set((input.logs ?? []).map((l) => dayKey(new Date(l.date))).filter(Boolean));
   const completedToday = logDays.has(todayKey);
 
+  // Qual ficha fazer é SEMPRE a rotação (próxima depois da última feita),
+  // salvo quando o personal escreveu o dia no nome ("Seg · A"). Os dias
+  // marcados só dizem se hoje é dia de treino ou descanso. Antes a ficha
+  // ficava presa ao dia da semana: ABCDE em 3 dias nunca mostrava D/E e a
+  // quarta sugeria C sem o aluno ter feito A e B.
+  const byName = explicitWeekdays.length > 0;
+  const rotation = rotationIndex(slotChecks, days);
   let scheduled = false;
-  let dayIdx = 0;
+  let dayIdx = rotation;
   if (scheduledWeekdays.length > 0) {
     const pos = scheduledWeekdays.indexOf(todayWeekday);
     if (pos >= 0) {
       scheduled = true;
-      dayIdx = mapWeekdayToIndex(todayWeekday, explicit, scheduledWeekdays, days.length);
+      if (byName) dayIdx = mapWeekdayToIndex(todayWeekday, explicit, scheduledWeekdays, days.length);
     }
   } else {
     // Sem dias fixos: a rotação vale todo dia.
     scheduled = true;
-    dayIdx = rotationIndex(slotChecks, days);
   }
 
   // O próximo treino para "treinar mesmo assim": se hoje é programado, é o
   // próprio; se é descanso, é o próximo dia programado (ou o próximo slot).
   let optionalDayIdx = dayIdx;
   if (!scheduled) {
-    if (scheduledWeekdays.length > 0) {
+    if (byName && scheduledWeekdays.length > 0) {
       let best: { weekday: Weekday; delta: number } | null = null;
       for (const w of scheduledWeekdays) {
         const idx = WEEKDAYS.indexOf(w);
@@ -210,7 +216,9 @@ export function resolveTrainingDay(input: TrainingDayInput): TrainingDayState {
   // Pendência: o dia programado mais recente (até 6 dias atrás) sem nenhum
   // log. Só existe quando a programação é fixa; rotação não tem "faltou".
   let missed: MissedTraining | null = null;
-  if (fixed && scheduledWeekdays.length > 0) {
+  // Pendência só faz sentido com dia escrito no nome; na rotação o treino
+  // não feito simplesmente continua sendo o próximo.
+  if (fixed && byName && scheduledWeekdays.length > 0) {
     // Só a semana corrente conta. Na terça, a sexta anterior é de outra
     // semana e não pode aparecer como "faltou".
     const daysSinceMonday = (todayIdx + 6) % 7;

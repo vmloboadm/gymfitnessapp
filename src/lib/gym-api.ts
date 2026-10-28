@@ -833,30 +833,47 @@ export type RankRow = {
 };
 
 /**
- * Perfis que nunca podem ficar no pódio (top 3) e aparecem com a pontuação
- * exibida zerada. Os pontos reais continuam no banco; só a exibição é
- * zerada, pra não criar ranking falso enquanto o criador testa o app.
- * Remova o id para liberar a posição e os pontos normais.
+ * Trava do ranking: perfis que treinam todo dia para testar o app (o criador)
+ * não sobem além da posição travada. Na lista eles aparecem em 5º (4º se
+ * houver pouca gente) com uma pontuação entre o vizinho de cima e o de baixo.
+ * Os pontos reais continuam no banco e aparecem normalmente para o próprio
+ * aluno (home, liga, perfil). Remova o id para liberar.
  */
 export const PINNED_BELOW_PODIUM: string[] = [
   "25543c88-032b-4198-bd10-9d8e5d23885c", // Vinícius Lobo (criador)
 ];
 
+/** Posição máxima (base 0) de quem está travado: 4 = 5º lugar. */
+const PIN_INDEX = 4;
+
 /**
- * Garante que perfis em PINNED_BELOW_PODIUM fiquem fora do top 3.
- * Se algum deles cair nas 3 primeiras posições, move para a 4ª.
- * `idOf` extrai o id de cada linha (shapes diferentes entre telas).
- * Use depois de zerar os pontos e ordenar.
+ * Aplica a trava numa lista JÁ ORDENADA pelos pontos reais. Quem estiver
+ * acima da posição travada desce para ela, com pontos condizentes. Quem já
+ * está abaixo fica onde está, com os pontos reais (nunca infla ninguém).
  */
-export function pinBelowPodium<T>(rows: T[], idOf: (row: T) => string): T[] {
+export function pinBelowPodium<T extends { points: number }>(rows: T[], idOf: (row: T) => string): T[] {
+  let out = [...rows];
   for (const id of PINNED_BELOW_PODIUM) {
-    const idx = rows.findIndex((r) => idOf(r) === id);
-    if (idx >= 0 && idx < 3) {
-      const [row] = rows.splice(idx, 1);
-      rows.splice(3, 0, row);
+    const idx = out.findIndex((r) => idOf(r) === id);
+    if (idx < 0) continue;
+    const others = out.filter((_, i) => i !== idx);
+    // pouca gente: fica logo abaixo do pódio (ou no fim, se nem isso)
+    const target = Math.min(others.length >= PIN_INDEX + 1 ? PIN_INDEX : 3, others.length);
+    if (idx <= target && idx < others.length && target > 0) {
+      const row = out[idx];
+      const above = others[target - 1]?.points ?? row.points;
+      const below = others[target]?.points;
+      let pts: number;
+      if (below === undefined) pts = Math.max(0, above - Math.max(1, Math.round(above * 0.08)));
+      else if (above - below <= 1) pts = below;
+      else pts = below + Math.floor((above - below) / 2);
+      pts = Math.min(pts, row.points);
+      if (idx === target && pts === row.points) continue;
+      others.splice(target, 0, { ...row, points: pts });
+      out = others;
     }
   }
-  return rows;
+  return out;
 }
 
 export async function getRankingRows(gymId: string, students: PersonalStudent[]): Promise<RankRow[]> {

@@ -48,7 +48,7 @@ test("terça com o treino de segunda feito não tem pendência", () => {
   assert.equal(r.missed, null);
 });
 
-test("plano sem nome de dia usa daysSelected na ordem", () => {
+test("plano sem nome de dia segue a rotação nos dias marcados", () => {
   const generic = {
     plan: {
       daysSelected: ["Seg", "Qua", "Sex"],
@@ -59,10 +59,41 @@ test("plano sem nome de dia usa daysSelected na ordem", () => {
       ],
     },
   };
-  const r = resolveTrainingDay({ plan: generic, today: new Date("2026-10-28T12:00:00-03:00"), logs: [] });
-  assert.equal(r.status, "scheduled");
+  // nada feito ainda: começa pelo A, não pelo "B de quarta"
+  const r0 = resolveTrainingDay({ plan: generic, today: new Date("2026-10-28T12:00:00-03:00"), logs: [] });
+  assert.equal(r0.status, "scheduled");
+  assert.equal(r0.slot, "A");
+  // fez A na segunda: quarta é B
+  const r = resolveTrainingDay({
+    plan: generic,
+    today: new Date("2026-10-28T12:00:00-03:00"),
+    logs: [],
+    slotChecks: [{ slot: "A", checked_at: "2026-10-26T12:00:00-03:00" }],
+  });
   assert.equal(r.dayIdx, 1);
   assert.equal(r.slot, "B");
+  assert.equal(r.missed, null);
+});
+
+test("dia de descanso sugere o próximo da rotação", () => {
+  const generic = {
+    plan: {
+      daysSelected: ["Seg", "Qua", "Sex"],
+      dias: [
+        { nome: "Treino A", foco: "A", slot: "A", exercicios: [] },
+        { nome: "Treino B", foco: "B", slot: "B", exercicios: [] },
+        { nome: "Treino C", foco: "C", slot: "C", exercicios: [] },
+      ],
+    },
+  };
+  const r = resolveTrainingDay({
+    plan: generic,
+    today: new Date("2026-10-27T12:00:00-03:00"),
+    logs: [],
+    slotChecks: [{ slot: "B", checked_at: "2026-10-26T12:00:00-03:00" }],
+  });
+  assert.equal(r.status, "rest");
+  assert.equal(r.optionalSlot, "C");
 });
 
 test("sem dias fixos a rotação continua no próximo slot", () => {
@@ -101,6 +132,7 @@ test("available_days é fallback quando o plano não tem daysSelected", () => {
     today: new Date("2026-10-28T12:00:00-03:00"),
     logs: [],
     fallbackDays: ["Seg", "Qua"],
+    slotChecks: [{ slot: "A", checked_at: "2026-10-26T12:00:00-03:00" }],
   });
   assert.equal(r.status, "scheduled");
   assert.equal(r.dayIdx, 1);

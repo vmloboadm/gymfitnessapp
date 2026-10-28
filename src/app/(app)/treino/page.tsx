@@ -9,9 +9,6 @@ import {
   CalendarDays,
   ChevronRight,
   ChevronDown,
-  ThumbsUp,
-  Meh,
-  Frown,
   Play,
   CheckCircle2,
   Lock,
@@ -91,6 +88,47 @@ import type {
   WorkoutPrograms,
 } from "~/lib/types/models";
 
+type LastPerf = { weight: number | null; reps: number | null; date: string };
+
+/** Última carga/reps registrada de cada exercício (até 120 dias). */
+async function loadLastPerformance(studentId: string, exerciseIds: string[]): Promise<Record<string, LastPerf>> {
+  const ids = [...new Set(exerciseIds)].filter(Boolean);
+  if (ids.length === 0) return {};
+  try {
+    const { data } = await supabaseBrowser()
+      .from("workout_logs")
+      .select("exercise_id, weight_kg, reps, date")
+      .eq("student_id", studentId)
+      .in("exercise_id", ids)
+      .gte("date", localDayStartDaysAgoISO(120))
+      .order("date", { ascending: false })
+      .limit(300);
+    const out: Record<string, LastPerf> = {};
+    for (const r of (data ?? []) as Array<{ exercise_id: string; weight_kg: number | null; reps: number | null; date: string }>) {
+      const prev = out[r.exercise_id];
+      // a linha mais recente manda; se ela veio sem carga, usa a última com carga
+      if (!prev) out[r.exercise_id] = { weight: r.weight_kg || null, reps: r.reps || null, date: r.date };
+      else if (!prev.weight && r.weight_kg) out[r.exercise_id] = { ...prev, weight: r.weight_kg };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** Melhor série feita: maior carga (empate: mais reps). Vira a linha do log. */
+function bestDoneSet(sets: Array<{ reps?: string; weight?: string; done?: boolean }>): { reps: number; weight: number } | null {
+  let best: { reps: number; weight: number } | null = null;
+  for (const st of sets) {
+    if (!st?.done) continue;
+    const reps = Math.min(999, parseInt(String(st.reps ?? "").match(/\d+/)?.[0] ?? "0", 10) || 0);
+    const w = parseFloat((String(st.weight ?? "").match(/\d+(?:[.,]\d+)?/)?.[0] ?? "0").replace(",", "."));
+    const weight = Number.isFinite(w) ? Math.round(w * 10) / 10 : 0;
+    if (!best || weight > best.weight || (weight === best.weight && reps > best.reps)) best = { reps, weight };
+  }
+  return best;
+}
+
 type TreinoDay = WorkoutExercises & { exercise: Exercises | null };
 
 type TreinoData = {
@@ -158,7 +196,6 @@ const DEFAULT_DEMO_EX: Array<{ id: string; name: string; sets: number; reps: str
 export default function TreinoHomePage() {
   const { user, profile, loading: authLoading } = useAuth();
   const demo = isDemoMode();
-  const [feeling, setFeeling] = useState<string | null>(null);
   const [summarySeconds, setSummarySeconds] = useState<number | null>(null);
   const [_rpe, _setRpe] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "active" | "done">("idle");
@@ -468,7 +505,8 @@ export default function TreinoHomePage() {
     }
     if (!raw) return;
     let saved: {
-      exercises?: Array<{ id?: string; name?: string }>;
+      exercises?: Array<{ id?: string; name?: string; exerciseId?: string | null }>;
+      sessionStartedAt?: number | null;
       progress?: Record<string, { sets?: Array<{ reps?: string; weight?: string; done?: boolean }> }>;
       savedAt?: number;
     } | null = null;
@@ -488,31 +526,26 @@ export default function TreinoHomePage() {
     }
     void (async () => {
       let queued = 0;
+      // mesmo id do salvamento por exercício: o que já entrou não duplica
+      const key = `${user.id}:${saved?.sessionStartedAt ?? todayKey}`;
       for (const id of ids) {
         const ex = (saved?.exercises ?? []).find((x) => x.id === id);
         if (!ex?.name) continue;
-        const exerciseId = detailsExerciseId(ex.name);
+        const exerciseId = ex.exerciseId ?? planExerciseMap[id]?.exerciseId ?? detailsExerciseId(ex.name);
         if (!exerciseId) continue;
-        const doneSets = (progress[id]?.sets ?? []).filter((s) => s?.done);
-        const last = doneSets[doneSets.length - 1];
-        const reps = String(last?.reps ?? "").match(/\d+/)?.[0] ?? "0";
-        const weight = String(last?.weight ?? "").match(/\d+(?:[.,]\d+)?/)?.[0]?.replace(",", ".") ?? "0";
+        const best = bestDoneSet(progress[id]?.sets ?? []);
+        if (!best) continue;
+        const workoutId = planExerciseMap[id]?.workoutId || planActive[0]?.id || null;
         const row = {
-          id: await stableWorkoutLogId([
-            user.id,
-            exerciseId,
-            planActive[0]?.id ?? "",
-            String(saved?.savedAt ?? ""),
-            todayKey,
-          ]),
+          id: await logIdFor(key, exerciseId, String(workoutId ?? "")),
           gym_id: profile.gym_id,
           student_id: user.id,
-          workout_id: planActive[0]?.id ?? null,
+          workout_id: workoutId,
           workout_session_id: null,
           exercise_id: exerciseId,
           date: new Date(saved?.savedAt ?? Date.now()).toISOString(),
-          weight_kg: Math.round(parseFloat(weight) * 10) / 10 || 0,
-          reps: Math.min(999, parseInt(reps, 10) || 0),
+          weight_kg: best.weight,
+          reps: best.reps,
           rpe: null,
         };
         if (enqueueOffline("workout_logs", row)) queued++;
@@ -535,6 +568,54 @@ export default function TreinoHomePage() {
     return () => { alive = false; };
   }, [demo, daySession, user?.id]);
 
+  // Chave estável da sessão (início local do treino): a mesma no salvamento
+  // por exercício e no final, inclusive depois de recarregar a página.
+  const sessionKey = () => `${user?.id ?? "anon"}:${daySession?.startedAt ?? todayKey}`;
+  const logIdFor = (key: string, exerciseId: string, workoutId: string) =>
+    stableWorkoutLogId([key, user?.id ?? "", exerciseId, workoutId, todayKey]);
+
+  // Salva o exercício NA HORA em que o aluno fecha as séries dele. Antes tudo
+  // esperava o "Finalizar": fechou o app, acabou a bateria ou o finalizar
+  // falhou, e o treino inteiro sumia do histórico.
+  const savedExRef = useRef<Set<string>>(new Set());
+  const persistExercise = async (
+    ex: { id: string; name: string; reps?: string; exerciseId?: string | null },
+    sets: Array<{ reps?: string; weight?: string; done?: boolean }>
+  ) => {
+    if (demo || !user?.id || !profile?.gym_id) return;
+    const best = bestDoneSet(sets);
+    if (!best) return;
+    const m = planExerciseMap[ex.id];
+    const exerciseId = ex.exerciseId ?? m?.exerciseId ?? detailsExerciseId(ex.name);
+    if (!exerciseId) return;
+    const key = sessionKey();
+    const workoutId = m?.workoutId || null;
+    const id = await logIdFor(key, exerciseId, String(workoutId ?? ""));
+    if (savedExRef.current.has(id)) return;
+    const row = {
+      id,
+      gym_id: profile.gym_id,
+      student_id: user.id,
+      workout_id: workoutId,
+      workout_session_id: activeSessionIdRef.current,
+      exercise_id: exerciseId,
+      date: new Date().toISOString(),
+      weight_kg: best.weight,
+      reps: best.reps || Math.min(999, parseInt(String(ex.reps ?? "").match(/\d+/)?.[0] ?? "0", 10) || 0),
+      rpe: m?.rpe ?? null,
+    };
+    savedExRef.current.add(id);
+    if (isOffline()) {
+      enqueueOffline("workout_logs", row);
+      return;
+    }
+    const { error } = await supabaseBrowser().from("workout_logs").insert(row as never);
+    if (error && error.code !== "23505") {
+      savedExRef.current.delete(id);
+      enqueueOffline("workout_logs", row);
+    }
+  };
+
   const concludingRef = useRef(false);
 
   const conclude = async (
@@ -547,10 +628,6 @@ export default function TreinoHomePage() {
     const parseReps = (r: string): number => {
       const m = String(r ?? "").match(/\d+/);
       return m ? Math.min(999, parseInt(m[0], 10)) : 0;
-    };
-    const parseWeight = (w?: string): number | null => {
-      const m = String(w ?? "").match(/\d+(?:[.,]\d+)?/);
-      return m ? Math.round(parseFloat(m[0].replace(",", ".")) * 10) / 10 : null;
     };
     // ids: parâmetro → ref ao vivo → progresso persistido (fallback triplo)
     let ids = completedIds?.length ? completedIds : [...completedRef.current];
@@ -597,6 +674,7 @@ export default function TreinoHomePage() {
     setSummarySeconds(daySession ? elapsedSeconds(daySession.startedAt, Date.now()) : 0);
     setFinishedSessionId(activeSessionIdRef.current);
     const sessSnapshot = session;
+    const sessionKeySnapshot = sessionKey();
     const slotSnapshot = activeSlot;
     const planSnapshot = planActive[0] ?? null;
     const profileSnapshot = profile;
@@ -699,16 +777,15 @@ export default function TreinoHomePage() {
             const rows = loggedIds.flatMap((id) => {
               const m = planExerciseMap?.[id];
               const s = sessList.find((x) => x.id === id);
-              const exerciseId = m?.exerciseId ?? detailIds[id] ?? (s ? findId(s.name) : null);
+              const exerciseId = (s as { exerciseId?: string | null } | undefined)?.exerciseId ?? m?.exerciseId ?? detailIds[id] ?? (s ? findId(s.name) : null);
               if (!exerciseId) return [];
-              const doneSets = (progMap[id]?.sets ?? []).filter((x) => x?.done);
-              const lastSet = doneSets[doneSets.length - 1];
-              const realReps = lastSet?.reps != null && String(lastSet.reps).trim() !== ""
-                ? parseReps(String(lastSet.reps))
+              const best = bestDoneSet(progMap[id]?.sets ?? []);
+              const realReps = best && best.reps > 0
+                ? best.reps
                 : m?.reps
                   ? parseReps(m.reps)
                   : parseReps(s?.reps ?? "0");
-              const realWeight = lastSet?.weight != null ? parseWeight(String(lastSet.weight)) : null;
+              const realWeight = best ? best.weight : null;
               return [{
                 gym_id: profileSnapshot.gym_id,
                 student_id: user.id,
@@ -723,14 +800,9 @@ export default function TreinoHomePage() {
             });
             logRows = await Promise.all(rows.map(async (row) => ({
               ...row,
-              id: await stableWorkoutLogId([
-                sessionId ?? `${user.id}:${todayKey}`,
-                user.id,
-                String(row.exercise_id ?? ""),
-                String(row.workout_id ?? ""),
-                String(savedAt),
-                todayKey,
-              ]),
+              // mesmo id do salvamento por exercício durante o treino:
+              // o que já entrou vira conflito (23505) e não duplica
+              id: await logIdFor(sessionKeySnapshot, String(row.exercise_id ?? ""), String(row.workout_id ?? "")),
             })));
             const programId = planSnapshot?.programId;
             slotRow = slotSnapshot && programId
@@ -816,6 +888,10 @@ export default function TreinoHomePage() {
             }
           }
         }
+
+        // Persistiu (no banco ou na fila do aparelho): limpa o rascunho local
+        // para a recuperação não reenviar o mesmo treino.
+        if (inserted > 0 || queuedOffline > 0) clearSessionProgress();
 
         const failedToPersist =
           !!profileSnapshot && loggedIds.length > 0 && inserted === 0 && queuedOffline === 0;
@@ -1134,7 +1210,7 @@ export default function TreinoHomePage() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
         >
-          <WorkoutInProgress exercises={activeExercises} onFinish={(ids, prog) => { void conclude(ids, prog); }} onProgressChange={(ids) => { completedRef.current = ids; }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
+          <WorkoutInProgress exercises={activeExercises} onExerciseDone={(ex, sets) => { void persistExercise(ex, sets); }} onFinish={(ids, prog) => { void conclude(ids, prog); }} onProgressChange={(ids) => { completedRef.current = ids; }} onMinimize={() => { toast.success("Treino rodando! Continue por onde quiser"); router.push("/"); }} />
         </m.div>
       </AnimatePresence>
     );
@@ -1180,47 +1256,30 @@ export default function TreinoHomePage() {
     );
   }
 
-  // Idle: se já concluiu hoje (dado real), mostra resumo em vez de "Iniciar".
-  if (finishedToday) {
-    return (
-      <>
-        <TopBar title="Treino" subtitle={cap(weekdayName())} />
-        <div className="space-y-6 p-4">
-          <div className="rounded-2xl border border-success/35 bg-gradient-to-b from-success/12 to-card p-5">
-            <p className="gf-section flex items-center gap-1.5 text-success">
-              <CheckCircle2 className="h-4 w-4" /> Concluído hoje
-            </p>
-            <h2 className="mt-2 font-display text-lg font-bold text-foreground">
-              {todayLogs} de {totalToday} exercícios
-            </h2>
-            <p className="mt-1 gf-card-text">
-              {todayLogs >= totalToday
-                ? "Tudo feito! A recuperação também faz parte do plano."
-                : "Sessão encerrada. Faça um novo check-in se quiser completar o restante."}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link
-                href="/progresso"
-                className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-bold text-brand-foreground shadow-lg shadow-brand/25"
-              >
-                Ver resumo do treino <ChevronRight className="h-4 w-4" />
-              </Link>
-              {todayLogs < totalToday ? (
-                // o texto pede um novo check-in para completar: dá o atalho
-                <Link
-                  href="/checkin"
-                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-card/60 px-5 py-3 text-sm font-bold text-foreground"
-                >
-                  Completar o restante
-                </Link>
-              ) : null}
-            </div>
-          </div>
-        </div>
-        <AiCoach />
-      </>
-    );
-  }
+  // Já treinou hoje: mostra o feito no topo, mas NÃO trava a tela. Quem
+  // treina todo dia (ou duas vezes) segue para o próximo da rotação.
+  const allTodayLogs = (data?.logs ?? []).filter((l) => dayOf(l.date) === todayKey).length;
+  const doneTodayCard = finishedToday ? (
+    <div className="rounded-2xl border border-success/35 bg-gradient-to-b from-success/12 to-card p-4">
+      <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-success">
+        <CheckCircle2 className="h-4 w-4" /> Treino de hoje concluído
+      </p>
+      <p className="mt-1 text-[13px] font-bold text-foreground">
+        {allTodayLogs > 0
+          ? `${allTodayLogs} ${allTodayLogs === 1 ? "exercício registrado" : "exercícios registrados"} hoje.`
+          : "Sessão de hoje encerrada."}
+      </p>
+      <p className="mt-0.5 text-[12px] text-muted-foreground">
+        Quer treinar mais? O próximo da sua divisão está logo abaixo.
+      </p>
+      <Link
+        href="/progresso"
+        className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-bold text-success"
+      >
+        Ver minha evolução <ChevronRight className="h-3.5 w-3.5" />
+      </Link>
+    </div>
+  ) : null;
 
   // PLANO DO PERSONAL: o dia de hoje vem do mesmo resolvedor da Home.
   // Dia não programado é descanso; a rotação só vale sem dias fixos.
@@ -1249,14 +1308,28 @@ export default function TreinoHomePage() {
       exercicios: Array<{ exercicio: string; series: number; reps: string; descanso: string; rpe?: number | null; dica?: string | null }>;
     }>;
   };
+  // Check-in automático: o aluno toca em "Iniciar treino" e pronto. Abre a
+  // presença e a sessão no banco (o personal vê "na academia agora") e o
+  // início do treino adota essa sessão logo abaixo.
+  async function ensureCheckin(): Promise<boolean> {
+    if (demo || daySession || dayUnlockedLocal || data?.activeSessionToday) return true;
+    if (!TRAINING_GATE_OPEN) {
+      setUnlockOpen(true);
+      return false;
+    }
+    if (!isOffline()) {
+      const started = await startCheckin("app").catch(() => null);
+      if (started) activeSessionIdRef.current = started.session_id;
+    }
+    markDayUnlocked("app");
+    setDayUnlockedLocal(true);
+    return true;
+  }
   async function startTemplateSession(tpl: TemplateInput, opts?: { force?: boolean }) {
     const day = tpl.days?.[0];
     if (!day || day.exercicios.length === 0) return;
-    // Gate de INÍCIO: precisa de check-in aberto ou sessão local viva.
-    if (!demo && !daySession && !dayUnlockedLocal && !data?.activeSessionToday) {
-      setUnlockOpen(true);
-      return;
-    }
+    // Sem check-in aberto: na fase de testes o próprio início faz o check-in.
+    if (!(await ensureCheckin())) return;
     // Sessão aberta no check-in é adotada; outra ficha ativa pede retomada.
     let adoptedSession = false;
     if (!demo && !opts?.force && user?.id && !isOffline()) {
@@ -1354,11 +1427,8 @@ export default function TreinoHomePage() {
   const startPlanSession = async (dayIdx?: number, opts?: { force?: boolean }) => {
     if (!plan?.plan?.dias || plan.plan.dias.length === 0) return;
     const idx = dayIdx ?? suggestedIdx;
-    // Gate de INÍCIO: precisa de check-in aberto ou sessão local viva.
-    if (!demo && !daySession && !dayUnlockedLocal && !data?.activeSessionToday) {
-      setUnlockOpen(true);
-      return;
-    }
+    // Sem check-in aberto: na fase de testes o próprio início faz o check-in.
+    if (!(await ensureCheckin())) return;
     const day = plan.plan.dias[idx % plan.plan.dias.length];
     const plannedSlot = diaSlot(day, idx % plan.plan.dias.length);
 
@@ -1394,12 +1464,21 @@ export default function TreinoHomePage() {
     try {
       localStorage.setItem("gymfit_session_slot_v1", JSON.stringify({ slot: diaSlot(day, idx % plan.plan.dias.length), at: Date.now() }));
     } catch { /* ok */ }
+    // Carga/reps da última vez de cada exercício: o aluno não digita do zero.
+    const planIds = day.exercicios
+      .map((e) => (e as { exerciseId?: string | null }).exerciseId)
+      .filter((x): x is string => !!x);
+    const lastById = demo || isOffline() || !user?.id ? {} : await loadLastPerformance(user.id, planIds);
     // Fotos/vídeos da BIBLIOTECA (mesma fonte do catálogo) por nome; curado como fallback
     const exList = day.exercicios.map((e, i) => {
       const lib = libraryMatch(e.exercicio);
       const cur = lib ? null : findInDatabase(e.exercicio);
+      const exId = (e as { exerciseId?: string | null }).exerciseId ?? detailsExerciseId(e.exercicio);
       return {
         id: `plan-${i}`,
+        exerciseId: exId,
+        last: exId ? lastById[exId] ?? null : null,
+        tecnica: (e as { tecnica?: string }).tecnica ?? "normal",
         name: e.exercicio,
         sets: e.series,
         reps: e.reps,
@@ -1421,7 +1500,8 @@ export default function TreinoHomePage() {
     const map: Record<string, { workoutId: string; exerciseId: string; reps: string; rpe: number | null }> = {};
     const pendingIdx: number[] = [];
     day.exercicios.forEach((e, i) => {
-      const fromDetails = detailsExerciseId(e.exercicio);
+      // o plano já traz o id do exercício; nome só como último recurso
+      const fromDetails = (e as { exerciseId?: string | null }).exerciseId ?? detailsExerciseId(e.exercicio);
       if (fromDetails) {
         map[`plan-${i}`] = {
           workoutId: plan.id,
@@ -1508,43 +1588,8 @@ export default function TreinoHomePage() {
         </div>
       ) : null}
       <div className="space-y-8 p-4">
-        {/* 1. STATUS ATUAL, linha compacta sem card pesado */}
-        <div className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 backdrop-blur">
-          <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">Como está?</span>
-          <div className="flex flex-1 justify-end gap-1.5">
-            {[
-              { key: "leve", label: "Leve", icon: Frown, tone: "text-sky-400" },
-              { key: "ok", label: "No ritmo", icon: Meh, tone: "text-warning" },
-              { key: "pronto", label: "Na energia", icon: ThumbsUp, tone: "text-success" },
-            ].map((opt) => {
-              const Icon = opt.icon;
-              const active = feeling === opt.key;
-              return (
-                <button
-                  key={opt.key}
-                  onClick={() => {
-                    setFeeling(opt.key);
-                    try { localStorage.setItem("gf-preworkout-mood", JSON.stringify({ mood: opt.key, at: new Date().toISOString() })); } catch { /* ok */ }
-                    toast.success(`Anotado: ${opt.label}`, { description: "Só o clima de hoje. O feedback do treino vem no final." });
-                  }}
-                  className={cn(
-                    "tactile flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors",
-                    active ? "border-brand bg-brand-soft text-brand" : "border-transparent text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className={cn("h-4 w-4", opt.tone)} />
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-          {feeling ? (
-            <p className="-mt-3 pl-3 text-[10px] text-brand">Anotado! O Assistente de Treino ajusta amanhã.</p>
-          ) : null}
-        </div>
+        {doneTodayCard}
 
-        {/* 1.5 TREINOS ENVIADOS PELO PERSONAL */}
-        <PersonalWorkouts />
 
         {/* CONTINUAR: treino em andamento (saiu da tela no meio) */}
         {phase === "idle" && (!!daySession || hasSavedProgress) ? (
@@ -1848,6 +1893,9 @@ export default function TreinoHomePage() {
           )}
         </div>
         )}
+        {/* TREINOS ENVIADOS PELO PERSONAL (depois da ação principal) */}
+        <PersonalWorkouts />
+
         {/* 3. BIBLIOTECA POR MÚSCULO, mapa navy/laranja com escala de recuperação */}
         <BodyMap
           counts={BODY_COUNTS}
@@ -1857,59 +1905,6 @@ export default function TreinoHomePage() {
           activeCat={libCat ?? ""}
           lastTrained={tw.lastTrained}
         />
-
-        {/* 4. PLANOS DISPONÍVEIS, preview bloqueado, liberação pelo personal */}
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground">Planos disponíveis</h2>
-            <span className="text-[10px] font-semibold text-muted-foreground">liberação pelo personal</span>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              {
-                name: "Full Body Iniciante", focus: "Corpo inteiro", weeks: "4 semanas", level: "Iniciante",
-                ghost: ["Supino Reto", "Puxada Alta", "Leg Press 45°", "Prancha"],
-              },
-              {
-                name: "Push · Pull · Legs", focus: "Divisão 3 dias", weeks: "8 semanas", level: "Intermediário",
-                ghost: ["Supino Inclinado", "Remada Curvada", "Agachamento Livre", "Elevação Lateral"],
-              },
-              {
-                name: "Força Máxima", focus: "Baixas reps · cargas altas", weeks: "6 semanas", level: "Avançado",
-                ghost: ["Agachamento Livre", "Supino Reto", "Levantamento Terra", "Desenvolvimento"],
-              },
-              {
-                name: "Hipertrofia Express", focus: "Volume alto · 40min", weeks: "5 semanas", level: "Intermediário",
-                ghost: ["Rosca Direta", "Tríceps Corda", "Crucifixo Máquina", "Cadeira Extensora"],
-              },
-            ].map((p) => (
-              <div key={p.name} className="relative overflow-hidden rounded-[16px] border border-border bg-card/40 p-3.5 select-none" aria-disabled="true">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10">
-                    <Lock className="h-3.5 w-3.5 text-brand" />
-                  </span>
-                  <span className="rounded-full bg-card px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{p.level}</span>
-                </div>
-                <p className="mt-2 truncate text-[13px] font-bold text-foreground">{p.name}</p>
-                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{p.focus} · {p.weeks}</p>
-
-                {/* lista fantasma, dá vontade de desbloquear */}
-                <ul className="mt-2.5 space-y-1 select-none" aria-hidden>
-                  {p.ghost.map((g) => (
-                    <li key={g} className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 blur-[1.5px]">
-                      <span className="h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50" />
-                      {g}
-                    </li>
-                  ))}
-                </ul>
-
-                <p className="mt-2.5 flex items-center gap-1 rounded-lg bg-brand/10 py-1.5 text-center justify-center text-[10px] font-semibold text-brand">
-                  <Lock className="h-2.5 w-2.5" /> Solicite ao seu Personal
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* CARDIO: registro rápido de tempo + intensidade (trilha própria) */}
         <CardioQuickAdd />

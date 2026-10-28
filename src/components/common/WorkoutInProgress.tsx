@@ -28,6 +28,10 @@ export type WExercise = {
   thumbUrl?: string | null;
   videoUrlMale?: string | null;
   videoUrlFemale?: string | null;
+  /** id real do exercício (exercises.id) para gravar o log */
+  exerciseId?: string | null;
+  /** o que o aluno fez da última vez neste exercício */
+  last?: { weight: number | null; reps: number | null; date: string } | null;
 };
 
 type SetRecord = { reps: string; weight: string; done: boolean };
@@ -51,9 +55,12 @@ export default function WorkoutInProgress({
   onFinish,
   onMinimize,
   onProgressChange,
+  onExerciseDone,
 }: {
   exercises: WExercise[];
   onFinish: (completedIds: string[], progress: Record<string, ExerciseProgress>) => void;
+  /** chamado quando o aluno fecha (ou deixa com séries feitas) um exercício */
+  onExerciseDone?: (exercise: WExercise, sets: SetRecord[]) => void;
   onMinimize?: () => void;
   onProgressChange?: (completedIds: string[]) => void;
 }) {
@@ -107,7 +114,12 @@ export default function WorkoutInProgress({
       const next: Record<string, ExerciseProgress> = {};
       for (const ex of exercises) {
         next[ex.id] = {
-          sets: Array.from({ length: ex.sets }, () => ({ reps: String(ex.reps), weight: "", done: false })),
+          // carga da última vez já vem preenchida: o aluno só confirma ou ajusta
+          sets: Array.from({ length: ex.sets }, () => ({
+            reps: String(ex.reps).match(/\d+/)?.[0] ?? String(ex.reps),
+            weight: ex.last?.weight ? String(ex.last.weight).replace(".", ",") : "",
+            done: false,
+          })),
         };
       }
       return next;
@@ -144,6 +156,25 @@ export default function WorkoutInProgress({
     onProgressChange?.(completedIds);
   }, [completedIds, onProgressChange]);
 
+  // Salva cada exercício assim que todas as séries dele são marcadas.
+  const reportedRef = useRef<Set<string>>(new Set());
+  const reportDone = useCallback(
+    (ex: WExercise | undefined) => {
+      if (!ex || !onExerciseDone) return;
+      const sets = progressRef.current[ex.id]?.sets ?? [];
+      if (!sets.some((st) => st.done)) return;
+      onExerciseDone(ex, sets);
+    },
+    [onExerciseDone]
+  );
+  useEffect(() => {
+    for (const id of completedIds) {
+      if (reportedRef.current.has(id)) continue;
+      reportedRef.current.add(id);
+      reportDone(exercises.find((e) => e.id === id));
+    }
+  }, [completedIds, exercises, reportDone]);
+
   const startRest = useCallback((seconds: number) => {
     if (!seconds || seconds <= 0) return;
     if (restInterval.current) clearInterval(restInterval.current);
@@ -153,6 +184,11 @@ export default function WorkoutInProgress({
         if (v === null || v <= 1) {
           if (restInterval.current) clearInterval(restInterval.current);
           restIdxRef.current = -1;
+          if (v !== null) {
+            // fim do descanso: avisa mesmo com o celular no bolso
+            navigator.vibrate?.([200, 100, 200]);
+            toast("Descanso acabou. Bora pra próxima série!", { duration: 2500 });
+          }
           return null;
         }
         return v - 1;
@@ -265,6 +301,7 @@ export default function WorkoutInProgress({
       return;
     }
     if (!currentAllDone && currentProgress?.sets.some((s) => s.done)) {
+      reportDone(current);
       toast("Exercício pulado · o que marcou continua valendo");
     } else if (!currentAllDone) {
       toast("Exercício pulado");
@@ -397,6 +434,15 @@ export default function WorkoutInProgress({
                       </span>
                     ) : null}
                   </p>
+                  {current.last && (current.last.weight || current.last.reps) ? (
+                    <p className="mt-1 text-[12px] font-semibold text-brand">
+                      Última vez: {current.last.weight ? `${String(current.last.weight).replace(".", ",")} kg` : "sem carga"}
+                      {current.last.reps ? ` × ${current.last.reps}` : ""}
+                      <span className="font-medium text-muted-foreground">
+                        {" "}· {new Date(current.last.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                      </span>
+                    </p>
+                  ) : null}
                   {upNext.length > 0 ? (
                     <div className="mt-2 rounded-xl border border-brand/35 bg-brand/[0.08] px-2.5 py-2">
                       <p className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-brand">
