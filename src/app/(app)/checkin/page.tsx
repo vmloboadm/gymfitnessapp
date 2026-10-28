@@ -92,7 +92,8 @@ export default function CheckinPage() {
   const [closedVisit, setClosedVisit] = useState<{ entrada: string; saida: string } | null>(null);
   const sessionMetrics = useMemo(() => {
     const logs = demo ? (getTodayWorkout().logs as Array<{ date: string }>) : (weekLogs ?? []);
-    const weekAgo = localDayKeyDaysAgo(7);
+    // Semana de calendário (segunda a domingo), igual à home e ao Progresso.
+    const weekAgo = localDayKeyDaysAgo((new Date().getDay() + 6) % 7);
     const diasSemana = new Set(
       logs
         .map((l) => localDayKey(l.date))

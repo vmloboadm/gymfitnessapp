@@ -881,11 +881,24 @@ export default function TreinoHomePage() {
                 // Insere linha a linha: um conflito não pode derrubar o lote
                 // inteiro (o aluno perderia todos os exercícios do dia).
                 const failedRows: Array<Record<string, unknown>> = [];
-                for (const row of logRows) {
-                  // Já salvo por exercício durante o treino: ignora em vez de dar 409.
-                  const { error: logErr } = await supabase
+                // Exercícios já salvos durante o treino (salvamento por exercício)
+                // não são gravados de novo: antes cada um dava 409 no console.
+                const savedNow = new Set<string>();
+                if (sessionId) {
+                  const { data: existing } = await supabase
                     .from("workout_logs")
-                    .upsert(row as never, { onConflict: "id", ignoreDuplicates: true });
+                    .select("exercise_id")
+                    .eq("workout_session_id", sessionId);
+                  for (const r of (existing ?? []) as Array<{ exercise_id: string | null }>) {
+                    if (r.exercise_id) savedNow.add(r.exercise_id);
+                  }
+                }
+                for (const row of logRows) {
+                  if (savedNow.has(String(row.exercise_id))) {
+                    inserted++;
+                    continue;
+                  }
+                  const { error: logErr } = await supabase.from("workout_logs").insert(row as never);
                   if (!logErr || logErr.code === "23505") inserted++;
                   else failedRows.push(row);
                 }

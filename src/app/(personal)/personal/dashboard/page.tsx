@@ -346,7 +346,7 @@ export default function PersonalDashboardPage() {
           <p className="mt-1 font-display text-xl font-black leading-none text-foreground">
             <CountUp value={approvalsPending} />
           </p>
-          <p className="mt-1 text-[9px] font-semibold text-muted-foreground">p/ aprovar</p>
+          <p className="mt-1 text-[9px] font-semibold text-muted-foreground">pedidos p/ decidir</p>
         </Link>
       </m.div>
 
