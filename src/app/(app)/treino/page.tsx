@@ -1101,6 +1101,16 @@ export default function TreinoHomePage() {
           <button
             data-testid="finalizar-treino"
             onClick={() => {
+              // um toque acidental aqui fechava o treino e marcava a saída
+              const saved = readSessionProgress()?.progress ?? {};
+              const doneSets = Object.values(saved).reduce(
+                (n, p) => n + (p.sets ?? []).filter((x) => x.done).length,
+                0
+              );
+              const msg = doneSets > 0
+                ? `Finalizar o treino agora? ${doneSets} ${doneSets === 1 ? "série feita" : "séries feitas"}.`
+                : "Finalizar o treino agora? Nenhuma série foi marcada ainda.";
+              if (!window.confirm(msg)) return;
               finishNow();
             }}
             className="tactile rounded-full bg-success px-4 py-1.5 text-[11px] font-black text-black transition-transform active:scale-95"

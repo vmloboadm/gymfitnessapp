@@ -119,6 +119,22 @@ const RESTRICAO_OPTS: RestricaoOption[] = [
 ];
 
 /** Normaliza o nível salvo no perfil para uma das opções do assistente. */
+/**
+ * Descanso em texto livre → "Ns". O banco só guarda dígitos: sem isto,
+ * "1min" virava 1 segundo e "60-90s" virava 6090 segundos.
+ */
+function normalizeRest(raw: string | null | undefined): string {
+  const s = (raw ?? "").toLowerCase().replace(",", ".").trim();
+  if (!s) return "60s";
+  const mmss = s.match(/^(\d+):(\d{1,2})$/); // 1:30
+  if (mmss) return `${Number(mmss[1]) * 60 + Number(mmss[2])}s`;
+  const minSec = s.match(/^(\d+(?:\.\d+)?)\s*(?:m|min|mins|minutos?|')\s*(\d+)?\s*(?:s|seg)?/); // 1min, 1m30, 1.5 min
+  if (minSec) return `${Math.round(Number(minSec[1]) * 60) + Number(minSec[2] ?? 0)}s`;
+  const first = s.match(/\d+(?:\.\d+)?/); // 60-90s → 60
+  if (!first) return "60s";
+  return `${Math.min(600, Math.max(0, Math.round(Number(first[0]))))}s`;
+}
+
 function normNivel(raw?: string | null): string | null {
   if (!raw) return null;
   const v = raw.toLowerCase();
@@ -953,7 +969,7 @@ function PersonalTreinosContent() {
       frequencia: `${skeleton.length}x semana`,
       nivel: ansNivel ?? target.experience_level ?? "Intermediário",
       objetivo: objetivoLabel,
-      observacao_geral: "Estrutura montada pelo esqueleto guiado. Exercícios escolhidos pelo personal.",
+      observacao_geral: "",
       daysSelected: [...daysSelected],
       splitType: split,
       modo: "esqueleto",
@@ -1092,6 +1108,11 @@ function PersonalTreinosContent() {
           description: `${target.name} recebeu a nova versão com ${plan.dias.length} ${plan.dias.length === 1 ? "dia" : "dias"} de treino.`,
         });
       } else {
+        // A divisão vem da ficha (quantidade de dias), não dos dias da semana
+        // marcados: editar um ABCDE de aluno com 3 dias não pode virar "ABC".
+        const finalSplit =
+          [plan.splitType, split].find((s) => !!s && s.length === plan.dias.length) ??
+          plan.dias.map((_, i) => dayLetter(i)).join("");
         const newProgramId = await approvePlan({
           gymId: profile.gym_id,
           trainerId: user.id,
@@ -1099,8 +1120,12 @@ function PersonalTreinosContent() {
           plan: {
             ...plan,
             daysSelected: [...daysSelected],
-            splitType: split,
-            dias: plan.dias.map((d, i) => ({ ...d, slot: split[i] ?? String(i + 1) })),
+            splitType: finalSplit,
+            dias: plan.dias.map((d, i) => ({
+              ...d,
+              slot: finalSplit[i] ?? String(i + 1),
+              exercicios: d.exercicios.map((e) => ({ ...e, descanso: normalizeRest(e.descanso) })),
+            })),
           },
           notes: notes.trim() || null,
           previousWorkoutId: editId && !editId.startsWith("aw-") ? editId : null,

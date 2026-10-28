@@ -521,6 +521,18 @@ export async function fetchGymAssignedPlans(gymId: string, opts?: PageOpts): Pro
   return Object.assign(rows, { total: countRes.count ?? offset + rows.length });
 }
 
+/**
+ * workout_exercises.notes é gravado como "<nome>. <dica>" (save_student_plan).
+ * Devolve a dica inteira, mesmo com vários pontos finais.
+ */
+function dicaFromNotes(notes: string | null | undefined, name: string): string {
+  if (!notes) return "";
+  if (notes.startsWith(`${name}. `)) return notes.slice(name.length + 2).trim();
+  if (notes === name) return "";
+  const cut = notes.indexOf(". ");
+  return cut >= 0 ? notes.slice(cut + 2).trim() : "";
+}
+
 /** Planos do aluno logado (aba Treino): demo → local; produção → banco. */
 export async function fetchMyAssignedPlans(
   userId: string,
@@ -569,19 +581,18 @@ export async function fetchMyAssignedPlans(
     .map((r) => {
       const prog = r.workout_programs!;
       const days = [...(prog.workout_days ?? [])].sort((a, b) => a.day_order - b.day_order || a.id.localeCompare(b.id));
-      let daysSelected: string[] | undefined;
-      let splitType: string | undefined;
-      let draftDias: Array<{ slot?: string }> | undefined;
+      // ai_draft guarda a ficha completa (aquecimento, finalizador, cardio,
+      // nível...). As tabelas guardam só os exercícios. Junta os dois.
+      let draft: Partial<WorkoutPlan> | null = null;
       try {
-        const draft = prog.ai_draft
-          ? (JSON.parse(prog.ai_draft) as { daysSelected?: string[]; splitType?: string; dias?: Array<{ slot?: string }> })
-          : null;
-        daysSelected = draft?.daysSelected;
-        splitType = draft?.splitType;
-        draftDias = draft?.dias;
+        draft = prog.ai_draft ? (JSON.parse(prog.ai_draft) as Partial<WorkoutPlan>) : null;
       } catch {
-        daysSelected = undefined;
+        draft = null;
       }
+      const daysSelected: string[] | undefined = draft?.daysSelected;
+      let splitType: string | undefined = draft?.splitType;
+      // só confia nos dias do rascunho se batem com os do banco
+      const draftDias = draft?.dias && draft.dias.length === days.length ? draft.dias : undefined;
       if (!splitType) {
         splitType = "ABCDEF".slice(0, Math.min(Math.max(days.length, 2), 6));
       }
@@ -598,32 +609,40 @@ export async function fetchMyAssignedPlans(
         plan: {
           nome: prog.name,
           frequencia: `${days.length}x semana`,
-          nivel: prog.objective ?? "Treino",
-          objetivo: prog.objective ?? "Treino",
-          observacao_geral: "",
+          nivel: draft?.nivel || prog.objective || "Treino",
+          objetivo: draft?.objetivo || prog.objective || "Treino",
+          observacao_geral: draft?.observacao_geral ?? "",
           daysSelected,
           splitType,
-          dias: days.map((d, di) => ({
-            nome: d.name,
-            foco: d.name,
-            slot: draftDias?.[di]?.slot ?? "ABCDEF"[di] ?? String(di + 1),
-            aquecimento: [],
-            exercicios: d.workout_exercises
-              .sort((a, b) => a.ord - b.ord)
-              .map((e) => ({
-                exerciseId: e.exercise_id,
-                variationId: e.variation_id ?? undefined,
-                exercicio: e.exercises?.name ?? e.notes?.split(".")[0] ?? "Exercício",
-                series: e.sets,
-                reps: e.reps,
-                descanso: `${e.rest_seconds}s`,
-                rpe: e.rpe ?? 7,
-                dica: e.notes?.split(".")[1]?.trim() ?? "",
-                tecnica: normalizaTecnica(e.technique),
-              })),
-            finalizador: "",
-          })),
-          cardio: "",
+          ...(draft?.modo ? { modo: draft.modo } : {}),
+          dias: days.map((d, di) => {
+            const dd = draftDias?.[di];
+            return {
+              nome: d.name,
+              foco: dd?.foco || d.name,
+              slot: dd?.slot ?? "ABCDEF"[di] ?? String(di + 1),
+              aquecimento: Array.isArray(dd?.aquecimento) ? dd.aquecimento : [],
+              ...(dd?.alvo ? { alvo: dd.alvo } : {}),
+              exercicios: [...d.workout_exercises]
+                .sort((a, b) => a.ord - b.ord)
+                .map((e) => {
+                  const name = e.exercises?.name ?? e.notes?.split(".")[0] ?? "Exercício";
+                  return {
+                    exerciseId: e.exercise_id,
+                    variationId: e.variation_id ?? undefined,
+                    exercicio: name,
+                    series: e.sets,
+                    reps: e.reps,
+                    descanso: `${e.rest_seconds}s`,
+                    rpe: e.rpe ?? 7,
+                    dica: dicaFromNotes(e.notes, name),
+                    tecnica: normalizaTecnica(e.technique),
+                  };
+                }),
+              finalizador: dd?.finalizador ?? "",
+            };
+          }),
+          cardio: draft?.cardio ?? "",
         },
         source: "ia" as const,
         created_at: r.assigned_at,
