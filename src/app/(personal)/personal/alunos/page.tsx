@@ -134,6 +134,11 @@ export default function PersonalAlunosPage() {
         : tab === "com-treino"
           ? withPlan
           : [...pending, ...awaiting, ...withPlan];
+  // Lista longa: mostra 25 por vez (busca e troca de aba voltam ao início).
+  const PAGE = 25;
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => setLimit(PAGE), [tab, query]);
+  const shown = list.slice(0, limit);
 
   /** Aprova o aluno novo e leva o personal direto para criar o treino dele. */
   const approve = async (s: PersonalStudent) => {
@@ -253,12 +258,12 @@ export default function PersonalAlunosPage() {
       ) : (
         <m.ul
           key={tab}
-          variants={{ hidden: {}, show: { transition: { staggerChildren: Math.min(0.04, 0.3 / Math.max(1, list.length)) } } }}
+          variants={{ hidden: {}, show: { transition: { staggerChildren: Math.min(0.04, 0.3 / Math.max(1, shown.length)) } } }}
           initial="hidden"
           animate="show"
           className="divide-y divide-white/[0.05] overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]"
         >
-          {list.map((s) => {
+          {shown.map((s) => {
             const isPending = !s.approved_at;
             const noPlan = !isPending && needsWorkout(s);
             const status = studentStatus(s);
@@ -325,6 +330,16 @@ export default function PersonalAlunosPage() {
               </m.li>
             );
           })}
+          {list.length > shown.length ? (
+            <li>
+              <button
+                onClick={() => setLimit((n) => n + PAGE)}
+                className="tactile w-full px-3 py-3 text-center text-[12px] font-bold text-brand"
+              >
+                Mostrar mais {Math.min(PAGE, list.length - shown.length)} de {list.length - shown.length} restantes
+              </button>
+            </li>
+          ) : null}
           {list.length === 0 ? (
             <li className="p-6 text-center text-xs text-muted-foreground">
               {query

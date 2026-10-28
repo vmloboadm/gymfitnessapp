@@ -329,7 +329,7 @@ export default function ProgressoPage() {
 
         {/* Evolução corporal (peso/bioimpedância) */}
         <div className="gf-rise gf-card gf-glass !py-4" style={{ animationDelay: "240ms" }}>
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
             <div>
               <p className="gf-section">Evolução corporal</p>
               <p className="mt-0.5 text-[12px] text-muted-foreground">Peso · gordura corporal · massa muscular</p>
@@ -351,12 +351,9 @@ export default function ProgressoPage() {
               </p>
             </>
           ) : (
-            <div className="rounded-xl border border-brand/20 bg-brand-soft/15 p-4 text-center">
-              <p className="text-[13px] font-semibold text-foreground">Bioimpedância conectada</p>
-              <p className="gf-card-text mt-1">
-                No plano Pro, sincronize a balança/bioimpedância da academia e acompanhe peso, % de gordura e massa magra aqui.
-              </p>
-            </div>
+            <p className="-mt-1 text-[12px] leading-snug text-muted-foreground">
+              No plano Pro, a balança de bioimpedância da academia mostra sua evolução aqui.
+            </p>
           )}
         </div>
 

@@ -31,6 +31,7 @@ export const metadata: Metadata = {
   description: "App de academia com check-in NFC e métrica real",
   manifest: "/app/manifest.json",
   icons: {
+    icon: "/app/favicon.ico",
     apple: "/app/icons/icon-180x180.png",
   },
   appleWebApp: {

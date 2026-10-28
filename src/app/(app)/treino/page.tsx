@@ -624,23 +624,28 @@ export default function TreinoHomePage() {
     const m = planExerciseMap[ex.id];
     const exerciseId = ex.exerciseId ?? m?.exerciseId ?? detailsExerciseId(ex.name);
     if (!exerciseId) return;
-    const key = sessionKey();
     const workoutId = m?.workoutId || null;
-    const id = await logIdFor(key, exerciseId, String(workoutId ?? ""));
-    if (savedExRef.current.has(id)) return;
+    const sessionId = activeSessionIdRef.current;
+    // Com sessão aberta, o id segue o índice único (sessão + exercício): assim
+    // um segundo salvamento do mesmo exercício cai no "ignorar" e não dá 409.
+    const id = sessionId
+      ? await stableWorkoutLogId(["session", sessionId, exerciseId])
+      : await logIdFor(sessionKey(), exerciseId, String(workoutId ?? ""));
+    const dedupeKey = sessionId ? `${sessionId}:${exerciseId}` : id;
+    if (savedExRef.current.has(dedupeKey)) return;
     const row = {
       id,
       gym_id: profile.gym_id,
       student_id: user.id,
       workout_id: workoutId,
-      workout_session_id: activeSessionIdRef.current,
+      workout_session_id: sessionId,
       exercise_id: exerciseId,
       date: new Date().toISOString(),
       weight_kg: best.weight,
       reps: best.reps || Math.min(999, parseInt(String(ex.reps ?? "").match(/\d+/)?.[0] ?? "0", 10) || 0),
       rpe: m?.rpe ?? null,
     };
-    savedExRef.current.add(id);
+    savedExRef.current.add(dedupeKey);
     if (isOffline()) {
       enqueueOffline("workout_logs", row);
       return;
@@ -650,7 +655,7 @@ export default function TreinoHomePage() {
       .from("workout_logs")
       .upsert(row as never, { onConflict: "id", ignoreDuplicates: true });
     if (error && error.code !== "23505") {
-      savedExRef.current.delete(id);
+      savedExRef.current.delete(dedupeKey);
       enqueueOffline("workout_logs", row);
     }
   };

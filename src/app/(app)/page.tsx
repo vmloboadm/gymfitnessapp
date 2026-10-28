@@ -203,7 +203,7 @@ export default function HomePage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [showTopBtn, setShowTopBtn] = useState(false);
   useEffect(() => {
-    const onScroll = () => setShowTopBtn(window.scrollY > 600);
+    const onScroll = () => setShowTopBtn(window.scrollY > 1200);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -661,7 +661,7 @@ export default function HomePage() {
   }
 
   return (
-      <div className="relative mx-auto max-w-md pb-32 pt-8">
+      <div className="relative mx-auto max-w-md pb-48 pt-8">
         {/* ORBS DE AMBIENTE: luz difusa atrás do cockpit/hero — dá profundidade premium sem poluir.
             z negativo: pai é relative sem z-index (não cria stacking context), então o orb
             vai pra trás de todo o conteúdo, mas à frente do canvas escuro do body.
@@ -1267,7 +1267,7 @@ export default function HomePage() {
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
             aria-label="Voltar ao topo"
-            className="fixed bottom-[152px] right-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-brand/40 bg-[#0B1A33]/90 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur"
+            className="fixed bottom-[152px] right-5 z-30 flex h-9 w-9 items-center justify-center rounded-full border border-brand/30 bg-[#0B1A33]/60 opacity-80 shadow-[0_6px_16px_rgba(0,0,0,0.35)] backdrop-blur transition-opacity hover:opacity-100"
           >
             <ChevronDown className="h-5 w-5 rotate-180 text-brand" />
           </m.button>
