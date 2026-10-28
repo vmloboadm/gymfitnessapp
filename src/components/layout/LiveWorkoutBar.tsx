@@ -19,7 +19,8 @@ export function LiveWorkoutBar() {
     return () => clearInterval(t);
   }, [session]);
 
-  const show = !!session && pathname !== "/treino";
+  // Na home o banner do topo já mostra o tempo e o botão de finalizar.
+  const show = !!session && pathname !== "/treino" && pathname !== "/";
   const elapsed = show ? elapsedSeconds(session.startedAt, now) : 0;
   const phase = show ? sessionPhase(session.startedAt, now) : "ok";
 

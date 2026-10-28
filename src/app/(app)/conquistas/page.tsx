@@ -3,52 +3,14 @@
 import { useMemo } from "react";
 import { m } from "framer-motion";
 import { Award, Lock } from "lucide-react";
-import { useAuth } from "~/hooks/useAuth";
-import { useAsyncQuery } from "~/hooks/useAsyncQuery";
-import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { cn } from "~/lib/utils";
 import { formatDate } from "~/lib/utils/format";
-import { isDemoMode } from "~/lib/demo-bridge";
-import { sortedAchievements, type StudentAchievement } from "~/lib/achievements";
+import { useMyAchievements } from "~/hooks/useMyAchievements";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 
-type Ach = StudentAchievement & { gym_id?: string | null };
-
-const DEMO_ACHIEVEMENTS = sortedAchievements();
-
 export default function ConquistasPage() {
-  const { user, profile } = useAuth();
-  const demo = isDemoMode();
-
-  const { data, loading, error, refetch } = useAsyncQuery<{ list: Ach[]; progress: number }>(
-    async () => {
-      if (demo) {
-        return { data: { list: DEMO_ACHIEVEMENTS, progress: Math.round((DEMO_ACHIEVEMENTS.filter((a) => a.earned_at).length / DEMO_ACHIEVEMENTS.length) * 100) }, error: null };
-      }
-
-      const supabase = supabaseBrowser();
-      if (!user || !profile) return { data: null, error: { message: "Sessão indisponível" } };
-
-      const [achRes, mineRes] = await Promise.all([
-        supabase.from("achievements").select("*").or(`gym_id.is.null,gym_id.eq.${profile.gym_id}`),
-        supabase.from("student_achievements").select("achievement_id, earned_at").eq("student_id", user.id),
-      ]);
-      if (achRes.error) return { data: null, error: achRes.error };
-      if (mineRes.error) return { data: null, error: mineRes.error };
-
-      const achievements = (achRes.data ?? []) as any[];
-      const mine = (mineRes.data ?? []) as any[];
-      const earnedMap = new Map(mine.map((m) => [m.achievement_id, m.earned_at]));
-
-      const list: Ach[] = achievements
-        .map((a) => ({ ...a, sort: a.gym_id === null ? 0 : 1, earned_at: earnedMap.get(a.id) ?? null }))
-        .sort((a, b) => (a.earned_at === null ? 1 : 0) - (b.earned_at === null ? 1 : 0) || a.sort - b.sort);
-
-      return { data: { list, progress: achievements.length ? Math.round((mine.length / achievements.length) * 100) : 0 }, error: null };
-    },
-    [user?.id, profile?.id, demo]
-  );
+  const { data, loading, error, refetch } = useMyAchievements();
 
   const earnedCount = useMemo(() => data?.list.filter((a) => a.earned_at).length ?? 0, [data?.list]);
 

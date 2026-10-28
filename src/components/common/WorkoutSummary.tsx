@@ -54,8 +54,14 @@ export default function WorkoutSummary({
   total,
   onDone,
   sessionId,
+  sets,
+  volumeKg,
 }: {
   seconds: number;
+  /** Séries marcadas como feitas. */
+  sets?: number;
+  /** Volume total (kg × reps) das séries feitas. */
+  volumeKg?: number;
   done: number;
   total: number;
   /** Chamado ao concluir o fluxo do resumo (RPE escolhido ou pular). */
@@ -70,7 +76,7 @@ export default function WorkoutSummary({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const shareText = `Acabei de esmagar meu treino na GymFitness! ${formatMMSS(seconds)} de treino · ${done}/${total} exercícios`;
+  const shareText = `Acabei de esmagar meu treino na GymFitness! ${formatMMSS(seconds)} de treino · ${done}/${total} exercícios${volumeKg ? ` · ${volumeKg.toLocaleString("pt-BR")} kg levantados` : ""}`;
 
   const shareInstagram = async () => {
     try {
@@ -130,6 +136,21 @@ export default function WorkoutSummary({
               <span className="text-[14px] text-muted-foreground">/{total}</span>
             </p>
           </div>
+          {sets ? (
+            <div className="rounded-xl border border-border bg-card/40 p-3.5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Séries</p>
+              <p className="pm-num mt-1 text-[28px] leading-none text-foreground">{sets}</p>
+            </div>
+          ) : null}
+          {volumeKg ? (
+            <div className="rounded-xl border border-border bg-card/40 p-3.5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Volume</p>
+              <p className="pm-num mt-1 text-[28px] leading-none text-foreground">
+                {volumeKg.toLocaleString("pt-BR")}
+                <span className="text-[14px] text-muted-foreground"> kg</span>
+              </p>
+            </div>
+          ) : null}
         </m.div>
 
         {/* celebração sempre: missão cumprida, sem conquista inventada */}
@@ -152,8 +173,14 @@ export default function WorkoutSummary({
             >
               <Trophy className="h-10 w-10 text-[#FBBF24]" strokeWidth={1.8} fill="rgba(251, 191, 36, 0.25)" aria-hidden />
             </m.span>
-            <h2 className="relative mt-3 font-display text-xl font-black text-foreground">Missão cumprida!</h2>
-            <p className="relative mt-1 gf-card-text">Treino concluído com determinação. A constância tá construindo você.</p>
+            <h2 className="relative mt-3 font-display text-xl font-black text-foreground">
+              {done >= total ? "Missão cumprida!" : "Treino registrado!"}
+            </h2>
+            <p className="relative mt-1 gf-card-text">
+              {done >= total
+                ? "Treino completo. A constância tá construindo você."
+                : `Você fez ${done} de ${total} exercícios. Tudo que marcou já conta no seu histórico e no ranking.`}
+            </p>
           </m.div>
 
         {/* RPE rápido */}

@@ -89,6 +89,7 @@ export default function CheckinPage() {
     { enabled: !demo && !!user, silentRefetch: true }
   );
 
+  const [closedVisit, setClosedVisit] = useState<{ entrada: string; saida: string } | null>(null);
   const sessionMetrics = useMemo(() => {
     const logs = demo ? (getTodayWorkout().logs as Array<{ date: string }>) : (weekLogs ?? []);
     const weekAgo = localDayKeyDaysAgo(7);
@@ -102,14 +103,15 @@ export default function CheckinPage() {
     const progresso = readSessionProgress();
     // Tempo na academia é PRESENÇA: começa no check-in, não no cronômetro do
     // treino. O treino pode nem ter sido iniciado ainda.
-    const entrada = gymEntry ? new Date(gymEntry.checked_at) : null;
+    const entrada = gymEntry ? new Date(gymEntry.checked_at) : closedVisit ? new Date(closedVisit.entrada) : null;
+    const fim = gymEntry ? nowTick : closedVisit ? new Date(closedVisit.saida).getTime() : nowTick;
     return {
       entradaHora: entrada ? entrada.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null,
-      tempoNa: entrada ? formatMMSS(elapsedSeconds(entrada.getTime(), nowTick)) : null,
+      tempoNa: entrada ? formatMMSS(elapsedSeconds(entrada.getTime(), fim)) : null,
       treinoHoje: daySession || progresso ? "Em andamento" : treinouHoje ? "Concluído" : "Não iniciado",
       semana: diasSemana.size,
     };
-  }, [gymEntry, daySession, nowTick, weekLogs, demo]);
+  }, [gymEntry, closedVisit, daySession, nowTick, weekLogs, demo]);
 
   const { data, loading, error, refetch } = useAsyncQuery<{
     equipment: Equipment[];
@@ -564,6 +566,22 @@ export default function CheckinPage() {
     toast.success("Check-out realizado. Treino encerrado.");
   };
 
+  // Visita já encerrada hoje (entrou e o treino finalizado registrou a saída):
+  // o painel continua mostrando a hora de entrada e o tempo total.
+  const applyTodayCheckins = useCallback(
+    (rows: { id: string; checked_at: string; source: string; type: string }[]) => {
+      const last = rows[0];
+      setGymEntry(last?.type === "entrada" ? { id: last.id, checked_at: last.checked_at, source: last.source } : null);
+      if (last?.type === "saida") {
+        const entrada = rows.find((r) => r.type === "entrada");
+        setClosedVisit(entrada ? { entrada: entrada.checked_at, saida: last.checked_at } : null);
+      } else {
+        setClosedVisit(null);
+      }
+    },
+    []
+  );
+
   // Restaura o check-in de hoje ao abrir/recarregar a tela. Antes o estado
   // vivia só em memória: ao dar reload o card voltava a dizer "Entrada na
   // academia" mesmo com o aluno já dentro, e o botão virava "Fazer check-out"
@@ -580,19 +598,12 @@ export default function CheckinPage() {
         .gte("checked_at", localDayStartDaysAgoISO(0))
         .order("checked_at", { ascending: false })
         .limit(5);
-      const last = (data ?? [])[0] as { id: string; checked_at: string; source: string; type: string } | undefined;
-      if (!cancelled) {
-        if (last?.type === "entrada") {
-          setGymEntry({ id: last.id, checked_at: last.checked_at, source: last.source });
-        } else {
-          setGymEntry(null);
-        }
-      }
+      if (!cancelled) applyTodayCheckins((data ?? []) as { id: string; checked_at: string; source: string; type: string }[]);
     })();
     return () => {
       cancelled = true;
     };
-  }, [demo, user?.id, profile?.gym_id]);
+  }, [demo, user?.id, profile?.gym_id, applyTodayCheckins]);
 
   // O treino finalizado fecha a presença; atualiza esta tela sem reload.
   useEffect(() => {
@@ -608,8 +619,7 @@ export default function CheckinPage() {
         .order("checked_at", { ascending: false })
         .limit(5);
       if (cancelled) return;
-      const last = (data ?? [])[0] as { id: string; checked_at: string; source: string; type: string } | undefined;
-      setGymEntry(last?.type === "entrada" ? { id: last.id, checked_at: last.checked_at, source: last.source } : null);
+      applyTodayCheckins((data ?? []) as { id: string; checked_at: string; source: string; type: string }[]);
     };
     window.addEventListener("gymfit-checkin-updated", refresh);
     window.addEventListener("gymfit-workout-finished", refresh);
@@ -618,7 +628,7 @@ export default function CheckinPage() {
       window.removeEventListener("gymfit-checkin-updated", refresh);
       window.removeEventListener("gymfit-workout-finished", refresh);
     };
-  }, [demo, user?.id, profile?.gym_id]);
+  }, [demo, user?.id, profile?.gym_id, applyTodayCheckins]);
 
   if (loading) {
     return (

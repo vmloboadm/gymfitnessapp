@@ -204,6 +204,7 @@ export default function TreinoHomePage() {
   const { user, profile, loading: authLoading } = useAuth();
   const demo = isDemoMode();
   const [summarySeconds, setSummarySeconds] = useState<number | null>(null);
+  const [summaryStats, setSummaryStats] = useState<{ sets: number; volumeKg: number } | null>(null);
   const [_rpe, _setRpe] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "active" | "done">("idle");
   const [unlockOpen, setUnlockOpen] = useState(false);
@@ -643,7 +644,10 @@ export default function TreinoHomePage() {
       enqueueOffline("workout_logs", row);
       return;
     }
-    const { error } = await supabaseBrowser().from("workout_logs").insert(row as never);
+    // Grava só se ainda não existe: o id é estável por sessão/exercício.
+    const { error } = await supabaseBrowser()
+      .from("workout_logs")
+      .upsert(row as never, { onConflict: "id", ignoreDuplicates: true });
     if (error && error.code !== "23505") {
       savedExRef.current.delete(id);
       enqueueOffline("workout_logs", row);
@@ -698,6 +702,20 @@ export default function TreinoHomePage() {
     const savedExList = (savedProgress?.exercises ?? []) as Array<{ id?: string; name?: string }>;
     const savedAt = savedProgress?.savedAt ?? Date.now();
     setConcludedCount(loggedIds.length || ids.length);
+    {
+      // séries feitas e volume (kg × reps) para o resumo
+      let sets = 0;
+      let vol = 0;
+      for (const v of Object.values(progMap)) {
+        for (const st of v.sets ?? []) {
+          if (!st?.done) continue;
+          sets++;
+          const w = parseFloat(String(st.weight ?? "").replace(",", "."));
+          if (Number.isFinite(w) && w > 0) vol += w * parseReps(st.reps ?? "");
+        }
+      }
+      setSummaryStats({ sets, volumeKg: Math.round(vol) });
+    }
     if (loggedIds.length) {
       setDoneIds((prev) => new Set([...prev, ...loggedIds]));
     }
@@ -864,7 +882,10 @@ export default function TreinoHomePage() {
                 // inteiro (o aluno perderia todos os exercícios do dia).
                 const failedRows: Array<Record<string, unknown>> = [];
                 for (const row of logRows) {
-                  const { error: logErr } = await supabase.from("workout_logs").insert(row as never);
+                  // Já salvo por exercício durante o treino: ignora em vez de dar 409.
+                  const { error: logErr } = await supabase
+                    .from("workout_logs")
+                    .upsert(row as never, { onConflict: "id", ignoreDuplicates: true });
                   if (!logErr || logErr.code === "23505") inserted++;
                   else failedRows.push(row);
                 }
@@ -1261,6 +1282,8 @@ export default function TreinoHomePage() {
         done={concludedCount ?? Math.min(todayLogs, totalToday)}
         total={activeTotal || totalToday || Math.max(concludedCount ?? 0, 1)}
         sessionId={finishedSessionId}
+        sets={summaryStats?.sets}
+        volumeKg={summaryStats?.volumeKg}
         onDone={() => {
           router.replace("/");
         }}

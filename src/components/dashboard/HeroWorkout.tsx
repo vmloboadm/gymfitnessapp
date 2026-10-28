@@ -11,7 +11,9 @@ interface HeroWorkoutProps {
   image: string;
   title: string;
   exerciseCount: number;
-  estMin: number;
+  /** null esconde o bloco de minutos (ex.: treino já concluído). */
+  estMin: number | null;
+  minutesLabel?: string;
   sessionsWeek: number;
   sessionLabel: string;
   ready: boolean;
@@ -47,6 +49,7 @@ export function HeroWorkout({
   title,
   exerciseCount,
   estMin,
+  minutesLabel,
   sessionsWeek,
   sessionLabel,
   ready,
@@ -130,13 +133,15 @@ export function HeroWorkout({
                   <p className="mt-2 text-[12px] font-medium text-[#9AA5B8]">{countLabel ?? "exercícios"}</p>
                 </div>
                 <div className="flex gap-8 text-right">
+                  {estMin != null ? (
                   <div>
                     <p className="flex items-center justify-end gap-1.5">
                       <Clock className="h-4 w-4 text-[#9AA5B8]" />
                       <span className="pm-num text-[26px] text-[#E6EAF3] tabular-nums">{estMin}</span>
                     </p>
-                    <p className="mt-1 text-[12px] font-medium text-[#9AA5B8]">minutos</p>
+                    <p className="mt-1 text-[12px] font-medium text-[#9AA5B8]">{minutesLabel ?? "minutos"}</p>
                   </div>
+                  ) : null}
                   <div>
                     <p className="pm-num text-[26px] text-[#E6EAF3] tabular-nums">{sessionsWeek}</p>
                     <p className="mt-1 text-[12px] font-medium text-[#9AA5B8]">na semana</p>

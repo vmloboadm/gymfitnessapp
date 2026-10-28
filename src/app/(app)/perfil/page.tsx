@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
 import { formatDate } from "~/lib/utils/format";
 import { isDemoMode, demoMetricsData } from "~/lib/demo-bridge";
-import { sortedAchievements } from "~/lib/achievements";
+import { useMyAchievements } from "~/hooks/useMyAchievements";
 import { FitnessIcon, fitnessForName } from "~/components/common/FitnessIcon";
 import type { StudentSubscriptions } from "~/lib/types/models";
 import { BUILD_LABEL } from "~/lib/build";
@@ -118,7 +118,8 @@ export default function PerfilPage() {
     profile?.vencimento
       ? Math.ceil((new Date(`${profile.vencimento}T12:00:00`).getTime() - Date.now()) / 864e5)
       : null;
-  const achievements = useMemo(() => sortedAchievements(), []);
+  const { data: achData } = useMyAchievements();
+  const achievements = achData?.list ?? [];
   const earned = achievements.filter((a) => a.earned_at);
   const latestWeight = weightSeries[weightSeries.length - 1]?.peso ?? null;
 

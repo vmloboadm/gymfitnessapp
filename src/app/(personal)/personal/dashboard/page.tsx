@@ -76,6 +76,19 @@ function waHref(phone: string, text: string): string | null {
  * academia e agenda do dia.
  */
 export default function PersonalDashboardPage() {
+  // Saudação e data no fuso do aparelho. Calcular no servidor (UTC) dava
+  // "Boa noite" às 17h e quebrava a hidratação (React #418).
+  const [greeting, setGreeting] = useState({ hello: "Olá", date: "" });
+  useEffect(() => {
+    const now = new Date();
+    const h = now.getHours();
+    setGreeting({
+      hello: h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite",
+      date: now
+        .toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "short" })
+        .replace(/^./, (c) => c.toUpperCase()),
+    });
+  }, []);
   const { profile } = useAuth();
   const gymId = profile?.gym_id ?? "";
   const [students, setStudents] = useState<PersonalStudent[]>([]);
@@ -268,16 +281,11 @@ export default function PersonalDashboardPage() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold text-muted-foreground">
-              {(() => {
-                const h = new Date().getHours();
-                return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
-              })()}
+              {greeting.hello}
               , <span className="font-bold text-foreground">{(profile?.name ?? "Personal").split(" ")[0]}</span>
             </p>
             <p className="truncate text-[15px] font-black leading-tight text-foreground">
-              {new Date()
-                .toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "short" })
-                .replace(/^./, (c) => c.toUpperCase())}
+              {greeting.date || "\u00a0"}
             </p>
           </div>
           <button

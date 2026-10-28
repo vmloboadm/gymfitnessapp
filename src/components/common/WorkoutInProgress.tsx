@@ -333,6 +333,36 @@ export default function WorkoutInProgress({
     goNext();
   };
 
+  // Próxima série pendente do exercício/bloco atual, na ordem da rodada
+  // (bi-set: A1 série 1 → A2 série 1 → A1 série 2...). É o que o botão
+  // principal marca: o aluno treina só com o polegar, sem caçar a linha.
+  const nextPending = useMemo(() => {
+    const rounds = Math.max(0, ...blockItems.map((it) => progress[it.id]?.sets.length ?? 0));
+    for (let r = 0; r < rounds; r++) {
+      for (const it of blockItems) {
+        const st = progress[it.id]?.sets[r];
+        if (st && !st.done) return { ex: it, idx: r };
+      }
+    }
+    return null;
+  }, [blockItems, progress]);
+
+  const primaryLabel = nextPending
+    ? isBlock
+      ? `${nextPending.ex.name.split(" ").slice(0, 2).join(" ")} · série ${nextPending.idx + 1} feita ✓`
+      : `Série ${nextPending.idx + 1} de ${progress[nextPending.ex.id]?.sets.length ?? nextPending.ex.sets} feita ✓`
+    : isLast
+      ? "Finalizar treino"
+      : "Próximo exercício →";
+
+  const onPrimary = () => {
+    if (nextPending) {
+      toggleSetFor(nextPending.ex, nextPending.idx);
+      return;
+    }
+    advanceOrFinish();
+  };
+
   const handleFinish = () => {
     if (finishing) return;
     setFinishing(true);
@@ -718,11 +748,19 @@ export default function WorkoutInProgress({
             <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">séries</p>
           </div>
           <button
-            onClick={advanceOrFinish}
-            className="flex-1 rounded-xl bg-brand py-3.5 text-sm font-black text-brand-foreground shadow-lg shadow-brand/25 transition-transform active:scale-[0.98]"
+            onClick={onPrimary}
+            className="min-w-0 flex-1 truncate rounded-xl bg-brand px-3 py-3.5 text-sm font-black text-brand-foreground shadow-lg shadow-brand/25 transition-transform active:scale-[0.98]"
           >
-            {isLast ? "Finalizar treino" : currentAllDone ? "Próximo exercício →" : "Pular exercício →"}
+            {primaryLabel}
           </button>
+          {nextPending && !isLast ? (
+            <button
+              onClick={advanceOrFinish}
+              className="shrink-0 rounded-xl border border-border px-3 py-3.5 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Pular
+            </button>
+          ) : null}
         </div>
       </footer>
 

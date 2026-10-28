@@ -250,15 +250,8 @@ export default function HomePage() {
     };
   }, [demo, refetchCheckin]);
 
+  // O card do treino fica no topo da home: não precisa rolar até ele.
   const heroRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (isCheckedInToday && heroRef.current) {
-      const t = setTimeout(() => heroRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 350);
-      return () => clearTimeout(t);
-    }
-    // isCheckedInToday é derivado de `session`: intencional não listar.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
 
   useEffect(() => {
     if (loading) return;
@@ -841,6 +834,74 @@ export default function HomePage() {
           <PWAInstallBanner />
         </m.div>
 
+        {/* TREINO DE HOJE, ação principal; recebe o scroll quando check-in feito */}
+        <m.div variants={item} ref={heroRef} className="px-0 pb-2">
+          <HeroWorkout
+            image={heroPlan?.image ?? FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
+            title={
+              session
+                ? heroPlan?.title ?? "Treino em andamento"
+                : heroFinishedToday
+                  ? "Treino de hoje feito"
+                  : heroPlan?.title ??
+                    // sem ficha do personal: o foco é só sugestão de treino livre
+                    `Treino livre · ${focusLabel}`
+            }
+            subtitle={
+              heroFinishedToday && heroPlan?.slot
+                ? `Próximo: ${heroPlan.title}`
+                : !session && heroPlan?.lastDoneLabel
+                  ? heroPlan.lastDoneLabel
+                  : undefined
+            }
+            exerciseCount={heroFinishedToday || session ? todayDoneCount : heroPlan?.count ?? 0}
+            countLabel={heroFinishedToday || session ? (todayDoneCount === 1 ? "exercício feito" : "exercícios feitos") : "exercícios"}
+            estMin={
+              session && startedAt
+                ? Math.max(1, Math.round((Date.now() - startedAt) / 60000))
+                : heroFinishedToday
+                  ? null
+                  : heroPlan && heroPlan.count > 0 ? Math.max(15, heroPlan.count * 4) : 45
+            }
+            minutesLabel={session ? "min de treino" : "min aprox."}
+            sessionsWeek={sessionsWeek}
+            href={session ? "/treino?resume=1" : heroFinishedToday ? "/progresso" : heroPlan?.state.status === "rest" ? "/treino" : "/treino?start=1"}
+            ctaLabel={
+              session
+                ? "Continuar treino"
+                : heroFinishedToday
+                  ? "Ver minha evolução"
+                  : heroPlan?.state.status === "rest"
+                    ? "Ver opções de descanso"
+                    : heroPlan
+                      ? `Iniciar treino ${heroPlan.slot}`.trim()
+                      : undefined
+            }
+            sessionLabel={
+              session
+                ? "Treino em andamento"
+                : heroFinishedToday
+                  ? "Concluído hoje"
+                  : heroPlan?.state.status === "rest"
+                    ? "Dia de descanso"
+                    : heroPlan
+                      ? "Treino de hoje"
+                      : focusResume
+                        ? "Retomando onde parou"
+                        : "Treino de hoje"
+            }
+            notice={fatigueNotice ?? undefined}
+            emptyHint={
+              heroPlan?.state.status === "rest" && !heroFinishedToday
+                ? "Hoje não está na sua programação. Se quiser, dá para treinar mesmo assim na aba Treino."
+                : heroPlan && heroPlan.count > 0
+                  ? undefined
+                  : "Seu personal ainda não montou seu treino. Enquanto isso, dê uma olhada nos treinos livres e faça seu check-in."
+            }
+            ready={!session && !heroFinishedToday && !!heroPlan && heroPlan.count > 0}
+          />
+        </m.div>
+
         {/* COCKPIT, Anel da meta + Streak + Liga */}
         <m.section
           variants={item}
@@ -950,67 +1011,6 @@ export default function HomePage() {
             </m.div>
           </div>
         </m.section>
-
-        {/* TREINO DE HOJE, ação principal; recebe o scroll quando check-in feito */}
-        <m.div variants={item} ref={heroRef} className="pt-2">
-          <HeroWorkout
-            image={heroPlan?.image ?? FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
-            title={
-              session
-                ? heroPlan?.title ?? "Treino em andamento"
-                : heroFinishedToday
-                  ? "Treino de hoje feito"
-                  : heroPlan?.title ??
-                    // sem ficha do personal: o foco é só sugestão de treino livre
-                    `Treino livre · ${focusLabel}`
-            }
-            subtitle={
-              heroFinishedToday && heroPlan?.slot
-                ? `Próximo: ${heroPlan.title}`
-                : !session && heroPlan?.lastDoneLabel
-                  ? heroPlan.lastDoneLabel
-                  : undefined
-            }
-            exerciseCount={heroFinishedToday || session ? todayDoneCount : heroPlan?.count ?? 0}
-            countLabel={heroFinishedToday || session ? (todayDoneCount === 1 ? "exercício feito" : "exercícios feitos") : "exercícios"}
-            estMin={heroPlan && heroPlan.count > 0 ? Math.max(15, heroPlan.count * 4) : 45}
-            sessionsWeek={sessionsWeek}
-            href={session ? "/treino?resume=1" : heroFinishedToday ? "/progresso" : heroPlan?.state.status === "rest" ? "/treino" : "/treino?start=1"}
-            ctaLabel={
-              session
-                ? "Continuar treino"
-                : heroFinishedToday
-                  ? "Ver minha evolução"
-                  : heroPlan?.state.status === "rest"
-                    ? "Ver opções de descanso"
-                    : heroPlan
-                      ? `Iniciar treino ${heroPlan.slot}`.trim()
-                      : undefined
-            }
-            sessionLabel={
-              session
-                ? "Treino em andamento"
-                : heroFinishedToday
-                  ? "Concluído hoje"
-                  : heroPlan?.state.status === "rest"
-                    ? "Dia de descanso"
-                    : heroPlan
-                      ? "Treino de hoje"
-                      : focusResume
-                        ? "Retomando onde parou"
-                        : "Treino de hoje"
-            }
-            notice={fatigueNotice ?? undefined}
-            emptyHint={
-              heroPlan?.state.status === "rest" && !heroFinishedToday
-                ? "Hoje não está na sua programação. Se quiser, dá para treinar mesmo assim na aba Treino."
-                : heroPlan && heroPlan.count > 0
-                  ? undefined
-                  : "Seu personal ainda não montou seu treino. Enquanto isso, dê uma olhada nos treinos livres e faça seu check-in."
-            }
-            ready={!!heroPlan && heroPlan.count > 0}
-          />
-        </m.div>
 
         {/* VER MAIS, densidade controlada (#9): o essencial fica visível,
             o resto (ritmo detalhado, comunidade, artigo, dica, parceiros)

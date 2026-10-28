@@ -80,11 +80,15 @@ export default function ProgressoPage() {
           .select("date, weight_kg, reps")
           .eq("student_id", user.id)
           .gte("date", since),
+        // Só serve de reserva para a sequência: as datas dos últimos 120 dias bastam.
         supabase
           .from("workout_logs")
-          .select("date, weight_kg, reps")
+          .select("date")
           .eq("student_id", user.id)
-          .lt("date", since),
+          .lt("date", since)
+          .gte("date", localDayStartDaysAgoISO(120))
+          .order("date", { ascending: false })
+          .limit(2000),
         supabase
           .from("checkins")
           .select("checked_at")
@@ -147,7 +151,8 @@ export default function ProgressoPage() {
     }));
   }, [data?.logs]);
 
-  const weekAgo = localDayKeyDaysAgo(6);
+  // Semana de calendário (segunda a domingo), mesma regra da home e da meta.
+  const weekAgo = localDayKeyDaysAgo((new Date().getDay() + 6) % 7);
   const weekVolume = useMemo(
     () => totalVolume((data?.logs ?? []).filter((l) => localDayKey(l.date) >= weekAgo)),
     [data?.logs, weekAgo]
