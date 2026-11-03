@@ -192,6 +192,9 @@ type Offer = {
   price_cents: number | null;
   sessions_per_week: number | null;
   duration_label: string | null;
+  promo_price_cents?: number | null;
+  promo_label?: string | null;
+  promo_until?: string | null;
 };
 export type Personal = {
   id: string;
@@ -203,8 +206,11 @@ export type Personal = {
   offers?: Offer[];
 };
 
+const hasPromo = (o: Offer) => o.promo_price_cents !== null && o.promo_price_cents !== undefined;
 const priceLine = (o: Offer) =>
-  `${formatBRL(o.price_cents)}${o.price_cents !== null && o.duration_label ? ` ${o.duration_label}` : ""}`;
+  hasPromo(o)
+    ? `${o.promo_label ?? "Promoção"}: ${formatBRL(o.promo_price_cents!)}${o.duration_label ? ` ${o.duration_label}` : ""}, de ${formatBRL(o.price_cents)}`
+    : `${formatBRL(o.price_cents)}${o.price_cents !== null && o.duration_label ? ` ${o.duration_label}` : ""}`;
 
 /** Escolha do personal: foto, nome, bio e WhatsApp com mensagem pronta. */
 export function PersonalChooser({ studentName, goal, onSent }: { studentName: string; goal: string | null; onSent: () => void }) {
@@ -283,9 +289,20 @@ export function PersonalChooser({ studentName, goal, onSent }: { studentName: st
               <div className="mt-3 space-y-2">
                 {p.offers.map((o) => (
                   <div key={o.id} className="rounded-xl border border-[#FFC24D]/35 bg-gradient-to-br from-[#FFC24D]/10 via-card to-card p-3">
+                    {hasPromo(o) ? (
+                      <span className="mb-1 inline-block rounded bg-black px-1.5 py-0.5 text-[9.5px] font-black tracking-wider text-white ring-1 ring-white/30">
+                        {(o.promo_label ?? "Promoção").toUpperCase()}
+                        {o.promo_until ? ` · até ${new Date(`${o.promo_until}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : ""}
+                      </span>
+                    ) : null}
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="text-[13.5px] font-black text-foreground">{o.title}</p>
-                      <p className="shrink-0 text-[13px] font-black text-[#FFC24D]">{formatBRL(o.price_cents)}</p>
+                      <p className="shrink-0 text-right">
+                        {hasPromo(o) ? (
+                          <span className="block text-[10.5px] font-semibold text-muted-foreground line-through">{formatBRL(o.price_cents)}</span>
+                        ) : null}
+                        <span className="text-[13px] font-black text-[#FFC24D]">{formatBRL(hasPromo(o) ? o.promo_price_cents! : o.price_cents)}</span>
+                      </p>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
                       {[o.price_cents !== null ? o.duration_label : null, o.sessions_per_week ? `${o.sessions_per_week}x por semana` : null]

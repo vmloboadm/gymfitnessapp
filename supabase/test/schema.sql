@@ -1075,6 +1075,56 @@ $$;
 
 
 --
+-- Name: challenge_board(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.challenge_board(p_challenge uuid) RETURNS jsonb
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  with me as (select id, gym_id from public.profiles where id = auth.uid()),
+  c as (
+    select ch.* from public.challenges ch, me where ch.id = p_challenge and ch.gym_id = me.gym_id
+  ),
+  part as (
+    select cp.student_id from public.challenge_participants cp, c where cp.challenge_id = c.id
+  ),
+  days as (
+    select x.sid, count(distinct x.d)::int as days
+    from (
+      select wl.student_id sid, public.local_day(wl.date) d
+      from public.workout_logs wl join part on part.student_id = wl.student_id
+      union
+      select ck.student_id, public.local_day(ck.checked_at)
+      from public.checkins ck join part on part.student_id = ck.student_id
+      where ck.type = 'entrada'
+    ) x, c
+    where x.d between c.starts_on and least(c.ends_on, (now() at time zone 'America/Sao_Paulo')::date)
+    group by x.sid
+  ),
+  ranked as (
+    select part.student_id as id, coalesce(days.days, 0) as days,
+      rank() over (order by coalesce(days.days, 0) desc) as rk,
+      (part.student_id = (select id from me)) as is_me
+    from part left join days on days.sid = part.student_id
+  )
+  select jsonb_build_object(
+    'participants', (select count(*) from part),
+    'joined', exists (select 1 from part where student_id = (select id from me)),
+    'rows', coalesce((
+      select jsonb_agg(jsonb_build_object(
+          'id', r.id, 'name', (public.athlete_display(r.id)).disp,
+          'avatar_url', p.avatar_url, 'days', r.days, 'rank', r.rk, 'me', r.is_me
+        ) order by r.rk, (public.athlete_display(r.id)).disp)
+      from ranked r join public.profiles p on p.id = r.id
+      where r.rk <= 50 or r.is_me
+    ), '[]'::jsonb)
+  )
+  where exists (select 1 from c);
+$$;
+
+
+--
 -- Name: choose_personal(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1854,7 +1904,10 @@ CREATE FUNCTION public.gym_personals() RETURNS jsonb
         select coalesce(jsonb_agg(jsonb_build_object(
             'id', o.id, 'title', o.title, 'description', o.description,
             'price_cents', o.price_cents, 'sessions_per_week', o.sessions_per_week,
-            'duration_label', o.duration_label
+            'duration_label', o.duration_label,
+            'promo_price_cents', case when public.offer_promo_valid(o.promo_price_cents, o.promo_until) then o.promo_price_cents end,
+            'promo_label', case when public.offer_promo_valid(o.promo_price_cents, o.promo_until) then coalesce(o.promo_label, 'Promoção') end,
+            'promo_until', case when public.offer_promo_valid(o.promo_price_cents, o.promo_until) then o.promo_until end
           ) order by o.sort, o.created_at), '[]'::jsonb)
         from public.personal_offers o
         where o.trainer_id = staff.id and o.active
@@ -1932,6 +1985,54 @@ begin
   v_key := 'together:'||least(v_me, p_invitee)||':'||greatest(v_me, p_invitee)||':'||current_date;
   perform public.add_points(v_gym, v_me, 'together', 30, v_key||':'||v_me, 'chamar alguém para treinar junto');
   perform public.add_points(v_gym, p_invitee, 'together', 30, v_key||':'||p_invitee, 'treinar junto com um amigo');
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+
+--
+-- Name: join_challenge(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.join_challenge(p_challenge uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_uid uuid := auth.uid();
+  st record;
+  c record;
+  n record;
+  today date := (now() at time zone 'America/Sao_Paulo')::date;
+begin
+  select id, gym_id, role into st from public.profiles where id = v_uid;
+  if st.id is null or st.role <> 'student' then
+    raise exception 'Sem permissão';
+  end if;
+  select * into c from public.challenges where id = p_challenge and gym_id = st.gym_id and active;
+  if c.id is null then
+    return jsonb_build_object('ok', false, 'reason', 'indisponivel');
+  end if;
+  if today > c.ends_on then
+    return jsonb_build_object('ok', false, 'reason', 'encerrado');
+  end if;
+
+  insert into public.challenge_participants (challenge_id, student_id, gym_id)
+  values (c.id, v_uid, st.gym_id)
+  on conflict do nothing;
+  if not found then
+    return jsonb_build_object('ok', false, 'reason', 'ja_participa');
+  end if;
+
+  n := public.athlete_display(v_uid);
+  perform public.system_feed_post(st.gym_id, v_uid,
+    n.disp || ' entrou no ' || c.title || ' 🔥 Meta: ' || c.goal_days || ' dias de treino até '
+    || to_char(c.ends_on, 'DD/MM') || '. Bora junto? Entra também pelo app!');
+  insert into public.notifications (gym_id, user_id, channel, title, body)
+  values (st.gym_id, v_uid, 'in_app', 'Você está no ' || c.title,
+    'Meta: ' || c.goal_days || ' dias de treino até ' || to_char(c.ends_on, 'DD/MM')
+    || '. Cada dia treinado conta no ranking. Bora!');
+
   return jsonb_build_object('ok', true);
 end;
 $$;
@@ -2393,6 +2494,18 @@ $$;
 
 
 --
+-- Name: offer_promo_valid(integer, date); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.offer_promo_valid(p_promo integer, p_until date) RETURNS boolean
+    LANGUAGE sql STABLE
+    AS $$
+  select p_promo is not null and p_until is not null
+    and p_until >= (now() at time zone 'America/Sao_Paulo')::date;
+$$;
+
+
+--
 -- Name: on_student_approved(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2639,9 +2752,13 @@ declare
   tr record;
   v_offer_title text;
   v_offer_price integer;
+  v_promo integer;
+  v_promo_label text;
+  v_promo_until date;
   v_has_offer boolean := false;
   v_msg text := nullif(btrim(coalesce(p_message, '')), '');
   v_plan text := '';
+  v_price_txt text;
 begin
   select id, gym_id, name, role into st from public.profiles where id = v_uid;
   if st.id is null or st.role <> 'student' then
@@ -2655,13 +2772,17 @@ begin
   end if;
 
   if p_offer is not null then
-    select title, price_cents, true into v_offer_title, v_offer_price, v_has_offer
+    select title, price_cents, promo_price_cents, promo_label, promo_until, true
+      into v_offer_title, v_offer_price, v_promo, v_promo_label, v_promo_until, v_has_offer
     from public.personal_offers
     where id = p_offer and trainer_id = tr.id and gym_id = st.gym_id and active;
     if not coalesce(v_has_offer, false) then
       raise exception 'Plano indisponível';
     end if;
-    v_plan := ' · ' || v_offer_title || ' · ' || public.fmt_brl(v_offer_price);
+    v_price_txt := case when public.offer_promo_valid(v_promo, v_promo_until)
+      then coalesce(v_promo_label, 'Promoção') || ' ' || public.fmt_brl(v_promo) || ' (de ' || public.fmt_brl(v_offer_price) || ')'
+      else public.fmt_brl(v_offer_price) end;
+    v_plan := ' · ' || v_offer_title || ' · ' || v_price_txt;
   end if;
 
   perform set_config('gf.request_notified', '1', true);
@@ -2674,7 +2795,7 @@ begin
   insert into public.notifications (gym_id, user_id, channel, title, body)
   values (st.gym_id, tr.id, 'in_app', 'Pedido de acompanhamento',
     coalesce(nullif(trim(st.name), ''), 'Um aluno') || ' quer acompanhamento com você'
-    || case when v_has_offer then ' no plano "' || v_offer_title || '" (' || public.fmt_brl(v_offer_price) || ')' else '' end
+    || case when v_has_offer then ' no plano "' || v_offer_title || '" (' || v_price_txt || ')' else '' end
     || coalesce(': ' || left(v_msg, 120), '.') || ' Ele deve te chamar no WhatsApp agora.');
 
   return jsonb_build_object('ok', true, 'phone', tr.phone, 'name', tr.name,
@@ -3734,6 +3855,38 @@ CREATE TABLE public.cardio_logs (
 
 
 --
+-- Name: challenge_participants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.challenge_participants (
+    challenge_id uuid NOT NULL,
+    student_id uuid NOT NULL,
+    gym_id uuid NOT NULL,
+    joined_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: challenges; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.challenges (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    gym_id uuid NOT NULL,
+    title text NOT NULL,
+    description text,
+    starts_on date NOT NULL,
+    ends_on date NOT NULL,
+    goal_days integer NOT NULL,
+    prize_text text,
+    active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT challenges_check CHECK ((ends_on >= starts_on)),
+    CONSTRAINT challenges_goal_days_check CHECK (((goal_days >= 1) AND (goal_days <= 366)))
+);
+
+
+--
 -- Name: checkins; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4101,9 +4254,14 @@ CREATE TABLE public.personal_offers (
     sort integer DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    promo_price_cents integer,
+    promo_label text,
+    promo_until date,
     CONSTRAINT personal_offers_description_check CHECK (((description IS NULL) OR (length(description) <= 400))),
     CONSTRAINT personal_offers_duration_label_check CHECK (((duration_label IS NULL) OR (length(duration_label) <= 40))),
     CONSTRAINT personal_offers_price_cents_check CHECK (((price_cents IS NULL) OR ((price_cents >= 0) AND (price_cents <= 10000000)))),
+    CONSTRAINT personal_offers_promo_label_check CHECK (((promo_label IS NULL) OR (length(promo_label) <= 30))),
+    CONSTRAINT personal_offers_promo_price_cents_check CHECK (((promo_price_cents IS NULL) OR ((promo_price_cents >= 0) AND (promo_price_cents <= 10000000)))),
     CONSTRAINT personal_offers_sessions_per_week_check CHECK (((sessions_per_week IS NULL) OR ((sessions_per_week >= 1) AND (sessions_per_week <= 7)))),
     CONSTRAINT personal_offers_title_check CHECK (((length(btrim(title)) >= 2) AND (length(btrim(title)) <= 80)))
 );
@@ -4205,6 +4363,33 @@ CREATE TABLE public.progress_photos (
     CONSTRAINT progress_photos_angle_check CHECK ((angle = ANY (ARRAY['frente'::text, 'lado'::text, 'costas'::text]))),
     CONSTRAINT progress_photos_phase_check CHECK ((phase = ANY (ARRAY['antes'::text, 'depois'::text]))),
     CONSTRAINT progress_photos_visibility_check CHECK ((visibility = ANY (ARRAY['self'::text, 'trainer'::text])))
+);
+
+
+--
+-- Name: promo_campaigns; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.promo_campaigns (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    gym_id uuid NOT NULL,
+    kind text DEFAULT 'oferta'::text NOT NULL,
+    badge text,
+    title text NOT NULL,
+    subtitle text,
+    cta_label text,
+    cta_type text DEFAULT 'whatsapp_gym'::text NOT NULL,
+    cta_value text,
+    challenge_id uuid,
+    theme text DEFAULT 'black'::text NOT NULL,
+    starts_at timestamp with time zone NOT NULL,
+    ends_at timestamp with time zone NOT NULL,
+    active boolean DEFAULT true NOT NULL,
+    sort integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT promo_campaigns_cta_type_check CHECK ((cta_type = ANY (ARRAY['whatsapp_gym'::text, 'personal'::text, 'challenge'::text, 'link'::text]))),
+    CONSTRAINT promo_campaigns_kind_check CHECK ((kind = ANY (ARRAY['oferta'::text, 'desafio'::text]))),
+    CONSTRAINT promo_campaigns_theme_check CHECK ((theme = ANY (ARRAY['black'::text, 'verao'::text, 'brand'::text])))
 );
 
 
@@ -4658,6 +4843,22 @@ ALTER TABLE ONLY public.cardio_logs
 
 
 --
+-- Name: challenge_participants challenge_participants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.challenge_participants
+    ADD CONSTRAINT challenge_participants_pkey PRIMARY KEY (challenge_id, student_id);
+
+
+--
+-- Name: challenges challenges_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.challenges
+    ADD CONSTRAINT challenges_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: checkins checkins_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4919,6 +5120,14 @@ ALTER TABLE ONLY public.profiles
 
 ALTER TABLE ONLY public.progress_photos
     ADD CONSTRAINT progress_photos_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: promo_campaigns promo_campaigns_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.promo_campaigns
+    ADD CONSTRAINT promo_campaigns_pkey PRIMARY KEY (id);
 
 
 --
@@ -5664,6 +5873,38 @@ ALTER TABLE ONLY public.cardio_logs
 
 
 --
+-- Name: challenge_participants challenge_participants_challenge_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.challenge_participants
+    ADD CONSTRAINT challenge_participants_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenges(id) ON DELETE CASCADE;
+
+
+--
+-- Name: challenge_participants challenge_participants_gym_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.challenge_participants
+    ADD CONSTRAINT challenge_participants_gym_id_fkey FOREIGN KEY (gym_id) REFERENCES public.gyms(id) ON DELETE CASCADE;
+
+
+--
+-- Name: challenge_participants challenge_participants_student_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.challenge_participants
+    ADD CONSTRAINT challenge_participants_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: challenges challenges_gym_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.challenges
+    ADD CONSTRAINT challenges_gym_id_fkey FOREIGN KEY (gym_id) REFERENCES public.gyms(id) ON DELETE CASCADE;
+
+
+--
 -- Name: checkins checkins_gym_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6061,6 +6302,22 @@ ALTER TABLE ONLY public.progress_photos
 
 ALTER TABLE ONLY public.progress_photos
     ADD CONSTRAINT progress_photos_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.profiles(id);
+
+
+--
+-- Name: promo_campaigns promo_campaigns_challenge_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.promo_campaigns
+    ADD CONSTRAINT promo_campaigns_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenges(id) ON DELETE SET NULL;
+
+
+--
+-- Name: promo_campaigns promo_campaigns_gym_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.promo_campaigns
+    ADD CONSTRAINT promo_campaigns_gym_id_fkey FOREIGN KEY (gym_id) REFERENCES public.gyms(id) ON DELETE CASCADE;
 
 
 --
@@ -6539,6 +6796,39 @@ CREATE POLICY cardio_select_own ON public.cardio_logs FOR SELECT TO authenticate
 --
 
 CREATE POLICY cardio_select_staff ON public.cardio_logs FOR SELECT TO authenticated USING (((public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text])) AND (gym_id = public.current_gym_id())));
+
+
+--
+-- Name: challenge_participants; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.challenge_participants ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: challenge_participants challenge_participants_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY challenge_participants_select ON public.challenge_participants FOR SELECT USING ((gym_id = public.current_gym_id()));
+
+
+--
+-- Name: challenges; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.challenges ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: challenges challenges_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY challenges_select ON public.challenges FOR SELECT USING ((gym_id = public.current_gym_id()));
+
+
+--
+-- Name: challenges challenges_staff_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY challenges_staff_write ON public.challenges USING (((gym_id = public.current_gym_id()) AND (public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text])))) WITH CHECK (((gym_id = public.current_gym_id()) AND (public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text]))));
 
 
 --
@@ -7299,6 +7589,26 @@ CREATE POLICY profiles_update_own ON public.profiles FOR UPDATE USING ((auth.uid
 --
 
 ALTER TABLE public.progress_photos ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: promo_campaigns; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.promo_campaigns ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: promo_campaigns promo_campaigns_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY promo_campaigns_select ON public.promo_campaigns FOR SELECT USING (((gym_id = public.current_gym_id()) AND ((active AND ((now() >= starts_at) AND (now() <= ends_at))) OR (public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text])))));
+
+
+--
+-- Name: promo_campaigns promo_campaigns_staff_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY promo_campaigns_staff_write ON public.promo_campaigns USING (((gym_id = public.current_gym_id()) AND (public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text])))) WITH CHECK (((gym_id = public.current_gym_id()) AND (public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text]))));
+
 
 --
 -- Name: push_subscriptions ps_delete_own; Type: POLICY; Schema: public; Owner: -

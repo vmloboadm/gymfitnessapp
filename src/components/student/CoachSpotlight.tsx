@@ -36,9 +36,13 @@ export function CoachSpotlight({ compact = false }: { compact?: boolean }) {
   const main = list[0];
   const first = (main.name ?? "").trim().split(/\s+/)[0] || "o personal";
   const offers = list.flatMap((p) => p.offers ?? []);
-  const priced = offers.filter((o) => o.price_cents !== null).sort((a, b) => a.price_cents! - b.price_cents!);
-  const fromLine = priced[0]
-    ? `Planos a partir de ${formatBRL(priced[0].price_cents)}${priced[0].duration_label ? ` ${priced[0].duration_label}` : ""}`
+  const effective = (o: (typeof offers)[number]) => o.promo_price_cents ?? o.price_cents;
+  const priced = offers.filter((o) => effective(o) !== null).sort((a, b) => effective(a)! - effective(b)!);
+  const promo = offers.find((o) => o.promo_price_cents !== null && o.promo_price_cents !== undefined);
+  const fromLine = promo
+    ? `${promo.promo_label ?? "Promoção"}: a partir de ${formatBRL(effective(priced[0])!)}`
+    : priced[0]
+      ? `Planos a partir de ${formatBRL(priced[0].price_cents)}${priced[0].duration_label ? ` ${priced[0].duration_label}` : ""}`
     : offers.length > 0
       ? `${offers.length} plano${offers.length > 1 ? "s" : ""} de acompanhamento`
       : "Treino sob medida, correção e evolução de perto";
@@ -73,7 +77,9 @@ export function CoachSpotlight({ compact = false }: { compact?: boolean }) {
             </span>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-black uppercase tracking-wider text-[#FFC24D]">Acompanhamento personalizado</p>
+            <p className="text-[10px] font-black uppercase tracking-wider text-[#FFC24D]">
+              {promo ? `${promo.promo_label ?? "Promoção"} · acompanhamento` : "Acompanhamento personalizado"}
+            </p>
             <p className={compact ? "text-[14.5px] font-black leading-tight text-foreground" : "text-[16px] font-black leading-tight text-foreground"}>
               {list.length > 1 ? `Treine com ${list.slice(0, 3).map((p) => (p.name ?? "").trim().split(/\s+/)[0]).join(", ").replace(/, ([^,]*)$/, " ou $1")}` : `Treine com ${first}`}
             </p>

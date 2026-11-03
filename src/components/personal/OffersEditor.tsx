@@ -23,11 +23,33 @@ type Offer = {
   duration_label: string | null;
   active: boolean;
   sort: number;
+  promo_price_cents: number | null;
+  promo_label: string | null;
+  promo_until: string | null;
 };
 
-type Draft = { id?: string; title: string; description: string; price: string; sessions: string; duration: string };
+type Draft = {
+  id?: string;
+  title: string;
+  description: string;
+  price: string;
+  sessions: string;
+  duration: string;
+  promoPrice: string;
+  promoLabel: string;
+  promoUntil: string;
+};
 
-const EMPTY: Draft = { title: "", description: "", price: "", sessions: "", duration: "por mês" };
+const EMPTY: Draft = {
+  title: "",
+  description: "",
+  price: "",
+  sessions: "",
+  duration: "por mês",
+  promoPrice: "",
+  promoLabel: "Black Friday",
+  promoUntil: "2026-11-30",
+};
 
 const EXAMPLES = [
   { title: "Acompanhamento 3x por semana", sessions: "3", price: "", duration: "por mês" },
@@ -43,7 +65,7 @@ export function OffersEditor({ trainerId, gymId }: { trainerId: string; gymId: s
   const load = useCallback(async () => {
     const { data, error } = await supabaseBrowser()
       .from("personal_offers" as never)
-      .select("id, title, description, price_cents, sessions_per_week, duration_label, active, sort")
+      .select("id, title, description, price_cents, sessions_per_week, duration_label, active, sort, promo_price_cents, promo_label, promo_until")
       .eq("trainer_id", trainerId)
       .order("sort")
       .order("created_at");
@@ -72,6 +94,15 @@ export function OffersEditor({ trainerId, gymId }: { trainerId: string; gymId: s
       return;
     }
     const sessions = draft.sessions.trim() ? Number(draft.sessions) : null;
+    const promo = draft.promoPrice.trim() ? parseBRLToCents(draft.promoPrice) : null;
+    if (draft.promoPrice.trim() && promo === null) {
+      toast.message("Preço promocional inválido. Ex.: 199 ou 199,90");
+      return;
+    }
+    if (promo !== null && (!draft.promoUntil || (price !== null && promo >= price))) {
+      toast.message(!draft.promoUntil ? "Diga até quando vale a promoção." : "O preço promocional precisa ser menor que o normal.");
+      return;
+    }
     const row = {
       gym_id: gymId,
       trainer_id: trainerId,
@@ -80,6 +111,9 @@ export function OffersEditor({ trainerId, gymId }: { trainerId: string; gymId: s
       price_cents: price,
       sessions_per_week: sessions && sessions >= 1 && sessions <= 7 ? sessions : null,
       duration_label: draft.duration.trim() || null,
+      promo_price_cents: promo,
+      promo_label: promo !== null ? draft.promoLabel.trim() || "Promoção" : null,
+      promo_until: promo !== null ? draft.promoUntil : null,
     };
     setSaving(true);
     const sb = supabaseBrowser();
@@ -165,6 +199,9 @@ export function OffersEditor({ trainerId, gymId }: { trainerId: string; gymId: s
                 {o.price_cents !== null && o.duration_label ? ` ${o.duration_label}` : ""}
                 {o.sessions_per_week ? ` · ${o.sessions_per_week}x por semana` : ""}
                 {!o.active ? " · pausado" : ""}
+                {o.promo_price_cents !== null && o.promo_until
+                  ? ` · ${o.promo_label ?? "Promoção"} ${formatBRL(o.promo_price_cents)} até ${o.promo_until.slice(8, 10)}/${o.promo_until.slice(5, 7)}`
+                  : ""}
               </p>
             </div>
             <button type="button" aria-label="Editar plano" onClick={() => setDraft({
@@ -174,6 +211,9 @@ export function OffersEditor({ trainerId, gymId }: { trainerId: string; gymId: s
               price: o.price_cents === null ? "" : (o.price_cents / 100).toFixed(2).replace(".", ","),
               sessions: o.sessions_per_week ? String(o.sessions_per_week) : "",
               duration: o.duration_label ?? "",
+              promoPrice: o.promo_price_cents === null ? "" : (o.promo_price_cents / 100).toFixed(2).replace(".", ","),
+              promoLabel: o.promo_label ?? "Black Friday",
+              promoUntil: o.promo_until ?? "2026-11-30",
             })} className="tactile rounded-full p-1.5 text-muted-foreground hover:text-brand">
               <Pencil className="h-3.5 w-3.5" />
             </button>
@@ -209,6 +249,23 @@ export function OffersEditor({ trainerId, gymId }: { trainerId: string; gymId: s
               value={draft.sessions} onChange={(e) => setDraft({ ...draft, sessions: e.target.value.replace(/\D/g, "").slice(0, 1) })} />
           </div>
           <p className="text-[10.5px] text-muted-foreground">Preço vazio aparece como “valor a combinar”.</p>
+          <div className="rounded-lg border border-white/15 bg-black/40 p-2.5">
+            <p className="text-[11px] font-black text-foreground">🖤 Preço promocional (opcional)</p>
+            <div className="mt-1.5 grid grid-cols-3 gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span>Promo (R$)</span>
+              <span>Nome</span>
+              <span>Vale até</span>
+            </div>
+            <div className="mt-0.5 grid grid-cols-3 gap-2">
+              <input className={input} inputMode="decimal" placeholder="199,00" aria-label="Preço promocional"
+                value={draft.promoPrice} onChange={(e) => setDraft({ ...draft, promoPrice: e.target.value })} />
+              <input className={input} placeholder="Black Friday" aria-label="Nome da promoção" maxLength={30}
+                value={draft.promoLabel} onChange={(e) => setDraft({ ...draft, promoLabel: e.target.value })} />
+              <input className={input} type="date" aria-label="Promoção vale até"
+                value={draft.promoUntil} onChange={(e) => setDraft({ ...draft, promoUntil: e.target.value })} />
+            </div>
+            <p className="mt-1 text-[10px] text-muted-foreground">O aluno vê “de R$ X por R$ Y” com o selo até essa data.</p>
+          </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => setDraft(null)} className="tactile flex-1 rounded-xl border border-border py-2.5 text-[12.5px] font-bold text-muted-foreground">
               Cancelar
