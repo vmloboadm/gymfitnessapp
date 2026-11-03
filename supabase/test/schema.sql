@@ -214,6 +214,26 @@ $$;
 
 
 --
+-- Name: athlete_display(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.athlete_display(p_student uuid, OUT disp text, OUT firstn text) RETURNS record
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  aname text;
+begin
+  select coalesce(nullif(trim(name), ''), 'Atleta') into aname from public.profiles where id = p_student;
+  aname := coalesce(aname, 'Atleta');
+  firstn := split_part(aname, ' ', 1);
+  disp := firstn || case when split_part(aname, ' ', 2) <> ''
+    then ' ' || left(split_part(aname, ' ', 2), 1) || '.' else '' end;
+end;
+$$;
+
+
+--
 -- Name: auto_close_stale_workouts(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -338,13 +358,26 @@ CREATE FUNCTION public.award_checkin() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare v_day date := (NEW.checked_at at time zone 'America/Sao_Paulo')::date;
+declare
+  v_day date := (NEW.checked_at at time zone 'America/Sao_Paulo')::date;
+  n record;
 begin
   if NEW.type = 'entrada' then
-    perform public.add_points(NEW.gym_id, NEW.student_id, 'checkin', 5, 'checkin:'||NEW.student_id||':'||v_day, 'fazer check-in na academia');
+    perform public.add_points(NEW.gym_id, NEW.student_id, 'checkin', 5,
+      'checkin:'||NEW.student_id||':'||v_day, 'fazer check-in na academia');
+
+    if not exists (
+      select 1 from public.checkins
+      where student_id = NEW.student_id and type = 'entrada' and id <> NEW.id
+    ) then
+      n := public.athlete_display(NEW.student_id);
+      perform public.grant_achievement(NEW.gym_id, NEW.student_id, 'first_checkin',
+        n.disp, n.firstn, 'fez o primeiro check-in na academia!');
+    end if;
   end if;
   return NEW;
-end; $$;
+end;
+$$;
 
 
 --
@@ -384,11 +417,95 @@ CREATE FUNCTION public.award_feed_post() RETURNS trigger
     SET search_path TO 'public'
     AS $$
 begin
-  if NEW.author_id is not null and not NEW.is_pinned then
+  if NEW.author_id is not null and not NEW.is_pinned
+     and coalesce(current_setting('gf.system_post', true), '') <> '1' then
     perform public.add_points(NEW.gym_id, NEW.author_id, 'feed_post', 10, 'post:'||NEW.id, 'postar no feed');
   end if;
   return NEW;
-end; $$;
+end;
+$$;
+
+
+--
+-- Name: award_log_milestones(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.award_log_milestones() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  prev numeric;
+  exname text;
+  n record;
+  today date := public.local_day(NEW.date);
+  ws date := date_trunc('week', public.local_day(NEW.date))::date;
+  week_volume numeric;
+  pr_owned boolean;
+begin
+  begin
+    n := public.athlete_display(NEW.student_id);
+
+    -- Recorde: carga maior que qualquer dia anterior no mesmo exercício
+    if NEW.weight_kg is not null and NEW.weight_kg > 0 and NEW.exercise_id is not null then
+      select max(weight_kg) into prev
+      from public.workout_logs
+      where student_id = NEW.student_id
+        and exercise_id = NEW.exercise_id
+        and id <> NEW.id
+        and public.local_day(date) < today;
+
+      if prev is not null and NEW.weight_kg > prev then
+        select coalesce(nullif(trim(name), ''), 'um exercício') into exname
+        from public.exercises where id = NEW.exercise_id;
+        exname := coalesce(exname, 'um exercício');
+
+        select exists (
+          select 1 from public.student_achievements sa
+          join public.achievements a on a.id = sa.achievement_id
+          where sa.student_id = NEW.student_id and a.code = 'pr_new_record'
+        ) into pr_owned;
+
+        if not exists (
+          select 1 from public.feed_posts
+          where author_id = NEW.student_id and type = 'conquista'
+            and body like '%novo recorde%'
+            and public.local_day(created_at) = public.local_day(now())
+        ) then
+          if not pr_owned then
+            perform public.grant_achievement(NEW.gym_id, NEW.student_id, 'pr_new_record',
+              n.disp, n.firstn,
+              'bateu um novo recorde no ' || exname || ': ' || public.fmt_kg(NEW.weight_kg) || ' kg!');
+          else
+            perform public.system_feed_post(NEW.gym_id, NEW.student_id,
+              n.disp || ' bateu um novo recorde no ' || exname || ': '
+              || public.fmt_kg(NEW.weight_kg) || ' kg! 💪 Parabéns, ' || n.firstn || '!');
+            insert into public.notifications (gym_id, user_id, channel, title, body)
+            values (NEW.gym_id, NEW.student_id, 'in_app', 'Novo recorde: ' || exname,
+              public.fmt_kg(NEW.weight_kg) || ' kg, acima dos ' || public.fmt_kg(prev)
+              || ' kg de antes. Já está no feed!');
+          end if;
+        end if;
+      end if;
+    end if;
+
+    -- 10.000 kg de volume na semana (seg-dom)
+    if NEW.weight_kg is not null and NEW.reps is not null then
+      select coalesce(sum(coalesce(weight_kg, 0) * coalesce(reps, 0)), 0) into week_volume
+      from public.workout_logs
+      where student_id = NEW.student_id and public.local_day(date) >= ws
+        and public.local_day(date) < ws + 7;
+      if week_volume >= 10000 then
+        perform public.grant_achievement(NEW.gym_id, NEW.student_id, 'volume_10k',
+          n.disp, n.firstn, 'moveu mais de 10 toneladas na semana!');
+      end if;
+    end if;
+  exception when others then
+    raise warning 'award_log_milestones falhou: %', sqlerrm;
+  end;
+  return NEW;
+end;
+$$;
 
 
 --
@@ -830,6 +947,35 @@ $_$;
 
 
 --
+-- Name: dispatch_push(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.dispatch_push() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $_$
+declare
+  v_url text;
+begin
+  if NEW.pushed_at is not null then
+    return NEW;
+  end if;
+  select value into v_url from public.app_config where key = 'push_dispatch_url';
+  if v_url is null or to_regnamespace('net') is null then
+    return NEW;
+  end if;
+  begin
+    execute 'select net.http_post(url := $1, body := $2, headers := $3)'
+      using v_url, jsonb_build_object('id', NEW.id), '{"Content-Type": "application/json"}'::jsonb;
+  exception when others then
+    raise warning 'dispatch_push falhou: %', sqlerrm;
+  end;
+  return NEW;
+end;
+$_$;
+
+
+--
 -- Name: enforce_medical_clearance(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -878,6 +1024,18 @@ begin
       updated_at           = now()
   where id = auth.uid();
 end;
+$$;
+
+
+--
+-- Name: fmt_kg(numeric); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.fmt_kg(p numeric) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    AS $$
+  select case when p = trunc(p) then trunc(p)::text
+              else rtrim(rtrim(round(p, 2)::text, '0'), '.') end;
 $$;
 
 
@@ -958,10 +1116,11 @@ CREATE FUNCTION public.grant_achievement(p_gym uuid, p_student uuid, p_code text
 declare
   aid uuid;
   aname text;
+  apoints integer;
   inserted_count integer;
-  fresh boolean;
 begin
-  select id, name into aid, aname from public.achievements where code = p_code;
+  select id, name, coalesce(points, 0) into aid, aname, apoints
+  from public.achievements where code = p_code and gym_id is null;
   if aid is null then
     return;
   end if;
@@ -969,24 +1128,27 @@ begin
   insert into public.student_achievements (gym_id, student_id, achievement_id)
   values (p_gym, p_student, aid)
   on conflict (student_id, achievement_id) do nothing;
-
   get diagnostics inserted_count = row_count;
-  fresh := inserted_count > 0;
-
-  if not fresh then
+  if inserted_count = 0 then
     return;
+  end if;
+
+  if apoints > 0 then
+    insert into public.point_events (gym_id, student_id, source, points, dedupe_key)
+    values (p_gym, p_student, 'achievement', apoints, 'ach:' || p_student || ':' || p_code)
+    on conflict (dedupe_key) do nothing;
+    perform public.recompute_leaderboard(p_student, p_gym);
   end if;
 
   insert into public.notifications (gym_id, user_id, channel, title, body)
   values (p_gym, p_student, 'in_app', 'Conquista liberada: ' || aname,
-    'Você ganhou a conquista ' || aname || '. Ela já apareceu no feed da academia.');
+    'Você ganhou ' || aname
+      || case when apoints > 0 then ' (+' || apoints || ' pontos)' else '' end
+      || '. Já está no feed: a galera pode curtir e comentar.');
 
-  if p_post then
-    insert into public.feed_posts (gym_id, author_id, type, body, expires_at)
-    values (p_gym, p_student, 'conquista',
-      p_disp || ' ' || p_action || ' Parabéns, ' || p_first || '! 🎉❤️',
-      now() + interval '30 days');
-  end if;
+  -- p_post ficou só por compatibilidade: toda conquista vai pro feed
+  perform public.system_feed_post(p_gym, p_student,
+    p_disp || ' ' || p_action || ' 🏆 ' || aname || '. Parabéns, ' || p_first || '! 🎉');
 exception when others then
   raise warning 'grant_achievement falhou: %', sqlerrm;
 end;
@@ -2142,6 +2304,23 @@ $$;
 
 
 --
+-- Name: system_feed_post(uuid, uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.system_feed_post(p_gym uuid, p_author uuid, p_body text) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  perform set_config('gf.system_post', '1', true);
+  insert into public.feed_posts (gym_id, author_id, type, body, expires_at)
+  values (p_gym, p_author, 'conquista', p_body, now() + interval '30 days');
+  perform set_config('gf.system_post', '', true);
+end;
+$$;
+
+
+--
 -- Name: touch_updated_at(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2373,6 +2552,16 @@ CREATE TABLE public.ai_generation_logs (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT ai_generation_logs_created_via_check CHECK ((created_via = ANY (ARRAY['manual'::text, 'ia'::text, 'foto'::text, 'template'::text]))),
     CONSTRAINT ai_generation_logs_purpose_check CHECK ((purpose = ANY (ARRAY['generate_workout'::text, 'parse_ficha'::text, 'edit_template'::text, 'plato_detection'::text, 'insight_student'::text, 'insight_trainer'::text, 'insight_manager'::text, 'register_student'::text])))
+);
+
+
+--
+-- Name: app_config; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_config (
+    key text NOT NULL,
+    value text NOT NULL
 );
 
 
@@ -2769,6 +2958,7 @@ CREATE TABLE public.notifications (
     body text NOT NULL,
     read_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    pushed_at timestamp with time zone,
     CONSTRAINT notifications_channel_check CHECK ((channel = ANY (ARRAY['in_app'::text, 'push'::text, 'email'::text])))
 );
 
@@ -3260,6 +3450,14 @@ ALTER TABLE ONLY public.ai_audit_logs
 
 ALTER TABLE ONLY public.ai_generation_logs
     ADD CONSTRAINT ai_generation_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: app_config app_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_config
+    ADD CONSTRAINT app_config_pkey PRIMARY KEY (key);
 
 
 --
@@ -4006,6 +4204,13 @@ CREATE TRIGGER trg_award_feed_post AFTER INSERT ON public.feed_posts FOR EACH RO
 
 
 --
+-- Name: workout_logs trg_award_log_milestones; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_award_log_milestones AFTER INSERT ON public.workout_logs FOR EACH ROW EXECUTE FUNCTION public.award_log_milestones();
+
+
+--
 -- Name: progress_photos trg_award_progress_photo; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -4038,6 +4243,13 @@ CREATE TRIGGER trg_checkin_duplicate BEFORE INSERT ON public.checkins FOR EACH R
 --
 
 CREATE TRIGGER trg_default_profile_name BEFORE INSERT OR UPDATE OF name, email ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.default_profile_name();
+
+
+--
+-- Name: notifications trg_dispatch_push; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_dispatch_push AFTER INSERT ON public.notifications FOR EACH ROW EXECUTE FUNCTION public.dispatch_push();
 
 
 --
@@ -4989,6 +5201,12 @@ CREATE POLICY ai_logs_insert ON public.ai_generation_logs FOR INSERT WITH CHECK 
 
 CREATE POLICY ai_logs_select_staff ON public.ai_generation_logs FOR SELECT USING (((public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text])) AND (gym_id = public.current_gym_id())));
 
+
+--
+-- Name: app_config; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.app_config ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: app_data_migrations; Type: ROW SECURITY; Schema: public; Owner: -
