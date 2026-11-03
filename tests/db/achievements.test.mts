@@ -35,7 +35,7 @@ test("primeiro treino libera 'first_workout', avisa o aluno e posta no feed", as
   });
 });
 
-test("3 dias seguidos liberam 'streak_3' (sem post no feed)", async () => {
+test("3 dias seguidos liberam 'streak_3' (e agora também vai pro feed)", async () => {
   await withTx(async (q, h) => {
     const gym = await h.gym();
     const aluno = await h.student(gym);
@@ -47,7 +47,7 @@ test("3 dias seguidos liberam 'streak_3' (sem post no feed)", async () => {
     const [f] = await q<{ n: number }>(
       "select count(*)::int n from feed_posts where author_id = $1 and body like '%3 dias programados%'", [aluno]
     );
-    assert.equal(f.n, 0);
+    assert.equal(f.n, 1);
   });
 });
 

@@ -61,6 +61,14 @@ test("calcScheduledStreak: sem ficha usa a sequência simples", () => {
   assert.equal(calcScheduledStreak(["2026-11-04", "2026-11-03"], []), 2);
 });
 
-test.todo(
-  "reserva do app deveria seguir a regra de reposição do banco (migration 067): ficha seg/qua/sex e treino ter/qui/sex mantém a sequência"
-);
+// Mesma regra de reposição do banco (migration 067), mesmos cenários de
+// tests/db/streak.test.mts: semana passada = 26/10 (seg) a 01/11 (dom).
+test("calcScheduledStreak: reposição — ficha seg/qua/sex, treinou ter/qui/sex, continua", () => {
+  const dias = ["2026-11-03", "2026-11-02", "2026-10-27", "2026-10-29", "2026-10-30"];
+  assert.equal(calcScheduledStreak(dias, SEG_QUA_SEX), 5);
+});
+
+test("calcScheduledStreak: reposição cobre só uma falta por treino extra", () => {
+  const dias = ["2026-11-03", "2026-11-02", "2026-10-27", "2026-10-30"];
+  assert.equal(calcScheduledStreak(dias, SEG_QUA_SEX), 4);
+});

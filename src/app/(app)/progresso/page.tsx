@@ -111,7 +111,11 @@ export default function ProgressoPage() {
         getLastReportRequest(profile.gym_id, user.id).catch(() => null),
         supabaseBrowser().rpc("day_streak" as never, { p_student: user.id } as never),
       ]);
-      const serverStreak = Number((streakRes as { data?: unknown }).data ?? 0) || 0;
+      // falha na chamada → null, para a tela usar o cálculo de reserva (e não 0)
+      const streakErr = (streakRes as { error?: unknown }).error;
+      const serverStreak: number | null = streakErr
+        ? null
+        : Number((streakRes as { data?: unknown }).data ?? 0) || 0;
 
       return {
         data: {

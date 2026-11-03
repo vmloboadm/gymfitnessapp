@@ -4,7 +4,7 @@
  * BASE-aware: deriva o prefixo (/app) do próprio scope do SW, funcionando
  * tanto na raiz quanto sob basePath.
  */
-const CACHE_VERSION = "gymfitness-v64";
+const CACHE_VERSION = "gymfitness-v65";
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
@@ -130,6 +130,8 @@ self.addEventListener("push", (event) => {
       icon: `${BASE}/icons/icon-192x192.png`,
       badge: `${BASE}/icons/icon-96x96.png`,
       data: { url: data.url ?? `${BASE}/` },
+      // avisos do mesmo tipo (curtidas, conquistas…) se agrupam num só
+      ...(data.tag ? { tag: data.tag, renotify: true } : {}),
     })
   );
 });

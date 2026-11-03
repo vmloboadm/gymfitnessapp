@@ -59,33 +59,62 @@ export function calcStreak(days: string[]): number {
 
 const WEEK_LABEL = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 
-/** Sequência respeitando os dias programados. Descanso não quebra. */
+/** Segunda-feira (chave YYYY-MM-DD) da semana de uma chave de dia. */
+function weekMondayKey(key: string): string {
+  const d = new Date(`${key}T12:00:00Z`);
+  const dow = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - (dow === 0 ? 6 : dow - 1));
+  return d.toISOString().slice(0, 10);
+}
+
+function previousKey(key: string): string {
+  const d = new Date(`${key}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function weekdayLabel(key: string): string {
+  return WEEK_LABEL[new Date(`${key}T12:00:00Z`).getUTCDay()];
+}
+
+/**
+ * Sequência respeitando os dias programados — MESMA regra do banco
+ * (day_streak, migration 067), usada quando a chamada ao banco falha:
+ *   * dia com treino soma 1, marcado ou não;
+ *   * dia não marcado e sem treino é descanso: não soma nem quebra;
+ *   * dia marcado perdido só quebra se não houver reposição na mesma semana
+ *     (seg-dom): cada treino em dia não marcado repõe uma falta.
+ */
 export function calcScheduledStreak(days: string[], scheduledWeekdays: string[] = []): number {
   const unique = [...new Set(days.map((d) => localDayKey(d)))].filter(Boolean).sort();
   if (unique.length === 0) return 0;
   if (scheduledWeekdays.length === 0) return calcStreak(unique);
 
-  const set = new Set(unique);
+  const trained = new Set(unique);
   const allowed = new Set(scheduledWeekdays);
   const today = localDayKey(new Date());
-  let cursor = set.has(today) ? today : localDayKeyDaysAgo(1);
+  const used = new Map<string, number>();
+  let cursor = trained.has(today) ? today : previousKey(today);
   let streak = 0;
 
-  const previous = (key: string): string => {
-    const d = new Date(`${key}T12:00:00`);
-    d.setDate(d.getDate() - 1);
-    return localDayKey(d);
-  };
-
-  for (let guard = 0; guard < 370; guard++) {
-    const label = WEEK_LABEL[new Date(`${cursor}T12:00:00`).getDay()];
-    if (!allowed.has(label)) {
-      cursor = previous(cursor);
+  for (let guard = 0; guard < 400; guard++) {
+    if (trained.has(cursor)) {
+      streak++;
+      cursor = previousKey(cursor);
       continue;
     }
-    if (!set.has(cursor)) break;
-    streak++;
-    cursor = previous(cursor);
+    if (!allowed.has(weekdayLabel(cursor))) {
+      cursor = previousKey(cursor);
+      continue;
+    }
+    const week = weekMondayKey(cursor);
+    const makeups = unique.filter(
+      (t) => t <= today && weekMondayKey(t) === week && !allowed.has(weekdayLabel(t))
+    ).length;
+    const usedHere = used.get(week) ?? 0;
+    if (makeups - usedHere <= 0) break;
+    used.set(week, usedHere + 1);
+    cursor = previousKey(cursor);
   }
   return streak;
 }

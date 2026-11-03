@@ -34,6 +34,7 @@ import { StreakFlame, FlameStageHint } from "~/components/dashboard/StreakFlame"
 import { PerformanceRing } from "~/components/dashboard/PerformanceRing";
 import { HeroWorkout } from "~/components/dashboard/HeroWorkout";
 import { PWAInstallBanner } from "~/components/pwa/PWAInstallBanner";
+import { PushInvite } from "~/components/pwa/PushInvite";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { titleFor } from "~/components/dashboard/TitlePoints";
@@ -344,7 +345,7 @@ export default function HomePage() {
     foco: string;
     count: number;
     image: string;
-    streak: number;
+    streak: number | null;
     completedToday: boolean;
     /** "Feito pela última vez em 22/10" do slot sugerido */
     lastDoneLabel?: string;
@@ -377,7 +378,11 @@ export default function HomePage() {
           .maybeSingle(),
       ]);
       const checks = checksRes.data;
-      const serverStreak = Number((streakRes as { data?: unknown }).data ?? 0) || 0;
+      // falha na chamada → null, para a home usar o cálculo de reserva (e não 0)
+      const streakErr = (streakRes as { error?: unknown }).error;
+      const serverStreak: number | null = streakErr
+        ? null
+        : Number((streakRes as { data?: unknown }).data ?? 0) || 0;
       const state = resolveTrainingDay({
         plan: p,
         today: new Date(),
@@ -832,6 +837,9 @@ export default function HomePage() {
         {/* Convite de instalação do PWA (só quando dá para instalar) */}
         <m.div variants={item} className="px-4 pt-1">
           <PWAInstallBanner />
+          <div className="mt-2 empty:hidden">
+            <PushInvite />
+          </div>
         </m.div>
 
         {/* TREINO DE HOJE, ação principal; recebe o scroll quando check-in feito */}
