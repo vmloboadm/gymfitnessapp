@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Flame, HandHeart, Timer, Trophy, Users } from "lucide-react";
+import { CalendarClock, Flame, HandHeart, Target, Timer, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
@@ -34,7 +34,15 @@ type Campaign = {
 
 type BoardRow = { id: string; name: string; avatar_url: string | null; days: number; rank: number; me: boolean };
 type Board = { participants: number; joined: boolean; rows: BoardRow[] };
-type Challenge = { id: string; title: string; goal_days: number; ends_on: string; prize_text: string | null };
+type Challenge = {
+  id: string;
+  title: string;
+  goal_days: number;
+  ends_on: string;
+  prize_text: string | null;
+  objective_text: string | null;
+  registration_opens_on: string | null;
+};
 
 const THEME: Record<Campaign["theme"], { box: string; badge: string; cta: string }> = {
   black: {
@@ -63,6 +71,14 @@ function timeLeft(iso: string): string {
   return h >= 1 ? `faltam ${h}h` : "últimas horas";
 }
 
+/** "Inscrições abrem em 10/01" só quando a data ainda não chegou. */
+function registrationLine(iso: string | null): string | null {
+  if (!iso) return null;
+  const opens = new Date(`${iso}T12:00:00`);
+  if (opens.getTime() <= Date.now()) return null;
+  return `Inscrições abrem em ${opens.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`;
+}
+
 export function CampaignCards({ only }: { only?: Campaign["kind"] } = {}) {
   const { profile } = useAuth();
   const [items, setItems] = useState<Campaign[]>([]);
@@ -85,6 +101,23 @@ export function CampaignCards({ only }: { only?: Campaign["kind"] } = {}) {
     else if (r?.reason === "ja_deu_hoje") toast.message(`Você já deu força para ${to.name} hoje.`);
   };
 
+  const leave = async (challengeId: string) => {
+    if (!window.confirm("Sair do desafio? Seus dias treinados continuam contando e você pode entrar de novo.")) return;
+    const { data, error } = await supabaseBrowser().rpc("leave_challenge" as never, { p_challenge: challengeId } as never);
+    const r = data as unknown as { ok: boolean; reason?: string } | null;
+    if (error) {
+      logger.error("challenge.leave", error);
+      return toast.error("Não foi possível sair agora.");
+    }
+    if (r?.ok) {
+      toast.success("Você saiu do desafio.");
+      await loadBoard(challengeId);
+    } else if (r?.reason === "nao_participa") {
+      toast.message("Você não está nesse desafio.");
+      await loadBoard(challengeId);
+    } else toast.error("Não foi possível sair agora.");
+  };
+
   const loadBoard = useCallback(async (challengeId: string) => {
     const { data } = await supabaseBrowser().rpc("challenge_board" as never, { p_challenge: challengeId } as never);
     if (data) setBoards((b) => ({ ...b, [challengeId]: data as unknown as Board }));
@@ -105,7 +138,7 @@ export function CampaignCards({ only }: { only?: Campaign["kind"] } = {}) {
       setItems(list);
       const ids = list.map((c) => c.challenge_id).filter(Boolean) as string[];
       if (ids.length) {
-        const { data: ch } = await sb.from("challenges" as never).select("id, title, goal_days, ends_on, prize_text").in("id", ids);
+        const { data: ch } = await sb.from("challenges" as never).select("id, title, goal_days, ends_on, prize_text, objective_text, registration_opens_on").in("id", ids);
         if (alive) setChallenges(Object.fromEntries(((ch as unknown as Challenge[]) ?? []).map((c) => [c.id, c])));
         for (const id of ids) void loadBoard(id);
       }
@@ -127,11 +160,13 @@ export function CampaignCards({ only }: { only?: Campaign["kind"] } = {}) {
         logger.error("challenge.join", error);
         return toast.error("Não foi possível entrar agora.");
       }
-      const r = data as unknown as { ok: boolean; reason?: string };
+      const r = data as unknown as { ok: boolean; reason?: string; opens_on?: string };
       if (r.ok || r.reason === "ja_participa") {
         toast.success("Você está no desafio! 🔥 Cada dia de treino conta.");
         await loadBoard(c.challenge_id);
         setRanking(c.challenge_id);
+      } else if (r.reason === "ainda_nao_abriu") {
+        toast.message(`As inscrições abrem em ${r.opens_on ?? "breve"}. Acompanhe por aqui!`);
       } else toast.message(r.reason === "encerrado" ? "Esse desafio já terminou." : "Desafio indisponível.");
       return;
     }
@@ -154,6 +189,7 @@ export function CampaignCards({ only }: { only?: Campaign["kind"] } = {}) {
         const ch = c.challenge_id ? challenges[c.challenge_id] : null;
         const mine = board?.rows.find((r) => r.me);
         const pct = ch && mine ? Math.min(100, Math.round((mine.days / ch.goal_days) * 100)) : 0;
+        const regLine = registrationLine(ch?.registration_opens_on ?? null);
         return (
           <article key={c.id} className={cn("gf-rise overflow-hidden rounded-2xl border p-4", t.box)}>
             <div className="flex items-center justify-between gap-2">
@@ -166,6 +202,18 @@ export function CampaignCards({ only }: { only?: Campaign["kind"] } = {}) {
             </div>
             <h3 className="mt-2 text-[18px] font-black leading-tight text-white">{c.title}</h3>
             {c.subtitle ? <p className="mt-1 text-[12.5px] leading-snug text-white/75">{c.subtitle}</p> : null}
+
+            {ch?.objective_text ? (
+              <p className="mt-2.5 flex items-center gap-1.5 rounded-xl border border-[#FFC24D]/45 bg-[#FFC24D]/15 px-2.5 py-2 text-[13.5px] font-black leading-snug text-[#FFC24D]">
+                <Target className="h-4 w-4 shrink-0" />
+                {ch.objective_text}
+              </p>
+            ) : null}
+            {regLine ? (
+              <p className="mt-2 flex items-center gap-1.5 text-[11.5px] font-bold text-white/85">
+                <CalendarClock className="h-3.5 w-3.5 shrink-0" /> {regLine}
+              </p>
+            ) : null}
 
             {board ? (
               <div className="mt-3 space-y-2">
@@ -213,6 +261,12 @@ export function CampaignCards({ only }: { only?: Campaign["kind"] } = {}) {
         {rankingBoard && rankingChallenge ? (
           <div className="max-h-[75dvh] space-y-3 overflow-y-auto p-1 pb-4">
             <h2 className="pr-10 text-lg font-black text-foreground">{rankingChallenge.title}</h2>
+            {rankingChallenge.objective_text ? (
+              <p className="flex items-center gap-1.5 rounded-xl border border-[#FFC24D]/45 bg-[#FFC24D]/15 px-3 py-2 text-[13.5px] font-black text-[#FFC24D]">
+                <Target className="h-4 w-4 shrink-0" />
+                {rankingChallenge.objective_text}
+              </p>
+            ) : null}
             <p className="text-[12.5px] text-muted-foreground">
               Meta: {rankingChallenge.goal_days} dias de treino até{" "}
               {new Date(`${rankingChallenge.ends_on}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}.
@@ -247,6 +301,15 @@ export function CampaignCards({ only }: { only?: Campaign["kind"] } = {}) {
                 </li>
               ))}
             </ol>
+            {rankingBoard.joined ? (
+              <button
+                type="button"
+                onClick={() => void leave(ranking!)}
+                className="tactile w-full rounded-xl border border-[#F87171]/40 bg-[#F87171]/10 py-2.5 text-[13px] font-black text-[#F87171]"
+              >
+                Sair do desafio
+              </button>
+            ) : null}
           </div>
         ) : null}
       </BottomSheet>

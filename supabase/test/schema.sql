@@ -1171,6 +1171,10 @@ begin
   if p_to = v_uid then return jsonb_build_object('ok', false, 'reason', 'voce_mesmo'); end if;
   select * into c from public.challenges where id = p_challenge and gym_id = st.gym_id;
   if c.id is null then return jsonb_build_object('ok', false, 'reason', 'indisponivel'); end if;
+  -- quem dá força também precisa estar no desafio (saíu = não participa)
+  if not exists (select 1 from public.challenge_participants where challenge_id = c.id and student_id = v_uid) then
+    return jsonb_build_object('ok', false, 'reason', 'nao_participa');
+  end if;
   if not exists (select 1 from public.challenge_participants where challenge_id = c.id and student_id = p_to) then
     return jsonb_build_object('ok', false, 'reason', 'nao_participa');
   end if;
@@ -2133,6 +2137,10 @@ begin
   if c.id is null then
     return jsonb_build_object('ok', false, 'reason', 'indisponivel');
   end if;
+  if c.registration_opens_on is not null and today < c.registration_opens_on then
+    return jsonb_build_object('ok', false, 'reason', 'ainda_nao_abriu',
+      'opens_on', to_char(c.registration_opens_on, 'DD/MM'));
+  end if;
   if today > c.ends_on then
     return jsonb_build_object('ok', false, 'reason', 'encerrado');
   end if;
@@ -2153,6 +2161,38 @@ begin
     'Meta: ' || c.goal_days || ' dias de treino até ' || to_char(c.ends_on, 'DD/MM')
     || '. Cada dia treinado conta no ranking. Bora!');
 
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+
+--
+-- Name: leave_challenge(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.leave_challenge(p_challenge uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_uid uuid := auth.uid();
+  st record;
+begin
+  select id, gym_id, role into st from public.profiles where id = v_uid;
+  if st.id is null or st.role <> 'student' then
+    raise exception 'Sem permissão';
+  end if;
+  if not exists (
+    select 1 from public.challenge_participants cp
+    join public.challenges c on c.id = cp.challenge_id
+    where cp.challenge_id = p_challenge and cp.student_id = v_uid
+      and c.gym_id = st.gym_id
+  ) then
+    return jsonb_build_object('ok', false, 'reason', 'nao_participa');
+  end if;
+
+  delete from public.challenge_participants
+  where challenge_id = p_challenge and student_id = v_uid;
   return jsonb_build_object('ok', true);
 end;
 $$;
@@ -4070,8 +4110,11 @@ CREATE TABLE public.challenges (
     prize_text text,
     active boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    objective_text text,
+    registration_opens_on date,
     CONSTRAINT challenges_check CHECK ((ends_on >= starts_on)),
-    CONSTRAINT challenges_goal_days_check CHECK (((goal_days >= 1) AND (goal_days <= 366)))
+    CONSTRAINT challenges_goal_days_check CHECK (((goal_days >= 1) AND (goal_days <= 366))),
+    CONSTRAINT challenges_objective_text_check CHECK (((objective_text IS NULL) OR (length(objective_text) <= 80)))
 );
 
 

@@ -21,8 +21,9 @@ async function setup(q: Q, h: Helpers) {
 
 async function join(q: Q, h: Helpers, id: string, ch: string) {
   await h.asApp(id);
-  await q("select public.join_challenge($1)", [ch]);
+  const [r] = await q<{ r: { ok: boolean; reason?: string } }>("select public.join_challenge($1) r", [ch]);
   await h.asDb();
+  return r.r;
 }
 
 test("convite do desafio vai só para quem tem consentimento e ainda não entrou, a partir da data", async () => {
@@ -100,5 +101,75 @@ test("post semanal não sai para desafio sem participantes ou encerrado", async 
     await setup(q, h);
     const [r] = await q<{ n: number }>("select public.post_challenge_weekly_updates() n");
     assert.equal(Number(r.n), 0);
+  });
+});
+
+test("aluno sai do desafio: some da lista e pode entrar de novo", async () => {
+  await withTx(async (q, h) => {
+    const { gym, ch } = await setup(q, h);
+    const ana = await h.student(gym, "Ana Lima");
+    await join(q, h, ana, ch);
+
+    await h.asApp(ana);
+    const [saiu] = await q<{ r: { ok: boolean } }>("select public.leave_challenge($1) r", [ch]);
+    const [deNovo] = await q<{ r: { ok: boolean; reason?: string } }>("select public.leave_challenge($1) r", [ch]);
+    await h.asDb();
+
+    assert.equal(saiu.r.ok, true);
+    assert.equal(deNovo.r.reason, "nao_participa", "quem já saiu não 'sai' de novo");
+    const [n] = await q<{ n: number }>("select count(*)::int n from challenge_participants");
+    assert.equal(n.n, 0);
+
+    assert.equal((await join(q, h, ana, ch)).ok, true, "sair não impede voltar");
+    const [b] = await q<{ n: number }>("select count(*)::int n from challenge_participants");
+    assert.equal(b.n, 1);
+  });
+});
+
+test("sair de desafio de outra academia ou não participado é recusado", async () => {
+  await withTx(async (q, h) => {
+    const { ch } = await setup(q, h);
+    const outra = await h.gym();
+    const alheio = await h.student(outra);
+    await h.asApp(alheio);
+    const [r1] = await q<{ r: { reason?: string } }>("select public.leave_challenge($1) r", [ch]);
+    const [r2] = await q<{ r: { reason?: string } }>("select public.leave_challenge($1) r", [ch]);
+    await h.asDb();
+    assert.equal(r1.r.reason, "nao_participa");
+    assert.equal(r2.r.reason, "nao_participa");
+  });
+});
+
+test("inscrição com data futura trava a entrada; data nula deixa entrar", async () => {
+  await withTx(async (q, h) => {
+    const { gym, ch } = await setup(q, h);
+    const ana = await h.student(gym, "Ana Lima");
+    const hoje = await todaySP(q);
+    await q("update challenges set registration_opens_on = $2 where id = $1", [ch, addDays(hoje, 3)]);
+    assert.equal((await join(q, h, ana, ch)).reason, "ainda_nao_abriu");
+
+    await q("update challenges set registration_opens_on = null, objective_text = 'Perca 5kg para o verão' where id = $1", [ch]);
+    assert.equal((await join(q, h, ana, ch)).ok, true);
+
+    await h.asApp(ana);
+    const [o] = await q<{ objective_text: string | null }>("select objective_text from challenges where id = $1", [ch]);
+    await h.asDb();
+    assert.equal(o.objective_text, "Perca 5kg para o verão");
+  });
+});
+
+test("dar força exige estar no desafio — quem saiu não força mais", async () => {
+  await withTx(async (q, h) => {
+    const { gym, ch } = await setup(q, h);
+    const ana = await h.student(gym, "Ana Lima");
+    const bia = await h.student(gym, "Bia Souza");
+    await join(q, h, ana, ch);
+    await join(q, h, bia, ch);
+    await h.asApp(ana);
+    await q("select public.leave_challenge($1)", [ch]);
+    const [r] = await q<{ r: { ok: boolean; reason?: string } }>("select public.challenge_cheer($1, $2) r", [ch, bia]);
+    await h.asDb();
+    assert.equal(r.r.ok, false);
+    assert.equal(r.r.reason, "nao_participa");
   });
 });
