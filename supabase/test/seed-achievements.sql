@@ -1,0 +1,16 @@
+INSERT INTO public.achievements VALUES ('6849b7eb-2412-4299-af54-22e6ba792865', NULL, 'first_checkin', 'Primeiro check-in', 'Registrou a chegada na academia pela primeira vez', NULL, 10);
+INSERT INTO public.achievements VALUES ('67b968e5-ff41-44e7-b54f-9ae5e0ddf19f', NULL, 'first_workout', 'Primeiro treino', 'Completou o primeiro treino completo', NULL, 50);
+INSERT INTO public.achievements VALUES ('50c21c36-669a-4b86-b0f6-a1782e5ffd54', NULL, 'streak_3', 'Raio de 3 dias', 'Treinou 3 dias consecutivos', NULL, 30);
+INSERT INTO public.achievements VALUES ('585c15b3-2495-4358-8864-cbd64857b28c', NULL, 'streak_7', 'Semana de fogo', 'Treinou 7 dias consecutivos', NULL, 100);
+INSERT INTO public.achievements VALUES ('b8a7cbd9-6dbd-43c8-8e5c-f7dad43784a9', NULL, 'streak_30', 'Mês consecutivo', 'Treinou 30 dias em sequência', NULL, 400);
+INSERT INTO public.achievements VALUES ('a9b6fc5e-3ed0-406c-a5e2-5e4bb1de8419', NULL, 'volume_10k', 'Pesos pesados', 'Acumulou 10.000 kg de volume em uma semana', NULL, 60);
+INSERT INTO public.achievements VALUES ('787d2e8d-4825-4f54-be38-9d0821eea87d', NULL, 'pr_new_record', 'Novo recorde', 'Bateu um recorde pessoal em algum exercício', NULL, 25);
+INSERT INTO public.achievements VALUES ('bb0558cf-4375-4fd9-9143-2aa3538f00d3', NULL, 'workout_10', 'Dez treinos', 'Completou 10 treinos no total', NULL, 80);
+INSERT INTO public.achievements VALUES ('80fae587-e2d9-4beb-8e35-c29405a58805', NULL, 'workout_50', 'Cinco décimos', 'Completou 50 treinos no total', NULL, 250);
+INSERT INTO public.achievements VALUES ('6e5ead5d-7e1c-4308-8f34-f5c76779b55c', NULL, 'day_pass_used', 'Conheceu a academia', 'Usou uma day-pass e voltou para se matricular', NULL, 20);
+INSERT INTO public.achievements VALUES ('b991b806-967e-4aa4-ab12-991c95c84611', NULL, 'plato_buster', 'Quebrador de platô', 'Saiu de um platô identificado pela IA', NULL, 35);
+INSERT INTO public.achievements VALUES ('1369836f-5474-430c-8d90-748b7583fae8', NULL, 'squad_winner', 'Campeão do squad', 'Venceu um desafio de squad', NULL, 120);
+INSERT INTO public.achievements VALUES ('99a5e995-df44-4ec8-8ec3-992d1ae6f240', NULL, 'week_goal', 'Meta da semana', 'Completou os treinos da meta semanal', NULL, 120);
+INSERT INTO public.achievements VALUES ('e895254a-dccc-427d-be3c-447e3139d854', NULL, 'month_12', 'Mês em dia', 'Treinou 12 dias no mês', NULL, 150);
+INSERT INTO public.achievements VALUES ('00b55828-0993-4aae-9ed2-bc2734a23ce3', NULL, 'cardio_first', 'Primeiro cardio', 'Registrou o primeiro cardio', NULL, 30);
+INSERT INTO public.achievements VALUES ('340a8448-6f88-4f9c-a127-f1a4450751bd', NULL, 'cardio_180', 'Coração forte', 'Somou 180 minutos de cardio no mês', NULL, 120);
