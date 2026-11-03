@@ -6,6 +6,7 @@ import { Bell, CheckCheck, Inbox, Flame, Trophy, Award, Megaphone, Target, Chevr
 import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
 import { TopBar } from "~/components/layout/TopBar";
+import { PushInvite } from "~/components/pwa/PushInvite";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -143,6 +144,7 @@ export default function NotificacoesPage() {
     <>
       <TopBar title="Notificações" subtitle={unread ? `${unread} não lida${unread > 1 ? "s" : ""}` : "Tudo lido"} />
       <div className="space-y-6 p-4">
+        <PushInvite context="notificacoes" ignoreSnooze />
         {items.length > 0 ? (
           <Button variant="outline" size="sm" className="gf-rise w-full" onClick={markAllRead}>
             <CheckCheck className="mr-1.5 h-3.5 w-3.5" />

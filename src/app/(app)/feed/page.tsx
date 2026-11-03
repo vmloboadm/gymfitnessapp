@@ -25,7 +25,6 @@ import {
   feedLocalToggleLike,
   FEED_LOCAL_EVENT,
 } from "~/lib/feed-store";
-import { PushInvite } from "~/components/pwa/PushInvite";
 import type { FeedComments, FeedLikes, FeedPosts, Profiles } from "~/lib/types/models";
 
 const POST_TYPE_LABEL: Record<FeedPosts["type"], string> = {
@@ -425,7 +424,6 @@ export default function FeedPage() {
     <>
       <TopBar title="Feed" subtitle="Comunidade do gym" />
       <div className="space-y-6 p-4">
-        <PushInvite context="feed" />
         <div className="gf-rise gf-card gf-glass !py-4">
           <div className="mb-2 flex items-center gap-2">
             <Avatar className="h-8 w-8">

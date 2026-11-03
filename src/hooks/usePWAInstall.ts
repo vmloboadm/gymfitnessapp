@@ -63,5 +63,5 @@ export function usePWAInstall() {
 
   // Android/Chrome com prompt capturado OU iPhone ainda não instalado
   const showable = !installed && !dismissed && (!!deferred || isIOS);
-  return { showable, isIOS, installed, promptInstall, dismiss };
+  return { showable, isIOS, installed, promptInstall, dismiss, canPrompt: !!deferred };
 }

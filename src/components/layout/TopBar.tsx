@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Bell, CloudOff } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
+import { usePush } from "~/hooks/usePush";
 import { OnlineCounter } from "~/components/layout/OnlineCounter";
 import { GymLogo } from "~/components/layout/GymLogo";
 import { cn } from "~/lib/utils";
@@ -26,6 +27,8 @@ export function TopBar({
 }) {
   const { user, profile } = useAuth();
   const { unread } = useNotifications(user?.id);
+  const push = usePush();
+  const pushOff = push.supported && !push.active && push.permission === "default";
   // "X treinando agora" só onde ajuda a decidir ir treinar; nas outras telas
   // espremia o título (ex.: "Resumo do treino" quebrava em duas linhas).
   const pathname = usePathname();
@@ -62,6 +65,9 @@ export function TopBar({
               <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-black text-brand-foreground">
                 {unread > 9 ? "9+" : unread}
               </span>
+            ) : pushOff ? (
+              // notificações desligadas neste aparelho: ponto de atenção no sino
+              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-warning ring-2 ring-background" aria-hidden />
             ) : null}
           </Link>
         </div>

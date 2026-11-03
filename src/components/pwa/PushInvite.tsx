@@ -23,13 +23,20 @@ function snoozed(): boolean {
   }
 }
 
-export function PushInvite({ context = "home" }: { context?: "home" | "feed" }) {
+export function PushInvite({
+  context = "home",
+  ignoreSnooze = false,
+}: {
+  context?: "home" | "feed" | "notificacoes";
+  /** na tela de notificações o convite aparece mesmo se foi adiado */
+  ignoreSnooze?: boolean;
+}) {
   const push = usePush();
   const [hidden, setHidden] = useState(true);
 
   useEffect(() => {
-    setHidden(snoozed());
-  }, []);
+    setHidden(ignoreSnooze ? false : snoozed());
+  }, [ignoreSnooze]);
 
   if (hidden || !push.supported || push.permission !== "default" || push.active) return null;
 
@@ -65,7 +72,9 @@ export function PushInvite({ context = "home" }: { context?: "home" | "feed" }) 
         <p className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">
           {context === "feed"
             ? "Saiba na hora quando curtirem ou comentarem suas conquistas."
-            : "Conquistas, recordes, curtidas e treino novo chegam direto no celular."}
+            : context === "notificacoes"
+              ? "Estes avisos também podem chegar no celular, mesmo com o app fechado."
+              : "Conquistas, recordes, curtidas e treino novo chegam direto no celular."}
         </p>
       </div>
       <button

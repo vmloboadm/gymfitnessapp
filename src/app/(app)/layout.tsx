@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BottomNav } from "~/components/layout/BottomNav";
 import { LiveWorkoutBar } from "~/components/layout/LiveWorkoutBar";
 import { PhotoGate } from "~/components/account/PhotoGate";
+import { AppSetupBar } from "~/components/pwa/AppSetupBar";
 import { useOfflineQueue } from "~/hooks/useOfflineQueue";
 import { useAuth } from "~/hooks/useAuth";
 import { CloudOff } from "lucide-react";
@@ -48,6 +49,7 @@ export default function AppLayout({
       <PhotoGate>
         <main>{children}</main>
         <LiveWorkoutBar />
+        <AppSetupBar />
         <BottomNav />
       </PhotoGate>
     </div>

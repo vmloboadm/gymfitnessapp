@@ -33,8 +33,6 @@ import { AiCoach } from "~/components/ai/AiCoachLazy";
 import { StreakFlame, FlameStageHint } from "~/components/dashboard/StreakFlame";
 import { PerformanceRing } from "~/components/dashboard/PerformanceRing";
 import { HeroWorkout } from "~/components/dashboard/HeroWorkout";
-import { PWAInstallBanner } from "~/components/pwa/PWAInstallBanner";
-import { PushInvite } from "~/components/pwa/PushInvite";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { titleFor } from "~/components/dashboard/TitlePoints";
@@ -834,13 +832,6 @@ export default function HomePage() {
           </div>
         </m.div>
 
-        {/* Convite de instalação do PWA (só quando dá para instalar) */}
-        <m.div variants={item} className="px-4 pt-1">
-          <PWAInstallBanner />
-          <div className="mt-2 empty:hidden">
-            <PushInvite />
-          </div>
-        </m.div>
 
         {/* TREINO DE HOJE, ação principal; recebe o scroll quando check-in feito */}
         <m.div variants={item} ref={heroRef} className="px-0 pb-2">
