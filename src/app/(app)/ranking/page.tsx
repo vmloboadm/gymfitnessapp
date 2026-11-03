@@ -9,6 +9,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
 import { useLeaderboardRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { supabaseBrowser } from "~/lib/supabase/client";
+import { CampaignCards } from "~/components/student/CampaignCards";
 import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -289,6 +290,9 @@ export default function RankingPage() {
       <TopBar title="Comunidade" subtitle={`Ranking ${periodLabel.toLowerCase()} · ${players} atletas na disputa`} />
 
       <div className="space-y-6 p-4">
+        {/* Desafio em andamento: entrar, ranking do desafio e "Força" */}
+        <CampaignCards only="desafio" />
+
         {/* Pulso da academia no período */}
         <div className="gf-rise flex items-center justify-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-2" style={{ animationDelay: "30ms" }}>
           <span className="relative flex h-2 w-2">

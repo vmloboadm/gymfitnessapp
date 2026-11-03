@@ -63,7 +63,7 @@ function timeLeft(iso: string): string {
   return h >= 1 ? `faltam ${h}h` : "últimas horas";
 }
 
-export function CampaignCards() {
+export function CampaignCards({ only }: { only?: Campaign["kind"] } = {}) {
   const { profile } = useAuth();
   const [items, setItems] = useState<Campaign[]>([]);
   const [boards, setBoards] = useState<Record<string, Board>>({});
@@ -99,7 +99,9 @@ export function CampaignCards() {
         .select("id, kind, badge, title, subtitle, cta_label, cta_type, cta_value, challenge_id, theme, ends_at")
         .order("sort");
       if (!alive || error) return;
-      const list = ((data as unknown as Campaign[]) ?? []).filter((c) => new Date(c.ends_at).getTime() > Date.now());
+      const list = ((data as unknown as Campaign[]) ?? []).filter(
+        (c) => new Date(c.ends_at).getTime() > Date.now() && (!only || c.kind === only)
+      );
       setItems(list);
       const ids = list.map((c) => c.challenge_id).filter(Boolean) as string[];
       if (ids.length) {
@@ -111,7 +113,7 @@ export function CampaignCards() {
     return () => {
       alive = false;
     };
-  }, [loadBoard]);
+  }, [loadBoard, only]);
 
   if (profile?.role !== "student" || items.length === 0) return null;
 
