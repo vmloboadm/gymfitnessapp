@@ -1532,6 +1532,70 @@ $$;
 
 
 --
+-- Name: enqueue_starter_campaign(uuid, timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enqueue_starter_campaign(p_gym uuid, p_start timestamp with time zone DEFAULT now()) RETURNS integer
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  r record;
+  i integer := 0;
+  slot timestamptz := public.next_business_slot(p_start);
+  batch_start timestamptz;
+  phone text;
+  first text;
+  n integer := 0;
+begin
+  for r in
+    select p.id, p.name, p.phone
+    from public.profiles p
+    where p.gym_id = p_gym and p.role = 'student'
+      and coalesce(p.whatsapp_consent, false)
+      and p.phone is not null
+      and not exists (select 1 from public.student_workouts sw where sw.student_id = p.id and sw.status = 'active')
+      and not exists (select 1 from public.whatsapp_outbox o where o.campaign = 'treino-pronto' and o.student_id = p.id)
+    order by p.approved_at desc nulls last, p.created_at desc
+  loop
+    phone := regexp_replace(r.phone, '\D', '', 'g');
+    phone := regexp_replace(phone, '^0+', '');
+    if length(phone) in (10, 11) then
+      phone := '55' || phone;
+    end if;
+    if not (phone like '55%' and length(phone) in (12, 13)) then
+      continue;
+    end if;
+
+    -- novo lote a cada 2 pessoas: ~3h depois (+ até 40 min aleatórios)
+    if i % 2 = 0 then
+      if i > 0 then
+        slot := slot + interval '3 hours' + (random() * interval '40 minutes');
+      end if;
+      slot := public.next_business_slot(slot);
+      -- lote que começaria muito perto das 20h vai para a manhã seguinte
+      if extract(hour from (slot at time zone 'America/Sao_Paulo')) >= 19 then
+        slot := public.next_business_slot(slot + interval '2 hours');
+      end if;
+      batch_start := slot;
+    end if;
+
+    first := initcap(lower(split_part(coalesce(nullif(trim(r.name), ''), 'tudo bem'), ' ', 1)));
+    insert into public.whatsapp_outbox (gym_id, student_id, campaign, phone, body, scheduled_at)
+    values (p_gym, r.id, 'treino-pronto', phone,
+      public.starter_campaign_message(first, i),
+      -- 2º da dupla sai alguns minutos depois do 1º
+      batch_start + case when i % 2 = 1 then interval '3 minutes' + random() * interval '5 minutes' else interval '0' end)
+    on conflict (campaign, student_id) do nothing;
+    i := i + 1;
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+
+
+--
 -- Name: finish_onboarding(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1941,6 +2005,30 @@ CREATE FUNCTION public.my_day_passes(p_codes text[]) RETURNS SETOF public.day_pa
   where code = any(p_codes)
   order by created_at desc
   limit 20;
+$$;
+
+
+--
+-- Name: next_business_slot(timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.next_business_slot(p_at timestamp with time zone) RETURNS timestamp with time zone
+    LANGUAGE plpgsql STABLE
+    AS $$
+declare
+  l timestamp := p_at at time zone 'America/Sao_Paulo';
+begin
+  if extract(hour from l) < 9 then
+    l := date_trunc('day', l) + interval '9 hours';
+  elsif extract(hour from l) >= 20 then
+    l := date_trunc('day', l) + interval '1 day 9 hours';
+  end if;
+  -- domingo não envia: segunda 9h
+  if extract(isodow from l) = 7 then
+    l := date_trunc('day', l) + interval '1 day 9 hours';
+  end if;
+  return l at time zone 'America/Sao_Paulo';
+end;
 $$;
 
 
@@ -3104,6 +3192,33 @@ begin
     'session_id', v_session_id, 'started_at', v_started_at
   );
 end;
+$$;
+
+
+--
+-- Name: starter_campaign_message(text, integer); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.starter_campaign_message(p_first text, p_variant integer) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    AS $$
+  select case p_variant % 3
+    when 0 then
+      'Oi, ' || p_first || '! Aqui é da GymFitness 💪' || chr(10) || chr(10) ||
+      'Seu treino já está pronto pra você escolher no app: tem opções AB, ABC, ABCD e ABCDE montadas pela nossa personal, do iniciante ao avançado. Leva 1 minutinho:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Escolheu, já pode treinar hoje! Qualquer dúvida é só responder aqui 😉'
+    when 1 then
+      'E aí, ' || p_first || '! Tudo certo? Aqui é da GymFitness.' || chr(10) || chr(10) ||
+      'Liberamos treinos prontos no app pra ninguém ficar esperando: você escolhe o que combina com você (iniciante, intermediário ou avançado) e começa na hora 👇' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Depois me conta qual você escolheu! 💪'
+    else
+      'Oi, ' || p_first || ', tudo bem? 😊 Passando pra avisar que o seu treino na GymFitness já pode ser escolhido no app.' || chr(10) || chr(10) ||
+      'São treinos prontos, com divisão certinha (tipo ABC), e se quiser algo sob medida dá pra pedir à personal ali mesmo:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Bora começar essa semana? 🔥'
+  end;
 $$;
 
 
@@ -4308,6 +4423,40 @@ CREATE TABLE public.tv_content (
 
 
 --
+-- Name: whatsapp_outbox; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.whatsapp_outbox (
+    id bigint NOT NULL,
+    gym_id uuid NOT NULL,
+    student_id uuid,
+    campaign text NOT NULL,
+    phone text NOT NULL,
+    body text NOT NULL,
+    scheduled_at timestamp with time zone NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    sent_at timestamp with time zone,
+    error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT whatsapp_outbox_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'sent'::text, 'failed'::text, 'skipped'::text])))
+);
+
+
+--
+-- Name: whatsapp_outbox_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.whatsapp_outbox ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.whatsapp_outbox_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: workout_days; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4914,6 +5063,22 @@ ALTER TABLE ONLY public.tv_content
 
 
 --
+-- Name: whatsapp_outbox whatsapp_outbox_campaign_student_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.whatsapp_outbox
+    ADD CONSTRAINT whatsapp_outbox_campaign_student_id_key UNIQUE (campaign, student_id);
+
+
+--
+-- Name: whatsapp_outbox whatsapp_outbox_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.whatsapp_outbox
+    ADD CONSTRAINT whatsapp_outbox_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workout_days workout_days_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5197,6 +5362,13 @@ CREATE INDEX push_subscriptions_user_id_idx ON public.push_subscriptions USING b
 --
 
 CREATE UNIQUE INDEX ux_wsession_active ON public.workout_sessions USING btree (student_id) WHERE (status = 'active'::text);
+
+
+--
+-- Name: whatsapp_outbox_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX whatsapp_outbox_due_idx ON public.whatsapp_outbox USING btree (status, scheduled_at);
 
 
 --
@@ -6094,6 +6266,22 @@ ALTER TABLE ONLY public.student_workouts
 
 ALTER TABLE ONLY public.tv_content
     ADD CONSTRAINT tv_content_gym_id_fkey FOREIGN KEY (gym_id) REFERENCES public.gyms(id);
+
+
+--
+-- Name: whatsapp_outbox whatsapp_outbox_gym_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.whatsapp_outbox
+    ADD CONSTRAINT whatsapp_outbox_gym_id_fkey FOREIGN KEY (gym_id) REFERENCES public.gyms(id) ON DELETE CASCADE;
+
+
+--
+-- Name: whatsapp_outbox whatsapp_outbox_student_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.whatsapp_outbox
+    ADD CONSTRAINT whatsapp_outbox_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -7489,6 +7677,12 @@ CREATE POLICY wex_select_trainer_gym ON public.workout_exercises FOR SELECT USIN
 
 CREATE POLICY wex_update_trainer_gym ON public.workout_exercises FOR UPDATE USING (((public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text])) AND (gym_id = public.current_gym_id()))) WITH CHECK (((public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text])) AND (gym_id = public.current_gym_id())));
 
+
+--
+-- Name: whatsapp_outbox; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.whatsapp_outbox ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: workout_days; Type: ROW SECURITY; Schema: public; Owner: -

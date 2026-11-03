@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence,m, type Variants } from "framer-motion";
 import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLine, Bell, MessageCircle, CheckCircle2 } from "lucide-react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { CoachSpotlight } from "~/components/student/CoachSpotlight";
 import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
 import { useOnlineCount } from "~/hooks/useOnlineCount";
@@ -899,6 +900,11 @@ export default function HomePage() {
             }
             ready={!session && !heroFinishedToday && !!heroPlan && heroPlan.count > 0}
           />
+        </m.div>
+
+        {/* Personal em destaque: contratar acompanhamento (vitrine do personal) */}
+        <m.div variants={item} className="px-4 pb-2">
+          <CoachSpotlight />
         </m.div>
 
         {/* COCKPIT, Anel da meta + Streak + Liga */}

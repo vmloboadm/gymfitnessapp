@@ -37,3 +37,4 @@ next-env.d.ts
 _backup_outro_agente/
 .env*
 imagens-reais/
+.whatsapp-drip.log

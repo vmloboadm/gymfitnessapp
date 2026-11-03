@@ -193,7 +193,7 @@ type Offer = {
   sessions_per_week: number | null;
   duration_label: string | null;
 };
-type Personal = {
+export type Personal = {
   id: string;
   name: string | null;
   bio: string | null;
@@ -207,7 +207,7 @@ const priceLine = (o: Offer) =>
   `${formatBRL(o.price_cents)}${o.price_cents !== null && o.duration_label ? ` ${o.duration_label}` : ""}`;
 
 /** Escolha do personal: foto, nome, bio e WhatsApp com mensagem pronta. */
-function PersonalChooser({ studentName, goal, onSent }: { studentName: string; goal: string | null; onSent: () => void }) {
+export function PersonalChooser({ studentName, goal, onSent }: { studentName: string; goal: string | null; onSent: () => void }) {
   const [list, setList] = useState<Personal[] | null>(null);
   const [done, setDone] = useState<string | null>(null);
 

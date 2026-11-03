@@ -48,6 +48,7 @@ import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
 import { StarterPicker } from "~/components/student/StarterPicker";
 import { PersonalSupportBox } from "~/components/student/PersonalSupportBox";
+import { CoachSpotlight } from "~/components/student/CoachSpotlight";
 import { groupByTecnica, tecnicaLabel, tecnicaHint, type PlanExercise } from "~/lib/workout-groups";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { CardioQuickAdd } from "~/components/training/CardioQuickAdd";
@@ -1331,6 +1332,7 @@ export default function TreinoHomePage() {
           ) : (
             <EmptyState title="Aguardando seu treino" description="No modo demonstração os treinos prontos não aparecem." icon={Dumbbell} />
           )}
+          {!demo ? <CoachSpotlight /> : null}
           {!demo ? <PersonalSupportBox hasPlan={false} onPlanChanged={() => void refetch()} /> : null}
         </div>
         <AiCoach />
@@ -1977,6 +1979,9 @@ export default function TreinoHomePage() {
           )}
         </div>
         )}
+        {/* Personal em destaque logo depois da ação principal */}
+        {!demo ? <CoachSpotlight compact /> : null}
+
         {/* TREINOS ENVIADOS PELO PERSONAL (depois da ação principal) */}
         <PersonalWorkouts />
 
