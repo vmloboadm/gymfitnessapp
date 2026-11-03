@@ -5,6 +5,7 @@ import { ChevronRight, ClipboardPen, HeartHandshake, MessageCircle, Repeat, Slid
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { normalizeBRPhone } from "~/lib/whatsapp";
+import { formatBRL } from "~/lib/money";
 import { toast } from "sonner";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { StarterPicker } from "~/components/student/StarterPicker";
@@ -184,7 +185,26 @@ export function PersonalSupportBox({ onPlanChanged, hasPlan }: { onPlanChanged: 
   );
 }
 
-type Personal = { id: string; name: string | null; bio: string | null; avatar_url: string | null; phone: string | null; role: string };
+type Offer = {
+  id: string;
+  title: string;
+  description: string | null;
+  price_cents: number | null;
+  sessions_per_week: number | null;
+  duration_label: string | null;
+};
+type Personal = {
+  id: string;
+  name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  phone: string | null;
+  role: string;
+  offers?: Offer[];
+};
+
+const priceLine = (o: Offer) =>
+  `${formatBRL(o.price_cents)}${o.price_cents !== null && o.duration_label ? ` ${o.duration_label}` : ""}`;
 
 /** Escolha do personal: foto, nome, bio e WhatsApp com mensagem pronta. */
 function PersonalChooser({ studentName, goal, onSent }: { studentName: string; goal: string | null; onSent: () => void }) {
@@ -209,19 +229,24 @@ function PersonalChooser({ studentName, goal, onSent }: { studentName: string; g
   }, []);
 
   const firstName = (n: string | null) => (n ?? "").trim().split(/\s+/)[0] || "";
-  const message = (p: Personal) =>
+  const message = (p: Personal, o?: Offer) =>
     `Oi, ${firstName(p.name)}! Sou ${studentName.trim() || "aluno(a)"} da GymFitness. ` +
-    `Vi seu perfil no app e quero saber como funciona o acompanhamento com você.` +
+    (o
+      ? `Vi no app o seu plano "${o.title}" (${priceLine(o)}) e quero contratar.`
+      : `Vi seu perfil no app e quero saber como funciona o acompanhamento com você.`) +
     (goal ? ` Meu objetivo é ${goal.toLowerCase()}.` : "");
 
   // registra o pedido e avisa o personal; não espera, para o WhatsApp abrir
   // ainda dentro do toque (senão o celular bloqueia a abertura)
-  const record = (p: Personal) => {
+  const record = (p: Personal, o?: Offer) => {
     void (async () => {
-      const { error } = await supabaseBrowser().rpc("request_coaching" as never, { p_trainer: p.id, p_message: null } as never);
+      const { error } = await supabaseBrowser().rpc(
+        "request_coaching" as never,
+        { p_trainer: p.id, p_message: null, p_offer: o?.id ?? null } as never
+      );
       if (error) logger.error("coaching.request", error);
     })();
-    setDone(p.id);
+    setDone(o?.id ?? p.id);
     onSent();
   };
 
@@ -254,7 +279,45 @@ function PersonalChooser({ studentName, goal, onSent }: { studentName: string; g
               </div>
             </div>
             {p.bio ? <p className="mt-2 line-clamp-4 text-[12.5px] leading-snug text-muted-foreground">{p.bio}</p> : null}
-            {href ? (
+            {phone && p.offers && p.offers.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {p.offers.map((o) => (
+                  <div key={o.id} className="rounded-xl border border-[#FFC24D]/35 bg-gradient-to-br from-[#FFC24D]/10 via-card to-card p-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-[13.5px] font-black text-foreground">{o.title}</p>
+                      <p className="shrink-0 text-[13px] font-black text-[#FFC24D]">{formatBRL(o.price_cents)}</p>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {[o.price_cents !== null ? o.duration_label : null, o.sessions_per_week ? `${o.sessions_per_week}x por semana` : null]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    {o.description ? <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">{o.description}</p> : null}
+                    <a
+                      href={`https://wa.me/${phone}?text=${encodeURIComponent(message(p, o))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => record(p, o)}
+                      className="tactile mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] py-2.5 text-[13px] font-black text-black"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      {done === o.id ? "Abrir WhatsApp de novo" : "Quero este plano"}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {href && p.offers && p.offers.length > 0 ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => record(p)}
+                className="tactile mt-2 block text-center text-[12px] font-bold text-muted-foreground underline-offset-2 hover:underline"
+              >
+                Só quero conversar com {firstName(p.name)}
+              </a>
+            ) : href ? (
               <a
                 href={href}
                 target="_blank"

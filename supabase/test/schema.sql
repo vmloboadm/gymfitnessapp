@@ -1564,6 +1564,18 @@ $$;
 
 
 --
+-- Name: fmt_brl(integer); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.fmt_brl(p_cents integer) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    AS $_$
+  select case when p_cents is null then 'valor a combinar'
+    else 'R$ ' || replace(to_char(p_cents / 100.0, 'FM9999990.00'), '.', ',') end;
+$_$;
+
+
+--
 -- Name: fmt_kg(numeric); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1777,8 +1789,18 @@ CREATE FUNCTION public.gym_personals() RETURNS jsonb
     select * from staff where role <> 'trainer' and not exists (select 1 from staff where role = 'trainer')
   )
   select coalesce(jsonb_agg(jsonb_build_object(
-      'id', id, 'name', name, 'bio', bio, 'avatar_url', avatar_url, 'phone', phone, 'role', role
-    ) order by created_at), '[]'::jsonb)
+      'id', pick.id, 'name', pick.name, 'bio', pick.bio, 'avatar_url', pick.avatar_url,
+      'phone', pick.phone, 'role', pick.role,
+      'offers', (
+        select coalesce(jsonb_agg(jsonb_build_object(
+            'id', o.id, 'title', o.title, 'description', o.description,
+            'price_cents', o.price_cents, 'sessions_per_week', o.sessions_per_week,
+            'duration_label', o.duration_label
+          ) order by o.sort, o.created_at), '[]'::jsonb)
+        from public.personal_offers o
+        where o.trainer_id = pick.id and o.active
+      )
+    ) order by pick.created_at), '[]'::jsonb)
   from pick;
 $$;
 
@@ -2521,10 +2543,10 @@ $$;
 
 
 --
--- Name: request_coaching(uuid, text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: request_coaching(uuid, text, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.request_coaching(p_trainer uuid, p_message text DEFAULT NULL::text) RETURNS jsonb
+CREATE FUNCTION public.request_coaching(p_trainer uuid, p_message text DEFAULT NULL::text, p_offer uuid DEFAULT NULL::uuid) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
@@ -2532,7 +2554,11 @@ declare
   v_uid uuid := auth.uid();
   st record;
   tr record;
+  v_offer_title text;
+  v_offer_price integer;
+  v_has_offer boolean := false;
   v_msg text := nullif(btrim(coalesce(p_message, '')), '');
+  v_plan text := '';
 begin
   select id, gym_id, name, role into st from public.profiles where id = v_uid;
   if st.id is null or st.role <> 'student' then
@@ -2545,20 +2571,31 @@ begin
     raise exception 'Personal não encontrado';
   end if;
 
-  -- o aviso genérico (notify_student_request) não dispara: avisamos só ele
+  if p_offer is not null then
+    select title, price_cents, true into v_offer_title, v_offer_price, v_has_offer
+    from public.personal_offers
+    where id = p_offer and trainer_id = tr.id and gym_id = st.gym_id and active;
+    if not coalesce(v_has_offer, false) then
+      raise exception 'Plano indisponível';
+    end if;
+    v_plan := ' · ' || v_offer_title || ' · ' || public.fmt_brl(v_offer_price);
+  end if;
+
   perform set_config('gf.request_notified', '1', true);
   insert into public.premium_requests (gym_id, student_id, request_type, details, status)
   values (st.gym_id, v_uid, 'other',
-    '[acompanhamento] (com ' || coalesce(tr.name, 'personal') || ')' || coalesce(' ' || left(v_msg, 300), ''),
+    '[acompanhamento] (com ' || coalesce(tr.name, 'personal') || v_plan || ')' || coalesce(' ' || left(v_msg, 300), ''),
     'pending');
   perform set_config('gf.request_notified', '', true);
 
   insert into public.notifications (gym_id, user_id, channel, title, body)
   values (st.gym_id, tr.id, 'in_app', 'Pedido de acompanhamento',
     coalesce(nullif(trim(st.name), ''), 'Um aluno') || ' quer acompanhamento com você'
+    || case when v_has_offer then ' no plano "' || v_offer_title || '" (' || public.fmt_brl(v_offer_price) || ')' else '' end
     || coalesce(': ' || left(v_msg, 120), '.') || ' Ele deve te chamar no WhatsApp agora.');
 
-  return jsonb_build_object('ok', true, 'phone', tr.phone, 'name', tr.name);
+  return jsonb_build_object('ok', true, 'phone', tr.phone, 'name', tr.name,
+    'offer', case when v_has_offer then v_offer_title end);
 end;
 $$;
 
@@ -3938,6 +3975,31 @@ CREATE TABLE public.partners (
 
 
 --
+-- Name: personal_offers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.personal_offers (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    gym_id uuid NOT NULL,
+    trainer_id uuid NOT NULL,
+    title text NOT NULL,
+    description text,
+    price_cents integer,
+    sessions_per_week integer,
+    duration_label text,
+    active boolean DEFAULT true NOT NULL,
+    sort integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT personal_offers_description_check CHECK (((description IS NULL) OR (length(description) <= 400))),
+    CONSTRAINT personal_offers_duration_label_check CHECK (((duration_label IS NULL) OR (length(duration_label) <= 40))),
+    CONSTRAINT personal_offers_price_cents_check CHECK (((price_cents IS NULL) OR ((price_cents >= 0) AND (price_cents <= 10000000)))),
+    CONSTRAINT personal_offers_sessions_per_week_check CHECK (((sessions_per_week IS NULL) OR ((sessions_per_week >= 1) AND (sessions_per_week <= 7)))),
+    CONSTRAINT personal_offers_title_check CHECK (((length(btrim(title)) >= 2) AND (length(btrim(title)) <= 80)))
+);
+
+
+--
 -- Name: point_events; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4668,6 +4730,14 @@ ALTER TABLE ONLY public.partners
 
 
 --
+-- Name: personal_offers personal_offers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.personal_offers
+    ADD CONSTRAINT personal_offers_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: point_events point_events_dedupe_key_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5102,6 +5172,13 @@ CREATE INDEX page_views_visitor_idx ON public.page_views USING btree (visitor_id
 
 
 --
+-- Name: personal_offers_trainer_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX personal_offers_trainer_idx ON public.personal_offers USING btree (trainer_id, active, sort);
+
+
+--
 -- Name: push_subscriptions_gym_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5295,6 +5372,13 @@ CREATE TRIGGER trg_notify_workout_milestones AFTER INSERT ON public.workout_logs
 --
 
 CREATE TRIGGER trg_on_student_approved AFTER UPDATE OF approved_at ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.on_student_approved();
+
+
+--
+-- Name: personal_offers trg_personal_offers_updated; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_personal_offers_updated BEFORE UPDATE ON public.personal_offers FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
 
 
 --
@@ -5730,6 +5814,22 @@ ALTER TABLE ONLY public.notifications
 
 ALTER TABLE ONLY public.page_views
     ADD CONSTRAINT page_views_gym_id_fkey FOREIGN KEY (gym_id) REFERENCES public.gyms(id);
+
+
+--
+-- Name: personal_offers personal_offers_gym_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.personal_offers
+    ADD CONSTRAINT personal_offers_gym_id_fkey FOREIGN KEY (gym_id) REFERENCES public.gyms(id) ON DELETE CASCADE;
+
+
+--
+-- Name: personal_offers personal_offers_trainer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.personal_offers
+    ADD CONSTRAINT personal_offers_trainer_id_fkey FOREIGN KEY (trainer_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -6832,6 +6932,40 @@ CREATE POLICY partners_select ON public.partners FOR SELECT USING ((active = tru
 --
 
 CREATE POLICY partners_staff ON public.partners TO authenticated USING (true) WITH CHECK (true);
+
+
+--
+-- Name: personal_offers; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.personal_offers ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: personal_offers personal_offers_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY personal_offers_delete ON public.personal_offers FOR DELETE USING (((gym_id = public.current_gym_id()) AND ((trainer_id = auth.uid()) OR (public."current_role"() = ANY (ARRAY['manager'::text, 'admin'::text])))));
+
+
+--
+-- Name: personal_offers personal_offers_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY personal_offers_insert ON public.personal_offers FOR INSERT WITH CHECK (((gym_id = public.current_gym_id()) AND (((trainer_id = auth.uid()) AND (public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text]))) OR (public."current_role"() = ANY (ARRAY['manager'::text, 'admin'::text])))));
+
+
+--
+-- Name: personal_offers personal_offers_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY personal_offers_select ON public.personal_offers FOR SELECT USING (((gym_id = public.current_gym_id()) AND (active OR (trainer_id = auth.uid()))));
+
+
+--
+-- Name: personal_offers personal_offers_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY personal_offers_update ON public.personal_offers FOR UPDATE USING (((gym_id = public.current_gym_id()) AND ((trainer_id = auth.uid()) OR (public."current_role"() = ANY (ARRAY['manager'::text, 'admin'::text]))))) WITH CHECK (((gym_id = public.current_gym_id()) AND ((trainer_id = auth.uid()) OR (public."current_role"() = ANY (ARRAY['manager'::text, 'admin'::text])))));
 
 
 --

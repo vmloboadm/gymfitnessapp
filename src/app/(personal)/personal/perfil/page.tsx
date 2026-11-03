@@ -16,6 +16,7 @@ import { cn } from "~/lib/utils";
 import { localDayKey, localDayKeyDaysAgo, localDayStartDaysAgoISO, localDayStartISO, localWeekStartKey } from "~/lib/utils/local-date";
 import { hasRole } from "~/lib/utils/roles";
 import { ImageCropModal } from "~/components/common/ImageCropModal";
+import { OffersEditor } from "~/components/personal/OffersEditor";
 
 import { apiPath } from "~/lib/api-path";
 const TABS_BASE = [
@@ -394,6 +395,9 @@ export default function PersonalPerfilPage() {
           )}
         </div>
       </m.header>
+
+      {/* Planos de acompanhamento: vitrine para os alunos (Treino → Seu personal) */}
+      {profile?.id && profile.gym_id ? <OffersEditor trainerId={profile.id} gymId={profile.gym_id} /> : null}
 
       {/* Tour guiado: reabre o super onboarding do staff */}
       <button
