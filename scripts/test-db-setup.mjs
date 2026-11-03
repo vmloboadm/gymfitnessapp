@@ -67,7 +67,7 @@ await admin.end();
 const url = new URL(ADMIN_URL);
 url.pathname = `/${DB}`;
 const db = await connectWithRetry(url.toString());
-for (const f of ["supabase-stubs.sql", "schema.sql", "seed-achievements.sql"]) {
+for (const f of ["supabase-stubs.sql", "schema.sql", "seed-achievements.sql", "seed-exercises.sql"]) {
   try {
     await db.query(file(f));
   } catch (err) {

@@ -30,15 +30,9 @@ import {
   type PointAdjustment,
 } from "~/lib/trainer-store";
 import type { WorkoutPlan } from "~/lib/ai/local-gen";
-import { notifyStaffPush } from "~/lib/push-client";
 
 export type GymUser = { id: string; gymId: string; name: string };
 
-const NEW_WORKOUT_PUSH = {
-  title: "Novo treino disponível",
-  body: "Seu personal publicou um treino para você. Abra o app para começar.",
-  url: "/app/treino",
-};
 
 /* ------------------------------------------------------------------ */
 /* Alunos da academia                                                  */
@@ -161,7 +155,7 @@ async function assignReal(
   }
   const out = data as { program_id?: string };
   if (!out.program_id) throw new Error("A ficha foi salva sem retorno do programa.");
-  notifyStaffPush([student.id], NEW_WORKOUT_PUSH.title, NEW_WORKOUT_PUSH.body, NEW_WORKOUT_PUSH.url).catch(() => {});
+  // aviso + push de "Novo treino liberado" saem do banco (trg_notify_plan_assigned)
   return out.program_id;
 }
 
@@ -247,7 +241,7 @@ export async function assignExistingPlan(opts: {
       continue;
     }
     ok++;
-    notifyStaffPush([t.id], NEW_WORKOUT_PUSH.title, NEW_WORKOUT_PUSH.body, NEW_WORKOUT_PUSH.url).catch(() => {});
+    // aviso + push de "Novo treino liberado" saem do banco (trg_notify_plan_assigned)
   }
   return { ok, failed };
 }
@@ -420,7 +414,7 @@ export async function assignCopiedPlan(opts: {
       continue;
     }
     ok++;
-    notifyStaffPush([t.id], NEW_WORKOUT_PUSH.title, NEW_WORKOUT_PUSH.body, NEW_WORKOUT_PUSH.url).catch(() => {});
+    // aviso + push de "Novo treino liberado" saem do banco (trg_notify_plan_assigned)
   }
 
   return { ok, failed };
@@ -689,6 +683,8 @@ export async function getRequests(gymId: string, opts?: PageOpts): Promise<Paged
     if (d.startsWith("[relatorio]")) return "relatorio";
     if (d.startsWith("[ajuste]")) return "ajuste";
     if (d.startsWith("[carga]")) return "carga";
+    if (d.startsWith("[treino]")) return "treino";
+    if (d.startsWith("[acompanhamento]")) return "acompanhamento";
     return "premium";
   };
   return Object.assign(
@@ -697,7 +693,7 @@ export async function getRequests(gymId: string, opts?: PageOpts): Promise<Paged
       studentId: r.student_id,
       studentName: r.profiles?.name ?? "Aluno",
       type: tagOf(r.details),
-      message: (r.details ?? "").replace(/^\[(carga|premium|relatorio|ajuste)\]\s*/, ""),
+      message: (r.details ?? "").replace(/^\[(carga|premium|relatorio|ajuste|treino|acompanhamento)\]\s*/, ""),
       status: r.status === "aprovado" || r.status === "approved" ? ("aprovado" as const) : r.status === "recusado" || r.status === "rejected" ? ("recusado" as const) : ("pendente" as const),
       created_at: r.created_at,
       resolved_at: null,
@@ -710,14 +706,14 @@ export async function submitRequest(opts: {
   gymId: string;
   userId: string;
   userName: string;
-  type: "premium" | "carga" | "relatorio" | "ajuste";
+  type: "premium" | "carga" | "relatorio" | "ajuste" | "treino" | "acompanhamento";
   message: string;
 }): Promise<void> {
   if (isDemoMode()) {
     createApproval({
       studentId: opts.userId,
       studentName: opts.userName,
-      type: opts.type === "relatorio" || opts.type === "ajuste" ? "carga" : opts.type,
+      type: opts.type === "premium" ? "premium" : "carga",
       message: opts.message,
     });
     return;

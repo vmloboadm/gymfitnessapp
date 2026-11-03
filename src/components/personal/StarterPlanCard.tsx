@@ -47,7 +47,7 @@ export function StarterPlanCard() {
         <p className="text-[11px] text-muted-foreground">
           {templates === 0
             ? "Escolha um modelo inicial e eles já começam a treinar hoje"
-            : "Aplique o treino inicial em 1 toque"}
+            : "Eles já podem escolher um treino pronto. Ou aplique em 1 toque"}
         </p>
       </div>
       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />

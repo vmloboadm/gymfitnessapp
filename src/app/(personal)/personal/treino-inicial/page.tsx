@@ -18,7 +18,17 @@ import { cn } from "~/lib/utils";
 const LEVELS = ["Iniciante", "Intermediário", "Avançado"] as const;
 
 type Program = { id: string; name: string; days: number; exercises: number; inUse: number };
-type Template = { id: string; program_id: string; label: string; levels: string[] | null; active: boolean };
+type Template = {
+  id: string;
+  program_id: string;
+  label: string;
+  levels: string[] | null;
+  active: boolean;
+  is_base: boolean;
+  audience: "M" | "F" | null;
+  split: string | null;
+  sort: number;
+};
 type Status = { without_plan: number; medical: number; pending_approval: number };
 
 export default function TreinoInicialPage() {
@@ -43,7 +53,10 @@ export default function TreinoInicialPage() {
           .eq("gym_id", gymId)
           .order("created_at", { ascending: false })
           .limit(200),
-        sb.from("starter_templates" as never).select("id, program_id, label, levels, active").eq("gym_id", gymId),
+        sb
+          .from("starter_templates" as never)
+          .select("id, program_id, label, levels, active, is_base, audience, split, sort")
+          .eq("gym_id", gymId),
         sb.rpc("starter_plan_status" as never),
       ]);
       if (progRes.error) throw progRes.error;
@@ -64,7 +77,14 @@ export default function TreinoInicialPage() {
           }))
           .filter((p) => p.days > 0 && p.exercises > 0)
       );
-      setTemplates(((tplRes.data ?? []) as unknown as Template[]) ?? []);
+      setTemplates(
+        ((tplRes.data ?? []) as unknown as Template[]).sort(
+          (a, b) =>
+            Number(a.is_base) - Number(b.is_base) ||
+            (a.audience ?? "").localeCompare(b.audience ?? "") ||
+            a.sort - b.sort
+        )
+      );
       setStatus((stRes.data as unknown as Status | null) ?? null);
     } catch (err) {
       logger.error("starter_plan.load", err);
@@ -153,11 +173,12 @@ export default function TreinoInicialPage() {
       <header>
         <h1 className="flex items-center gap-2 text-lg font-bold text-foreground">
           <Sparkles className="h-5 w-5 text-brand" />
-          Treino inicial automático
+          Treinos prontos
         </h1>
         <p className="text-[11px] text-muted-foreground">
-          Aluno aprovado sem ficha recebe na hora a cópia do modelo que mais combina com o nível e os dias dele.
-          Você recebe um aviso para revisar quando puder. Quem tem risco médico continua só com você.
+          O aluno escolhe um destes e já começa a treinar (quem não escolher recebe o que mais combina ao ser
+          aprovado). Você é avisado de cada escolha e pode oferecer ajuste ou acompanhamento. Quem tem risco
+          médico continua só com você. Os seus modelos aparecem primeiro para o aluno.
         </p>
       </header>
 
@@ -184,7 +205,7 @@ export default function TreinoInicialPage() {
       <section className="rounded-2xl border border-border bg-card/50" aria-label="Modelos iniciais">
         <div className="flex items-center justify-between px-4 pt-4">
           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            Modelos iniciais · {templates.length}
+            Treinos disponíveis · {templates.length}
           </p>
           <button
             type="button"
@@ -212,6 +233,13 @@ export default function TreinoInicialPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-semibold text-foreground">{t.label}</p>
                       <p className="text-[10px] text-muted-foreground">
+                        {t.is_base ? (
+                          <span className="mr-1 rounded bg-white/[0.06] px-1 py-px font-bold text-brand">
+                            Pronto · {t.audience === "F" ? "Feminino" : t.audience === "M" ? "Masculino" : "Todos"}
+                          </span>
+                        ) : (
+                          <span className="mr-1 rounded bg-brand/15 px-1 py-px font-bold text-brand">Seu modelo</span>
+                        )}
                         {p ? `${p.days} dias · ${p.exercises} exercícios` : "ficha removida"}
                       </p>
                     </div>

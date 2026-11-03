@@ -49,7 +49,7 @@ export type ApprovalRequest = {
   studentId: string;
   studentName: string;
   /** premium = desbloqueio de plano | carga = ajuste de carga | relatorio = relatório de evolução | ajuste = troca de exercício */
-  type: "premium" | "carga" | "relatorio" | "ajuste";
+  type: "premium" | "carga" | "relatorio" | "ajuste" | "treino" | "acompanhamento";
   message: string;
   status: "pendente" | "aprovado" | "recusado";
   created_at: string;

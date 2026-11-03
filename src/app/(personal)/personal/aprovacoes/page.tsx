@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { m, type Variants } from "framer-motion";
-import { Inbox, Crown, Dumbbell, Check, X, Inbox as InboxIcon, FileText, ArrowLeftRight } from "lucide-react";
+import { Inbox, Crown, Dumbbell, Check, X, Inbox as InboxIcon, FileText, ArrowLeftRight, HeartHandshake, ClipboardPen, MessageCircle } from "lucide-react";
+import { waLink } from "~/lib/whatsapp";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import type { PersonalStudent } from "~/lib/personal-data";
@@ -54,6 +55,8 @@ const TYPE_META: Record<ApprovalRequest["type"], { label: string; short: string;
   carga: { label: "Ajuste de treino", short: "Carga", icon: Dumbbell, cls: "text-brand" },
   relatorio: { label: "Relatório de evolução", short: "Relatório", icon: FileText, cls: "text-sky-400" },
   ajuste: { label: "Troca de exercício", short: "Troca", icon: ArrowLeftRight, cls: "text-[#4ADE80]" },
+  treino: { label: "Quer um treino feito por você", short: "Treino", icon: ClipboardPen, cls: "text-brand" },
+  acompanhamento: { label: "Quer acompanhamento com personal", short: "Acompanhamento", icon: HeartHandshake, cls: "text-[#FFC24D]" },
 };
 
 /**
@@ -187,6 +190,8 @@ export default function PersonalAprovacoesPage() {
 
   const avatarFor = (a: ApprovalRequest) =>
     students.find((s) => s.name === a.studentName)?.avatar ?? null;
+  const phoneFor = (a: ApprovalRequest) =>
+    students.find((s) => s.id === a.studentId)?.phone ?? null;
 
   return (
     <div className="space-y-5">
@@ -230,7 +235,7 @@ export default function PersonalAprovacoesPage() {
           <InboxIcon className="mx-auto mb-2 h-7 w-7 text-muted-foreground" />
           <p className="text-sm font-semibold text-foreground">Caixa vazia</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Pedidos de ajuste de treino e desbloqueio premium chegam aqui.
+            Pedidos de ajuste, treino personalizado e acompanhamento chegam aqui.
           </p>
         </div>
       ) : (
@@ -265,6 +270,34 @@ export default function PersonalAprovacoesPage() {
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
+                {(a.type === "treino" || a.type === "acompanhamento") && a.studentId ? (
+                  <>
+                    {phoneFor(a) ? (
+                      <a
+                        href={waLink(
+                          phoneFor(a)!,
+                          a.type === "acompanhamento"
+                            ? `Oi, ${a.studentName.split(" ")[0]}! Vi que você quer acompanhamento com personal. Vamos conversar sobre seus objetivos?`
+                            : `Oi, ${a.studentName.split(" ")[0]}! Vou montar seu treino. Me conta seu objetivo e os dias que você treina?`
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="tactile flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#25D366]/15 text-[12px] font-bold text-[#25D366] ring-1 ring-[#25D366]/30 transition-transform active:scale-[0.97]"
+                      >
+                        <MessageCircle className="h-4 w-4" /> WhatsApp
+                      </a>
+                    ) : null}
+                    <Link
+                      href={`/personal/treinos?aluno=${a.studentId}`}
+                      className={cn(
+                        "tactile flex h-10 items-center justify-center gap-1.5 rounded-xl bg-brand/15 text-[12px] font-bold text-brand ring-1 ring-brand/30 transition-transform active:scale-[0.97]",
+                        phoneFor(a) ? "" : "col-span-2"
+                      )}
+                    >
+                      Montar treino
+                    </Link>
+                  </>
+                ) : null}
                 {(a.type === "ajuste" || a.type === "relatorio") && a.studentId ? (
                   <Link
                     href={a.type === "ajuste" ? `/personal/treinos?aluno=${a.studentId}` : `/personal/alunos?aluno=${a.studentId}`}

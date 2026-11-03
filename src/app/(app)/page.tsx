@@ -895,7 +895,7 @@ export default function HomePage() {
                 ? "Hoje não está na sua programação. Se quiser, dá para treinar mesmo assim na aba Treino."
                 : heroPlan && heroPlan.count > 0
                   ? undefined
-                  : "Seu personal ainda não montou seu treino. Enquanto isso, dê uma olhada nos treinos livres e faça seu check-in."
+                  : "Escolha um treino pronto na aba Treino e comece hoje, sem esperar."
             }
             ready={!session && !heroFinishedToday && !!heroPlan && heroPlan.count > 0}
           />

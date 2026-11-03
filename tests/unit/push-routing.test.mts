@@ -36,3 +36,9 @@ test("preferência: sem registro manda; desligado não manda", () => {
 test("equipe: 'Treino inicial aplicado' abre a lista de alunos", () => {
   assert.equal(routePush("Treino inicial aplicado").path, "/personal/alunos");
 });
+
+test("equipe: pedidos do aluno abrem Aprovações; escolha de treino abre Alunos", () => {
+  assert.equal(routePush("Pedido de acompanhamento").path, "/personal/aprovacoes");
+  assert.equal(routePush("Pedido de treino personalizado").path, "/personal/aprovacoes");
+  assert.equal(routePush("Aluno escolheu treino base").path, "/personal/alunos");
+});

@@ -46,10 +46,10 @@ const BodyMap = dynamic(() => import("~/components/body-map"), { ssr: false });
 import { ImageLightbox } from "~/components/common/ImageLightbox";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
-import { StarterPlanCTA } from "~/components/student/StarterPlanCTA";
+import { StarterPicker } from "~/components/student/StarterPicker";
+import { PersonalSupportBox } from "~/components/student/PersonalSupportBox";
 import { groupByTecnica, tecnicaLabel, tecnicaHint, type PlanExercise } from "~/lib/workout-groups";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
-import { ProvisionalTemplates } from "~/components/training/ProvisionalTemplates";
 import { CardioQuickAdd } from "~/components/training/CardioQuickAdd";
 import { fetchMyAssignedPlans } from "~/lib/gym-api";
 import { AiCoach } from "~/components/ai/AiCoachLazy";
@@ -1317,19 +1317,21 @@ export default function TreinoHomePage() {
         <TopBar title="Hoje" subtitle={cap(weekdayName())} />
         <PendingApprovalBanner />
         <div className="space-y-6 p-4">
-          {profile?.approved_at && user?.id && !demo ? (
-            <StarterPlanCTA studentId={user.id} onAssigned={() => void refetch()} />
-          ) : null}
-          <EmptyState
-            title={profile?.approved_at ? "Aguardando seu treino" : "Aguardando aprovação do personal"}
-            description={
-              profile?.approved_at
-                ? "Seu personal está montando seu treino. Enquanto isso, faça seu check-in, suba no ranking e teste um treino livre abaixo."
-                : "Seu cadastro está com o personal. Assim que ele aprovar e montar seu treino, ele aparece aqui."
-            }
-            icon={Dumbbell}
-          />
-          {profile?.approved_at ? <ProvisionalTemplates onStart={startTemplateSession} /> : null}
+          {!demo ? (
+            <StarterPicker
+              onPicked={() => void refetch()}
+              fallback={
+                <EmptyState
+                  title="Aguardando seu treino"
+                  description="Seu personal está montando seu treino. Enquanto isso, faça seu check-in e suba no ranking."
+                  icon={Dumbbell}
+                />
+              }
+            />
+          ) : (
+            <EmptyState title="Aguardando seu treino" description="No modo demonstração os treinos prontos não aparecem." icon={Dumbbell} />
+          )}
+          {!demo ? <PersonalSupportBox hasPlan={false} onPlanChanged={() => void refetch()} /> : null}
         </div>
         <AiCoach />
       </>
@@ -1977,6 +1979,9 @@ export default function TreinoHomePage() {
         )}
         {/* TREINOS ENVIADOS PELO PERSONAL (depois da ação principal) */}
         <PersonalWorkouts />
+
+        {/* Fale com o personal: ajuste, treino sob medida, acompanhamento, trocar treino pronto */}
+        {!demo ? <PersonalSupportBox hasPlan onPlanChanged={() => void refetch()} /> : null}
 
         {/* 3. BIBLIOTECA POR MÚSCULO, mapa navy/laranja com escala de recuperação */}
         {/* Recolhido por padrão: ocupava quase uma tela no meio da aba. */}
