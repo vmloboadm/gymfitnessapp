@@ -22,24 +22,24 @@ test("aluno vê os personais da academia dele, com telefone para o WhatsApp", as
     await h.asApp(aluno);
     const [r] = await q<{ p: Personal[] }>("select public.gym_personals() p");
     await h.asDb();
-    assert.equal(r.p.length, 1);
-    assert.equal(r.p[0].id, daiana);
+    assert.equal(r.p.filter((x) => x.id === daiana).length, 1);
     assert.equal(r.p[0].phone, "(22) 99800-1234");
     assert.equal(r.p[0].bio, "Hipertrofia e glúteo");
     assert.ok(!r.p.some((x) => x.id === deFora));
   });
 });
 
-test("sem personal cadastrado, mostra a gestão da academia", async () => {
+test("gestores também aparecem como personais (personais primeiro)", async () => {
   await withTx(async (q, h) => {
     const gym = await h.gym();
-    const gestor = await h.trainer(gym);
-    await q("update profiles set role = 'manager' where id = $1", [gestor]);
+    const daiana = await h.trainer(gym);
+    const claudeir = await h.trainer(gym);
+    await q("update profiles set role = 'manager' where id = $1", [claudeir]);
     const aluno = await h.student(gym);
     await h.asApp(aluno);
     const [r] = await q<{ p: Personal[] }>("select public.gym_personals() p");
     await h.asDb();
-    assert.deepEqual(r.p.map((x) => x.id), [gestor]);
+    assert.deepEqual(r.p.map((x) => x.id), [daiana, claudeir]);
   });
 });
 

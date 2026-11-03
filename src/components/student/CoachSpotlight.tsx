@@ -24,7 +24,7 @@ export function CoachSpotlight({ compact = false }: { compact?: boolean }) {
     void supabaseBrowser()
       .rpc("gym_personals" as never)
       .then(({ data }) => {
-        if (alive) setList(((data as unknown as Personal[]) ?? []).filter((p) => p.role === "trainer"));
+        if (alive) setList((data as unknown as Personal[]) ?? []);
       });
     return () => {
       alive = false;
@@ -75,7 +75,7 @@ export function CoachSpotlight({ compact = false }: { compact?: boolean }) {
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-wider text-[#FFC24D]">Acompanhamento personalizado</p>
             <p className={compact ? "text-[14.5px] font-black leading-tight text-foreground" : "text-[16px] font-black leading-tight text-foreground"}>
-              {list.length > 1 ? "Treine com um personal" : `Treine com ${first}`}
+              {list.length > 1 ? `Treine com ${list.slice(0, 3).map((p) => (p.name ?? "").trim().split(/\s+/)[0]).join(", ").replace(/, ([^,]*)$/, " ou $1")}` : `Treine com ${first}`}
             </p>
             <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">{fromLine}</p>
           </div>

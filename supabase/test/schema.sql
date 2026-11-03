@@ -1846,15 +1846,10 @@ CREATE FUNCTION public.gym_personals() RETURNS jsonb
     select p.id, p.name, p.bio, p.avatar_url, p.phone, p.role, p.created_at
     from public.profiles p, me
     where p.gym_id = me.gym_id and p.role in ('trainer', 'manager', 'admin')
-  ),
-  pick as (
-    select * from staff where role = 'trainer'
-    union all
-    select * from staff where role <> 'trainer' and not exists (select 1 from staff where role = 'trainer')
   )
   select coalesce(jsonb_agg(jsonb_build_object(
-      'id', pick.id, 'name', pick.name, 'bio', pick.bio, 'avatar_url', pick.avatar_url,
-      'phone', pick.phone, 'role', pick.role,
+      'id', staff.id, 'name', staff.name, 'bio', staff.bio, 'avatar_url', staff.avatar_url,
+      'phone', staff.phone, 'role', staff.role,
       'offers', (
         select coalesce(jsonb_agg(jsonb_build_object(
             'id', o.id, 'title', o.title, 'description', o.description,
@@ -1862,10 +1857,10 @@ CREATE FUNCTION public.gym_personals() RETURNS jsonb
             'duration_label', o.duration_label
           ) order by o.sort, o.created_at), '[]'::jsonb)
         from public.personal_offers o
-        where o.trainer_id = pick.id and o.active
+        where o.trainer_id = staff.id and o.active
       )
-    ) order by pick.created_at), '[]'::jsonb)
-  from pick;
+    ) order by (staff.role = 'trainer') desc, staff.created_at), '[]'::jsonb)
+  from staff;
 $$;
 
 

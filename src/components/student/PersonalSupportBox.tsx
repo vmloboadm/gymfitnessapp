@@ -275,7 +275,7 @@ export function PersonalChooser({ studentName, goal, onSent }: { studentName: st
               </Avatar>
               <div className="min-w-0">
                 <p className="truncate text-[15px] font-black text-foreground">{p.name ?? "Personal"}</p>
-                <p className="text-[11px] font-semibold text-brand">{p.role === "trainer" ? "Personal trainer" : "Equipe da academia"}</p>
+                <p className="text-[11px] font-semibold text-brand">Personal trainer</p>
               </div>
             </div>
             {p.bio ? <p className="mt-2 line-clamp-4 text-[12.5px] leading-snug text-muted-foreground">{p.bio}</p> : null}
