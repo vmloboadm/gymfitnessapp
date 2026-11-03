@@ -4,7 +4,7 @@
  * BASE-aware: deriva o prefixo (/app) do próprio scope do SW, funcionando
  * tanto na raiz quanto sob basePath.
  */
-const CACHE_VERSION = "gymfitness-v65";
+const CACHE_VERSION = "gymfitness-v66";
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
@@ -21,12 +21,17 @@ const SHELL_URLS = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL_URLS))
-      .then(() => self.skipWaiting())
-  );
+  // Ativa NA HORA: o push (e o resto do app) não pode esperar o cache.
+  // As páginas offline são baixadas em segundo plano; se uma falhar, as
+  // outras continuam (antes, uma falha travava a instalação inteira e o
+  // botão "Ativar avisos" ficava esperando para sempre).
+  self.skipWaiting();
+  const warm = caches
+    .open(SHELL_CACHE)
+    .then((cache) => Promise.allSettled(SHELL_URLS.map((u) => cache.add(u))))
+    .catch(() => undefined);
+  // espera no máximo 3s; o que faltar continua baixando depois de ativo
+  event.waitUntil(Promise.race([warm, new Promise((r) => setTimeout(r, 3000))]));
 });
 
 self.addEventListener("activate", (event) => {

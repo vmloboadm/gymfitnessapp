@@ -38,7 +38,9 @@ export function PushInvite({
     setHidden(ignoreSnooze ? false : snoozed());
   }, [ignoreSnooze]);
 
-  if (hidden || !push.supported || push.permission !== "default" || push.active) return null;
+  // bloqueado: só na tela de notificações, com o caminho para liberar
+  const blocked = push.permission === "denied" && context === "notificacoes";
+  if (hidden || !push.supported || push.active || (push.permission === "denied" && !blocked)) return null;
 
   const dismiss = () => {
     try {
@@ -54,11 +56,6 @@ export function PushInvite({
     if (ok) {
       toast.success("Notificações ligadas! Você fica sabendo na hora.");
       setHidden(true);
-    } else if (typeof Notification !== "undefined" && Notification.permission === "denied") {
-      toast.message("Notificações bloqueadas", {
-        description: "Dá para liberar depois nas configurações do navegador.",
-      });
-      setHidden(true);
     }
   };
 
@@ -68,9 +65,11 @@ export function PushInvite({
         <BellRing className="h-5 w-5" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[13.5px] font-black text-foreground">Ative as notificações</p>
+        <p className="text-[13.5px] font-black text-foreground">{blocked ? "Avisos bloqueados" : "Ative as notificações"}</p>
         <p className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">
-          {context === "feed"
+          {blocked
+            ? "Este aparelho bloqueou os avisos do app. Veja como liberar."
+            : context === "feed"
             ? "Saiba na hora quando curtirem ou comentarem suas conquistas."
             : context === "notificacoes"
               ? "Estes avisos também podem chegar no celular, mesmo com o app fechado."
@@ -83,7 +82,7 @@ export function PushInvite({
         disabled={push.enabling}
         className="tactile shrink-0 rounded-xl bg-brand px-4 py-2.5 text-[12px] font-black text-brand-foreground disabled:opacity-60"
       >
-        {push.enabling ? "…" : "Ativar"}
+        {push.enabling ? "Ativando…" : blocked ? "Como liberar" : "Ativar"}
       </button>
       <button
         type="button"

@@ -62,3 +62,7 @@ test("computador: não pede instalação, só notificação", () => {
   assert.equal(appSetupStep({ ...base, ua: DESKTOP }), "push");
   assert.equal(appSetupStep({ ...base, ua: DESKTOP, pushSnoozed: true }), null);
 });
+
+test("permissão já dada mas sem assinatura (falhou antes): oferece ativar de novo", () => {
+  assert.equal(appSetupStep({ ...base, standalone: true, permission: "granted", pushActive: false }), "push");
+});

@@ -229,7 +229,6 @@ export default function WorkoutSummary({
                 onClick={async () => {
                   const ok = await push.enable();
                   if (ok) toast.success("Notificações ativadas!");
-                  else toast.error("Não ativou agora. Você pode ativar no seu perfil.");
                 }}
                 className="gf-touch rounded-lg bg-brand px-3 py-1.5 text-[11px] font-black text-brand-foreground"
               >

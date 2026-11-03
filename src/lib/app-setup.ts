@@ -51,6 +51,6 @@ export function appSetupStep(env: SetupEnv): SetupStep | null {
   }
 
   const canAskPush =
-    env.pushSupported && !env.pushActive && env.permission === "default" && !env.pushSnoozed;
+    env.pushSupported && !env.pushActive && env.permission !== "denied" && !env.pushSnoozed;
   return canAskPush ? "push" : null;
 }

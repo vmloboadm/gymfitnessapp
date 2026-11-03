@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronRight, ClipboardPen, HeartHandshake, Repeat, SlidersHorizontal } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronRight, ClipboardPen, HeartHandshake, MessageCircle, Repeat, SlidersHorizontal } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { supabaseBrowser } from "~/lib/supabase/client";
+import { normalizeBRPhone } from "~/lib/whatsapp";
 import { toast } from "sonner";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { StarterPicker } from "~/components/student/StarterPicker";
@@ -145,9 +148,17 @@ export function PersonalSupportBox({ onPlanChanged, hasPlan }: { onPlanChanged: 
               }}
             />
           </div>
+        ) : open === "acompanhamento" ? (
+          <PersonalChooser
+            studentName={profile?.name ?? ""}
+            goal={(profile as { objetivo?: string | null; goal?: string | null } | null)?.objetivo ?? profile?.goal ?? null}
+            onSent={() => {
+              setSent((s) => new Set(s).add("acompanhamento"));
+            }}
+          />
         ) : open ? (
           <div className="space-y-3 p-1 pb-4">
-            <h2 className="text-lg font-black text-foreground">{KINDS[open].title}</h2>
+            <h2 className="pr-10 text-lg font-black text-foreground">{KINDS[open].title}</h2>
             <p className="text-[13px] text-muted-foreground">{KINDS[open].text}</p>
             <textarea
               value={text}
@@ -170,5 +181,105 @@ export function PersonalSupportBox({ onPlanChanged, hasPlan }: { onPlanChanged: 
         ) : null}
       </BottomSheet>
     </section>
+  );
+}
+
+type Personal = { id: string; name: string | null; bio: string | null; avatar_url: string | null; phone: string | null; role: string };
+
+/** Escolha do personal: foto, nome, bio e WhatsApp com mensagem pronta. */
+function PersonalChooser({ studentName, goal, onSent }: { studentName: string; goal: string | null; onSent: () => void }) {
+  const [list, setList] = useState<Personal[] | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const { data, error } = await supabaseBrowser().rpc("gym_personals" as never);
+      if (!alive) return;
+      if (error) {
+        logger.error("coaching.list", error);
+        setList([]);
+        return;
+      }
+      setList((data as unknown as Personal[]) ?? []);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const firstName = (n: string | null) => (n ?? "").trim().split(/\s+/)[0] || "";
+  const message = (p: Personal) =>
+    `Oi, ${firstName(p.name)}! Sou ${studentName.trim() || "aluno(a)"} da GymFitness. ` +
+    `Vi seu perfil no app e quero saber como funciona o acompanhamento com você.` +
+    (goal ? ` Meu objetivo é ${goal.toLowerCase()}.` : "");
+
+  // registra o pedido e avisa o personal; não espera, para o WhatsApp abrir
+  // ainda dentro do toque (senão o celular bloqueia a abertura)
+  const record = (p: Personal) => {
+    void (async () => {
+      const { error } = await supabaseBrowser().rpc("request_coaching" as never, { p_trainer: p.id, p_message: null } as never);
+      if (error) logger.error("coaching.request", error);
+    })();
+    setDone(p.id);
+    onSent();
+  };
+
+  if (list === null) return <div className="h-40 animate-pulse rounded-2xl bg-white/[0.04]" />;
+
+  return (
+    <div className="max-h-[75dvh] space-y-3 overflow-y-auto p-1 pb-4">
+      <h2 className="pr-10 text-lg font-black text-foreground">Acompanhamento com personal</h2>
+      <p className="text-[13px] text-muted-foreground">
+        Escolha o personal e fale direto com ele no WhatsApp. A mensagem já vai pronta.
+      </p>
+      {list.length === 0 ? (
+        <p className="text-[13px] text-muted-foreground">Nenhum personal cadastrado na academia ainda.</p>
+      ) : null}
+      {list.map((p) => {
+        const phone = normalizeBRPhone(p.phone);
+        const href = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message(p))}` : null;
+        return (
+          <article key={p.id} className="rounded-2xl border border-border bg-card/70 p-4">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-14 w-14 border border-white/[0.08]">
+                {p.avatar_url ? <AvatarImage src={p.avatar_url} alt={p.name ?? "Personal"} /> : null}
+                <AvatarFallback className="bg-brand/20 text-[15px] font-black text-brand">
+                  {(p.name ?? "P").trim().charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-black text-foreground">{p.name ?? "Personal"}</p>
+                <p className="text-[11px] font-semibold text-brand">{p.role === "trainer" ? "Personal trainer" : "Equipe da academia"}</p>
+              </div>
+            </div>
+            {p.bio ? <p className="mt-2 line-clamp-4 text-[12.5px] leading-snug text-muted-foreground">{p.bio}</p> : null}
+            {href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => record(p)}
+                className="tactile mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] py-3 text-[14px] font-black text-black"
+              >
+                <MessageCircle className="h-4 w-4" />
+                {done === p.id ? "Abrir WhatsApp de novo" : `Chamar ${firstName(p.name)} no WhatsApp`}
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  record(p);
+                  toast.success("Pedido enviado! O personal vai falar com você.");
+                }}
+                className="tactile mt-3 w-full rounded-xl bg-brand py-3 text-[14px] font-black text-brand-foreground"
+              >
+                {done === p.id ? "Pedido enviado ✓" : "Pedir pelo app"}
+              </button>
+            )}
+          </article>
+        );
+      })}
+    </div>
   );
 }

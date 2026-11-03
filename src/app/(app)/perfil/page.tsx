@@ -256,15 +256,8 @@ export default function PerfilPage() {
                   onClick={() => {
                     void (async () => {
                       const ok = await push.enable();
-                      if (ok) {
-                        toast.success("Avisos ativados.");
-                      } else if (typeof Notification !== "undefined" && Notification.permission === "denied") {
-                        toast.error("Notificações bloqueadas", {
-                          description: "Libere nas configurações do navegador para ativar os avisos.",
-                        });
-                      } else {
-                        toast.error("Não foi possível ativar os avisos.");
-                      }
+                      // em caso de falha o próprio usePush explica o que fazer
+                      if (ok) toast.success("Avisos ativados.");
                     })();
                   }}
                   className="tactile shrink-0 rounded-full bg-brand px-3.5 py-2 text-[11px] font-black text-brand-foreground"

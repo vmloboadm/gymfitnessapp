@@ -64,6 +64,7 @@ const COPY: Record<SetupStep, { title: string; text: string; cta: string }> = {
   },
 };
 
+
 export function AppSetupBar() {
   const pathname = usePathname();
   const push = usePush();
@@ -137,7 +138,7 @@ export function AppSetupBar() {
             disabled={push.enabling}
             className="tactile shrink-0 rounded-xl bg-brand px-3.5 py-2 text-[12px] font-black text-brand-foreground disabled:opacity-60"
           >
-            {c.cta}
+            {push.enabling && step === "push" ? "Ativando…" : c.cta}
           </button>
           <button
             type="button"

@@ -28,7 +28,7 @@ export function TopBar({
   const { user, profile } = useAuth();
   const { unread } = useNotifications(user?.id);
   const push = usePush();
-  const pushOff = push.supported && !push.active && push.permission === "default";
+  const pushOff = push.supported && !push.active && push.permission !== "denied";
   // "X treinando agora" só onde ajuda a decidir ir treinar; nas outras telas
   // espremia o título (ex.: "Resumo do treino" quebrava em duas linhas).
   const pathname = usePathname();

@@ -1758,6 +1758,32 @@ $$;
 
 
 --
+-- Name: gym_personals(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gym_personals() RETURNS jsonb
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  with me as (select gym_id from public.profiles where id = auth.uid()),
+  staff as (
+    select p.id, p.name, p.bio, p.avatar_url, p.phone, p.role, p.created_at
+    from public.profiles p, me
+    where p.gym_id = me.gym_id and p.role in ('trainer', 'manager', 'admin')
+  ),
+  pick as (
+    select * from staff where role = 'trainer'
+    union all
+    select * from staff where role <> 'trainer' and not exists (select 1 from staff where role = 'trainer')
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'id', id, 'name', name, 'bio', bio, 'avatar_url', avatar_url, 'phone', phone, 'role', role
+    ) order by created_at), '[]'::jsonb)
+  from pick;
+$$;
+
+
+--
 -- Name: gym_roster(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2166,6 +2192,9 @@ declare
   v_title text;
   sid uuid;
 begin
+  if coalesce(current_setting('gf.request_notified', true), '') = '1' then
+    return NEW;
+  end if;
   begin
     select coalesce(nullif(trim(name), ''), 'Um aluno') into v_name from public.profiles where id = NEW.student_id;
     v_title := case v_tag
@@ -2487,6 +2516,49 @@ begin
     load_kg  = excluded.load_kg,
     points   = excluded.points,
     streak   = excluded.streak;
+end;
+$$;
+
+
+--
+-- Name: request_coaching(uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.request_coaching(p_trainer uuid, p_message text DEFAULT NULL::text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_uid uuid := auth.uid();
+  st record;
+  tr record;
+  v_msg text := nullif(btrim(coalesce(p_message, '')), '');
+begin
+  select id, gym_id, name, role into st from public.profiles where id = v_uid;
+  if st.id is null or st.role <> 'student' then
+    raise exception 'Sem permissão';
+  end if;
+
+  select id, name, phone into tr from public.profiles
+  where id = p_trainer and gym_id = st.gym_id and role in ('trainer', 'manager', 'admin');
+  if tr.id is null then
+    raise exception 'Personal não encontrado';
+  end if;
+
+  -- o aviso genérico (notify_student_request) não dispara: avisamos só ele
+  perform set_config('gf.request_notified', '1', true);
+  insert into public.premium_requests (gym_id, student_id, request_type, details, status)
+  values (st.gym_id, v_uid, 'other',
+    '[acompanhamento] (com ' || coalesce(tr.name, 'personal') || ')' || coalesce(' ' || left(v_msg, 300), ''),
+    'pending');
+  perform set_config('gf.request_notified', '', true);
+
+  insert into public.notifications (gym_id, user_id, channel, title, body)
+  values (st.gym_id, tr.id, 'in_app', 'Pedido de acompanhamento',
+    coalesce(nullif(trim(st.name), ''), 'Um aluno') || ' quer acompanhamento com você'
+    || coalesce(': ' || left(v_msg, 120), '.') || ' Ele deve te chamar no WhatsApp agora.');
+
+  return jsonb_build_object('ok', true, 'phone', tr.phone, 'name', tr.name);
 end;
 $$;
 
