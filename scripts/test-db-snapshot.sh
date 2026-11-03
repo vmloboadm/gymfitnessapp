@@ -23,6 +23,12 @@ PGPASSWORD="$SUPABASE_DB_PASSWORD" psql "$CONN" -At -c "
   select format('insert into public.exercises (id, gym_id, name, category, muscles, photo_url, tips, aliases) values (%L, null, %L, %L, %L, %L, %L, %L) on conflict do nothing;',
     id, name, category, muscles, photo_url, tips, aliases)
   from public.exercises where gym_id is null order by name" > supabase/test/seed-exercises.sql
+# funções que em produção o app NÃO pode chamar (o dump sem privilégios perde isso)
+PGPASSWORD="$SUPABASE_DB_PASSWORD" psql "$CONN" -At -c "
+  select format('revoke all on function public.%I(%s) from public, anon, authenticated;', p.proname, pg_get_function_identity_arguments(p.oid))
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and not has_function_privilege('authenticated', p.oid, 'execute')
+  order by 1" > supabase/test/revoked-functions.sql
 rm -f "$TMP"
 echo "$APPLIED" > supabase/test/SNAPSHOT_MIGRATION
 echo "✓ esquema atualizado até a migration $(cat supabase/test/SNAPSHOT_MIGRATION)"

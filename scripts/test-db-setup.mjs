@@ -82,11 +82,24 @@ await db.query(`
   grant all on all tables in schema public to anon, authenticated, service_role;
   grant all on all sequences in schema public to anon, authenticated, service_role;
   grant execute on all functions in schema public to anon, authenticated, service_role;
-  revoke all on public.app_errors from anon, authenticated;
-  revoke all on public.app_config from anon, authenticated;
+  -- tabelas só do servidor (RLS ligada e nenhuma policy) continuam fechadas,
+  -- como em produção (app_errors, app_config, whatsapp_outbox…)
+  do $$
+  declare t record;
+  begin
+    for t in
+      select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity
+        and not exists (select 1 from pg_policy p where p.polrelid = c.oid)
+    loop
+      execute format('revoke all on public.%I from anon, authenticated', t.relname);
+    end loop;
+  end $$;
   alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
   alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
 `);
+
+await db.query(file("revoked-functions.sql"));
 
 const snapshot = file("SNAPSHOT_MIGRATION").trim();
 const pending = readdirSync(new URL("../supabase/migrations/", import.meta.url))
