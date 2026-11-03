@@ -75,6 +75,19 @@ for (const f of ["supabase-stubs.sql", "schema.sql", "seed-achievements.sql"]) {
     process.exit(1);
   }
 }
+// Supabase dá acesso às tabelas para anon/authenticated e deixa o RLS
+// decidir; o dump sai sem esses grants, então recriamos aqui.
+await db.query(`
+  grant usage on schema public to anon, authenticated, service_role;
+  grant all on all tables in schema public to anon, authenticated, service_role;
+  grant all on all sequences in schema public to anon, authenticated, service_role;
+  grant execute on all functions in schema public to anon, authenticated, service_role;
+  revoke all on public.app_errors from anon, authenticated;
+  revoke all on public.app_config from anon, authenticated;
+  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+  alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+`);
+
 const snapshot = file("SNAPSHOT_MIGRATION").trim();
 const pending = readdirSync(new URL("../supabase/migrations/", import.meta.url))
   .filter((f) => /^\d{3}_.*\.sql$/.test(f) && f.slice(0, 3) > snapshot)

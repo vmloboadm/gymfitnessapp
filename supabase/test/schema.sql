@@ -82,6 +82,170 @@ $$;
 
 
 --
+-- Name: assign_starter_plan(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.assign_starter_plan(p_student uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_uid uuid := auth.uid();
+  v_caller record;
+  st record;
+  t record;
+  prog record;
+  d record;
+  n integer;
+  v_first text;
+  v_draft jsonb;
+  v_days text[];
+  v_program uuid;
+  v_day uuid;
+begin
+  select id, gym_id, name, approved_at, medical_risk, status, experience_level, available_days
+    into st
+  from public.profiles where id = p_student and role = 'student';
+  if st.id is null then
+    return jsonb_build_object('ok', false, 'reason', 'nao_e_aluno');
+  end if;
+
+  -- quem pode pedir: o próprio aluno, a equipe da academia dele, ou o banco
+  if v_uid is not null then
+    select role, gym_id into v_caller from public.profiles where id = v_uid;
+    if not (v_uid = p_student
+            or (v_caller.role in ('trainer', 'manager', 'admin') and v_caller.gym_id = st.gym_id)) then
+      raise exception 'Sem permissão';
+    end if;
+  end if;
+
+  if st.approved_at is null then
+    return jsonb_build_object('ok', false, 'reason', 'nao_aprovado');
+  end if;
+  if coalesce(st.medical_risk, false) or coalesce(st.status, 'active') <> 'active' then
+    return jsonb_build_object('ok', false, 'reason', 'avaliacao_medica');
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('starter:' || p_student::text));
+
+  if exists (select 1 from public.student_workouts
+             where student_id = p_student and status = 'active') then
+    return jsonb_build_object('ok', false, 'reason', 'ja_tem_ficha');
+  end if;
+
+  n := coalesce(array_length(st.available_days, 1), 3);
+
+  select x.* into t from (
+    select s.id, s.program_id, s.label, s.levels, s.created_at,
+      (select count(*) from public.workout_days wd where wd.program_id = s.program_id)::int as nd
+    from public.starter_templates s
+    where s.gym_id = st.gym_id and s.active
+  ) x
+  where x.nd > 0
+  order by (x.levels is not null and st.experience_level = any(x.levels)) desc,
+           (x.levels is null) desc,
+           abs(x.nd - n) asc,
+           x.created_at asc
+  limit 1;
+
+  if t.id is null then
+    return jsonb_build_object('ok', false, 'reason', 'sem_modelo');
+  end if;
+
+  select * into prog from public.workout_programs where id = t.program_id;
+  v_first := split_part(coalesce(nullif(trim(st.name), ''), 'Aluno'), ' ', 1);
+
+  begin
+    v_draft := prog.ai_draft::jsonb;
+  exception when others then
+    v_draft := null;
+  end;
+  -- dias da semana do aluno, se a quantidade bater com os dias do modelo
+  if v_draft is not null and st.available_days is not null and n = t.nd then
+    select array_agg(x order by public.weekday_number(x)) into v_days
+    from unnest(st.available_days) x where public.weekday_number(x) is not null;
+    if coalesce(array_length(v_days, 1), 0) = t.nd then
+      v_draft := jsonb_set(v_draft, '{daysSelected}', to_jsonb(v_days));
+    end if;
+  end if;
+  if v_draft is not null then
+    v_draft := jsonb_set(v_draft, '{nome}', to_jsonb(prog.name || ' · ' || v_first));
+  end if;
+
+  insert into public.workout_programs
+    (gym_id, trainer_id, name, objective, created_via, ai_draft, notes, reviewed_by)
+  values
+    (st.gym_id, prog.trainer_id, prog.name || ' · ' || v_first, prog.objective,
+     'template', coalesce(v_draft::text, prog.ai_draft), prog.notes, null)
+  returning id into v_program;
+
+  for d in select * from public.workout_days where program_id = prog.id order by day_order loop
+    insert into public.workout_days (gym_id, program_id, name, day_order)
+    values (st.gym_id, v_program, d.name, d.day_order)
+    returning id into v_day;
+
+    insert into public.workout_exercises
+      (gym_id, day_id, exercise_id, variation_id, sets, reps, rest_seconds, rpe, notes, technique, ord)
+    select st.gym_id, v_day, we.exercise_id, we.variation_id, we.sets, we.reps,
+           we.rest_seconds, we.rpe, we.notes, we.technique, we.ord
+    from public.workout_exercises we where we.day_id = d.id;
+  end loop;
+
+  -- dispara "Novo treino liberado" para o aluno (trg_notify_plan_assigned)
+  insert into public.student_workouts (gym_id, student_id, program_id, status)
+  values (st.gym_id, p_student, v_program, 'active');
+
+  if prog.trainer_id is not null then
+    insert into public.notifications (gym_id, user_id, channel, title, body)
+    values (st.gym_id, prog.trainer_id, 'in_app', 'Treino inicial aplicado',
+      coalesce(nullif(trim(st.name), ''), 'Um aluno') || ' recebeu o modelo "' || t.label
+      || '". Já pode treinar; revise e ajuste quando puder.');
+  end if;
+
+  return jsonb_build_object('ok', true, 'program_id', v_program, 'template', t.label);
+end;
+$$;
+
+
+--
+-- Name: assign_starter_plans_bulk(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.assign_starter_plans_bulk() RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_uid uuid := auth.uid();
+  v_gym uuid;
+  v_role text;
+  r record;
+  res jsonb;
+  applied integer := 0;
+  skipped integer := 0;
+begin
+  select gym_id, role into v_gym, v_role from public.profiles where id = v_uid;
+  if v_gym is null or v_role not in ('trainer', 'manager', 'admin') then
+    raise exception 'Sem permissão';
+  end if;
+
+  for r in
+    select p.id from public.profiles p
+    where p.gym_id = v_gym and p.role = 'student' and p.approved_at is not null
+      and not exists (select 1 from public.student_workouts sw
+                      where sw.student_id = p.id and sw.status = 'active')
+    order by p.approved_at
+  loop
+    res := public.assign_starter_plan(r.id);
+    if (res ->> 'ok')::boolean then applied := applied + 1; else skipped := skipped + 1; end if;
+  end loop;
+
+  return jsonb_build_object('applied', applied, 'skipped', skipped);
+end;
+$$;
+
+
+--
 -- Name: assign_workout_plan(uuid, uuid, jsonb, date); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1685,6 +1849,27 @@ $$;
 
 
 --
+-- Name: on_student_approved(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.on_student_approved() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if NEW.role = 'student' and OLD.approved_at is null and NEW.approved_at is not null then
+    begin
+      perform public.assign_starter_plan(NEW.id);
+    exception when others then
+      raise warning 'treino inicial automático falhou: %', sqlerrm;
+    end;
+  end if;
+  return NEW;
+end;
+$$;
+
+
+--
 -- Name: prevent_duplicate_checkin(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2232,6 +2417,34 @@ begin
     'session_id', v_session_id, 'started_at', v_started_at
   );
 end;
+$$;
+
+
+--
+-- Name: starter_plan_status(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.starter_plan_status() RETURNS jsonb
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  with me as (
+    select gym_id from public.profiles
+    where id = auth.uid() and role in ('trainer', 'manager', 'admin')
+  ),
+  s as (
+    select p.* from public.profiles p, me
+    where p.gym_id = me.gym_id and p.role = 'student' and p.approved_at is not null
+      and not exists (select 1 from public.student_workouts sw
+                      where sw.student_id = p.id and sw.status = 'active')
+  )
+  select jsonb_build_object(
+    'without_plan', (select count(*) from s),
+    'medical', (select count(*) from s where coalesce(medical_risk, false) or coalesce(status, 'active') <> 'active'),
+    'pending_approval', (select count(*) from public.profiles p, me
+                         where p.gym_id = me.gym_id and p.role = 'student' and p.approved_at is null)
+  )
+  where exists (select 1 from me);
 $$;
 
 
@@ -3199,6 +3412,22 @@ CREATE TABLE public.squads (
 
 
 --
+-- Name: starter_templates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.starter_templates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    gym_id uuid NOT NULL,
+    program_id uuid NOT NULL,
+    label text NOT NULL,
+    levels text[],
+    active boolean DEFAULT true NOT NULL,
+    created_by uuid DEFAULT auth.uid(),
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: student_achievements; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3813,6 +4042,22 @@ ALTER TABLE ONLY public.squads
 
 
 --
+-- Name: starter_templates starter_templates_gym_id_program_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.starter_templates
+    ADD CONSTRAINT starter_templates_gym_id_program_id_key UNIQUE (gym_id, program_id);
+
+
+--
+-- Name: starter_templates starter_templates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.starter_templates
+    ADD CONSTRAINT starter_templates_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: student_achievements student_achievements_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4306,6 +4551,13 @@ CREATE TRIGGER trg_notify_student_lifecycle AFTER INSERT OR UPDATE ON public.pro
 --
 
 CREATE TRIGGER trg_notify_workout_milestones AFTER INSERT ON public.workout_logs FOR EACH ROW EXECUTE FUNCTION public.notify_workout_milestones();
+
+
+--
+-- Name: profiles trg_on_student_approved; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_on_student_approved AFTER UPDATE OF approved_at ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.on_student_approved();
 
 
 --
@@ -4893,6 +5145,22 @@ ALTER TABLE ONLY public.squad_messages
 
 ALTER TABLE ONLY public.squads
     ADD CONSTRAINT squads_gym_id_fkey FOREIGN KEY (gym_id) REFERENCES public.gyms(id);
+
+
+--
+-- Name: starter_templates starter_templates_gym_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.starter_templates
+    ADD CONSTRAINT starter_templates_gym_id_fkey FOREIGN KEY (gym_id) REFERENCES public.gyms(id) ON DELETE CASCADE;
+
+
+--
+-- Name: starter_templates starter_templates_program_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.starter_templates
+    ADD CONSTRAINT starter_templates_program_id_fkey FOREIGN KEY (program_id) REFERENCES public.workout_programs(id) ON DELETE CASCADE;
 
 
 --
@@ -6177,6 +6445,26 @@ CREATE POLICY squads_insert_trainer ON public.squads FOR INSERT WITH CHECK (((pu
 --
 
 CREATE POLICY squads_select_gym ON public.squads FOR SELECT USING ((gym_id = public.current_gym_id()));
+
+
+--
+-- Name: starter_templates; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.starter_templates ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: starter_templates starter_templates_staff_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY starter_templates_staff_select ON public.starter_templates FOR SELECT USING (((gym_id = public.current_gym_id()) AND (public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text]))));
+
+
+--
+-- Name: starter_templates starter_templates_staff_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY starter_templates_staff_write ON public.starter_templates USING (((gym_id = public.current_gym_id()) AND (public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text])))) WITH CHECK (((gym_id = public.current_gym_id()) AND (public."current_role"() = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text]))));
 
 
 --

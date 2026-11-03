@@ -32,3 +32,7 @@ test("preferência: sem registro manda; desligado não manda", () => {
   assert.equal(pushAllowed("social", { push_social: false }), false);
   assert.equal(pushAllowed("workouts", { push_social: false }), true);
 });
+
+test("equipe: 'Treino inicial aplicado' abre a lista de alunos", () => {
+  assert.equal(routePush("Treino inicial aplicado").path, "/personal/alunos");
+});

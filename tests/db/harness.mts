@@ -119,6 +119,35 @@ function helpers(q: Q, notices: string[]) {
       ]);
     },
 
+    /** Espera que o SQL seja recusado, sem derrubar o resto do teste. */
+    async rejects(sql: string, params: unknown[] = [], match?: RegExp): Promise<void> {
+      await q("savepoint esperado");
+      let failed = false;
+      try {
+        await q(sql, params);
+      } catch (err) {
+        failed = true;
+        if (match && !match.test((err as Error).message)) {
+          await q("rollback to savepoint esperado");
+          throw new Error(`erro diferente do esperado: ${(err as Error).message}`);
+        }
+      }
+      await q(failed ? "rollback to savepoint esperado" : "release savepoint esperado");
+      if (!failed) throw new Error(`deveria ter sido recusado: ${sql}`);
+    },
+
+    /** Como um usuário real do app: papel authenticated, RLS valendo. */
+    async asApp(userId: string): Promise<void> {
+      await this.as(userId);
+      await q("set local role authenticated");
+    },
+
+    /** Volta a ser o banco (superusuário, sem RLS). */
+    async asDb(): Promise<void> {
+      await q("reset role");
+      await this.as(null);
+    },
+
     async streak(studentId: string): Promise<number> {
       const [r] = await q<{ s: number }>("select public.day_streak($1) s", [studentId]);
       return Number(r.s);

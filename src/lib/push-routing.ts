@@ -19,6 +19,7 @@ const RULES: Array<{ test: RegExp; route: PushRoute }> = [
   { test: /^Conquista liberada/, route: { category: "social", path: "/feed", tag: "achievement" } },
   { test: /^Novo recorde/, route: { category: "social", path: "/feed", tag: "record" } },
   { test: /^Recado da academia/, route: { category: "promotions", path: "/feed", tag: "broadcast" } },
+  { test: /^Treino inicial aplicado/, route: { category: "workouts", path: "/personal/alunos", tag: "starter" } },
   { test: /^(Novo treino|Treino)/, route: { category: "workouts", path: "/treino", tag: "workout" } },
   { test: /^(Sequência|Meta da semana)/, route: { category: "workouts", path: "/progresso", tag: "streak" } },
   { test: /^Você ganhou pontos/, route: { category: "social", path: "/ranking", tag: "points" } },

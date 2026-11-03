@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { StarterPlanCard } from "~/components/personal/StarterPlanCard";
 import { m, type Variants } from "framer-motion";
 import {
   MessageCircle,
@@ -348,6 +349,9 @@ export default function PersonalDashboardPage() {
           <p className="mt-1 text-[9px] font-semibold text-muted-foreground">pedidos p/ decidir</p>
         </Link>
       </m.div>
+
+      {/* Alunos sem ficha → treino inicial automático */}
+      <StarterPlanCard />
 
       {/* Lembretes: alunos aguardando aprovação + matrícula Gymfitness vencendo */}
       {(() => {

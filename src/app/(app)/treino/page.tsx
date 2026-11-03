@@ -46,6 +46,7 @@ const BodyMap = dynamic(() => import("~/components/body-map"), { ssr: false });
 import { ImageLightbox } from "~/components/common/ImageLightbox";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
 import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
+import { StarterPlanCTA } from "~/components/student/StarterPlanCTA";
 import { groupByTecnica, tecnicaLabel, tecnicaHint, type PlanExercise } from "~/lib/workout-groups";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { ProvisionalTemplates } from "~/components/training/ProvisionalTemplates";
@@ -1316,6 +1317,9 @@ export default function TreinoHomePage() {
         <TopBar title="Hoje" subtitle={cap(weekdayName())} />
         <PendingApprovalBanner />
         <div className="space-y-6 p-4">
+          {profile?.approved_at && user?.id && !demo ? (
+            <StarterPlanCTA studentId={user.id} onAssigned={() => void refetch()} />
+          ) : null}
           <EmptyState
             title={profile?.approved_at ? "Aguardando seu treino" : "Aguardando aprovação do personal"}
             description={
