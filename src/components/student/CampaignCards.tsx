@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Flame, Timer, Trophy, Users } from "lucide-react";
+import { Flame, HandHeart, Timer, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { BottomSheet } from "~/components/ui/bottom-sheet";
@@ -71,6 +71,19 @@ export function CampaignCards() {
   const [ranking, setRanking] = useState<string | null>(null);
   const [coach, setCoach] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [cheered, setCheered] = useState<Set<string>>(new Set());
+
+  const cheer = async (challengeId: string, to: BoardRow) => {
+    setCheered((s) => new Set(s).add(to.id));
+    const { data, error } = await supabaseBrowser().rpc("challenge_cheer" as never, { p_challenge: challengeId, p_to: to.id } as never);
+    const r = data as unknown as { ok: boolean; reason?: string } | null;
+    if (error) {
+      logger.error("challenge.cheer", error);
+      return toast.error("Não foi possível agora.");
+    }
+    if (r?.ok) toast.success(`Você deu força para ${to.name} 💪`);
+    else if (r?.reason === "ja_deu_hoje") toast.message(`Você já deu força para ${to.name} hoje.`);
+  };
 
   const loadBoard = useCallback(async (challengeId: string) => {
     const { data } = await supabaseBrowser().rpc("challenge_board" as never, { p_challenge: challengeId } as never);
@@ -201,7 +214,7 @@ export function CampaignCards() {
             <p className="text-[12.5px] text-muted-foreground">
               Meta: {rankingChallenge.goal_days} dias de treino até{" "}
               {new Date(`${rankingChallenge.ends_on}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}.
-              Conta treino registrado ou check-in, um por dia.
+              Conta treino registrado ou check-in, um por dia. Dê força para a galera: eles recebem um aviso 💪
             </p>
             {rankingChallenge.prize_text ? (
               <p className="flex items-start gap-1.5 rounded-xl border border-[#FFC24D]/40 bg-[#FFC24D]/10 p-3 text-[12.5px] font-semibold text-foreground">
@@ -218,6 +231,17 @@ export function CampaignCards() {
                   </Avatar>
                   <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-foreground">{r.me ? `${r.name} (você)` : r.name}</span>
                   <span className="text-[12.5px] font-black text-foreground">{r.days} {r.days === 1 ? "dia" : "dias"}</span>
+                  {!r.me && rankingBoard.joined ? (
+                    <button
+                      type="button"
+                      onClick={() => void cheer(ranking!, r)}
+                      disabled={cheered.has(r.id)}
+                      aria-label={`Dar força para ${r.name}`}
+                      className="tactile flex shrink-0 items-center gap-1 rounded-full border border-[#FFC24D]/50 px-2 py-1 text-[10.5px] font-black text-[#FFC24D] disabled:opacity-40"
+                    >
+                      <HandHeart className="h-3.5 w-3.5" /> {cheered.has(r.id) ? "Feito" : "Força"}
+                    </button>
+                  ) : null}
                 </li>
               ))}
             </ol>

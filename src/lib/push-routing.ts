@@ -17,6 +17,7 @@ const RULES: Array<{ test: RegExp; route: PushRoute }> = [
   { test: /^Curtiram sua publicação/, route: { category: "social", path: "/feed", tag: "feed-like" } },
   { test: /^Comentaram sua publicação/, route: { category: "social", path: "/feed", tag: "feed-comment" } },
   { test: /^Conquista liberada/, route: { category: "social", path: "/feed", tag: "achievement" } },
+  { test: /^(Força no desafio|Você está no)/, route: { category: "social", path: "/", tag: "challenge" } },
   { test: /^Novo recorde/, route: { category: "social", path: "/feed", tag: "record" } },
   { test: /^Recado da academia/, route: { category: "promotions", path: "/feed", tag: "broadcast" } },
   { test: /^Pedido d/, route: { category: "workouts", path: "/personal/aprovacoes", tag: "request" } },
