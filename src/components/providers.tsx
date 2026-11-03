@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { AuthProvider } from "~/hooks/useAuth";
 import { OfflineSyncListener } from "~/components/common/OfflineSyncListener";
+import { ErrorMonitor } from "~/components/common/ErrorMonitor";
 import { StaffTour } from "~/components/staff/StaffTour";
 import { StudentTour } from "~/components/student/StudentTour";
 import { PageTracker } from "~/components/analytics/PageTracker";
@@ -37,6 +38,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <PageTracker />
       </AuthProvider>
       <OfflineSyncListener />
+      <ErrorMonitor />
     </QueryClientProvider>
   );
 }

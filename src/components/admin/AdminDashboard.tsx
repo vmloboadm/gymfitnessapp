@@ -1,6 +1,6 @@
 "use client";
 
-import type { AdminData, AdminStudent } from "~/lib/admin-data";
+import type { AdminData, AdminErrorGroup, AdminStudent } from "~/lib/admin-data";
 import { formatNumber, formatDate, formatRelative } from "~/lib/utils/format";
 import { AutoRefresh } from "./AutoRefresh";
 
@@ -166,6 +166,8 @@ export function AdminDashboard({ data }: { data: AdminData }) {
         />
       </section>
 
+      <ErrorsSection errors={data.errors} />
+
       {/* série diária */}
       <section className="mt-5 rounded-2xl border border-border bg-card/50 p-4" aria-label="Últimos 14 dias">
         <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Últimos 14 dias</p>
@@ -264,5 +266,90 @@ export function AdminDashboard({ data }: { data: AdminData }) {
         Rota secreta · visível apenas para você · atualiza sozinho a cada 30s
       </p>
     </main>
+  );
+}
+
+function ErrorRow({ g }: { g: AdminErrorGroup }) {
+  const toastLevel = g.level === "toast";
+  return (
+    <details className="group px-4 py-2.5">
+      <summary className="flex cursor-pointer list-none items-start gap-3">
+        <span
+          className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+            g.count24h > 0 ? (toastLevel ? "bg-warning" : "bg-danger") : "bg-muted-foreground/40"
+          }`}
+          aria-hidden
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold text-foreground">{g.message || g.event}</p>
+          <p className="truncate text-[10px] text-muted-foreground">
+            {toastLevel ? "aviso mostrado ao usuário" : g.event} · {g.source === "server" ? "servidor" : "app"} ·{" "}
+            {g.lastPath ?? "—"}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-sm font-black text-foreground">{formatNumber(g.count)}×</p>
+          <p className="text-[9px] text-muted-foreground">
+            {g.users} {g.users === 1 ? "pessoa" : "pessoas"} · {formatRelative(g.lastAt)}
+          </p>
+        </div>
+      </summary>
+      <div className="mt-2 space-y-1 pl-5 text-[11px] text-muted-foreground">
+        <p>
+          Primeira vez {formatRelative(g.firstAt)} · {g.count24h} nas últimas 24h · versão {g.lastBuild ?? "?"}
+        </p>
+        {g.userNames.length > 0 ? <p>Quem viu: {g.userNames.join(", ")}</p> : null}
+        <p className="break-all font-mono text-[10px]">{g.event}</p>
+        {g.lastStack ? (
+          <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-background/60 p-2 font-mono text-[10px]">
+            {g.lastStack}
+          </pre>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function ErrorsSection({ errors }: { errors: AdminData["errors"] }) {
+  const real = errors.groups.filter((g) => g.level === "error");
+  const toasts = errors.groups.filter((g) => g.level === "toast");
+  return (
+    <section className="mt-4 rounded-2xl border border-border bg-card/50" aria-label="Erros do app">
+      <div className="flex items-baseline justify-between px-4 pt-4">
+        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Erros · 7 dias</p>
+        {errors.available ? (
+          <p className="text-[10px] text-muted-foreground">
+            {errors.total24h} nas últimas 24h · {errors.total7d} na semana · {errors.users7d} pessoas
+          </p>
+        ) : null}
+      </div>
+      {!errors.available ? (
+        <p className="px-4 py-4 text-sm text-muted-foreground">Monitoramento indisponível (tabela app_errors não encontrada).</p>
+      ) : errors.groups.length === 0 ? (
+        <p className="px-4 py-4 text-sm text-muted-foreground">Nenhum erro registrado na semana. 🎉</p>
+      ) : (
+        <>
+          {real.length > 0 ? (
+            <div className="mt-2 divide-y divide-border/60">
+              {real.map((g) => (
+                <ErrorRow key={g.fingerprint} g={g} />
+              ))}
+            </div>
+          ) : null}
+          {toasts.length > 0 ? (
+            <>
+              <p className="border-t border-border/60 px-4 pt-3 text-[11px] font-semibold text-foreground">
+                Avisos de erro que apareceram na tela
+              </p>
+              <div className="divide-y divide-border/60">
+                {toasts.map((g) => (
+                  <ErrorRow key={g.fingerprint} g={g} />
+                ))}
+              </div>
+            </>
+          ) : null}
+        </>
+      )}
+    </section>
   );
 }

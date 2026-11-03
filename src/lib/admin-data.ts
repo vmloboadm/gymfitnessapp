@@ -37,8 +37,35 @@ export type AdminStudent = {
   active7: boolean;
 };
 
+export type AdminErrorGroup = {
+  fingerprint: string;
+  event: string;
+  level: "error" | "toast";
+  source: "client" | "server";
+  message: string | null;
+  lastPath: string | null;
+  lastStack: string | null;
+  lastBuild: string | null;
+  lastAt: string;
+  firstAt: string;
+  count: number;
+  count24h: number;
+  users: number;
+  userNames: string[];
+};
+
+export type AdminErrors = {
+  /** false = tabela app_errors inacessível (migration não aplicada etc.) */
+  available: boolean;
+  total24h: number;
+  total7d: number;
+  users7d: number;
+  groups: AdminErrorGroup[];
+};
+
 export type AdminData = {
   generatedAt: string;
+  errors: AdminErrors;
   banners: Array<{ path: string; label: string; views: number; clicks: number; unique: number }>;
   daily: Array<{ day: string; scans: number; students: number; checkins: number; workouts: number }>;
   origins: Array<{ label: string; students: number }>;
@@ -228,8 +255,11 @@ export async function loadAdminData(): Promise<AdminData> {
   const soon = Date.now() + 7 * 86_400_000;
   const weights = [...weightByUser.values()];
 
+  const errors = await loadErrors(profiles);
+
   return {
     generatedAt: new Date().toISOString(),
+    errors,
     banners,
     daily,
     origins,
@@ -263,4 +293,100 @@ export async function loadAdminData(): Promise<AdminData> {
       avgWeight30: weights.length > 0 ? Math.round((weights.reduce((a, b) => a + b, 0) / weights.length) * 10) / 10 : null,
     },
   };
+}
+
+type ErrorRow = {
+  created_at: string;
+  source: "client" | "server";
+  level: "error" | "toast";
+  event: string;
+  message: string | null;
+  stack: string | null;
+  path: string | null;
+  user_id: string | null;
+  build: string | null;
+  fingerprint: string;
+};
+
+/** Erros dos últimos 7 dias agrupados por fingerprint (mais recentes no topo). */
+async function loadErrors(profiles: ProfileRow[]): Promise<AdminErrors> {
+  const empty: AdminErrors = { available: false, total24h: 0, total7d: 0, users7d: 0, groups: [] };
+  try {
+    const sb = supabaseAdmin() as unknown as {
+      from: (t: string) => {
+        select: (c: string) => {
+          gte: (c: string, v: string) => {
+            order: (c: string, o: { ascending: boolean }) => {
+              limit: (n: number) => PromiseLike<{ data: ErrorRow[] | null; error: { message: string } | null }>;
+            };
+          };
+        };
+      };
+    };
+    const { data, error } = await sb
+      .from("app_errors")
+      .select("created_at, source, level, event, message, stack, path, user_id, build, fingerprint")
+      .gte("created_at", day(7).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(3000);
+    if (error) return empty;
+
+    const rows = data ?? [];
+    const names = new Map(profiles.map((p) => [p.id, p.name ?? p.email ?? "aluno"]));
+    const since24 = Date.now() - 86_400_000;
+    const groups = new Map<string, AdminErrorGroup & { ids: Set<string> }>();
+
+    for (const r of rows) {
+      let g = groups.get(r.fingerprint);
+      if (!g) {
+        // rows vêm do mais novo pro mais velho: o 1º é o "último visto"
+        g = {
+          fingerprint: r.fingerprint,
+          event: r.event,
+          level: r.level,
+          source: r.source,
+          message: r.message,
+          lastPath: r.path,
+          lastStack: r.stack,
+          lastBuild: r.build,
+          lastAt: r.created_at,
+          firstAt: r.created_at,
+          count: 0,
+          count24h: 0,
+          users: 0,
+          userNames: [],
+          ids: new Set(),
+        };
+        groups.set(r.fingerprint, g);
+      }
+      g.count++;
+      g.firstAt = r.created_at;
+      if (new Date(r.created_at).getTime() >= since24) g.count24h++;
+      if (r.user_id) g.ids.add(r.user_id);
+    }
+
+    const list = [...groups.values()].map(({ ids, ...g }) => ({
+      ...g,
+      users: ids.size,
+      userNames: [...ids].map((id) => names.get(id) ?? "equipe").slice(0, 5),
+    }));
+    // erros de verdade antes de avisos; depois quem afetou mais gente
+    list.sort(
+      (a, b) =>
+        Number(b.count24h > 0) - Number(a.count24h > 0) ||
+        Number(a.level === "toast") - Number(b.level === "toast") ||
+        b.users - a.users ||
+        b.count - a.count
+    );
+
+    return {
+      available: true,
+      total24h: rows.filter((r) => new Date(r.created_at).getTime() >= since24).length,
+      total7d: rows.length,
+      users7d: new Set(rows.map((r) => r.user_id).filter(Boolean)).size,
+      groups: list.slice(0, 40),
+    };
+  } catch {
+    return empty;
+  }
 }

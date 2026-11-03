@@ -1,5 +1,6 @@
 /**
- * Logger local estruturado (fase de MVP — substituto leve do Sentry).
+ * Logger local estruturado. logger.error também vai para o monitoramento
+ * (tabela app_errors, painel /admin) via setErrorSink.
  * - Nível por env: LOG_LEVEL (debug|info|warn|error), default info.
  * - Buffer em memória dos últimos 200 eventos, exposto para diagnóstico
  *   em dev via window.__gfLogs (client) e exportável no server.
@@ -52,6 +53,27 @@ function sanitize(data?: unknown): unknown {
   return clone;
 }
 
+type ErrorSink = (event: string, error: unknown, data?: Record<string, unknown>) => void;
+
+/**
+ * Destino dos logger.error (monitoramento): o ErrorMonitor (client) e o
+ * instrumentation.ts (server) registram aqui. Fica em globalThis para valer
+ * entre bundles diferentes do mesmo processo.
+ */
+export function setErrorSink(sink: ErrorSink | null) {
+  (globalThis as { __gfErrorSink?: ErrorSink | null }).__gfErrorSink = sink;
+}
+
+function sendToSink(event: string, error: unknown, data?: unknown) {
+  const sink = (globalThis as { __gfErrorSink?: ErrorSink | null }).__gfErrorSink;
+  if (!sink) return;
+  try {
+    sink(event, error, sanitize(data) as Record<string, unknown> | undefined);
+  } catch {
+    /* monitoramento nunca quebra quem logou */
+  }
+}
+
 export const logger = {
   debug(event: string, data?: unknown) {
     push("debug", event, sanitize(data));
@@ -68,6 +90,7 @@ export const logger = {
         ? { message: error.message, stack: error.stack?.split("\n").slice(0, 4).join("\n") }
         : error;
     push("error", event, { err, ...((data as Record<string, unknown>) ?? {}) });
+    sendToSink(event, error, data);
   },
 
   /** Últimos eventos (para botão "copiar diagnóstico" em suporte). */
