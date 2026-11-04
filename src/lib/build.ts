@@ -2,7 +2,7 @@
  * Tag de build visível no app — amarra evidências à versão em execução.
  * Regra: BUMP OBRIGATÓRIO a cada release (BUILD_VERSION + BUILD_DATE).
  */
-export const BUILD_VERSION = "1.23.3";
+export const BUILD_VERSION = "1.23.4";
 export const BUILD_DATE = "03/11";
 
 export const BUILD_LABEL = `GymFitness · v${BUILD_VERSION} · ${BUILD_DATE}`;

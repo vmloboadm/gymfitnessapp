@@ -9,6 +9,7 @@ import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLin
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { CoachSpotlight } from "~/components/student/CoachSpotlight";
 import { CampaignCards } from "~/components/student/CampaignCards";
+import { ClearanceBanner } from "~/components/student/ClearanceBanner";
 import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
 import { useOnlineCount } from "~/hooks/useOnlineCount";
@@ -901,6 +902,11 @@ export default function HomePage() {
             }
             ready={!session && !heroFinishedToday && !!heroPlan && heroPlan.count > 0}
           />
+        </m.div>
+
+        {/* Restrição de saúde sem laudo aprovado: enviar laudo para liberar o treino */}
+        <m.div variants={item} className="px-4 pb-2 empty:hidden">
+          <ClearanceBanner />
         </m.div>
 
         {/* Campanhas: desafio (ranking), Black Friday e ofertas com prazo */}

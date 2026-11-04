@@ -20,6 +20,7 @@ const RULES: Array<{ test: RegExp; route: PushRoute }> = [
   { test: /^(Força no desafio|Você está no)/, route: { category: "social", path: "/", tag: "challenge" } },
   { test: /^Novo recorde/, route: { category: "social", path: "/feed", tag: "record" } },
   { test: /^Recado da academia/, route: { category: "promotions", path: "/feed", tag: "broadcast" } },
+  { test: /^(Laudo para analisar|Aluno aguardando laudo)/, route: { category: "workouts", path: "/personal/aprovacoes", tag: "clearance" } },
   { test: /^Pedido d/, route: { category: "workouts", path: "/personal/aprovacoes", tag: "request" } },
   { test: /^Aluno escolheu treino base/, route: { category: "workouts", path: "/personal/alunos", tag: "starter" } },
   { test: /^Treino inicial aplicado/, route: { category: "workouts", path: "/personal/alunos", tag: "starter" } },

@@ -104,7 +104,7 @@ const { rows } = await db.query(
 for (const [idx, m] of rows.entries()) {
   // confere de novo na hora: quem já escolheu treino ou tirou consentimento não recebe
   const { rows: chk } = await db.query(
-    `select coalesce(p.whatsapp_consent, false) consent,
+    `select coalesce(p.whatsapp_consent, false) consent, p.status = 'pending_clearance' medical,
        exists (select 1 from student_workouts sw where sw.student_id = p.id and sw.status = 'active') has_plan,
        exists (select 1 from challenge_participants cp
                where cp.student_id = p.id and 'desafio:' || cp.challenge_id = $2) joined
@@ -112,11 +112,13 @@ for (const [idx, m] of rows.entries()) {
     [m.student_id, m.campaign]
   );
   const c = chk[0];
-  const already = (m.campaign === "treino-pronto" && c?.has_plan) || (m.campaign.startsWith("desafio:") && c?.joined);
+  // "treino pronto" não serve para quem ainda precisa do laudo (não consegue escolher treino)
+  const already =
+    (m.campaign === "treino-pronto" && (c?.has_plan || c?.medical)) || (m.campaign.startsWith("desafio:") && c?.joined);
   if (!c || !c.consent || already) {
     await db.query("update whatsapp_outbox set status = 'skipped', error = $2 where id = $1", [
       m.id,
-      !c ? "aluno removido" : !c.consent ? "sem consentimento" : "já fez (treino/desafio)",
+      !c ? "aluno removido" : !c.consent ? "sem consentimento" : c.medical && m.campaign === "treino-pronto" ? "aguardando laudo" : "já fez (treino/desafio)",
     ]);
     console.log(stamp(), "pulado", m.id);
     continue;

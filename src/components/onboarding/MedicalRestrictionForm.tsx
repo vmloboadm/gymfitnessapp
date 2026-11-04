@@ -3,8 +3,8 @@
 import { useState, useRef } from "react";
 import { FileUp, Loader2, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { supabaseBrowser } from "~/lib/supabase/client";
 import { toast } from "sonner";
+import { uploadClearance } from "~/lib/medical-upload";
 import type { Profiles } from "~/lib/types/models";
 
 /**
@@ -27,36 +27,14 @@ export function MedicalRestrictionForm({
   const isPending = profile.status === "pending_clearance";
 
   const handleFile = async (f: File) => {
-    if (f.size > 5 * 1024 * 1024) {
-      toast.error("Arquivo grande demais", { description: "Envie um PDF ou imagem de até 5 MB." });
-      return;
-    }
     setFile(f);
     setUploading(true);
-    const supabase = supabaseBrowser();
-
-    const path = `clearances/${profile.id}/${Date.now()}-${f.name}`;
-    const { error } = await supabase.storage
-      .from("medical")
-      .upload(path, f, { upsert: false });
-
+    const r = await uploadClearance(profile, f);
     setUploading(false);
-    if (error) {
-      toast.error("Falha ao enviar laudo", { description: error.message });
+    if (!r.ok) {
+      toast.error("Falha ao enviar laudo", { description: r.error });
       return;
     }
-
-    // bucket privado: grava o caminho; a equipe abre com link assinado (lib/medical-doc)
-    const { error: insertError } = await supabase.from("medical_clearances").insert({
-      gym_id: profile.gym_id,
-      student_id: profile.id,
-      document_url: path,
-    } as never);
-    if (insertError) {
-      toast.error("Falha ao registrar laudo", { description: insertError.message });
-      return;
-    }
-
     setUploaded(true);
     toast.success("Laudo enviado, em análise pelo gestor");
   };

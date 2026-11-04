@@ -49,6 +49,7 @@ import { PersonalWorkouts } from "~/components/student/PersonalWorkouts";
 import { StarterPicker } from "~/components/student/StarterPicker";
 import { PersonalSupportBox } from "~/components/student/PersonalSupportBox";
 import { CoachSpotlight } from "~/components/student/CoachSpotlight";
+import { ClearanceBanner } from "~/components/student/ClearanceBanner";
 import { groupByTecnica, tecnicaLabel, tecnicaHint, type PlanExercise } from "~/lib/workout-groups";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { CardioQuickAdd } from "~/components/training/CardioQuickAdd";
@@ -1318,6 +1319,7 @@ export default function TreinoHomePage() {
         <TopBar title="Hoje" subtitle={cap(weekdayName())} />
         <PendingApprovalBanner />
         <div className="space-y-6 p-4">
+          {!demo ? <ClearanceBanner /> : null}
           {!demo ? (
             <StarterPicker
               onPicked={() => void refetch()}
