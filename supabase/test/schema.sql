@@ -2079,20 +2079,38 @@ CREATE FUNCTION public.handle_new_user() RETURNS trigger
     AS $$
 declare
   v_gym uuid;
+  v_ref_code text;
+  v_referrer record;
 begin
   select id into v_gym from public.gyms order by created_at limit 1;
-  insert into public.profiles (id, gym_id, role, status, name, email, onboarding_step, lgpd_consent_at)
+  v_gym := coalesce(v_gym, '00000000-0000-0000-0000-000000000001');
+
+  insert into public.profiles (id, gym_id, role, status, name, email, onboarding_step, lgpd_consent_at, referral_code)
   values (
     new.id,
-    coalesce(v_gym, '00000000-0000-0000-0000-000000000001'),
+    v_gym,
     'student',
     'active',
     coalesce(new.raw_user_meta_data->>'name', ''),
     coalesce(new.email, ''),
     1,
-    now()
+    now(),
+    public.new_referral_code()
   )
   on conflict (id) do nothing;
+
+  v_ref_code := upper(trim(coalesce(new.raw_user_meta_data->>'ref', '')));
+  if v_ref_code <> '' then
+    select id, gym_id into v_referrer
+    from public.profiles
+    where referral_code = v_ref_code and role = 'student' and gym_id = v_gym;
+    if v_referrer.id is not null and v_referrer.id <> new.id then
+      insert into public.referrals (gym_id, referrer_id, referred_id)
+      values (v_gym, v_referrer.id, new.id)
+      on conflict (referred_id) do nothing;
+    end if;
+  end if;
+
   return new;
 end;
 $$;
@@ -2272,6 +2290,52 @@ CREATE FUNCTION public.my_day_passes(p_codes text[]) RETURNS SETOF public.day_pa
   where code = any(p_codes)
   order by created_at desc
   limit 20;
+$$;
+
+
+--
+-- Name: my_referral(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.my_referral() RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_uid uuid := auth.uid();
+  v_code text;
+  v_total integer;
+  v_ok integer;
+  v_credit integer;
+begin
+  select referral_code into v_code from public.profiles where id = v_uid;
+  select count(*)::int,
+         count(*) filter (where p.approved_at is not null)::int,
+         coalesce(sum(r.amount_cents) filter (where p.approved_at is not null), 0)::int
+    into v_total, v_ok, v_credit
+  from public.referrals r
+  join public.profiles p on p.id = r.referred_id
+  where r.referrer_id = v_uid;
+
+  return jsonb_build_object(
+    'code', v_code,
+    'total', coalesce(v_total, 0),
+    'approved', coalesce(v_ok, 0),
+    'credit_cents', coalesce(v_credit, 0),
+    'per_friend_cents', 2000
+  );
+end;
+$$;
+
+
+--
+-- Name: new_referral_code(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.new_referral_code() RETURNS text
+    LANGUAGE sql
+    AS $$
+  select upper(substr(md5(random()::text || clock_timestamp()::text), 1, 6));
 $$;
 
 
@@ -4611,6 +4675,7 @@ CREATE TABLE public.profiles (
     plan_type text,
     vencimento date,
     approved_at timestamp with time zone,
+    referral_code text,
     CONSTRAINT profiles_plan_type_check CHECK ((plan_type = ANY (ARRAY['Gymfitness'::text, 'Gympass'::text, 'TotalPass'::text]))),
     CONSTRAINT profiles_role_check CHECK ((role = ANY (ARRAY['student'::text, 'trainer'::text, 'manager'::text, 'admin'::text]))),
     CONSTRAINT profiles_status_check CHECK ((status = ANY (ARRAY['active'::text, 'blocked'::text, 'pending_clearance'::text])))
@@ -4678,6 +4743,22 @@ CREATE TABLE public.push_subscriptions (
     p256dh text NOT NULL,
     auth text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: referrals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.referrals (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    gym_id uuid NOT NULL,
+    referrer_id uuid NOT NULL,
+    referred_id uuid NOT NULL,
+    amount_cents integer DEFAULT 2000 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT referrals_amount_cents_check CHECK ((amount_cents >= 0)),
+    CONSTRAINT referrals_check CHECK ((referrer_id <> referred_id))
 );
 
 
@@ -5396,6 +5477,14 @@ ALTER TABLE ONLY public.profiles
 
 
 --
+-- Name: profiles profiles_referral_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.profiles
+    ADD CONSTRAINT profiles_referral_code_key UNIQUE (referral_code);
+
+
+--
 -- Name: progress_photos progress_photos_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5425,6 +5514,22 @@ ALTER TABLE ONLY public.push_subscriptions
 
 ALTER TABLE ONLY public.push_subscriptions
     ADD CONSTRAINT push_subscriptions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: referrals referrals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referrals
+    ADD CONSTRAINT referrals_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: referrals referrals_referred_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referrals
+    ADD CONSTRAINT referrals_referred_id_key UNIQUE (referred_id);
 
 
 --
@@ -5840,6 +5945,13 @@ CREATE INDEX push_subscriptions_gym_id_idx ON public.push_subscriptions USING bt
 --
 
 CREATE INDEX push_subscriptions_user_id_idx ON public.push_subscriptions USING btree (user_id);
+
+
+--
+-- Name: referrals_referrer_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX referrals_referrer_idx ON public.referrals USING btree (referrer_id);
 
 
 --
@@ -6630,6 +6742,30 @@ ALTER TABLE ONLY public.promo_campaigns
 
 ALTER TABLE ONLY public.promo_campaigns
     ADD CONSTRAINT promo_campaigns_gym_id_fkey FOREIGN KEY (gym_id) REFERENCES public.gyms(id) ON DELETE CASCADE;
+
+
+--
+-- Name: referrals referrals_gym_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referrals
+    ADD CONSTRAINT referrals_gym_id_fkey FOREIGN KEY (gym_id) REFERENCES public.gyms(id) ON DELETE CASCADE;
+
+
+--
+-- Name: referrals referrals_referred_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referrals
+    ADD CONSTRAINT referrals_referred_id_fkey FOREIGN KEY (referred_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: referrals referrals_referrer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referrals
+    ADD CONSTRAINT referrals_referrer_id_fkey FOREIGN KEY (referrer_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -7954,6 +8090,21 @@ CREATE POLICY ps_select_own ON public.push_subscriptions FOR SELECT TO authentic
 --
 
 ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: referrals; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.referrals ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: referrals referrals_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY referrals_select ON public.referrals FOR SELECT TO authenticated USING (((referrer_id = auth.uid()) OR (referred_id = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM public.profiles me
+  WHERE ((me.id = auth.uid()) AND (me.gym_id = referrals.gym_id) AND (me.role = ANY (ARRAY['trainer'::text, 'manager'::text, 'admin'::text])))))));
+
 
 --
 -- Name: student_achievements sachievements_insert; Type: POLICY; Schema: public; Owner: -
