@@ -47,11 +47,13 @@ export function RegisterForm() {
 
     const supabase = supabaseBrowser();
     try {
+      // Link de indicação (?ref=CODIGO): o trigger de cadastro registra quem indicou
+      const ref = new URLSearchParams(window.location.search).get("ref")?.trim();
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { name },
+          data: ref ? { name, ref } : { name },
         },
       });
 

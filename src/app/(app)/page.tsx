@@ -9,6 +9,7 @@ import { ChevronRight, ChevronDown, Activity, Award, Trophy, Gem, Crown, ScanLin
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { CoachSpotlight } from "~/components/student/CoachSpotlight";
 import { CampaignCards } from "~/components/student/CampaignCards";
+import { IndicaCard } from "~/components/student/IndicaCard";
 import { ClearanceBanner } from "~/components/student/ClearanceBanner";
 import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
@@ -912,6 +913,11 @@ export default function HomePage() {
         {/* Campanhas: desafio (ranking), Black Friday e ofertas com prazo */}
         <m.div variants={item} className="px-4 pb-2 empty:hidden">
           <CampaignCards />
+        </m.div>
+
+        {/* Indique um amigo: desconto na mensalidade por amigo matriculado */}
+        <m.div variants={item} className="px-4 pb-2 empty:hidden">
+          <IndicaCard />
         </m.div>
 
         {/* Personal em destaque: contratar acompanhamento (vitrine do personal) */}
