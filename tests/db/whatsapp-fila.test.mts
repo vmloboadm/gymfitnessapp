@@ -36,7 +36,8 @@ test("enfileira só quem está sem ficha, com telefone válido e consentimento",
     assert.equal(row.student_id, ok);
     assert.equal(row.phone, "5522998001111");
     assert.match(row.body, /Ana/);
-    assert.match(row.body, /gymfitnesscampos\.com\.br\/app\/treino/);
+    assert.doesNotMatch(row.body, /https?:\/\//, "CTA é resposta no WhatsApp, sem link");
+    assert.match(row.body, /responde|me diz|me conta/i);
   });
 });
 
@@ -67,7 +68,8 @@ test("lote que passaria das 20h vai para o dia seguinte de manhã", async () => 
       const id = await h.student(gym, `Aluno ${i}`);
       await q("update profiles set phone = $2, whatsapp_consent = true where id = $1", [id, `229981000${i}0`]);
     }
-    await q("select public.enqueue_starter_campaign($1, '2026-11-04 18:30:00-03')", [gym]);
+    // começa 17h: o primeiro lote é hoje; o seguinte (2h+) já cai depois das 19h
+    await q("select public.enqueue_starter_campaign($1, '2026-11-04 17:00:00-03')", [gym]);
     const r = await rows(q);
     const day = (s: string) => new Date(new Date(s).getTime() - 3 * 3_600_000).toISOString().slice(0, 10);
     assert.equal(day(r[0].scheduled_at), "2026-11-04");
@@ -113,31 +115,24 @@ test("domingo não envia e nome em MAIÚSCULAS sai capitalizado", async () => {
   });
 });
 
-test("variedade: 4ª mensagem sai com outro link, quebrando a sequência do mesmo URL", async () => {
+test("variedade: 6 abordagens girando, nenhuma com link", async () => {
   await withTx(async (q, h) => {
     const gym = await h.gym();
-    const ids = [
-      await h.student(gym, "Ana Lima"),
-      await h.student(gym, "Bia Souza"),
-      await h.student(gym, "Caio Reis"),
-      await h.student(gym, "Duda Alves"),
-      await h.student(gym, "Eva Dias"),
-    ];
-    for (const [i, id] of ids.entries()) {
+    for (let i = 0; i < 7; i++) {
+      const id = await h.student(gym, `Aluno ${i}`);
       await q("update profiles set phone = $2, whatsapp_consent = true where id = $1", [
         id,
         `2299800${String(i + 1).padStart(4, "0")}`,
       ]);
     }
     const [r] = await q<{ n: number }>("select public.enqueue_starter_campaign($1, now()) n", [gym]);
-    assert.equal(Number(r.n), 5);
+    assert.equal(Number(r.n), 7);
     const rows = await q<{ body: string }>("select body from whatsapp_outbox order by scheduled_at");
-    assert.equal(rows.length, 5);
-    // 0..2 usam /app/treino; a 4ª (índice 3) muda o destino e o texto
-    for (const i of [0, 1, 2]) assert.match(rows[i].body, /gymfitnesscampos\.com\.br\/app\/treino/);
-    assert.match(rows[3].body, /gymfitnesscampos\.com\.br\/app$/m);
-    assert.doesNotMatch(rows[3].body, /\/app\/treino/);
-    // a 5ª volta ao ciclo
-    assert.match(rows[4].body, /gymfitnesscampos\.com\.br\/app\/treino/);
+    assert.equal(rows.length, 7);
+    for (const row of rows) assert.doesNotMatch(row.body, /https?:\/\//, "campanha não usa link");
+    // 6 variações distintas; a 7ª repete a 1ª
+    const primeiras = rows.map((x) => x.body.split("\n")[0]);
+    assert.equal(new Set(primeiras).size, 6);
+    assert.equal(primeiras[6], primeiras[0]);
   });
 });

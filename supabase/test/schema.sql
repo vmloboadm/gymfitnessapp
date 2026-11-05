@@ -1738,24 +1738,18 @@ begin
       and not exists (select 1 from public.whatsapp_outbox o where o.campaign = 'treino-pronto' and o.student_id = p.id)
     order by p.approved_at desc nulls last, p.created_at desc
   loop
-    phone := regexp_replace(r.phone, '\D', '', 'g');
-    phone := regexp_replace(phone, '^0+', '');
-    if length(phone) in (10, 11) then
-      phone := '55' || phone;
-    end if;
-    if not (phone like '55%' and length(phone) in (12, 13)) then
-      continue;
-    end if;
+    phone := regexp_replace(regexp_replace(r.phone, '\D', '', 'g'), '^0+', '');
+    if length(phone) in (10, 11) then phone := '55' || phone; end if;
+    if not (phone like '55%' and length(phone) in (12, 13)) then continue; end if;
 
-    -- novo lote a cada 2 pessoas: ~3h depois (+ até 40 min aleatórios)
     if i % 2 = 0 then
       if i > 0 then
-        slot := slot + interval '3 hours' + (random() * interval '40 minutes');
+        slot := slot + interval '2 hours' + random() * interval '3 hours';
       end if;
+      slot := slot + random() * interval '50 minutes';
       slot := public.next_business_slot(slot);
-      -- lote que começaria muito perto das 20h vai para a manhã seguinte
       if extract(hour from (slot at time zone 'America/Sao_Paulo')) >= 19 then
-        slot := public.next_business_slot(slot + interval '2 hours');
+        slot := public.next_business_slot(slot + interval '3 hours');
       end if;
       batch_start := slot;
     end if;
@@ -1764,8 +1758,10 @@ begin
     insert into public.whatsapp_outbox (gym_id, student_id, campaign, phone, body, scheduled_at)
     values (p_gym, r.id, 'treino-pronto', phone,
       public.starter_campaign_message(first, i),
-      -- 2º da dupla sai alguns minutos depois do 1º
-      batch_start + case when i % 2 = 1 then interval '3 minutes' + random() * interval '5 minutes' else interval '0' end)
+      batch_start + case
+        when i % 2 = 1 then interval '2 minutes' + random() * interval '7 minutes'
+        else interval '0'
+      end)
     on conflict (campaign, student_id) do nothing;
     i := i + 1;
     n := n + 1;
@@ -3645,27 +3641,25 @@ $$;
 CREATE FUNCTION public.starter_campaign_message(p_first text, p_variant integer) RETURNS text
     LANGUAGE sql IMMUTABLE
     AS $$
-  select case p_variant % 4
+  select case p_variant % 6
     when 0 then
-      'Oi, ' || p_first || '! Aqui é da GymFitness 💪' || chr(10) || chr(10) ||
-      'Seu treino já está pronto pra você escolher no app: tem opções AB, ABC, ABCD e ABCDE montadas pela nossa personal, do iniciante ao avançado. Leva 1 minutinho:' || chr(10) ||
-      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
-      'Escolheu, já pode treinar hoje! Qualquer dúvida é só responder aqui 😉'
+      'Oi, ' || p_first || '! Tudo bem? 😊 Aqui é a equipe da GymFitness.' || chr(10) || chr(10) ||
+      'Seu treino já está montado e separado aqui com a gente. Você prefere que eu te mande ele por aqui mesmo ou quer escolher no app? Me responde 1 ou 2 que eu já resolvo pra você 💪'
     when 1 then
-      'E aí, ' || p_first || '! Tudo certo? Aqui é da GymFitness.' || chr(10) || chr(10) ||
-      'Liberamos treinos prontos no app pra ninguém ficar esperando: você escolhe o que combina com você (iniciante, intermediário ou avançado) e começa na hora 👇' || chr(10) ||
-      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
-      'Depois me conta qual você escolheu! 💪'
+      'E aí, ' || p_first || '! Como você tá? 💪' || chr(10) || chr(10) ||
+      'Tô passando pra saber uma coisa rápida: você prefere treinar 2, 3 ou 4 vezes por semana? Com essa resposta eu já ajusto o seu treino e te mando ainda hoje.'
     when 2 then
-      'Oi, ' || p_first || ', tudo bem? 😊 Passando pra avisar que o seu treino na GymFitness já pode ser escolhido no app.' || chr(10) || chr(10) ||
-      'São treinos prontos, com divisão certinha (tipo ABC), e se quiser algo sob medida dá pra pedir à personal ali mesmo:' || chr(10) ||
-      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
-      'Bora começar essa semana? 🔥'
+      'Oi, ' || p_first || '! Final de ano chegando e a meta é chegar bem no verão 🔥' || chr(10) || chr(10) ||
+      'Seu treino já está pronto. Me conta: você quer focar em emagrecer, ganhar força ou só voltar ao ritmo? Eu te respondo aqui com o treino certo pra você.'
+    when 3 then
+      'E aí, ' || p_first || ', beleza? 😃' || chr(10) || chr(10) ||
+      'Seu treino novo tá pronto aqui. Só me diz uma coisa: qual dia dessa semana você consegue começar? Eu deixo tudo separado pra você chegar e treinar sem perder tempo.'
+    when 4 then
+      'Oi, ' || p_first || '! Aqui é da GymFitness 💪' || chr(10) || chr(10) ||
+      'Vi que seu treino já está pronto. Você prefere treinar de manhã, à tarde ou à noite? Me responde que eu já organizo o seu e te mando por aqui mesmo.'
     else
-      'Oi, ' || p_first || '! Tudo bem? Aqui é da equipe GymFitness 😊' || chr(10) || chr(10) ||
-      'Aquele treino que a gente comentou já está no app, esperando você. Abre o app e toca em Treino: dá pra escolher a divisão que mais combina com o seu dia a dia.' || chr(10) || chr(10) ||
-      'Qualquer dúvida, me responde por aqui que eu te ajudo a escolher.' || chr(10) ||
-      'https://gymfitnesscampos.com.br/app'
+      'Oi, ' || p_first || '! Tudo certo? 😊' || chr(10) || chr(10) ||
+      'Você topa entrar no Desafio Verão da academia? É treinar e marcar presença, com ranking e prêmio no final. Se quiser, eu te explico em 1 minuto por aqui — só responder "quero" 🔥'
   end;
 $$;
 
