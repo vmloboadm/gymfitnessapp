@@ -112,3 +112,32 @@ test("domingo não envia e nome em MAIÚSCULAS sai capitalizado", async () => {
     assert.doesNotMatch(r.body, /ROMERO/);
   });
 });
+
+test("variedade: 4ª mensagem sai com outro link, quebrando a sequência do mesmo URL", async () => {
+  await withTx(async (q, h) => {
+    const gym = await h.gym();
+    const ids = [
+      await h.student(gym, "Ana Lima"),
+      await h.student(gym, "Bia Souza"),
+      await h.student(gym, "Caio Reis"),
+      await h.student(gym, "Duda Alves"),
+      await h.student(gym, "Eva Dias"),
+    ];
+    for (const [i, id] of ids.entries()) {
+      await q("update profiles set phone = $2, whatsapp_consent = true where id = $1", [
+        id,
+        `2299800${String(i + 1).padStart(4, "0")}`,
+      ]);
+    }
+    const [r] = await q<{ n: number }>("select public.enqueue_starter_campaign($1, now()) n", [gym]);
+    assert.equal(Number(r.n), 5);
+    const rows = await q<{ body: string }>("select body from whatsapp_outbox order by scheduled_at");
+    assert.equal(rows.length, 5);
+    // 0..2 usam /app/treino; a 4ª (índice 3) muda o destino e o texto
+    for (const i of [0, 1, 2]) assert.match(rows[i].body, /gymfitnesscampos\.com\.br\/app\/treino/);
+    assert.match(rows[3].body, /gymfitnesscampos\.com\.br\/app$/m);
+    assert.doesNotMatch(rows[3].body, /\/app\/treino/);
+    // a 5ª volta ao ciclo
+    assert.match(rows[4].body, /gymfitnesscampos\.com\.br\/app\/treino/);
+  });
+});

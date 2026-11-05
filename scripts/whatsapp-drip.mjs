@@ -2,7 +2,9 @@
  * Enviador da fila de WhatsApp (tabela whatsapp_outbox, migration 077).
  * Roda NA VPS (o WAHA do CRM não é exposto para fora). A cada execução:
  *   - só envia entre 9h e 20h de São Paulo;
- *   - pega no máximo 2 mensagens vencidas;
+ *   - pega no máximo 2 mensagens vencidas e respeita o teto diário
+ *     (GF_DAILY_CAP, padrão 25) — número quente, usado por humano e pela IA;
+ *   - se as últimas 5 tentativas falharam, para por segurança;
  *   - antes de enviar, confere de novo: aluno ainda sem ficha? ainda com
  *     consentimento? número existe no WhatsApp?
  *   - simula "digitando…", envia pela sessão do número da academia e marca.
@@ -94,13 +96,44 @@ const db = new pg.Client({
 });
 await db.connect();
 
+// Teto diário de campanha: nunca passar de ~20-30 mensagens/dia no mesmo número
+// (recomendação para número usado por humano e pela IA).
+const CAP_DIARIO = Number(process.env.GF_DAILY_CAP ?? 25);
+const { rows: hojeRows } = await db.query(
+  `select count(*)::int n from whatsapp_outbox
+   where status = 'sent'
+     and (sent_at at time zone 'America/Sao_Paulo')::date = (now() at time zone 'America/Sao_Paulo')::date`
+);
+const enviadosHoje = hojeRows[0]?.n ?? 0;
+if (enviadosHoje >= CAP_DIARIO) {
+  console.log(stamp(), `teto diário atingido (${enviadosHoje}/${CAP_DIARIO}), nada enviado`);
+  await db.end();
+  process.exit(0);
+}
+
+// Freio de falhas: se as últimas 5 tentativas falharam, insistir só piora a
+// situação do número. Para em vez de tentar de novo.
+const { rows: ultimas } = await db.query(
+  `select status from whatsapp_outbox
+   where status in ('sent', 'failed')
+   order by coalesce(sent_at, scheduled_at) desc
+   limit 5`
+);
+if (ultimas.length === 5 && ultimas.every((r) => r.status === "failed")) {
+  console.error(stamp(), "as últimas 5 tentativas falharam — parando por segurança (confira a sessão/número)");
+  await db.end();
+  process.exit(1);
+}
+
 const { rows } = await db.query(
   `select o.id, o.student_id, o.phone, o.body, o.campaign
    from whatsapp_outbox o
    where o.status = 'pending' and o.scheduled_at <= now()
-   order by o.scheduled_at limit 2`
+   order by o.scheduled_at limit $1`,
+  [Math.min(2, CAP_DIARIO - enviadosHoje)]
 );
 
+let enviadosAgora = 0;
 for (const [idx, m] of rows.entries()) {
   // confere de novo na hora: quem já escolheu treino ou tirou consentimento não recebe
   const { rows: chk } = await db.query(
@@ -136,11 +169,14 @@ for (const [idx, m] of rows.entries()) {
       r.ok ? [m.id] : [m.id, r.error]
     );
     console.log(stamp(), r.ok ? "enviado" : "falhou", m.id, r.error ?? "");
+    if (r.ok) enviadosAgora++;
   } catch (err) {
     await db.query("update whatsapp_outbox set status = 'failed', error = $2 where id = $1", [m.id, String(err).slice(0, 300)]);
     console.log(stamp(), "erro", m.id, String(err).slice(0, 200));
   }
   if (idx < rows.length - 1) await sleep(rand(60_000, 180_000)); // 1 a 3 min entre os dois
 }
+
+console.log(stamp(), `dia: ${enviadosHoje + enviadosAgora}/${CAP_DIARIO} mensagens de campanha`);
 
 await db.end();

@@ -173,3 +173,25 @@ test("dar força exige estar no desafio — quem saiu não força mais", async (
     assert.equal(r.r.reason, "nao_participa");
   });
 });
+
+test("convite do desafio varia o link: o 4º aponta para o Ranking", async () => {
+  await withTx(async (q, h) => {
+    const { gym, ch } = await setup(q, h);
+    const nomes = ["Ana Lima", "Bia Souza", "Caio Reis", "Duda Alves"];
+    for (const [i, nome] of nomes.entries()) {
+      const id = await h.student(gym, nome);
+      await q("update profiles set phone = $2, whatsapp_consent = true where id = $1", [
+        id,
+        `2299700${String(i + 1).padStart(4, "0")}`,
+      ]);
+    }
+    const [r] = await q<{ n: number }>(
+      "select public.enqueue_challenge_campaign($1, $2, '2026-11-09 09:00:00-03') n",
+      [gym, ch]
+    );
+    assert.equal(Number(r.n), 4);
+    const rows = await q<{ body: string }>("select body from whatsapp_outbox order by scheduled_at");
+    for (const i of [0, 1, 2]) assert.match(rows[i].body, /gymfitnesscampos\.com\.br\/app$/m);
+    assert.match(rows[3].body, /gymfitnesscampos\.com\.br\/app\/ranking/);
+  });
+});

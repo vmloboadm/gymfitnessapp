@@ -1131,7 +1131,7 @@ $$;
 CREATE FUNCTION public.challenge_campaign_message(p_first text, p_title text, p_goal integer, p_ends date, p_variant integer) RETURNS text
     LANGUAGE sql IMMUTABLE
     AS $$
-  select case p_variant % 3
+  select case p_variant % 4
     when 0 then
       'Oi, ' || p_first || '! Aqui é da GymFitness ☀️' || chr(10) || chr(10) ||
       'Começou o ' || p_title || ': meta de ' || p_goal || ' dias de treino até ' || to_char(p_ends, 'DD/MM') ||
@@ -1143,11 +1143,17 @@ CREATE FUNCTION public.challenge_campaign_message(p_first text, p_title text, p_
       'A galera da GymFitness já tá no ' || p_title || ' e o ranking tá pegando fogo 🔥 São ' || p_goal ||
       ' dias de treino até ' || to_char(p_ends, 'DD/MM') || ' e prêmio pro Top 3.' || chr(10) || chr(10) ||
       'Entra lá no app e mostra quem manda:' || chr(10) || 'https://gymfitnesscampos.com.br/app'
-    else
+    when 2 then
       'Oi, ' || p_first || ', tudo bem? Passando pra te chamar pro ' || p_title || ' da GymFitness ☀️' || chr(10) || chr(10) ||
       'É simples: treinou ou fez check-in, conta 1 dia. Meta de ' || p_goal || ' dias até ' || to_char(p_ends, 'DD/MM') ||
       ', ranking no app e prêmio no final.' || chr(10) || chr(10) ||
       'Topa? É só entrar aqui:' || chr(10) || 'https://gymfitnesscampos.com.br/app'
+    else
+      'Oi, ' || p_first || '! Já ouviu falar do ' || p_title || '? 😃' || chr(10) || chr(10) ||
+      'É a galera treinando junto até ' || to_char(p_ends, 'DD/MM') || ': cada dia de treino ou check-in entra no ranking do app, e o Top 3 leva prêmio.' || chr(10) || chr(10) ||
+      'O desafio está logo no topo da aba Ranking:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/ranking' || chr(10) || chr(10) ||
+      'Qualquer coisa, me chama aqui 💪'
   end;
 $$;
 
@@ -3639,7 +3645,7 @@ $$;
 CREATE FUNCTION public.starter_campaign_message(p_first text, p_variant integer) RETURNS text
     LANGUAGE sql IMMUTABLE
     AS $$
-  select case p_variant % 3
+  select case p_variant % 4
     when 0 then
       'Oi, ' || p_first || '! Aqui é da GymFitness 💪' || chr(10) || chr(10) ||
       'Seu treino já está pronto pra você escolher no app: tem opções AB, ABC, ABCD e ABCDE montadas pela nossa personal, do iniciante ao avançado. Leva 1 minutinho:' || chr(10) ||
@@ -3650,11 +3656,16 @@ CREATE FUNCTION public.starter_campaign_message(p_first text, p_variant integer)
       'Liberamos treinos prontos no app pra ninguém ficar esperando: você escolhe o que combina com você (iniciante, intermediário ou avançado) e começa na hora 👇' || chr(10) ||
       'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
       'Depois me conta qual você escolheu! 💪'
-    else
+    when 2 then
       'Oi, ' || p_first || ', tudo bem? 😊 Passando pra avisar que o seu treino na GymFitness já pode ser escolhido no app.' || chr(10) || chr(10) ||
       'São treinos prontos, com divisão certinha (tipo ABC), e se quiser algo sob medida dá pra pedir à personal ali mesmo:' || chr(10) ||
       'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
       'Bora começar essa semana? 🔥'
+    else
+      'Oi, ' || p_first || '! Tudo bem? Aqui é da equipe GymFitness 😊' || chr(10) || chr(10) ||
+      'Aquele treino que a gente comentou já está no app, esperando você. Abre o app e toca em Treino: dá pra escolher a divisão que mais combina com o seu dia a dia.' || chr(10) || chr(10) ||
+      'Qualquer dúvida, me responde por aqui que eu te ajudo a escolher.' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app'
   end;
 $$;
 
