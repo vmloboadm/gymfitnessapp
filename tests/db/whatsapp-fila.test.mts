@@ -179,3 +179,26 @@ test("retomada: só quem recebeu há 2+ dias, segue sem ficha e não veio", asyn
     assert.match(row.body, /https:\/\/gymfitnesscampos\.com\.br\/app\/treino/);
   });
 });
+
+test("treino aplicado: avisa quem acabou de ganhar ficha, com o link", async () => {
+  await withTx(async (q, h) => {
+    const gym = await h.gym();
+    const nova = await h.student(gym, "Ana Nova");
+    const antiga = await h.student(gym, "Bia Antiga");
+    await q("update profiles set phone = '22996001111', whatsapp_consent = true where id = $1", [nova]);
+    await q("update profiles set phone = '22996002222', whatsapp_consent = true where id = $1", [antiga]);
+    await h.plan(gym, nova, ["Seg"]);
+    await h.plan(gym, antiga, ["Seg"]);
+    await q("update student_workouts set assigned_at = now() - interval '10 days' where student_id = $1", [antiga]);
+
+    const [r] = await q<{ n: number }>("select public.enqueue_treino_aplicado($1, now()) n", [gym]);
+    assert.equal(Number(r.n), 1);
+    const rows = await q<{ student_id: string; body: string }>(
+      "select student_id, body from whatsapp_outbox where campaign = 'treino-aplicado'"
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].student_id, nova);
+    assert.match(rows[0].body, /Ana/);
+    assert.match(rows[0].body, /https:\/\/gymfitnesscampos\.com\.br\/app\/treino/);
+  });
+});
