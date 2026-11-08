@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ChevronDown, Dumbbell, Sparkles } from "lucide-react";
+import { ChevronDown, Dumbbell, Sparkles, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { useAuth } from "~/hooks/useAuth";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { logger } from "~/lib/logger";
 import { cn } from "~/lib/utils";
@@ -29,10 +30,14 @@ type Option = {
 };
 
 const REASONS: Record<string, string> = {
+  nao_aprovado: "Falta a recepção confirmar seu cadastro. Chama no WhatsApp que liberamos.",
   avaliacao_medica: "Pelo seu histórico de saúde, quem monta seu treino é o personal. Peça abaixo.",
   ficha_do_personal: "Você já tem um treino montado pelo seu personal. Para mudar, peça um ajuste a ele.",
   modelo_indisponivel: "Esse treino não está mais disponível. Escolha outro.",
 };
+
+const WHATSAPP_LIBERAR = "https://wa.me/5522997787186?text=" +
+  encodeURIComponent("Oi! Quero liberar meu cadastro pra escolher meu treino no app.");
 
 export function StarterPicker({
   onPicked,
@@ -50,6 +55,7 @@ export function StarterPicker({
 }) {
   const [showAll, setShowAll] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const { profile } = useAuth();
 
   const { data, loading } = useAsyncQuery<Option[]>(
     async () => {
@@ -83,6 +89,32 @@ export function StarterPicker({
   if (loading) {
     return <div className="h-48 animate-pulse rounded-2xl bg-white/[0.04]" aria-label="Carregando treinos" />;
   }
+
+  // Aluno ainda não aprovado: mostrar a lista e deixar tocar para depois
+  // responder "não deu para liberar" é o que fazia o aluno achar que o app
+  // travou. Aqui ele vê o que falta e fala direto com a recepção.
+  if (profile?.role === "student" && !profile.approved_at) {
+    return (
+      <section className="rounded-2xl border border-brand/40 bg-brand/[0.08] p-4" aria-label="Cadastro aguardando confirmação">
+        <p className="text-[11px] font-black uppercase tracking-wider text-brand">Quase lá</p>
+        <h2 className="mt-0.5 text-[17px] font-black leading-tight text-foreground">
+          Falta a recepção confirmar seu cadastro
+        </h2>
+        <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+          Assim que confirmar, a lista de treinos aparece aqui e você começa no mesmo dia.
+        </p>
+        <a
+          href={WHATSAPP_LIBERAR}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-[11px] font-black text-black"
+        >
+          <MessageCircle className="h-3.5 w-3.5" /> Falar no WhatsApp
+        </a>
+      </section>
+    );
+  }
+
   const options = data ?? [];
   if (options.length === 0) return <>{fallback}</>;
 

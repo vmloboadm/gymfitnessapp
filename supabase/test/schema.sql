@@ -1712,6 +1712,74 @@ $$;
 
 
 --
+-- Name: enqueue_retomada_treino(uuid, timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enqueue_retomada_treino(p_gym uuid, p_start timestamp with time zone DEFAULT now()) RETURNS integer
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  r record;
+  i integer := 0;
+  slot timestamptz := public.next_business_slot(p_start);
+  batch_start timestamptz;
+  phone text;
+  first text;
+  n integer := 0;
+begin
+  for r in
+    select p.id, p.name, p.phone
+    from public.profiles p
+    join public.whatsapp_outbox o
+      on o.student_id = p.id and o.campaign = 'treino-pronto' and o.status = 'sent'
+    where p.gym_id = p_gym
+      and p.role = 'student'
+      and p.approved_at is not null
+      and coalesce(p.medical_risk, false) = false
+      and coalesce(p.status, 'active') = 'active'
+      and coalesce(p.whatsapp_consent, false)
+      and p.phone is not null
+      and o.sent_at <= now() - interval '2 days'
+      and not exists (select 1 from public.student_workouts sw where sw.student_id = p.id and sw.status = 'active')
+      and not exists (select 1 from public.checkins c where c.student_id = p.id and c.checked_at > now() - interval '2 days')
+      and not exists (select 1 from public.whatsapp_outbox x where x.campaign = 'retomada-treino' and x.student_id = p.id)
+    order by o.sent_at
+  loop
+    phone := regexp_replace(regexp_replace(r.phone, '\D', '', 'g'), '^0+', '');
+    if length(phone) in (10, 11) then phone := '55' || phone; end if;
+    if not (phone like '55%' and length(phone) in (12, 13)) then continue; end if;
+
+    if i % 2 = 0 then
+      if i > 0 then
+        slot := slot + interval '2 hours' + random() * interval '3 hours';
+      end if;
+      slot := slot + random() * interval '50 minutes';
+      slot := public.next_business_slot(slot);
+      if extract(hour from (slot at time zone 'America/Sao_Paulo')) >= 19 then
+        slot := public.next_business_slot(slot + interval '3 hours');
+      end if;
+      batch_start := slot;
+    end if;
+
+    first := initcap(lower(split_part(coalesce(nullif(trim(r.name), ''), 'tudo bem'), ' ', 1)));
+    insert into public.whatsapp_outbox (gym_id, student_id, campaign, phone, body, scheduled_at)
+    values (p_gym, r.id, 'retomada-treino', phone,
+      public.retomada_campaign_message(first, i),
+      batch_start + case
+        when i % 2 = 1 then interval '2 minutes' + random() * interval '7 minutes'
+        else interval '0'
+      end)
+    on conflict (campaign, student_id) do nothing;
+    i := i + 1;
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+
+
+--
 -- Name: enqueue_starter_campaign(uuid, timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1732,6 +1800,9 @@ begin
     select p.id, p.name, p.phone
     from public.profiles p
     where p.gym_id = p_gym and p.role = 'student'
+      and p.approved_at is not null
+      and coalesce(p.medical_risk, false) = false
+      and coalesce(p.status, 'active') = 'active'
       and coalesce(p.whatsapp_consent, false)
       and p.phone is not null
       and not exists (select 1 from public.student_workouts sw where sw.student_id = p.id and sw.status = 'active')
@@ -2855,6 +2926,27 @@ $$;
 
 
 --
+-- Name: pode_receber_campanha_treino(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.pode_receber_campanha_treino(p_student uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (
+    select 1 from public.profiles p
+    where p.id = p_student
+      and p.role = 'student'
+      and p.approved_at is not null
+      and coalesce(p.medical_risk, false) = false
+      and coalesce(p.status, 'active') = 'active'
+      and coalesce(p.whatsapp_consent, false)
+      and p.phone is not null
+  );
+$$;
+
+
+--
 -- Name: post_challenge_weekly_updates(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3124,6 +3216,36 @@ begin
   return jsonb_build_object('ok', true, 'phone', tr.phone, 'name', tr.name,
     'offer', case when v_has_offer then v_offer_title end);
 end;
+$$;
+
+
+--
+-- Name: retomada_campaign_message(text, integer); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.retomada_campaign_message(p_first text, p_variant integer) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    AS $$
+  select case p_variant % 4
+    when 0 then
+      'Oi, ' || p_first || '! Passando pra saber se você conseguiu ver seu treino no app 😊' || chr(10) || chr(10) ||
+      'Se ainda não escolheu, é rapidinho:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Me diz se travou em algo que eu te ajudo.'
+    when 1 then
+      'E aí, ' || p_first || ', tudo bem? Vi que seu treino ainda não foi escolhido.' || chr(10) || chr(10) ||
+      'Quer que eu te ajude a escolher? É só abrir aqui:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino'
+    when 2 then
+      'Oi, ' || p_first || '! Não quero te encher, só não queria que você ficasse sem treino 😊' || chr(10) || chr(10) ||
+      'Se ainda quiser, escolhe aqui:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Se preferir, me responde que eu escolho com você.'
+    else
+      'Fala, ' || p_first || '! Seu treino tá te esperando no app:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Qualquer dúvida me chama aqui que a gente resolve junto 💪'
+  end;
 $$;
 
 
@@ -3643,23 +3765,35 @@ CREATE FUNCTION public.starter_campaign_message(p_first text, p_variant integer)
     AS $$
   select case p_variant % 6
     when 0 then
-      'Oi, ' || p_first || '! Tudo bem? 😊 Aqui é a equipe da GymFitness.' || chr(10) || chr(10) ||
-      'Seu treino já está montado e separado aqui com a gente. Você prefere que eu te mande ele por aqui mesmo ou quer escolher no app? Me responde 1 ou 2 que eu já resolvo pra você 💪'
+      'Oi, ' || p_first || '! Seu treino já está pronto no app 😊' || chr(10) || chr(10) ||
+      'São treinos montados pela nossa personal (AB, ABC, ABCD e ABCDE). Escolhe o seu aqui:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Depois me diz qual você escolheu que eu acompanho.'
     when 1 then
-      'E aí, ' || p_first || '! Como você tá? 💪' || chr(10) || chr(10) ||
-      'Tô passando pra saber uma coisa rápida: você prefere treinar 2, 3 ou 4 vezes por semana? Com essa resposta eu já ajusto o seu treino e te mando ainda hoje.'
+      'E aí, ' || p_first || '! Você prefere treinar 2, 3 ou 4 vezes por semana? 💪' || chr(10) || chr(10) ||
+      'Já deixei os treinos prontos no app pra você escolher:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Me responde aqui a frequência que eu te ajudo a escolher o melhor.'
     when 2 then
       'Oi, ' || p_first || '! Final de ano chegando e a meta é chegar bem no verão 🔥' || chr(10) || chr(10) ||
-      'Seu treino já está pronto. Me conta: você quer focar em emagrecer, ganhar força ou só voltar ao ritmo? Eu te respondo aqui com o treino certo pra você.'
+      'Seu treino já está no app:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Me conta: o foco é emagrecer, ganhar força ou voltar ao ritmo?'
     when 3 then
       'E aí, ' || p_first || ', beleza? 😃' || chr(10) || chr(10) ||
-      'Seu treino novo tá pronto aqui. Só me diz uma coisa: qual dia dessa semana você consegue começar? Eu deixo tudo separado pra você chegar e treinar sem perder tempo.'
+      'Seu treino novo está pronto. Escolhe por aqui:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Depois me diz qual dia dessa semana você começa.'
     when 4 then
-      'Oi, ' || p_first || '! Aqui é da GymFitness 💪' || chr(10) || chr(10) ||
-      'Vi que seu treino já está pronto. Você prefere treinar de manhã, à tarde ou à noite? Me responde que eu já organizo o seu e te mando por aqui mesmo.'
+      'Oi, ' || p_first || '! Manhã, tarde ou noite? 💪' || chr(10) || chr(10) ||
+      'Escolhe seu treino no app:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Me responde o turno que eu já organizo o seu.'
     else
-      'Oi, ' || p_first || '! Tudo certo? 😊' || chr(10) || chr(10) ||
-      'Você topa entrar no Desafio Verão da academia? É treinar e marcar presença, com ranking e prêmio no final. Se quiser, eu te explico em 1 minuto por aqui — só responder "quero" 🔥'
+      'Oi, ' || p_first || '! Você topa entrar no Desafio Verão da academia? 😊' || chr(10) || chr(10) ||
+      'É treinar e marcar presença, com ranking e prêmio no final. Escolhe seu treino aqui:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Se quiser, me responde "quero" que eu te explico em 1 minuto.'
   end;
 $$;
 

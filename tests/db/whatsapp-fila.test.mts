@@ -18,16 +18,23 @@ async function rows(q: Parameters<Parameters<typeof withTx>[0]>[0]) {
   );
 }
 
-test("enfileira só quem está sem ficha, com telefone válido e consentimento", async () => {
+test("enfileira só quem está sem ficha, aprovado, com telefone válido e consentimento", async () => {
   await withTx(async (q, h) => {
     const gym = await h.gym();
     const ok = await h.student(gym, "Ana Lima");
     const semConsent = await h.student(gym, "Bia Sem");
     const semFone = await h.student(gym, "Caio Sem");
     const comFicha = await h.student(gym, "Duda Ficha");
+    const semAprovacao = await h.student(gym, "Eva Espera");
+    const comLaudo = await h.student(gym, "Fabio Laudo");
     await q("update profiles set phone = '(22) 99800-1111', whatsapp_consent = true where id in ($1, $2)", [ok, comFicha]);
     await q("update profiles set phone = '(22) 99800-2222', whatsapp_consent = false where id = $1", [semConsent]);
     await q("update profiles set phone = null, whatsapp_consent = true where id = $1", [semFone]);
+    await q("update profiles set phone = '(22) 99800-3333', whatsapp_consent = true, approved_at = null where id = $1", [semAprovacao]);
+    await q(
+      "update profiles set phone = '(22) 99800-4444', whatsapp_consent = true, medical_risk = true, status = 'pending_clearance' where id = $1",
+      [comLaudo]
+    );
     await h.plan(gym, comFicha, ["Seg"]);
 
     const [r] = await q<{ n: number }>("select public.enqueue_starter_campaign($1, now()) n", [gym]);
@@ -36,8 +43,9 @@ test("enfileira só quem está sem ficha, com telefone válido e consentimento",
     assert.equal(row.student_id, ok);
     assert.equal(row.phone, "5522998001111");
     assert.match(row.body, /Ana/);
-    assert.doesNotMatch(row.body, /https?:\/\//, "CTA é resposta no WhatsApp, sem link");
-    assert.match(row.body, /responde|me diz|me conta/i);
+    // agora o CTA leva o link direto do app, onde ele escolhe o treino
+    assert.match(row.body, /https:\/\/gymfitnesscampos\.com\.br\/app\/treino/);
+    assert.match(row.body, /me diz|me conta|me responde/i);
   });
 });
 
@@ -115,7 +123,7 @@ test("domingo não envia e nome em MAIÚSCULAS sai capitalizado", async () => {
   });
 });
 
-test("variedade: 6 abordagens girando, nenhuma com link", async () => {
+test("variedade: 6 abordagens girando, todas com o link do app", async () => {
   await withTx(async (q, h) => {
     const gym = await h.gym();
     for (let i = 0; i < 7; i++) {
@@ -129,10 +137,45 @@ test("variedade: 6 abordagens girando, nenhuma com link", async () => {
     assert.equal(Number(r.n), 7);
     const rows = await q<{ body: string }>("select body from whatsapp_outbox order by scheduled_at");
     assert.equal(rows.length, 7);
-    for (const row of rows) assert.doesNotMatch(row.body, /https?:\/\//, "campanha não usa link");
+    for (const row of rows) {
+      assert.match(row.body, /https:\/\/gymfitnesscampos\.com\.br\/app\/treino/);
+    }
     // 6 variações distintas; a 7ª repete a 1ª
     const primeiras = rows.map((x) => x.body.split("\n")[0]);
     assert.equal(new Set(primeiras).size, 6);
     assert.equal(primeiras[6], primeiras[0]);
+  });
+});
+
+test("retomada: só quem recebeu há 2+ dias, segue sem ficha e não veio", async () => {
+  await withTx(async (q, h) => {
+    const gym = await h.gym();
+    const parado = await h.student(gym, "Ana Parada");
+    const comFicha = await h.student(gym, "Bia Ficha");
+    const veio = await h.student(gym, "Caio Veio");
+    const recem = await h.student(gym, "Duda Recente");
+
+    for (const [i, id] of [parado, comFicha, veio, recem].entries()) {
+      await q("update profiles set phone = $2, whatsapp_consent = true where id = $1", [id, `2299700${i}00`]);
+      await q(
+        `insert into whatsapp_outbox (gym_id, student_id, campaign, phone, body, status, sent_at, scheduled_at)
+         values ($1, $2, 'treino-pronto', $3, 'oi', 'sent', now() - interval '3 days', now() - interval '3 days')`,
+        [gym, id, `552299700${i}00`]
+      );
+    }
+    await h.plan(gym, comFicha, ["Seg"]);
+    await q(
+      "insert into checkins (gym_id, student_id, checked_at) values ($1, $2, now() - interval '1 day')",
+      [gym, veio]
+    );
+    await q("update whatsapp_outbox set sent_at = now() - interval '1 day' where student_id = $1", [recem]);
+
+    const [r] = await q<{ n: number }>("select public.enqueue_retomada_treino($1, now()) n", [gym]);
+    assert.equal(Number(r.n), 1);
+    const [row] = await q<{ student_id: string; body: string }>(
+      "select student_id, body from whatsapp_outbox where campaign = 'retomada-treino'"
+    );
+    assert.equal(row.student_id, parado);
+    assert.match(row.body, /https:\/\/gymfitnesscampos\.com\.br\/app\/treino/);
   });
 });

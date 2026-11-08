@@ -899,7 +899,9 @@ export default function HomePage() {
                 ? "Hoje não está na sua programação. Se quiser, dá para treinar mesmo assim na aba Treino."
                 : heroPlan && heroPlan.count > 0
                   ? undefined
-                  : "Escolha um treino pronto na aba Treino e comece hoje, sem esperar."
+                  : profile && !profile.approved_at
+                    ? "Falta a recepção confirmar seu cadastro. Chama no WhatsApp que liberamos."
+                    : "Escolha um treino pronto na aba Treino e comece hoje, sem esperar."
             }
             ready={!session && !heroFinishedToday && !!heroPlan && heroPlan.count > 0}
           />

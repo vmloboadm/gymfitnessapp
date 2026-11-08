@@ -1,13 +1,17 @@
 "use client";
 
-import { UserCheck, Clock } from "lucide-react";
+import { UserCheck, Clock, MessageCircle } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 
 /**
- * Banner "aguardando aprovação do personal": aluno novo só entra na lista do
- * personal depois que um dos trainers/gestores aprovar em /personal/alunos.
- * Aparece no início e no treino enquanto approved_at for nulo.
+ * Banner "cadastro aguardando confirmação da recepção": aparece enquanto
+ * approved_at for nulo. O texto antigo prometia treino montado pelo personal
+ * e fazia o aluno achar que precisava "pedir liberação do app". Agora diz o
+ * que falta e dá o caminho direto no WhatsApp.
  */
+const WHATSAPP = "https://wa.me/5522997787186?text=" +
+  encodeURIComponent("Oi! Sou aluno(a) novo(a) no app e quero liberar meu cadastro pra escolher meu treino.");
+
 export function PendingApprovalBanner() {
   const { profile, loading } = useAuth();
   if (loading || !profile) return null;
@@ -22,13 +26,21 @@ export function PendingApprovalBanner() {
         </span>
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-[12px] font-black text-brand">
-            Aguardando aprovação do seu personal
+            Falta a recepção confirmar seu cadastro
             <Clock className="h-3.5 w-3.5" />
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-            Seu cadastro chegou na academia. Assim que um personal aprovar, seu
-            treino é montado e aparece aqui. Enquanto isso, explore o app à vontade.
+            Assim que confirmar, você escolhe seu treino aqui no app e começa no
+            mesmo dia. Se já resolveu na recepção, chama a gente que liberamos.
           </p>
+          <a
+            href={WHATSAPP}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-[11px] font-black text-black"
+          >
+            <MessageCircle className="h-3.5 w-3.5" /> Falar no WhatsApp
+          </a>
         </div>
       </div>
     </div>
