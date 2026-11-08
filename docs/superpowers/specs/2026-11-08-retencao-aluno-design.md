@@ -81,6 +81,11 @@ Metas em 14 dias:
    aplica o treino inicial automaticamente (trigger da mig 073), então os 11
    já estão com ficha. Os 2 com laudo (Gerson e Caio) seguem pendentes, como
    deve ser.
+8. **Convite do desafio segurado.** Quem ainda não tem ficha não recebe o
+   convite: ele é empurrado 3 dias e tenta de novo, até o aluno conseguir
+   treinar. Assim o desafio não chega antes do treino.
+9. **Volta ao treino** `volta-treino:AAAA-MM`: quem tem ficha há 5+ dias e não
+   aparece recebe um toque curto com o link. Mensal, para poder repetir.
 
 ## 6. Fase B — mutirão
 

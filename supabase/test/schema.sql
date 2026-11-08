@@ -180,6 +180,7 @@ declare
   res jsonb;
   applied integer := 0;
   skipped integer := 0;
+  avisados integer := 0;
 begin
   select gym_id, role into v_gym, v_role from public.profiles where id = v_uid;
   if v_gym is null or v_role not in ('trainer', 'manager', 'admin') then
@@ -189,6 +190,8 @@ begin
   for r in
     select p.id from public.profiles p
     where p.gym_id = v_gym and p.role = 'student' and p.approved_at is not null
+      and coalesce(p.medical_risk, false) = false
+      and coalesce(p.status, 'active') = 'active'
       and not exists (select 1 from public.student_workouts sw
                       where sw.student_id = p.id and sw.status = 'active')
     order by p.approved_at
@@ -197,7 +200,10 @@ begin
     if (res ->> 'ok')::boolean then applied := applied + 1; else skipped := skipped + 1; end if;
   end loop;
 
-  return jsonb_build_object('applied', applied, 'skipped', skipped);
+  -- avisa no WhatsApp quem ganhou ficha agora (mesmo teto e horários do drip)
+  avisados := public.enqueue_treino_aplicado(v_gym, now());
+
+  return jsonb_build_object('applied', applied, 'skipped', skipped, 'avisados', avisados);
 end;
 $$;
 
@@ -1900,6 +1906,82 @@ begin
     insert into public.whatsapp_outbox (gym_id, student_id, campaign, phone, body, scheduled_at)
     values (p_gym, r.id, 'treino-aplicado', phone,
       public.treino_aplicado_message(first, i),
+      batch_start + case
+        when i % 2 = 1 then interval '2 minutes' + random() * interval '7 minutes'
+        else interval '0'
+      end)
+    on conflict (campaign, student_id) do nothing;
+    i := i + 1;
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+
+
+--
+-- Name: enqueue_volta_treino(uuid, timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enqueue_volta_treino(p_gym uuid, p_start timestamp with time zone DEFAULT now()) RETURNS integer
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  r record;
+  i integer := 0;
+  slot timestamptz := public.next_business_slot(p_start);
+  batch_start timestamptz;
+  phone text;
+  first text;
+  n integer := 0;
+  v_campaign text := 'volta-treino:' || to_char(now() at time zone 'America/Sao_Paulo', 'YYYY-MM');
+begin
+  for r in
+    select p.id, p.name, p.phone
+    from public.profiles p
+    where p.gym_id = p_gym
+      and p.role = 'student'
+      and p.approved_at is not null
+      and coalesce(p.medical_risk, false) = false
+      and coalesce(p.status, 'active') = 'active'
+      and coalesce(p.whatsapp_consent, false)
+      and p.phone is not null
+      and exists (
+        select 1 from public.student_workouts sw
+        where sw.student_id = p.id and sw.status = 'active'
+          and sw.assigned_at < now() - interval '5 days'
+      )
+      and not exists (
+        select 1 from public.checkins c
+        where c.student_id = p.id and c.checked_at > now() - interval '5 days'
+      )
+      and not exists (
+        select 1 from public.whatsapp_outbox x
+        where x.campaign = v_campaign and x.student_id = p.id
+      )
+    order by p.name
+  loop
+    phone := regexp_replace(regexp_replace(r.phone, '\D', '', 'g'), '^0+', '');
+    if length(phone) in (10, 11) then phone := '55' || phone; end if;
+    if not (phone like '55%' and length(phone) in (12, 13)) then continue; end if;
+
+    if i % 2 = 0 then
+      if i > 0 then
+        slot := slot + interval '2 hours' + random() * interval '3 hours';
+      end if;
+      slot := slot + random() * interval '50 minutes';
+      slot := public.next_business_slot(slot);
+      if extract(hour from (slot at time zone 'America/Sao_Paulo')) >= 19 then
+        slot := public.next_business_slot(slot + interval '3 hours');
+      end if;
+      batch_start := slot;
+    end if;
+
+    first := initcap(lower(split_part(coalesce(nullif(trim(r.name), ''), 'tudo bem'), ' ', 1)));
+    insert into public.whatsapp_outbox (gym_id, student_id, campaign, phone, body, scheduled_at)
+    values (p_gym, r.id, v_campaign, phone,
+      public.volta_treino_message(first, i),
       batch_start + case
         when i % 2 = 1 then interval '2 minutes' + random() * interval '7 minutes'
         else interval '0'
@@ -4237,6 +4319,32 @@ begin
     raise exception 'Perfil não encontrado.';
   end if;
 end;
+$$;
+
+
+--
+-- Name: volta_treino_message(text, integer); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.volta_treino_message(p_first text, p_variant integer) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    AS $$
+  select case p_variant % 3
+    when 0 then
+      'Oi, ' || p_first || '! Senti sua falta por aqui 😊' || chr(10) || chr(10) ||
+      'Seu treino está no app, pronto pra quando você voltar:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Me diz o que está pegando que eu te ajudo.'
+    when 1 then
+      'E aí, ' || p_first || ', tudo bem? Faz uns dias que você não treina.' || chr(10) || chr(10) ||
+      'Sem cobrança, só queria saber se está tudo certo e se posso ajudar:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino'
+    else
+      'Oi, ' || p_first || '! Bora retomar essa semana? 💪' || chr(10) || chr(10) ||
+      'Seu treino já está montado, é só abrir:' || chr(10) ||
+      'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
+      'Se preferir outro horário ou outro treino, me fala aqui.'
+  end;
 $$;
 
 

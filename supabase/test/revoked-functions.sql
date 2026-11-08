@@ -4,5 +4,6 @@ revoke all on function public.enqueue_challenge_campaign(p_gym uuid, p_challenge
 revoke all on function public.enqueue_retomada_treino(p_gym uuid, p_start timestamp with time zone) from public, anon, authenticated;
 revoke all on function public.enqueue_starter_campaign(p_gym uuid, p_start timestamp with time zone) from public, anon, authenticated;
 revoke all on function public.enqueue_treino_aplicado(p_gym uuid, p_start timestamp with time zone) from public, anon, authenticated;
+revoke all on function public.enqueue_volta_treino(p_gym uuid, p_start timestamp with time zone) from public, anon, authenticated;
 revoke all on function public.post_challenge_weekly_updates() from public, anon, authenticated;
 revoke all on function public.seed_base_programs(p_gym uuid) from public, anon, authenticated;

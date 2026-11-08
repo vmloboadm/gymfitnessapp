@@ -202,3 +202,31 @@ test("treino aplicado: avisa quem acabou de ganhar ficha, com o link", async () 
     assert.match(rows[0].body, /https:\/\/gymfitnesscampos\.com\.br\/app\/treino/);
   });
 });
+
+test("volta ao treino: só quem tem ficha há 5+ dias e não veio", async () => {
+  await withTx(async (q, h) => {
+    const gym = await h.gym();
+    const parado = await h.student(gym, "Ana Parada");
+    const veio = await h.student(gym, "Bia Veio");
+    const novato = await h.student(gym, "Caio Novo");
+    for (const [i, id] of [parado, veio, novato].entries()) {
+      await q("update profiles set phone = $2, whatsapp_consent = true where id = $1", [id, `2299500${i}00`]);
+      await h.plan(gym, id, ["Seg"]);
+    }
+    await q("update student_workouts set assigned_at = now() - interval '10 days' where student_id in ($1, $2)", [
+      parado,
+      veio,
+    ]);
+    await q("insert into checkins (gym_id, student_id, checked_at) values ($1, $2, now() - interval '1 day')", [gym, veio]);
+
+    const [r] = await q<{ n: number }>("select public.enqueue_volta_treino($1, now()) n", [gym]);
+    assert.equal(Number(r.n), 1);
+    const rows = await q<{ student_id: string; campaign: string; body: string }>(
+      "select student_id, campaign, body from whatsapp_outbox where campaign like 'volta-treino%'"
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].student_id, parado);
+    assert.match(rows[0].campaign, /^volta-treino:\d{4}-\d{2}$/);
+    assert.match(rows[0].body, /https:\/\/gymfitnesscampos\.com\.br\/app\/treino/);
+  });
+});

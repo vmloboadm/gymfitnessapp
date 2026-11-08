@@ -168,6 +168,32 @@ for (const [idx, m] of rows.entries()) {
     console.log(stamp(), "pulado", m.id);
     continue;
   }
+
+  // Convite do desafio só depois que o aluno já tem ficha: não adianta chamar
+  // para o desafio quem ainda não consegue treinar. Empurra 3 dias e tenta de
+  // novo, em horário comercial.
+  if (m.campaign.startsWith("desafio:") && !c.has_plan) {
+    if (DRY) {
+      console.log(stamp(), "[dry-run] adiaria 3 dias (sem ficha)", m.id);
+    } else {
+      await db.query(
+        "update whatsapp_outbox set scheduled_at = public.next_business_slot(now() + interval '3 days') where id = $1",
+        [m.id]
+      );
+      console.log(stamp(), "adiado 3 dias (sem ficha)", m.id);
+    }
+    continue;
+  }
+
+  // Retomada de treino só para quem ainda tem ficha ativa.
+  if (m.campaign.startsWith("volta-treino") && (!c.approved || c.medical || !c.has_plan)) {
+    await db.query("update whatsapp_outbox set status = 'skipped', error = $2 where id = $1", [
+      m.id,
+      !c.has_plan ? "sem ficha ativa" : "cadastro aguardando aprovação",
+    ]);
+    console.log(stamp(), "pulado (retomada sem ficha)", m.id);
+    continue;
+  }
   try {
     const r = await send(m.phone, m.body);
     if (DRY) {
