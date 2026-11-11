@@ -178,9 +178,14 @@ benefício que não existe.
 
 ### 8.4 Aula experimental
 
-- Quem ainda não é aluno: experimental na recepção ou pelo WhatsApp, com a
-  recepção confirmando o horário.
+- Quem ainda não é aluno: a experimental é a **diária de R$ 20,00**. Regra do
+  Vinícius em 11/11: antes era gratuita e atraía aula sem retorno.
+- Se a pessoa se matricular, esses R$ 20,00 são descontados da mensalidade. O
+  valor pago reaproveita, ela não perde nada.
+- A IA nunca diz que a experimental é gratuita, de cortesia ou por conta da
+  academia, e não inventa outro desconto ou prazo.
 - Quem já é aluno e usa o app: agenda a experimental de modalidade pelo app.
+  Nesse caso ela não fala de diária; se perguntarem as condições, chama a equipe.
 - A IA nunca confirma horário sozinha. Ela coleta nome, objetivo e melhor
   horário, e diz que a recepção confirma.
 
