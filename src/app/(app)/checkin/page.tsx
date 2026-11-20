@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ScanLine, Check, X, LogIn, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
+import { fetchHomeSnapshot } from "~/lib/home-snapshot";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
 import { Button } from "~/components/ui/button";
@@ -90,6 +91,20 @@ export default function CheckinPage() {
   );
 
   const [closedVisit, setClosedVisit] = useState<{ entrada: string; saida: string } | null>(null);
+  // Treino finalizado hoje, vindo do servidor (não só de "tem exercício registrado")
+  const [concluiuHoje, setConcluiuHoje] = useState(false);
+  useEffect(() => {
+    if (demo || !user) return;
+    let vivo = true;
+    void fetchHomeSnapshot(localDayStartDaysAgoISO(0))
+      .then((snap) => {
+        if (vivo) setConcluiuHoje(!!snap.completed_today);
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [demo, user?.id]);
   const sessionMetrics = useMemo(() => {
     const logs = demo ? (getTodayWorkout().logs as Array<{ date: string }>) : (weekLogs ?? []);
     // Semana de calendário (segunda a domingo), igual à home e ao Progresso.
@@ -109,10 +124,16 @@ export default function CheckinPage() {
     return {
       entradaHora: entrada ? entrada.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null,
       tempoNa: entrada ? formatMMSS(elapsedSeconds(entrada.getTime(), fim)) : null,
-      treinoHoje: daySession || progresso ? "Em andamento" : treinouHoje ? "Concluído" : "Não iniciado",
+      treinoHoje: daySession || progresso
+        ? "Em andamento"
+        : concluiuHoje
+          ? "Concluído"
+          : treinouHoje
+            ? "Parcial"
+            : "Não iniciado",
       semana: diasSemana.size,
     };
-  }, [gymEntry, closedVisit, daySession, nowTick, weekLogs, demo]);
+  }, [gymEntry, closedVisit, daySession, nowTick, weekLogs, demo, concluiuHoje]);
 
   const { data, loading, error, refetch } = useAsyncQuery<{
     equipment: Equipment[];

@@ -34,6 +34,13 @@ const WeightAreaD = dynamic(() => import("~/components/charts/PerfilWeightArea")
   loading: () => <div className="skeleton-line h-32 w-full rounded-xl" />,
 });
 
+/** Nome da matrícula sem repetir o provedor ("Gympass · Gympass" não aparece mais). */
+function matriculaLabel(planName: string, type: string | null | undefined): string {
+  const provedor = type === "gympass" ? "Gympass" : type === "totalpass" ? "TotalPass" : null;
+  if (!provedor || planName.toLowerCase().includes(provedor.toLowerCase())) return planName;
+  return `${planName} · ${provedor}`;
+}
+
 export default function PerfilPage() {
   const { user, profile } = useAuth();
   const router = useRouter();
@@ -191,7 +198,7 @@ export default function PerfilPage() {
               <p className="gf-section">Matrícula</p>
               <p className="text-sm font-bold text-foreground">
                 {sub
-                  ? `${sub.plan_name}${sub.type === "gympass" || sub.type === "totalpass" ? ` · ${sub.type === "gympass" ? "Gympass" : "TotalPass"}` : ""}`
+                  ? matriculaLabel(sub.plan_name, sub.type)
                   : profile?.plan_type ?? "Sem plano ativo"}
               </p>
             </div>
