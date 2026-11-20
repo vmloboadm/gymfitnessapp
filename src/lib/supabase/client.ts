@@ -1,6 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/lib/types/database";
+import { guardDevDemo, isDevDemo } from "~/lib/dev-demo";
 
 type BrowserClient = SupabaseClient<Database>;
 
@@ -30,6 +31,8 @@ export function supabaseBrowser(): BrowserClient {
     });
   }
 
+  // Sessão demo (acesso DEV): leitura normal, escrita bloqueada
+  if (isDevDemo()) return guardDevDemo(cachedClient);
   return cachedClient;
 }
 

@@ -9,6 +9,7 @@ import { AppSetupBar } from "~/components/pwa/AppSetupBar";
 import { useOfflineQueue } from "~/hooks/useOfflineQueue";
 import { useAuth } from "~/hooks/useAuth";
 import { CloudOff } from "lucide-react";
+import { DevDemoBanner } from "~/components/layout/DevDemoBanner";
 
 /**
  * Área do aluno, mobile-first PWA (BottomNav + TopBar por página).
@@ -35,6 +36,7 @@ export default function AppLayout({
       className="min-h-[100dvh] pb-24 md:mx-auto md:max-w-md"
       style={{ overscrollBehaviorY: "contain" }}
     >
+      <DevDemoBanner />
       {!isOnline ? (
         <div className="sticky top-[56px] z-30 flex items-center justify-center gap-2 bg-warning py-1.5 text-[11px] font-bold text-black">
           <CloudOff className="h-3.5 w-3.5" />
