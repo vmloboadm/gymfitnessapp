@@ -1201,9 +1201,6 @@ export default function HomePage() {
           </div>
         </m.section>
 
-          </>
-        ) : null}
-
         {/* HOJE NA ACADEMIA — só conteúdo com fonte real (feed da comunidade, dica, personais) */}
         <m.section variants={item}>
           <p className="gf-section mb-2 px-1">Hoje na academia</p>
@@ -1265,6 +1262,10 @@ export default function HomePage() {
             />
           </div>
         </m.section>
+
+          </>
+        ) : null}
+
 
 
           </>
