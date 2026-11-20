@@ -13,6 +13,7 @@ import { CampaignCards } from "~/components/student/CampaignCards";
 import { TopBar } from "~/components/layout/TopBar";
 import { SkeletonList, ErrorState, EmptyState } from "~/components/common/AsyncStates";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { CheerStrip } from "~/components/social/CheerStrip";
 import { Badge } from "~/components/ui/badge";
 import { startOfWeek } from "~/lib/utils/calculations";
 import { formatNumber, formatDate, displayName } from "~/lib/utils/format";
@@ -424,6 +425,16 @@ export default function RankingPage() {
             })}
           </div>
         </div>
+
+        {/* Galera: bolhas 3D dos colegas para mandar força (não mostra o próprio aluno) */}
+        {!demo && !loading && !error && data ? (
+          <CheerStrip
+            mates={data.rows
+              .filter((r) => r.student_id !== user?.id && r.student)
+              .slice(0, 12)
+              .map((r) => ({ student_id: r.student_id, name: r.student?.name ?? null, avatar_url: r.student?.avatar_url ?? null }))}
+          />
+        ) : null}
 
         {/* Pódio, top 3 da semana em destaque — 1º central, mais alto */}
         {!loading && !error && data && data.rows.length >= 3 ? (

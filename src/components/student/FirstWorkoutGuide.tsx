@@ -69,6 +69,13 @@ export function FirstWorkoutGuide({
       </ol>
 
       <Link
+        href="/ranking"
+        className="mt-3 block text-center text-[12px] font-semibold text-muted-foreground underline-offset-4 hover:underline"
+      >
+        Ver quem já está treinando com você →
+      </Link>
+
+      <Link
         href={cta.href}
         className="tactile mt-4 block rounded-2xl bg-[#F4711E] px-5 py-3.5 text-center text-[14px] font-black text-black shadow-[0_0_20px_rgba(244,113,30,0.4)] transition-transform active:scale-[0.98]"
       >

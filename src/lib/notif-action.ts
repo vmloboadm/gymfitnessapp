@@ -12,6 +12,7 @@ const RULES: Array<{ test: RegExp; action: NotifAction }> = [
   { test: /^(Conquista liberada|2 conquistas liberadas)/, action: { label: "Ver conquista", href: "/conquistas" } },
   { test: /^(Força no desafio|Você está no)/, action: { label: "Ver desafio", href: "/ranking" } },
   { test: /^Novo recorde/, action: { label: "Ver progresso", href: "/progresso" } },
+  { test: /^Recebeu força/, action: { label: "Retribuir", href: "/ranking" } },
 ];
 
 /** Sem regra específica, usa o destino padrão da tela (fallbackHref) e um rótulo genérico. */
