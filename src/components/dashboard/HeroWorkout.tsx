@@ -29,6 +29,8 @@ interface HeroWorkoutProps {
   subtitle?: string;
   /** Legenda do número grande (padrão: "exercícios"). */
   countLabel?: string;
+  /** compact: cartão baixo (miniatura + botão pequeno), para a Home ficar limpa */
+  variant?: "full" | "compact";
 }
 
 /** Stagger interno do hero: cada bloco entra em cascata (label → título → números → CTA). */
@@ -56,10 +58,36 @@ export function HeroWorkout({
   notice,
   href,
   ctaLabel,
+  variant = "full",
   emptyHint,
   subtitle,
   countLabel,
 }: HeroWorkoutProps) {
+  if (variant === "compact") {
+    const detalhe = emptyHint ?? notice ?? (subtitle ? subtitle : `${exerciseCount} ${countLabel ?? "exercícios"}`);
+    return (
+      <m.div variants={item} whileTap={{ scale: 0.985 }}>
+        <Link
+          href={href ?? "/treino?ir=hoje"}
+          aria-label={`Treino de hoje: ${title}`}
+          className="pm-surface tactile flex items-center gap-4 !p-3"
+        >
+          <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[14px]">
+            <Image src={image} alt="" fill sizes="64px" className="object-cover" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-[10px] font-bold uppercase tracking-[0.14em] text-[#FF9A5C]">{sessionLabel}</p>
+            <p className="mt-0.5 truncate font-display text-[16px] font-extrabold text-white">{title}</p>
+            <p className="mt-0.5 truncate text-[12px] text-[#9AA5B8]">{detalhe}</p>
+          </div>
+          <span className="shrink-0 rounded-full bg-gradient-to-r from-[#FF8A3C] to-[#E85D0E] px-3.5 py-2 text-[12px] font-extrabold text-white">
+            {ctaLabel ?? "Começar"}
+          </span>
+        </Link>
+      </m.div>
+    );
+  }
+
   return (
     <m.div variants={item} whileTap={{ scale: 0.985 }} className="relative">
       {/* glow ambiente laranja atrás do card — dá profundidade sem custo de render */}

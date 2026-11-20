@@ -813,7 +813,7 @@ export default function HomePage() {
 
         {/* TREINO DE HOJE, ação principal; recebe o scroll quando check-in feito */}
         <m.div variants={item} ref={heroRef} className="px-0 pb-2">
-          <HeroWorkout
+          <HeroWorkout variant="compact"
             image={heroPlan?.image ?? FOCUS_IMAGE[(twSingleton?.bodyCat) ?? ""] ?? assetPath("/workout/workout-hero.jpg")}
             title={
               session
@@ -889,6 +889,11 @@ export default function HomePage() {
         {/* Restrição de saúde sem laudo aprovado: enviar laudo para liberar o treino */}
         <m.div variants={item} className="px-4 pb-2 empty:hidden">
           <ClearanceBanner />
+        </m.div>
+
+        {/* Indicação: desconto por amigo, visível na área principal */}
+        <m.div variants={item} className="px-4 pb-2 empty:hidden">
+          <IndicaCard />
         </m.div>
 
         {/* RITMO: uma linha sempre visível; anel, sequência e liga abrem ao tocar */}
@@ -1046,9 +1051,6 @@ export default function HomePage() {
           <>
           <m.div variants={item} className="px-4 pb-2 empty:hidden">
             <CampaignCards />
-          </m.div>
-          <m.div variants={item} className="px-4 pb-2 empty:hidden">
-            <IndicaCard />
           </m.div>
           <m.div variants={item} className="px-4 pb-2">
             <CoachSpotlight />
