@@ -20,12 +20,11 @@ import {
 import { useAuth } from "~/hooks/useAuth";
 import { cn } from "~/lib/utils";
 
-const STUDENT_NAV = [
+// Cinco itens. Feed e Progresso ficam acessíveis pelo Perfil (atalhos).
+const STUDENT_NAV: Array<{ href: string; label: string; icon: typeof Home; primary?: boolean }> = [
   { href: "/", label: "Início", icon: Home },
   { href: "/treino", label: "Treino", icon: Dumbbell },
-  { href: "/feed", label: "Feed", icon: Newspaper },
-  { href: "/checkin", label: "Check-in", icon: ScanLine },
-  { href: "/progresso", label: "Progresso", icon: TrendingUp },
+  { href: "/checkin", label: "Check-in", icon: ScanLine, primary: true },
   { href: "/ranking", label: "Ranking", icon: Trophy },
   { href: "/perfil", label: "Perfil", icon: User },
 ];
@@ -55,7 +54,7 @@ export function BottomNav() {
   const pathname = usePathname();
   const { profile } = useAuth();
   const role = profile?.role;
-  const NAV_ITEMS =
+  const NAV_ITEMS: Array<{ href: string; label: string; icon: typeof Home; primary?: boolean }> =
     role === "trainer" ? TRAINER_NAV : role === "manager" || role === "admin" ? MANAGER_NAV : STUDENT_NAV;
 
   const isActive = (href: string) => {
@@ -69,7 +68,7 @@ export function BottomNav() {
         <span className="pointer-events-none absolute right-0 top-0 z-10 h-full w-8 bg-gradient-to-l from-[#081020] to-transparent" aria-hidden />
         <span className="pointer-events-none absolute left-0 top-0 z-10 h-full w-4 bg-gradient-to-r from-[#081020] to-transparent" aria-hidden />
         <div className="scrollbar-hide flex snap-x snap-mandatory overflow-x-auto">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          {NAV_ITEMS.map(({ href, label, icon: Icon, primary }) => {
             const active = isActive(href);
             return (
               <Link
@@ -89,7 +88,13 @@ export function BottomNav() {
                       transition={{ type: "spring", stiffness: 400, damping: 30 }}
                     />
                   )}
-                  <Icon className="relative h-[22px] w-[22px]" strokeWidth={active ? 2.4 : 1.8} />
+                  {primary ? (
+                    <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#FF8A3C] to-[#E85D0E] text-white shadow-[0_6px_16px_-4px_rgba(244,113,30,0.6)]">
+                      <Icon className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                    </span>
+                  ) : (
+                    <Icon className="relative h-[22px] w-[22px]" strokeWidth={active ? 2.4 : 1.8} />
+                  )}
                 </span>
                 <span className="whitespace-nowrap font-medium">{label}</span>
               </Link>

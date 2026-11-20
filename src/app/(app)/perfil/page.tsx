@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Settings, LogOut, CalendarClock, ChevronRight, Scale, FileText, BadgePercent, MessageCircle, Bell } from "lucide-react";
+  Settings, LogOut, CalendarClock, ChevronRight, Scale, FileText, BadgePercent, MessageCircle, Bell, TrendingUp, Newspaper } from "lucide-react";
 import { gymSupportLink } from "~/lib/whatsapp";
 import { useAuth } from "~/hooks/useAuth";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
@@ -189,6 +189,16 @@ export default function PerfilPage() {
               </button>
             ) : null}
           </div>
+        </div>
+
+        {/* Atalhos: progresso e feed (saíram do menu inferior) */}
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/progresso" className="tactile pm-surface flex items-center justify-center gap-2 !py-3.5 text-[13px] font-semibold text-foreground">
+            <TrendingUp className="h-4 w-4 text-brand" /> Meu progresso
+          </Link>
+          <Link href="/feed" className="tactile pm-surface flex items-center justify-center gap-2 !py-3.5 text-[13px] font-semibold text-foreground">
+            <Newspaper className="h-4 w-4 text-brand" /> Feed da galera
+          </Link>
         </div>
 
         {/* Matrícula */}
