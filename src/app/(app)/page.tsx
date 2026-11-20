@@ -901,7 +901,7 @@ export default function HomePage() {
           >
             <span className="text-[13px] font-semibold text-foreground">
               Ritmo {sessionsWeek}/{weeklyGoal}
-              {streak > 0 ? <span className="text-[#FF9A5C]"> · {streak} seguidos</span> : null}
+              {streak > 0 ? <span className="text-[#FF9A5C]"> · {streak} {streak === 1 ? "seguido" : "seguidos"}</span> : null}
             </span>
             <ChevronDown className={`h-4 w-4 shrink-0 text-[#FF9A5C] transition-transform ${ritmoAberto ? "rotate-180" : ""}`} />
           </button>
