@@ -500,7 +500,8 @@ export default function TreinoHomePage() {
     [data, todayKey, detailsIds]
   );
   const totalToday = dayDetails.length;
-  const finishedToday = !daySession && !data?.activeSessionToday && (totalToday > 0 && todayLogs > 0 || !!data?.completedSessionToday);
+  // Concluído = sessão finalizada hoje OU todos os exercícios feitos (antes, um só bastava)
+  const finishedToday = !daySession && !data?.activeSessionToday && ((totalToday > 0 && todayLogs >= totalToday) || !!data?.completedSessionToday);
 
 
 

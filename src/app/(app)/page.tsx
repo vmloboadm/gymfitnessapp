@@ -473,11 +473,13 @@ export default function HomePage() {
       logs.filter((l) => localDayKey(l.date) === key).map((l) => l.exercise_id).filter(Boolean)
     ).size;
   }, [logs]);
+  // Treino do dia concluído = sessão finalizada hoje OU todos os exercícios feitos.
+  // Antes, um único exercício registrado já marcava o treino inteiro como concluído.
   const heroFinishedToday =
     !session &&
     !isCheckedInToday &&
     !!heroPlan &&
-    (todayDoneCount > 0 || !!heroPlan?.completedToday);
+    (!!heroPlan?.completedToday || (heroPlan.count > 0 && todayDoneCount >= heroPlan.count));
   // Semana de calendário (segunda a domingo), igual à meta do plano. Antes
   // eram os últimos 7 dias: na quarta mostrava "3/3 esta semana" contando
   // treinos da semana passada.
