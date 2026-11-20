@@ -124,9 +124,9 @@ export function AppSetupBar() {
   return (
     <>
       <div className="fixed inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-40 px-3 md:mx-auto md:max-w-md">
-        <div className="gf-rise flex items-center gap-3 rounded-2xl border border-brand/40 bg-card/95 p-3 shadow-lg shadow-black/30 backdrop-blur">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-foreground">
-            <Icon className="h-5 w-5" />
+        <div className="gf-rise flex items-center gap-2.5 rounded-2xl border border-brand/40 bg-card/95 px-2.5 py-2 shadow-lg shadow-black/30 backdrop-blur">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-foreground">
+            <Icon className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-black text-foreground">{c.title}</p>
@@ -136,7 +136,7 @@ export function AppSetupBar() {
             type="button"
             onClick={() => void act()}
             disabled={push.enabling}
-            className="tactile shrink-0 rounded-xl bg-brand px-3.5 py-2 text-[12px] font-black text-brand-foreground disabled:opacity-60"
+            className="tactile shrink-0 rounded-xl bg-brand px-3 py-1.5 text-[12px] font-black text-brand-foreground disabled:opacity-60"
           >
             {push.enabling && step === "push" ? "Ativando…" : c.cta}
           </button>

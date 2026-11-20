@@ -733,14 +733,14 @@ export default function HomePage() {
                 </Link>
               )}
             </div>
-          ) : (
+          ) : !(demo || (heroPlan && heroPlan.count > 0 && heroPlan.state.status !== "rest")) ? (
           <Link href="/checkin" className="tactile block rounded-2xl bg-[#F4711E] px-5 py-4 text-center shadow-[0_0_20px_rgba(244,113,30,0.4)] animate-glow" style={{ willChange: "transform" }}>
             <m.span whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex items-center justify-center gap-2.5 text-[15px] font-black text-black">
               <ScanLine className="h-5 w-5" />
               Cheguei na academia, fazer check-in
             </m.span>
           </Link>
-          )}
+          ) : null}
         </m.div>
       <m.div variants={container} initial="hidden" animate="show" className="space-y-6 px-4">
         {/* LINHA 1, Logo + relógio/data; LINHA 2, saudação */}
@@ -842,7 +842,7 @@ export default function HomePage() {
             }
             minutesLabel={session ? "min de treino" : "min aprox."}
             sessionsWeek={sessionsWeek}
-            href={session ? "/treino?resume=1" : heroFinishedToday ? "/progresso" : heroPlan?.state.status === "rest" ? "/treino" : "/treino?start=1"}
+            href={session ? "/treino?resume=1" : heroFinishedToday ? "/progresso" : heroPlan?.state.status === "rest" ? "/treino" : !isCheckedInToday ? "/checkin" : "/treino?start=1"}
             ctaLabel={
               session
                 ? "Continuar treino"
@@ -851,7 +851,9 @@ export default function HomePage() {
                   : heroPlan?.state.status === "rest"
                     ? "Ver opções de descanso"
                     : heroPlan
-                      ? `Iniciar treino ${heroPlan.slot}`.trim()
+                      ? !isCheckedInToday
+                        ? `Check-in e começar ${heroPlan.slot}`.trim()
+                        : `Iniciar treino ${heroPlan.slot}`.trim()
                       : undefined
             }
             sessionLabel={
