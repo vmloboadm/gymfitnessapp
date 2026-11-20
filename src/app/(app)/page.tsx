@@ -40,6 +40,7 @@ import { HeroWorkout } from "~/components/dashboard/HeroWorkout";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
 import { FirstWorkoutGuide } from "~/components/student/FirstWorkoutGuide";
+import { fetchHomeSnapshot } from "~/lib/home-snapshot";
 import { titleFor } from "~/components/dashboard/TitlePoints";
 import PartnerCarousel from "~/components/dashboard/PartnerCarousel";
 import {
@@ -221,16 +222,9 @@ export default function HomePage() {
   } | null>(
     async () => {
       if (demo || !user?.id || !profile?.gym_id) return { data: null, error: null };
-      const { data: rows, error } = await supabaseBrowser()
-        .from("checkins")
-        .select("id, checked_at, type")
-        .eq("student_id", user.id)
-        .eq("gym_id", profile.gym_id)
-        .gte("checked_at", localDayStartDaysAgoISO(0))
-        .order("checked_at", { ascending: false })
-        .limit(5);
-      if (error) return { data: null, error: null };
-      const last = (rows ?? [])[0] as { id: string; checked_at: string; type: string } | undefined;
+      // Vem do snapshot da Home (uma ida ao banco para tudo)
+      const snap = await fetchHomeSnapshot(localDayStartDaysAgoISO(0));
+      const last = snap.checkin_today;
       return {
         data: last?.type === "entrada" ? { id: last.id, checked_at: last.checked_at } : null,
         error: null,
@@ -287,32 +281,15 @@ export default function HomePage() {
           error: null,
         };
       }
-      const supabase = supabaseBrowser();
       if (!user) return { data: null, error: { message: "Sessão indisponível" } };
-      const gymId = profile?.gym_id ?? "";
-      // Mesmo placar da aba Ranking (acumulado, aba padrão): pontos e posição
-      // batem com o "ver classificação". Antes a consulta usava a data com
-      // hora e sem período, voltava vazia e a posição ficava sempre "-".
-      const [lRes, rRes] = await Promise.all([
-        supabase.from("workout_logs").select("date, exercise_id, weight_kg, reps").eq("student_id", user.id).order("date", { ascending: false }).limit(60),
-        gymId
-          ? supabase
-              .from("leaderboard")
-              .select("student_id, points")
-              .eq("gym_id", gymId)
-              .eq("period", "all")
-              .eq("week_start", "2000-01-01")
-              .eq("rank_type", "load")
-              .order("points", { ascending: false })
-              .limit(200)
-          : Promise.resolve({ data: [], error: null }),
-      ]);
-      const board = ((rRes.data ?? []) as Array<{ student_id: string; points: number }>).filter((r) => r.points > 0);
+      // Mesmo placar da aba Ranking (acumulado, aba padrão). Vem do snapshot da Home.
+      const snap = await fetchHomeSnapshot(localDayStartDaysAgoISO(0));
+      const board = (snap.board ?? []).filter((r) => r.points > 0);
       const mineRow = board.find((r) => r.student_id === user.id);
       const pts = mineRow?.points ?? 0;
       const ranked = pinBelowPodium(board, (r) => r.student_id);
       const pos = ranked.findIndex((r) => r.student_id === user.id);
-      const rows = (lRes.data ?? []) as WorkoutLogs[];
+      const rows = (snap.logs ?? []) as unknown as WorkoutLogs[];
       return {
         data: { logs: rows, points: pts, rank: pos >= 0 ? pos + 1 : 0 },
         error: null,
@@ -361,7 +338,7 @@ export default function HomePage() {
       const p = plans[0];
       const dias = p?.plan?.dias ?? [];
       if (!p || dias.length === 0) return { data: null, error: null };
-      const [checksRes, streakRes, completedRes] = await Promise.all([
+      const [checksRes, snap] = await Promise.all([
         p.programId
           ? supabaseBrowser()
               .from("slot_checks")
@@ -371,22 +348,11 @@ export default function HomePage() {
               .order("checked_at", { ascending: false })
               .limit(20)
           : Promise.resolve({ data: [] as Array<{ slot: string; checked_at: string }> }),
-        supabaseBrowser().rpc("day_streak" as never, { p_student: user.id } as never),
-        supabaseBrowser()
-          .from("workout_sessions")
-          .select("id")
-          .eq("student_id", user.id)
-          .eq("status", "completed")
-          .gte("ended_at", localDayStartDaysAgoISO(0))
-          .limit(1)
-          .maybeSingle(),
+        fetchHomeSnapshot(localDayStartDaysAgoISO(0)),
       ]);
       const checks = checksRes.data;
-      // falha na chamada → null, para a home usar o cálculo de reserva (e não 0)
-      const streakErr = (streakRes as { error?: unknown }).error;
-      const serverStreak: number | null = streakErr
-        ? null
-        : Number((streakRes as { data?: unknown }).data ?? 0) || 0;
+      // sem sequência no snapshot → null, para a home usar o cálculo de reserva (e não 0)
+      const serverStreak: number | null = snap.streak == null ? null : Number(snap.streak) || 0;
       const state = resolveTrainingDay({
         plan: p,
         today: new Date(),
@@ -394,7 +360,7 @@ export default function HomePage() {
         slotChecks: (checks ?? []) as Array<{ slot: string; checked_at: string }>,
         fallbackDays: profile?.available_days ?? undefined,
       });
-      const completedToday = !!completedRes.data || state.completedToday;
+      const completedToday = snap.completed_today || state.completedToday;
       const day = state.day as { nome: string; foco: string; slot?: string; exercicios: unknown[] } | null;
       if (!day) {
         return {
@@ -484,13 +450,8 @@ export default function HomePage() {
   const { data: motivation, refetch: refetchMotivation } = useAsyncQuery<{ phrase: string | null }>(
     async () => {
       if (demo || !profile?.gym_id) return { data: { phrase: null }, error: null };
-      const { data, error } = await supabaseBrowser()
-        .from("gym_motivation")
-        .select("phrase")
-        .eq("gym_id", profile.gym_id)
-        .maybeSingle();
-      if (error) return { data: null, error };
-      return { data: (data as { phrase: string | null } | null) ?? { phrase: null }, error: null };
+      const snap = await fetchHomeSnapshot(localDayStartDaysAgoISO(0));
+      return { data: { phrase: snap.motivation ?? null }, error: null };
     },
     [profile?.gym_id, demo],
     { silentRefetch: true }
