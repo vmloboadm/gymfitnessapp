@@ -890,21 +890,6 @@ export default function HomePage() {
           <ClearanceBanner />
         </m.div>
 
-        {/* Campanhas: desafio (ranking), Black Friday e ofertas com prazo */}
-        <m.div variants={item} className="px-4 pb-2 empty:hidden">
-          <CampaignCards />
-        </m.div>
-
-        {/* Indique um amigo: desconto na mensalidade por amigo matriculado */}
-        <m.div variants={item} className="px-4 pb-2 empty:hidden">
-          <IndicaCard />
-        </m.div>
-
-        {/* Personal em destaque: contratar acompanhamento (vitrine do personal) */}
-        <m.div variants={item} className="px-4 pb-2">
-          <CoachSpotlight />
-        </m.div>
-
         {/* COCKPIT, Anel da meta + Streak + Liga */}
         <m.section
           variants={item}
@@ -1018,9 +1003,6 @@ export default function HomePage() {
         {/* VER MAIS, densidade controlada (#9): o essencial fica visível,
             o resto (ritmo detalhado, comunidade, artigo, dica, parceiros)
             fica a um toque de distância sem obrigar a rolar tudo. */}
-        {/* Parceiros: sempre visíveis (cards de benefício da academia) */}
-        <PartnerCarousel />
-
         <m.div variants={item}>
           <button
             onClick={() => {
@@ -1043,6 +1025,16 @@ export default function HomePage() {
 
         {showMore ? (
           <>
+          <m.div variants={item} className="px-4 pb-2 empty:hidden">
+            <CampaignCards />
+          </m.div>
+          <m.div variants={item} className="px-4 pb-2 empty:hidden">
+            <IndicaCard />
+          </m.div>
+          <m.div variants={item} className="px-4 pb-2">
+            <CoachSpotlight />
+          </m.div>
+          <PartnerCarousel />
           <Link
             href="/conversas"
             className="tactile pm-surface flex items-center gap-3 !p-4"
