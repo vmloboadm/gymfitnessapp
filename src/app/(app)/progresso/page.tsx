@@ -14,7 +14,7 @@ const ProgressoCharts = dynamic(() => import("~/components/charts/ProgressoChart
 });
 const PesoLineChartD = dynamic(() => import("~/components/charts").then((m) => ({ default: m.PesoLineChart })), { ssr: false });
 import { useAuth } from "~/hooks/useAuth";
-import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { useCachedQuery } from "~/hooks/useCachedQuery";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { getRecentSessions, type StudentSession } from "~/lib/supabase/workout-session";
 import { requestEvolutionReport, getLastReportRequest, reportCooldownLeft } from "~/lib/gym-api";
@@ -51,7 +51,7 @@ export default function ProgressoPage() {
   const { user, profile } = useAuth();
   const demo = isDemoMode();
 
-  const { data, loading, error, refetch } = useAsyncQuery<{
+  const { data, loading, error, refetch } = useCachedQuery<{
     logs: WorkoutLogs[];
     prevLogs: WorkoutLogs[];
     checkins: Array<{ checked_at: string }>;
@@ -134,7 +134,8 @@ export default function ProgressoPage() {
         error: null,
       };
     },
-    [user?.id, profile?.id, demo]
+    [user?.id, profile?.id, demo],
+    { key: "progresso" }
   );
 
   const chart = useMemo(() => {
