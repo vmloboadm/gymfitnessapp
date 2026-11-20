@@ -55,6 +55,23 @@ const REACTIONS = [
  * Feed social do aluno (blueprint feed): posts do gym + curtir + comentar.
  * No modo demo as interações funcionam localmente (curtir/comentar/publicar).
  */
+const PERGUNTAS = [
+  "Qual foi seu treino mais pesado essa semana? 💪",
+  "Qual exercício você mais odeia e por quê? 😅",
+  "Quem você vai chamar pra treinar com você amanhã? 🤝",
+  "Qual é a sua meta para os próximos 3 meses? 🎯",
+  "Qual foi sua vitória da semana na academia? 🏆",
+];
+
+/** Muda a cada semana do ano, igual para todo mundo. */
+function perguntaDaSemana(): string {
+  const d = new Date();
+  const inicio = Date.UTC(d.getUTCFullYear(), 0, 1);
+  const semana = Math.floor((Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - inicio) / (7 * 86_400_000));
+  return PERGUNTAS[semana % PERGUNTAS.length]!;
+}
+const PERGUNTA_DA_SEMANA = perguntaDaSemana();
+
 export default function FeedPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const [body, setBody] = useState("");
@@ -424,6 +441,18 @@ export default function FeedPage() {
     <>
       <TopBar title="Feed" subtitle="Comunidade do gym" />
       <div className="space-y-6 p-4">
+        {/* Motivo para comentar: pergunta da semana. O botão já preenche a publicação. */}
+        <div className="gf-rise gf-card !py-4">
+          <p className="text-[10px] font-black uppercase tracking-widest text-brand">Pergunta da semana</p>
+          <p className="mt-1.5 text-[15px] font-semibold leading-snug text-foreground">{PERGUNTA_DA_SEMANA}</p>
+          <button
+            type="button"
+            onClick={() => setBody(`${PERGUNTA_DA_SEMANA} `)}
+            className="tactile mt-3 rounded-full bg-brand px-4 py-2 text-[12px] font-black text-brand-foreground"
+          >
+            Responder na publicação
+          </button>
+        </div>
         <div className="gf-rise gf-card gf-glass !py-4">
           <div className="mb-2 flex items-center gap-2">
             <Avatar className="h-8 w-8">
