@@ -206,6 +206,7 @@ export default function HomePage() {
   const router = useRouter();
   const demo = isDemoMode();
   const [showMore, setShowMore] = useState(false);
+  const [ritmoAberto, setRitmoAberto] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [showTopBtn, setShowTopBtn] = useState(false);
   useEffect(() => {
@@ -890,6 +891,24 @@ export default function HomePage() {
           <ClearanceBanner />
         </m.div>
 
+        {/* RITMO: uma linha sempre visível; anel, sequência e liga abrem ao tocar */}
+        <m.div variants={item} className="px-4 pb-2">
+          <button
+            type="button"
+            onClick={() => setRitmoAberto((v) => !v)}
+            aria-expanded={ritmoAberto}
+            className="tactile flex w-full items-center justify-between gap-3 rounded-[16px] border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-left"
+          >
+            <span className="text-[13px] font-semibold text-foreground">
+              Ritmo {sessionsWeek}/{weeklyGoal}
+              {streak > 0 ? <span className="text-[#FF9A5C]"> · {streak} seguidos</span> : null}
+            </span>
+            <ChevronDown className={`h-4 w-4 shrink-0 text-[#FF9A5C] transition-transform ${ritmoAberto ? "rotate-180" : ""}`} />
+          </button>
+        </m.div>
+
+        {ritmoAberto ? (
+          <>
         {/* COCKPIT, Anel da meta + Streak + Liga */}
         <m.section
           variants={item}
@@ -1181,6 +1200,9 @@ export default function HomePage() {
             </span>
           </div>
         </m.section>
+
+          </>
+        ) : null}
 
         {/* HOJE NA ACADEMIA — só conteúdo com fonte real (feed da comunidade, dica, personais) */}
         <m.section variants={item}>
