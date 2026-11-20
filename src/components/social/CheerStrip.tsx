@@ -31,19 +31,19 @@ function Bubble({ src, name, size, onClick, delay = 0 }: { src: string | null; n
       <m.button
         type="button"
         onClick={onClick}
-        whileTap={{ scale: 0.9, rotateX: 14 }}
-        whileHover={{ rotateX: -8, rotateY: 8 }}
-        className="relative h-full w-full rounded-full p-[3px] outline-none focus-visible:ring-2 focus-visible:ring-[#F4711E]"
+        whileTap={{ scale: 0.92, rotateX: 10 }}
+        whileHover={{ rotateX: -6, rotateY: 6 }}
+        className="relative h-full w-full rounded-full p-[2px] outline-none focus-visible:ring-2 focus-visible:ring-[#F4711E]"
         style={{
-          background: "conic-gradient(from 200deg, #FFB27A, #F4711E, #B8470B, #F4711E, #FFB27A)",
-          boxShadow: "0 12px 24px -6px rgba(244,113,30,0.45), inset 0 -6px 10px rgba(0,0,0,0.35)",
+          background: "conic-gradient(from 200deg, rgba(255,178,122,0.55), rgba(244,113,30,0.7), rgba(184,71,11,0.55), rgba(244,113,30,0.7), rgba(255,178,122,0.55))",
+          boxShadow: "0 6px 14px -6px rgba(244,113,30,0.35), inset 0 -3px 6px rgba(0,0,0,0.3)",
           transformStyle: "preserve-3d",
         }}
         aria-label={`Ver ${firstName(name)}`}
       >
         <span
-          className="pointer-events-none absolute inset-[3px] z-10 rounded-full"
-          style={{ background: "radial-gradient(circle at 32% 24%, rgba(255,255,255,0.55), transparent 42%)" }}
+          className="pointer-events-none absolute inset-[2px] z-10 rounded-full"
+          style={{ background: "radial-gradient(circle at 32% 24%, rgba(255,255,255,0.4), transparent 42%)" }}
           aria-hidden
         />
         <Avatar className="h-full w-full border border-black/40">
@@ -89,12 +89,12 @@ export function CheerStrip({ mates }: { mates: CheerMate[] }) {
 
   return (
     <section aria-label="Galera na academia" className="mb-5">
-      <p className="gf-section mb-3">Galera na academia</p>
-      <div className="-mx-1 flex snap-x gap-4 overflow-x-auto px-1 pb-3 pt-2" style={{ scrollbarWidth: "none" }}>
+      <p className="gf-section mb-2">Galera na academia</p>
+      <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2 pt-1" style={{ scrollbarWidth: "none" }}>
         {mates.map((mt, i) => (
           <div key={mt.student_id} className="flex snap-start flex-col items-center gap-1.5">
-            <Bubble src={mt.avatar_url} name={mt.name} size={66} delay={i * 0.25} onClick={() => setOpen(mt)} />
-            <span className="max-w-[70px] truncate text-[11px] font-semibold text-muted-foreground">
+            <Bubble src={mt.avatar_url} name={mt.name} size={46} delay={i * 0.15} onClick={() => setOpen(mt)} />
+            <span className="max-w-[56px] truncate text-[10px] font-medium text-muted-foreground/80">
               {sentTo.has(mt.student_id) ? "✓ " : ""}
               {firstName(mt.name)}
             </span>

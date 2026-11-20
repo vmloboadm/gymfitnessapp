@@ -431,7 +431,7 @@ export default function RankingPage() {
           <CheerStrip
             mates={data.rows
               .filter((r) => r.student_id !== user?.id && r.student)
-              .slice(0, 12)
+              .slice(0, 60)
               .map((r) => ({ student_id: r.student_id, name: r.student?.name ?? null, avatar_url: r.student?.avatar_url ?? null }))}
           />
         ) : null}
