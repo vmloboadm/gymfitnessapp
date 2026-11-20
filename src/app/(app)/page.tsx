@@ -325,8 +325,9 @@ export default function HomePage() {
   useEffect(() => {
     if (demo || !user?.id) return;
     let alive = true;
-    void completeStaleSessions(user.id).then(() => {
-      if (alive) {
+    void completeStaleSessions(user.id).then((closed) => {
+      // só recarrega se algum treino/check-in esquecido foi fechado agora
+      if (alive && closed > 0) {
         void refetchCheckin();
         void refetchLogs();
       }
@@ -469,12 +470,11 @@ export default function HomePage() {
     };
     window.addEventListener("gymfit-workout-finished", refresh);
     window.addEventListener("gymfit-checkin-updated", refresh);
-    window.addEventListener("focus", refresh);
+    // "focus" saiu: "visibilitychange" já cobre a volta ao app e antes disparava as 3 consultas duas vezes
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.removeEventListener("gymfit-workout-finished", refresh);
       window.removeEventListener("gymfit-checkin-updated", refresh);
-      window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [demo, refetchCheckin, refetchLogs, refetchHero]);

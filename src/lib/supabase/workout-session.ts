@@ -151,24 +151,25 @@ export type StudentSession = {
  * continuar mostrando "na academia agora" depois que o aluno já saiu.
  * Marca como auto para o app pedir o feedback do treino anterior.
  */
-export async function completeStaleSessions(studentId: string): Promise<void> {
+/** Devolve quantas sessões foram fechadas. 0 = nada mudou (a home não precisa recarregar). */
+export async function completeStaleSessions(studentId: string): Promise<number> {
   try {
     const sb = supabaseBrowser();
     // RPC fecha sessão E check-in em uma única operação, no servidor.
-    const { error } = await sb.rpc("auto_close_stale_workouts" as never, {
+    const { data, error } = await sb.rpc("auto_close_stale_workouts" as never, {
       p_student: studentId,
     } as never);
-    if (!error) return;
+    if (!error) return typeof data === "number" ? data : 0;
 
     // Fallback defensivo se a migration ainda não estiver no ambiente.
     const cutoff = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
-    const { data } = await sb
+    const { data: staleRows } = await sb
       .from("workout_sessions")
       .select("id, meta")
       .eq("student_id", studentId)
       .eq("status", "active")
       .lt("started_at", cutoff);
-    const rows = (data ?? []) as Array<{ id: string; meta: SessionMeta | null }>;
+    const rows = (staleRows ?? []) as Array<{ id: string; meta: SessionMeta | null }>;
     for (const r of rows) {
       await closeCheckinForSession(r.id).catch(() => {});
       await sb
@@ -180,8 +181,10 @@ export async function completeStaleSessions(studentId: string): Promise<void> {
         } as never)
         .eq("id", r.id);
     }
+    return rows.length;
   } catch {
     /* nunca bloqueia o treino */
+    return 0;
   }
 }
 
