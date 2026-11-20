@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { BottomNav } from "~/components/layout/BottomNav";
 import { LiveWorkoutBar } from "~/components/layout/LiveWorkoutBar";
 import { PhotoGate } from "~/components/account/PhotoGate";
@@ -23,6 +23,7 @@ export default function AppLayout({
 }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const { isOnline, pendingCount } = useOfflineQueue();
 
   // Guard client-side: em cache hits do CDN o middleware não roda
@@ -51,7 +52,7 @@ export default function AppLayout({
       <PhotoGate>
         <main>{children}</main>
         <LiveWorkoutBar />
-        <AppSetupBar />
+        {pathname === "/" ? <AppSetupBar /> : null}
         <BottomNav />
       </PhotoGate>
     </div>

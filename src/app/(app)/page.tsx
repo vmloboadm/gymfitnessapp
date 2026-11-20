@@ -648,7 +648,6 @@ export default function HomePage() {
             style={{ background: "radial-gradient(circle, rgba(56,120,255,0.3), transparent 70%)", animation: "float-orb 11s ease-in-out infinite reverse" }}
           />
         </div>
-        <PendingApprovalBanner />
         {/* PRIMEIRO TREINO GUIADO: só para quem ainda não registrou nenhum treino */}
         {!demo && !dataLoading && data && logs.length === 0 && !session && !heroFinishedToday && heroPlan && heroPlan.count > 0 ? (
           <FirstWorkoutGuide
@@ -763,8 +762,8 @@ export default function HomePage() {
               />
             </m.div>
             <div className="shrink-0 text-right">
-              <p className="pm-mono text-[12px] font-medium tracking-[0.08em] text-[#F4F6FB]">
-                <LiveClock />
+              <p className="pm-mono text-[12px] font-medium tracking-[0.08em] text-[#F4F6FB]" suppressHydrationWarning>
+                {dayNum} {monthShort}
               </p>
               <p className="pm-mono mt-0.5 text-[#7E8AA0]" suppressHydrationWarning>
                 {weekdayShort} · {dayNum} {monthShort}
@@ -876,12 +875,15 @@ export default function HomePage() {
                 : heroPlan && heroPlan.count > 0
                   ? undefined
                   : profile && !profile.approved_at
-                    ? "Falta a recepção confirmar seu cadastro. Chama no WhatsApp que liberamos."
+                    ? "Seu treino libera assim que a recepção confirmar seu cadastro."
                     : "Escolha um treino pronto na aba Treino e comece hoje, sem esperar."
             }
             ready={!session && !heroFinishedToday && !!heroPlan && heroPlan.count > 0}
           />
         </m.div>
+        <div className="px-4 pt-2">
+          <PendingApprovalBanner />
+        </div>
 
         {/* Restrição de saúde sem laudo aprovado: enviar laudo para liberar o treino */}
         <m.div variants={item} className="px-4 pb-2 empty:hidden">

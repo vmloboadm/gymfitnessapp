@@ -1,6 +1,6 @@
 "use client";
 
-import { UserCheck, Clock, MessageCircle } from "lucide-react";
+import { UserCheck, MessageCircle } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
 
 /**
@@ -19,30 +19,17 @@ export function PendingApprovalBanner() {
   if (profile.approved_at) return null;
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-3">
-      <div className="flex items-start gap-3 rounded-2xl border border-brand/40 bg-brand/[0.08] p-4">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/20 text-brand">
-          <UserCheck className="h-4.5 w-4.5" />
-        </span>
-        <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-[12px] font-black text-brand">
-            Falta a recepção confirmar seu cadastro
-            <Clock className="h-3.5 w-3.5" />
-          </p>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-            Assim que confirmar, você escolhe seu treino aqui no app e começa no
-            mesmo dia. Se já resolveu na recepção, chama a gente que liberamos.
-          </p>
-          <a
-            href={WHATSAPP}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-[11px] font-black text-black"
-          >
-            <MessageCircle className="h-3.5 w-3.5" /> Falar no WhatsApp
-          </a>
-        </div>
-      </div>
-    </div>
+    <a
+      href={WHATSAPP}
+      target="_blank"
+      rel="noreferrer"
+      className="mx-auto flex max-w-md items-center gap-2.5 rounded-xl border border-brand/25 bg-brand/[0.05] px-3 py-2.5"
+    >
+      <UserCheck className="h-4 w-4 shrink-0 text-brand" />
+      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-foreground">
+        Cadastro em confirmação na recepção
+      </span>
+      <MessageCircle className="h-3.5 w-3.5 shrink-0 text-brand" aria-label="Falar no WhatsApp" />
+    </a>
   );
 }
