@@ -39,6 +39,7 @@ import { PerformanceRing } from "~/components/dashboard/PerformanceRing";
 import { HeroWorkout } from "~/components/dashboard/HeroWorkout";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { PendingApprovalBanner } from "~/components/student/PendingApprovalBanner";
+import { FirstWorkoutGuide } from "~/components/student/FirstWorkoutGuide";
 import { titleFor } from "~/components/dashboard/TitlePoints";
 import PartnerCarousel from "~/components/dashboard/PartnerCarousel";
 import {
@@ -684,6 +685,15 @@ export default function HomePage() {
           />
         </div>
         <PendingApprovalBanner />
+        {/* PRIMEIRO TREINO GUIADO: só para quem ainda não registrou nenhum treino */}
+        {!demo && !dataLoading && data && logs.length === 0 && !session && !heroFinishedToday && heroPlan && heroPlan.count > 0 ? (
+          <FirstWorkoutGuide
+            firstName={(profile?.name ?? "").split(" ")[0] || "Atleta"}
+            checkedIn={isCheckedInToday}
+            workoutTitle={heroPlan.title}
+            exerciseCount={heroPlan.count}
+          />
+        ) : null}
         {/* CHECK-IN CONTEXTUAL: some após o check-in do dia; foco vai pro treino */}
         <m.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="px-4 pb-5">
           {session && !isCheckedInToday ? (
