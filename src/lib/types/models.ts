@@ -38,6 +38,8 @@ export type Profiles = {
   email: string;
   phone: string | null;
   avatar_url: string | null;
+  foto_publica?: boolean | null;
+  avatar_icone?: number | null;
   birth_date: string | null;
   goal: string | null;
   bio: string | null;

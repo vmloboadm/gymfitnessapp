@@ -25,6 +25,7 @@ import { normalizeBRPhone } from "~/lib/whatsapp";
 import { ensureUploadableImage } from "~/lib/image-upload";
 
 import { apiPath } from "~/lib/api-path";
+import { FotoPrivacidade } from "~/components/account/FotoPrivacidade";
 const OBJETIVOS: Array<{ id: NonNullable<ProfileEdits["objetivo"]>; label: string }> = [
   { id: "hipertrofia", label: "Hipertrofia" },
   { id: "emagrecimento", label: "Emagrecimento" },
@@ -167,6 +168,8 @@ export default function ConfiguracoesPage() {
     <>
       <TopBar title="Configurações" subtitle="Personalize sua conta" />
       <div className="mx-auto max-w-md space-y-5 p-4 pb-24">
+        <FotoPrivacidade />
+
         {/* PERFIL */}
         <section className="rounded-2xl border border-border bg-card/50 p-4">
           <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
