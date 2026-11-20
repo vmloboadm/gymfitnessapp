@@ -1,5 +1,6 @@
 "use client";
 
+import { GaleraOnboarding } from "~/components/onboarding/GaleraOnboarding";
 import { useEffect, useRef, useState } from "react";
 import { Camera, Check, Loader2, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -140,6 +141,7 @@ export function FinalStepForm({
 
   return (
     <div className="space-y-6">
+      <GaleraOnboarding gymId={profile?.gym_id} isDemo={isDemo} />
       {/* FOTO — pedida com destaque; pular é pequeno e discreto */}
       <section className="space-y-3 text-center">
         <div>

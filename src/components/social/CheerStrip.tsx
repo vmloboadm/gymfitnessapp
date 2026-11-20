@@ -20,7 +20,7 @@ function initials(name: string | null): string {
 }
 
 /** Bolha 3D: anel laranja em degradê, brilho no topo e sombra de profundidade. */
-function Bubble({ src, name, size, onClick, delay = 0 }: { src: string | null; name: string | null; size: number; onClick?: () => void; delay?: number }) {
+export function Bubble({ src, name, size, onClick, delay = 0 }: { src: string | null; name: string | null; size: number; onClick?: () => void; delay?: number }) {
   return (
     <m.div
       animate={{ y: [0, -4, 0] }}
