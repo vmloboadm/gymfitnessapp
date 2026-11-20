@@ -14,6 +14,7 @@ import { formatRelative } from "~/lib/utils/format";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
 import { isDemoMode } from "~/lib/demo-bridge";
+import { actionFor } from "~/lib/notif-action";
 
 type NotifItem = {
   id: string;
@@ -167,10 +168,11 @@ export default function NotificacoesPage() {
             {items.map((n, i) => {
               const isRead = !!n.read_at || !!demoReads[n.id];
               const KindIcon = n.kind && n.kind in KIND_ICON ? KIND_ICON[n.kind as keyof typeof KIND_ICON] : Bell;
+              const action = actionFor(n.title, linkFor(n));
               return (
                 <Link
                   key={n.id}
-                  href={linkFor(n)}
+                  href={action.href}
                   className={cn(
                     "gf-rise flex items-start gap-3 rounded-xl border bg-card/40 p-4 transition-colors hover:border-brand/40",
                     isRead ? "border-border" : "border-brand/40 bg-brand/5"
@@ -192,6 +194,9 @@ export default function NotificacoesPage() {
                     </div>
                     <p className="text-xs leading-relaxed text-muted-foreground">{n.body}</p>
                     <p className="text-[11px] text-muted-foreground">{formatRelative(n.created_at)}</p>
+                    <span className="mt-1.5 inline-flex items-center rounded-full bg-[#F4711E] px-3 py-1 text-[11px] font-black text-black">
+                      {action.label} →
+                    </span>
                   </div>
                   <ChevronRight className="mt-2 h-3.5 w-3.5 shrink-0 text-muted-foreground/50" aria-hidden />
                 </Link>
