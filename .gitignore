@@ -38,3 +38,10 @@ _backup_outro_agente/
 .env*
 imagens-reais/
 .whatsapp-drip.log
+
+# arquivos locais que não vão para o repositório público
+/_backup_outro_agente/
+/server.log
+/next-server.log
+/qrcodes/
+.whatsapp-drip.log
