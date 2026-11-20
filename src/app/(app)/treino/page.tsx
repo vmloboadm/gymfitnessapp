@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "~/hooks/useAuth";
-import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { useCachedQuery } from "~/hooks/useCachedQuery";
 import { useStudentWorkoutsRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import {
@@ -259,7 +259,7 @@ export default function TreinoHomePage() {
     setHasSavedProgress(!!readSessionProgress());
   }, [phase]);
 
-  const { data, loading, error, refetch } = useAsyncQuery<TreinoData>(
+  const { data, loading, error, refetch } = useCachedQuery<TreinoData>(
     async (): Promise<FetchResult<TreinoData>> => {
       if (demo) {
         const base = demoTreinoData() as TreinoData;
@@ -329,7 +329,7 @@ export default function TreinoHomePage() {
       };
     },
     [user?.id, profile?.id, demo],
-    { enabled: !authLoading && !!user }
+    { key: "treino", enabled: !authLoading && !!user, staleTime: 0 }
   );
 
   // Realtime: só refaz a query fora da sessão ativa. Enquanto o aluno está
@@ -376,7 +376,7 @@ export default function TreinoHomePage() {
 
   // Checks dos slots do plano ativo (hook no topo: nunca após early return)
   const activeProgramId = planActive[0]?.programId ?? null;
-  const { data: slotChecks, refetch: refetchSlotChecks } = useAsyncQuery<Array<{ slot: string; checked_at: string }>>(
+  const { data: slotChecks, refetch: refetchSlotChecks } = useCachedQuery<Array<{ slot: string; checked_at: string }>>(
     async () => {
       if (demo || !user || !profile?.gym_id || !activeProgramId) return { data: [], error: null };
       const { data: rows, error } = await supabaseBrowser()
@@ -390,7 +390,7 @@ export default function TreinoHomePage() {
       return { data: (rows ?? []) as Array<{ slot: string; checked_at: string }>, error: null };
     },
     [demo, user?.id, profile?.gym_id, activeProgramId],
-    { enabled: !loading && !!user }
+    { key: "slots", enabled: !loading && !!user, staleTime: 0 }
   );
 
   const programRef = useRef<HTMLDivElement | null>(null);
