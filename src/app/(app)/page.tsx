@@ -15,6 +15,7 @@ import { useAuth } from "~/hooks/useAuth";
 import { useNotifications } from "~/hooks/useNotifications";
 import { useOnlineCount } from "~/hooks/useOnlineCount";
 import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { useCachedQuery } from "~/hooks/useCachedQuery";
 import { useWorkoutLogsRealtime, useGymMotivationRealtime, useStudentWorkoutsRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { assetPath } from "~/lib/asset-path";
 import { supabaseBrowser } from "~/lib/supabase/client";
@@ -216,7 +217,7 @@ export default function HomePage() {
   const { session } = useWorkoutSession();
   // Check-in REAL do dia: a fonte é a tabela `checkins`, não a sessão local.
   // Antes, começar um treino sem check-in fazia a home dizer "Check-in feito".
-  const { data: checkinToday, refetch: refetchCheckin } = useAsyncQuery<{
+  const { data: checkinToday, refetch: refetchCheckin } = useCachedQuery<{
     id: string;
     checked_at: string;
   } | null>(
@@ -231,7 +232,7 @@ export default function HomePage() {
       };
     },
     [demo, user?.id, profile?.gym_id],
-    { enabled: !loading && !!user, silentRefetch: true }
+    { key: "checkin", enabled: !loading && !!user }
   );
   const isCheckedInToday = demo ? !!session : !!checkinToday;
   const startedAt = session?.startedAt ?? (checkinToday ? new Date(checkinToday.checked_at).getTime() : null);
@@ -262,7 +263,7 @@ export default function HomePage() {
 
 
 
-  const { data, loading: dataLoading, refetch: refetchLogs } = useAsyncQuery<{
+  const { data, loading: dataLoading, refetch: refetchLogs } = useCachedQuery<{
     logs: WorkoutLogs[];
     points: number;
     rank: number;
@@ -296,7 +297,7 @@ export default function HomePage() {
       };
     },
     [user?.id, profile?.id, demo],
-    { enabled: !loading && !!user, silentRefetch: true }
+    { key: "logs", enabled: !loading && !!user }
   );
 
   // Fecha treino/check-in esquecidos mesmo se o cron do banco atrasar.
@@ -331,7 +332,7 @@ export default function HomePage() {
     /** "Feito pela última vez em 22/10" do slot sugerido */
     lastDoneLabel?: string;
   };
-  const { data: heroPlan, refetch: refetchHero } = useAsyncQuery<HeroPlan | null>(
+  const { data: heroPlan, refetch: refetchHero } = useCachedQuery<HeroPlan | null>(
     async () => {
       if (demo || !user || !profile?.gym_id) return { data: null, error: null };
       const plans = await fetchMyAssignedPlans(user.id, profile.gym_id).catch(() => []);
@@ -414,8 +415,8 @@ export default function HomePage() {
         error: null,
       };
     },
-    [user?.id, profile?.gym_id, demo, data?.logs, profile?.available_days],
-    { enabled: !loading && !!user }
+    [user?.id, profile?.gym_id, demo, data?.logs?.length ?? 0, profile?.available_days],
+    { key: "hero", enabled: !loading && !!user }
   );
 
   // Ficha editada pelo personal: atualiza o Hero sem esperar reload.
@@ -447,14 +448,14 @@ export default function HomePage() {
   }, [demo, refetchCheckin, refetchLogs, refetchHero]);
 
   // Frase motivacional editada pelo staff, atualiza ao vivo para todos
-  const { data: motivation, refetch: refetchMotivation } = useAsyncQuery<{ phrase: string | null }>(
+  const { data: motivation, refetch: refetchMotivation } = useCachedQuery<{ phrase: string | null }>(
     async () => {
       if (demo || !profile?.gym_id) return { data: { phrase: null }, error: null };
       const snap = await fetchHomeSnapshot(localDayStartDaysAgoISO(0));
       return { data: { phrase: snap.motivation ?? null }, error: null };
     },
     [profile?.gym_id, demo],
-    { silentRefetch: true }
+    { key: "motivation" }
   );
   useGymMotivationRealtime(profile?.gym_id, refetchMotivation);
   const motivationPhrase = motivation?.phrase?.trim() || "bora somar com a galera!";
