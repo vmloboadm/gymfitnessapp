@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { m } from "framer-motion";
 import { useAuth } from "~/hooks/useAuth";
-import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { useCachedQuery } from "~/hooks/useCachedQuery";
 import { useLeaderboardRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { CampaignCards } from "~/components/student/CampaignCards";
@@ -101,7 +101,7 @@ export default function RankingPage() {
     }
   };
 
-  const { data, loading, error, refetch } = useAsyncQuery<{
+  const { data, loading, error, refetch } = useCachedQuery<{
     rows: RankRow[];
     mine: RankRow | null;
     streakById: Record<string, number>;
@@ -231,7 +231,7 @@ export default function RankingPage() {
       };
     },
     [user?.id, profile?.id, demo, period],
-    { enabled: !authLoading && !!user }
+    { key: "ranking", enabled: !authLoading && !!user }
   );
 
   useLeaderboardRealtime(profile?.gym_id, refetch);

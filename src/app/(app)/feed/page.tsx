@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, ThumbsUp, Flame, Hand, MessageSquare, Send, GraduationCap, Pin, ChevronDown } from "lucide-react";
 import { useAuth } from "~/hooks/useAuth";
-import { useAsyncQuery } from "~/hooks/useAsyncQuery";
+import { useCachedQuery } from "~/hooks/useCachedQuery";
 import { useFeedRealtime } from "~/hooks/useRealtimeSubscriptions";
 import { supabaseBrowser } from "~/lib/supabase/client";
 import { TopBar } from "~/components/layout/TopBar";
@@ -113,7 +113,7 @@ export default function FeedPage() {
     };
   }, [demo]);
 
-  const { data, loading, error, refetch } = useAsyncQuery<PostRow[]>(
+  const { data, loading, error, refetch } = useCachedQuery<PostRow[]>(
     async () => {
       if (demo) {
         const { posts, likes, comments } = demoFeedData();
@@ -219,7 +219,7 @@ export default function FeedPage() {
       };
     },
     [user?.id, profile?.id, demo],
-    { enabled: !authLoading && !!user }
+    { key: "feed", enabled: !authLoading && !!user, staleTime: 30_000 }
   );
 
   // Realtime: refetch feed when posts, likes, or comments change
