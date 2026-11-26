@@ -185,8 +185,11 @@ for (const [idx, m] of rows.entries()) {
     continue;
   }
 
-  // Retomada de treino só para quem ainda tem ficha ativa.
-  if (m.campaign.startsWith("volta-treino") && (!c.approved || c.medical || !c.has_plan)) {
+  // Retomada/constância só para quem ainda tem ficha ativa.
+  if (
+    (m.campaign.startsWith("volta-treino") || m.campaign.startsWith("constancia")) &&
+    (!c.approved || c.medical || !c.has_plan)
+  ) {
     await db.query("update whatsapp_outbox set status = 'skipped', error = $2 where id = $1", [
       m.id,
       !c.has_plan ? "sem ficha ativa" : "cadastro aguardando aprovação",

@@ -230,3 +230,30 @@ test("volta ao treino: só quem tem ficha há 5+ dias e não veio", async () => 
     assert.match(rows[0].body, /https:\/\/gymfitnesscampos\.com\.br\/app\/treino/);
   });
 });
+
+test("constância semanal: só quem treinou, com link do ranking", async () => {
+  await withTx(async (q, h) => {
+    const gym = await h.gym();
+    const ativo = await h.student(gym, "Ana Ativa");
+    const parado = await h.student(gym, "Bia Parada");
+    for (const [i, id] of [ativo, parado].entries()) {
+      await q("update profiles set phone = $2, whatsapp_consent = true where id = $1", [id, `2299700${i}00`]);
+      await h.plan(gym, id, ["Seg"]);
+    }
+    await q(
+      "insert into checkins (gym_id, student_id, checked_at) values ($1, $2, now() - interval '1 day'), ($1, $2, now() - interval '2 days')",
+      [gym, ativo]
+    );
+
+    const [r] = await q<{ n: number }>("select public.enqueue_constancia_semanal($1, now()) n", [gym]);
+    assert.equal(Number(r.n), 1);
+    const rows = await q<{ student_id: string; campaign: string; body: string }>(
+      "select student_id, campaign, body from whatsapp_outbox where campaign like 'constancia:%'"
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].student_id, ativo);
+    assert.match(rows[0].campaign, /^constancia:\d{4}-W\d{2}$/);
+    assert.match(rows[0].body, /https:\/\/gymfitnesscampos\.com\.br\/app\/ranking/);
+    assert.match(rows[0].body, /Ana/);
+  });
+});

@@ -2063,6 +2063,23 @@ $$;
 
 
 --
+-- Name: foto_para_quem_ve(uuid, text, boolean, smallint); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.foto_para_quem_ve(p_perfil uuid, p_url text, p_publica boolean, p_icone smallint) RETURNS text
+    LANGUAGE sql STABLE
+    SET search_path TO 'public'
+    AS $$
+  select case
+    when auth.uid() = p_perfil then p_url
+    when public.current_role() in ('trainer', 'manager', 'admin') then p_url
+    when coalesce(p_publica, true) then p_url
+    else 'icone:' || coalesce(p_icone, 1)::text
+  end;
+$$;
+
+
+--
 -- Name: generate_day_pass_code(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2286,9 +2303,13 @@ CREATE FUNCTION public.gym_roster(p_gym_id uuid) RETURNS TABLE(id uuid, name tex
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-  select p.id, p.name, p.avatar_url, p.role
+  select p.id,
+         p.name,
+         public.foto_para_quem_ve(p.id, p.avatar_url, p.foto_publica, p.avatar_icone),
+         p.role
   from public.profiles p
   where p.gym_id = p_gym_id
+    and p.is_demo = false
     and p.role in ('student', 'trainer', 'manager', 'admin')
     and (p.role <> 'student' or p.approved_at is not null)
   order by p.name;
@@ -2339,6 +2360,53 @@ begin
 
   return new;
 end;
+$$;
+
+
+--
+-- Name: home_snapshot(timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.home_snapshot(p_day_start timestamp with time zone) RETURNS jsonb
+    LANGUAGE sql STABLE
+    SET search_path TO 'public'
+    AS $$
+  with me as (
+    select id, gym_id, name from profiles where id = auth.uid()
+  )
+  select jsonb_build_object(
+    'checkin_today', (
+      select to_jsonb(c) from (
+        select id, checked_at, type from checkins
+         where student_id = auth.uid() and checked_at >= p_day_start
+         order by checked_at desc limit 1
+      ) c
+    ),
+    'logs', coalesce((
+      select jsonb_agg(l) from (
+        select date, exercise_id, weight_kg, reps from workout_logs
+         where student_id = auth.uid()
+         order by date desc limit 60
+      ) l
+    ), '[]'::jsonb),
+    'board', coalesce((
+      select jsonb_agg(b) from (
+        select student_id, points from leaderboard
+         where gym_id = (select gym_id from me)
+           and period = 'all' and week_start = '2000-01-01' and rank_type = 'load'
+           and points > 0
+         order by points desc limit 200
+      ) b
+    ), '[]'::jsonb),
+    'completed_today', exists (
+      select 1 from workout_sessions
+       where student_id = auth.uid() and status = 'completed' and ended_at >= p_day_start
+    ),
+    'streak', public.day_streak(auth.uid()),
+    'motivation', (
+      select phrase from gym_motivation where gym_id = (select gym_id from me)
+    )
+  );
 $$;
 
 
@@ -2449,6 +2517,28 @@ begin
   delete from public.challenge_participants
   where challenge_id = p_challenge and student_id = v_uid;
   return jsonb_build_object('ok', true);
+end;
+$$;
+
+
+--
+-- Name: limpar_contas_demo(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.limpar_contas_demo() RETURNS integer
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'auth'
+    AS $$
+declare
+  n integer;
+begin
+  delete from auth.users
+   where id in (
+     select id from public.profiles
+      where is_demo = true and created_at < now() - interval '3 hours'
+   );
+  get diagnostics n = row_count;
+  return n;
 end;
 $$;
 
@@ -2611,6 +2701,61 @@ begin
     return '55' || d;
   end if;
   return null;
+end;
+$$;
+
+
+--
+-- Name: notif_texto_engajamento(text, text, text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notif_texto_engajamento(p_title text, p_body text, p_primeiro text, p_role text) RETURNS TABLE(keep_it boolean, texto text)
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+declare
+  nome text := coalesce(nullif(trim(p_primeiro), ''), 'Atleta');
+  v_txt text;
+begin
+  -- Gestor e personal: só o que pede ação. O resto some (migration 090).
+  if p_role in ('manager', 'trainer', 'admin') then
+    if p_title ~ '^(Aluno novo na academia|Treino concluído|Ajustes no editor)' then
+      return query select false, p_body;
+      return;
+    end if;
+    return query select true, p_body;
+    return;
+  end if;
+
+  -- Aluno: emoji no início, nome logo depois, cobrança ou elogio.
+  if p_title like 'Novo treino liberado%' then
+    v_txt := '🏋️ ' || nome || ', seu treino novo já está liberado. Entra hoje e começa.';
+  elsif p_title like 'Novo treino disponível%' then
+    v_txt := '🏋️ ' || nome || ', treino novo na área. Não deixa pra depois.';
+  elsif p_title = 'Cadastro aprovado' then
+    v_txt := '🟠 ' || nome || ', você está aprovado. Bem-vindo. Agora o difícil é a frequência: começa hoje.';
+  elsif p_title like 'Conquista liberada%' or p_title like '2 conquistas liberadas%' then
+    v_txt := '🏆 ' || nome || ', conquista desbloqueada. Essa é sua. Agora continua no ritmo.';
+  elsif p_title like 'Você ganhou pontos!%' then
+    v_txt := '⚡ ' || nome || ', ' || coalesce(p_body, '') || ' Quem para perde posição.';
+  elsif p_title like 'Novo recorde%' then
+    v_txt := '🚀 ' || nome || ', novo recorde. Isso é progresso de verdade. Não para aqui.';
+  elsif p_title like 'Meta da semana%' then
+    v_txt := '🎯 ' || nome || ', meta da semana batida. Não relaxa: a próxima sobe a régua.';
+  elsif p_title like 'Sequência%' then
+    v_txt := '🔥 ' || nome || ', sequência firme. Não quebra agora.';
+  elsif p_title like 'Curtiram sua publicação%' then
+    v_txt := '❤️ ' || nome || ', alguém curtiu seu post. Posta mais: a galera está olhando.';
+  elsif p_title like 'Força no desafio%' then
+    v_txt := '💪 ' || nome || ', seu grupo está contando com você. Aparece hoje.';
+  elsif p_title like 'Você está no Desafio%' then
+    v_txt := '💪 ' || nome || ', você entrou no desafio. Agora é cumprir.';
+  elsif p_title like 'Seu treino foi registrado%' then
+    v_txt := '✅ ' || nome || ', treino registrado. Bom. Amanhã tem mais.';
+  else
+    v_txt := '🟠 ' || nome || ', ' || coalesce(p_body, '');
+  end if;
+
+  return query select true, v_txt;
 end;
 $$;
 
@@ -3701,6 +3846,76 @@ $$;
 
 
 --
+-- Name: send_cheer(uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.send_cheer(p_to uuid, p_emoji text DEFAULT '💪'::text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  me record;
+  alvo record;
+  v_emoji text := coalesce(nullif(p_emoji, ''), '💪');
+  v_inserted int;
+begin
+  if auth.uid() is null then
+    return jsonb_build_object('ok', false, 'motivo', 'sem_sessao');
+  end if;
+  if p_to = auth.uid() then
+    return jsonb_build_object('ok', false, 'motivo', 'proprio_aluno');
+  end if;
+  if v_emoji not in ('💪', '🔥', '👊', '🙌', '👏') then
+    return jsonb_build_object('ok', false, 'motivo', 'emoji_invalido');
+  end if;
+
+  select id, gym_id, split_part(coalesce(name, ''), ' ', 1) as primeiro
+    into me from profiles where id = auth.uid() and role = 'student' and status = 'active';
+  select id, gym_id into alvo from profiles where id = p_to and role = 'student' and status = 'active';
+  if me.id is null or alvo.id is null or me.gym_id is distinct from alvo.gym_id then
+    return jsonb_build_object('ok', false, 'motivo', 'fora_da_academia');
+  end if;
+
+  insert into student_cheers (from_id, to_id, emoji)
+  values (me.id, alvo.id, v_emoji)
+  on conflict (from_id, to_id, day) do nothing;
+  get diagnostics v_inserted = row_count;
+  if v_inserted = 0 then
+    return jsonb_build_object('ok', false, 'motivo', 'ja_enviou_hoje');
+  end if;
+
+  insert into notifications (gym_id, user_id, channel, title, body)
+  values (alvo.gym_id, alvo.id, 'in_app', 'Recebeu força',
+          coalesce(nullif(me.primeiro, ''), 'Um colega') || ' mandou ' || v_emoji || ' pra você. Retribui hoje.');
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+
+--
+-- Name: set_foto_privacidade(boolean, smallint); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.set_foto_privacidade(p_publica boolean, p_icone smallint DEFAULT NULL::smallint) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if auth.uid() is null then
+    return jsonb_build_object('ok', false, 'motivo', 'sem_sessao');
+  end if;
+  update public.profiles
+     set foto_publica = coalesce(p_publica, true),
+         avatar_icone = case when coalesce(p_publica, true) then null else coalesce(p_icone, 1) end,
+         updated_at = now()
+   where id = auth.uid();
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+
+--
 -- Name: staff_renew_matricula(uuid, integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -4192,6 +4407,36 @@ CREATE FUNCTION public.treino_aplicado_message(p_first text, p_variant integer) 
       'https://gymfitnesscampos.com.br/app/treino' || chr(10) || chr(10) ||
       'Bora começar essa semana? 💪'
   end;
+$$;
+
+
+--
+-- Name: trg_notif_engajamento(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_notif_engajamento() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  r record;
+  v record;
+begin
+  select p.role, split_part(coalesce(p.name, ''), ' ', 1) as primeiro
+    into r
+    from profiles p
+   where p.id = new.user_id;
+
+  select * into v
+    from public.notif_texto_engajamento(new.title, new.body, r.primeiro, r.role);
+
+  if not v.keep_it then
+    return null; -- descarta o aviso antes de gravar (não vai para sininho nem push)
+  end if;
+
+  new.body := v.texto;
+  return new;
+end;
 $$;
 
 
@@ -5021,6 +5266,10 @@ CREATE TABLE public.profiles (
     vencimento date,
     approved_at timestamp with time zone,
     referral_code text,
+    foto_publica boolean DEFAULT true NOT NULL,
+    avatar_icone smallint,
+    is_demo boolean DEFAULT false NOT NULL,
+    CONSTRAINT profiles_avatar_icone_check CHECK (((avatar_icone >= 1) AND (avatar_icone <= 3))),
     CONSTRAINT profiles_plan_type_check CHECK ((plan_type = ANY (ARRAY['Gymfitness'::text, 'Gympass'::text, 'TotalPass'::text]))),
     CONSTRAINT profiles_role_check CHECK ((role = ANY (ARRAY['student'::text, 'trainer'::text, 'manager'::text, 'admin'::text]))),
     CONSTRAINT profiles_status_check CHECK ((status = ANY (ARRAY['active'::text, 'blocked'::text, 'pending_clearance'::text])))
@@ -5223,6 +5472,20 @@ CREATE TABLE public.student_achievements (
     student_id uuid NOT NULL,
     achievement_id uuid NOT NULL,
     earned_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: student_cheers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.student_cheers (
+    from_id uuid NOT NULL,
+    to_id uuid NOT NULL,
+    emoji text NOT NULL,
+    day date DEFAULT ((now() AT TIME ZONE 'America/Sao_Paulo'::text))::date NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT student_cheers_check CHECK ((from_id <> to_id))
 );
 
 
@@ -5958,6 +6221,14 @@ ALTER TABLE ONLY public.student_achievements
 
 
 --
+-- Name: student_cheers student_cheers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_cheers
+    ADD CONSTRAINT student_cheers_pkey PRIMARY KEY (from_id, to_id, day);
+
+
+--
 -- Name: student_subscriptions student_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6423,6 +6694,13 @@ CREATE TRIGGER trg_dispatch_push AFTER INSERT ON public.notifications FOR EACH R
 --
 
 CREATE TRIGGER trg_equipment_updated BEFORE UPDATE ON public.equipment FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+
+--
+-- Name: notifications trg_notif_engajamento; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_notif_engajamento BEFORE INSERT ON public.notifications FOR EACH ROW EXECUTE FUNCTION public.trg_notif_engajamento();
 
 
 --
@@ -7239,6 +7517,22 @@ ALTER TABLE ONLY public.student_achievements
 
 ALTER TABLE ONLY public.student_achievements
     ADD CONSTRAINT student_achievements_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.profiles(id);
+
+
+--
+-- Name: student_cheers student_cheers_from_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_cheers
+    ADD CONSTRAINT student_cheers_from_id_fkey FOREIGN KEY (from_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: student_cheers student_cheers_to_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_cheers
+    ADD CONSTRAINT student_cheers_to_id_fkey FOREIGN KEY (to_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 
 --
@@ -8671,6 +8965,12 @@ CREATE POLICY strainers_select_self ON public.student_trainers FOR SELECT USING 
 --
 
 ALTER TABLE public.student_achievements ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: student_cheers; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.student_cheers ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: student_subscriptions student_subs_manage_manager; Type: POLICY; Schema: public; Owner: -
